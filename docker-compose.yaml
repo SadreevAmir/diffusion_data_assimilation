@@ -1,0 +1,26 @@
+version: "3.9"
+services:
+  experiments:
+    build: .
+    image: ${USER}/diffusion_data_assimilation
+    container_name: ${USER}_diffusion_data_assimilation
+    environment:
+      - HF_TOKEN=${HF_TOKEN}
+      - WANDB_SILENT=true 
+    ports:
+      - "9123:8888" 
+    volumes:
+      - "/mnt:/mnt"
+      - "./:/home/"
+    cpuset: 241-255
+    shm_size: '48gb'
+    deploy: 
+      resources:
+        reservations:
+          devices:
+          - driver: nvidia
+            device_ids: ['1']
+            capabilities: [gpu]
+        limits:
+          cpus: '6.0'
+          memory: 24G
