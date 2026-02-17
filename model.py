@@ -17,7 +17,7 @@ model.py
 import torch
 import torch.nn as nn
 from make_a_video_pytorch import SpaceTimeUnet
-from utils import make_normalized_xy_grid 
+from utils import make_normalized_xy_grid   # твой существующий модуль
 
 
 class VideoDiffusionModel(nn.Module):
@@ -40,7 +40,7 @@ class VideoDiffusionModel(nn.Module):
         Число входных кадров (T). Используется только для документации,
         реальный T определяется входным тензором.
     coord_embed_dim : int
-        Размерность, в которую проецируются координатыVi перед сложением.
+        Размерность, в которую проецируются координаты перед сложением.
         Должна совпадать с dim.
     """
 
@@ -50,6 +50,7 @@ class VideoDiffusionModel(nn.Module):
         dim: int = 64,
         dim_mults: tuple = (1, 2, 4, 8),
         temporal_compression: tuple = (False, False, False, False),
+        self_attns: tuple = (False, False, False, True),
         num_frames: int = 8,
         coord_embed_dim: int = None,   # по умолчанию = dim
     ):
@@ -94,9 +95,10 @@ class VideoDiffusionModel(nn.Module):
             channels=dim,
             dim_mult=dim_mults,
             temporal_compression=temporal_compression,
+            self_attns=self_attns,     # attention только на указанных уровнях
             condition_on_timestep=True,
             flash_attn=True,
-            attn_pos_bias=False,   # несовместимо с flash_attn — отключаем
+            attn_pos_bias=False,       # несовместимо с flash_attn — отключаем
         )
 
         # ── Выходная проекция (dim → in_channels) ──────────────────────────
@@ -152,3 +154,46 @@ class VideoDiffusionModel(nn.Module):
         pred = pred_flat.reshape(B, T, C, H, W).permute(0, 2, 1, 3, 4)  # (B, C, T, H, W)
 
         return pred
+
+    # ── Методы для поэтапного обучения ──────────────────────────────────────
+
+    def freeze_spatial(self):
+        """
+        Этап 2: замораживает всё кроме temporal attention.
+        Используй после предобучения на T=1 перед переходом на T>1.
+        """
+        # Замораживаем весь unet
+        for name, param in self.unet.named_parameters():
+            if 'temporal_attn' in name:
+                param.requires_grad = True   # temporal — обучаем
+            else:
+                param.requires_grad = False  # spatial, resnet — замораживаем
+
+        # Замораживаем проекции входа/выхода и координат
+        for param in self.input_proj.parameters():
+            param.requires_grad = False
+        for param in self.coord_proj.parameters():
+            param.requires_grad = False
+        for param in self.output_proj.parameters():
+            param.requires_grad = False
+
+        self.print_trainable()
+
+    def unfreeze_all(self):
+        """
+        Этап 3: размораживает все параметры для финального fine-tune.
+        Используй с уменьшенным lr (lr / 10).
+        """
+        for param in self.parameters():
+            param.requires_grad = True
+
+        self.print_trainable()
+
+    def print_trainable(self):
+        """Показывает сколько параметров обучается."""
+        trainable = sum(p.numel() for p in self.parameters() if p.requires_grad)
+        total = sum(p.numel() for p in self.parameters())
+        frozen = total - trainable
+        print(f"Обучаемых:   {trainable / 1e6:.1f}M")
+        print(f"Заморожено:  {frozen / 1e6:.1f}M")
+        print(f"Всего:       {total / 1e6:.1f}M")

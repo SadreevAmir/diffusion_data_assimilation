@@ -1,6 +1,8 @@
 import torch
 import os
 import torch.nn.functional as F
+import matplotlib.pyplot as plt
+from copy import deepcopy
 from dataclasses import dataclass, asdict
 from tqdm.auto import tqdm
 from accelerate import Accelerator
@@ -30,10 +32,13 @@ class TrainingConfig:
     hub_model_id: str = 'amirsadreev/diffusion_data_assimilation'
     save_best_model: bool = True
     base_output_dir: str = 'checkpoints'
-    in_channels: int = 2          
-    model_dim: int = 64 
+    in_channels: int = 2
+    model_dim: int = 64
     dim_mults: tuple = (1, 2, 4, 8)
-    num_frames: int = 1 
+    num_frames: int = 1
+    # Параметры сэмплинга
+    num_sample_timesteps: int = 100
+    num_samples: int = 4
 
 
 def build_model(config: TrainingConfig) -> VideoDiffusionModel:
@@ -49,10 +54,6 @@ def build_model(config: TrainingConfig) -> VideoDiffusionModel:
 
 
 class UNetTrainer:
-    """
-    Тренер — интерфейс полностью совпадает с оригиналом.
-    Единственное отличие: add_noise_func теперь работает с 5D тензором (B, C, T, H, W).
-    """
 
     def __init__(self, config, model, optimizer, data_loader_train, data_loader_val,
                  lr_scheduler, add_noise_func):
@@ -60,6 +61,7 @@ class UNetTrainer:
         self.config = config
         self.run_name = datetime.now().strftime("run_%Y%m%d_%H%M%S")
         self.output_dir = os.path.join(config.base_output_dir, self.run_name)
+        self.samples_dir = os.path.join(self.output_dir, "samples")
 
         self.model = model
         self.optimizer = optimizer
@@ -88,9 +90,9 @@ class UNetTrainer:
             clean = clean.unsqueeze(2)
 
         B = clean.shape[0]
-        timesteps = torch.rand(B, device=self.accelerator.device)   
+        timesteps = torch.rand(B, device=self.accelerator.device)
 
-        noisy, v_real = self.add_noise(clean, timesteps)          
+        noisy, v_real = self.add_noise(clean, timesteps)
         v_pred = self.model(noisy, timesteps)
 
         loss = F.mse_loss(v_pred, v_real)
@@ -108,6 +110,50 @@ class UNetTrainer:
 
         return total_loss / len(self.val_dataloader)
 
+    @torch.no_grad()
+    def _save_samples(self, epoch: int):
+        """EMA сэмплинг → PNG в samples/epoch_XXXX.png"""
+        os.makedirs(self.samples_dir, exist_ok=True)
+        device = self.accelerator.device
+
+        # Копия модели с EMA весами
+        unwrapped = self.accelerator.unwrap_model(self.model)
+        ema_model = deepcopy(unwrapped)
+        self.ema_model.copy_to(ema_model.parameters())
+        ema_model.eval()
+
+        sampler = Sampler(ema_model)
+        samples = sampler.sample_no_condition(
+            num_timesteps=self.config.num_sample_timesteps,
+            batch_size=self.config.num_samples,
+            num_frames=self.config.num_frames,
+            device=device,
+        )
+        # (N, 2, H, W) если T=1, иначе берём первый кадр
+        if samples.ndim == 5:
+            samples = samples[:, :, 0, :, :]
+        samples = samples.float().cpu().numpy()
+
+        N = samples.shape[0]
+        fig, axes = plt.subplots(N, 2, figsize=(8, N * 3), squeeze=False)
+        for i in range(N):
+            for ch, name in enumerate(['Concentration', 'Thickness']):
+                ax = axes[i][ch]
+                im = ax.imshow(samples[i, ch], cmap='Blues', origin='upper')
+                ax.set_title(f'Sample {i+1} — {name}', fontsize=9)
+                ax.axis('off')
+                plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+        plt.suptitle(f'Epoch {epoch} | EMA samples', fontsize=11)
+        plt.tight_layout()
+        plt.savefig(
+            os.path.join(self.samples_dir, f"epoch_{epoch:04d}.png"),
+            dpi=100, bbox_inches='tight',
+        )
+        plt.close(fig)
+
+        del ema_model
+        torch.cuda.empty_cache()
+
     def train_loop(self):
         logging_dir = os.path.join(self.output_dir, "logs")
         accelerator_project_config = ProjectConfiguration(
@@ -124,13 +170,14 @@ class UNetTrainer:
 
         if self.accelerator.is_main_process:
             os.makedirs(self.output_dir, exist_ok=True)
+            os.makedirs(self.samples_dir, exist_ok=True)
             if getattr(self.config, "push_to_hub", False):
                 create_repo(repo_id=self.config.hub_model_id, exist_ok=True)
 
         config_dict = {
             k: str(v) if isinstance(v, (tuple, list)) else v
             for k, v in asdict(self.config).items()
-            }
+        }
         self.accelerator.init_trackers(
             "diffusion_training",
             config=config_dict,
@@ -203,6 +250,12 @@ class UNetTrainer:
                     self.accelerator.print(
                         f"--- New best model saved! Loss: {val_loss:.6f}"
                     )
+
+                # EMA сэмплинг → PNG
+                try:
+                    self._save_samples(epoch)
+                except Exception as e:
+                    self.accelerator.print(f"Sampling error: {e}")
 
                 if self.config.push_to_hub:
                     try:
