@@ -9,7 +9,7 @@ sampler.py
 """
 
 import torch
-from utils import add_noise
+from utils import add_noise, get_device
 
 
 class Sampler:
@@ -18,7 +18,8 @@ class Sampler:
         self.noise_func = noise_func
 
     @torch.no_grad()
-    def sample_no_condition(self, num_timesteps, batch_size, num_frames=1, device='cuda'):
+    def sample_no_condition(self, num_timesteps, batch_size, num_frames=1, device=None):
+        device = device or get_device()
         """
         Unconditional sampling через flow matching.
 
@@ -100,8 +101,9 @@ class Sampler:
     @torch.no_grad()
     def sample_with_condition(
         self, y, mask, num_timesteps, guidance_scale=1.0,
-        device='cuda', batch_size=12, num_frames=1,
+        device=None, batch_size=12, num_frames=1,
     ):
+        device = device or get_device()
         timesteps = torch.linspace(1.0, 0.0, num_timesteps, device=device)
         dt = -1.0 / num_timesteps
 
@@ -121,8 +123,9 @@ class Sampler:
     @torch.no_grad()
     def correct_with_condition(
         self, background, y, mask, num_timesteps,
-        guidance_scale=1.0, device='cuda', batch_size=12, noise_val=0.5,
+        guidance_scale=1.0, device=None, batch_size=12, noise_val=0.5,
     ):
+        device = device or get_device()
         timesteps = torch.linspace(noise_val, 0.0, num_timesteps, device=device)
         dt = -noise_val / num_timesteps
 
@@ -144,8 +147,9 @@ class Sampler:
     @torch.no_grad()
     def concentration_to_thickness(
         self, y, mask, num_timesteps, guidance_scale=1.0,
-        device='cuda', batch_size=12,
+        device=None, batch_size=12,
     ):
+        device = device or get_device()
         timesteps = torch.linspace(1.0, 0.0, num_timesteps, device=device)
         dt = -1.0 / num_timesteps
 

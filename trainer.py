@@ -14,6 +14,7 @@ from datetime import datetime
 
 from model import VideoDiffusionModel
 from sampler import Sampler
+from utils import get_device
 
 torch.set_float32_matmul_precision('high')
 
@@ -152,7 +153,12 @@ class UNetTrainer:
         plt.close(fig)
 
         del ema_model
-        torch.cuda.empty_cache()
+        # Освобождаем кэш ускорителя (работает на CUDA и MPS)
+        device_type = str(self.accelerator.device.type)
+        if device_type == 'cuda':
+            torch.cuda.empty_cache()
+        elif device_type == 'mps':
+            torch.mps.empty_cache()
 
     def train_loop(self):
         logging_dir = os.path.join(self.output_dir, "logs")
@@ -199,6 +205,7 @@ class UNetTrainer:
         self.ema_model = EMAModel(self.unwrapped_model.parameters(), decay=0.999)
         self.ema_model.to(self.accelerator.device)
 
+        global_step = 0
         for epoch in range(self.config.num_epochs):
             self.model.train()
             progress_bar = tqdm(
@@ -221,7 +228,8 @@ class UNetTrainer:
                     self.optimizer.zero_grad()
                     self.ema_model.step(self.unwrapped_model.parameters())
 
-                self.accelerator.log({"train_loss": loss.item()}, step=step)
+                self.accelerator.log({"train_loss": loss.item()}, step=global_step)
+                global_step += 1
                 progress_bar.update(1)
                 progress_bar.set_postfix(loss=loss.item())
 
@@ -232,11 +240,11 @@ class UNetTrainer:
             self.val_history.append({
                 "epoch": epoch,
                 "val_loss": float(val_loss),
-                "step": step,
+                "step": global_step,
                 "timestamp": datetime.now().isoformat(),
             })
 
-            self.accelerator.log({"val_loss": val_loss}, step=step)
+            self.accelerator.log({"val_loss": val_loss}, step=global_step)
 
             if self.accelerator.is_main_process:
                 with open(os.path.join(self.output_dir, "metrics.json"), "w") as f:

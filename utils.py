@@ -5,6 +5,15 @@ import torch
 from torch.utils.data import Dataset
 
 
+def get_device() -> str:
+    """Returns the best available device: cuda > mps > cpu."""
+    if torch.cuda.is_available():
+        return 'cuda'
+    if torch.backends.mps.is_available():
+        return 'mps'
+    return 'cpu'
+
+
 
 """
 dataset.py
@@ -234,7 +243,7 @@ def make_normalized_xy_grid(
     H: int = 320,
     W: int = 256,
     batch_size = 1,
-    device='cuda',
+    device='cpu',
     dtype: torch.dtype = torch.float32,
 ):
     ys = torch.linspace(0.0, 1.0, H, device=device, dtype=dtype)

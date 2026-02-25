@@ -64,7 +64,9 @@ class VideoDiffusionModel(nn.Module):
         #   - не является обучаемым параметром
         #   - автоматически переезжает на GPU вместе с моделью (.to(device))
         #   - сохраняется в state_dict
-        coords = make_normalized_xy_grid()   # (2, 320, 256)
+        # device='cpu': буфер создаётся на CPU и переезжает на нужное устройство
+        # вместе с моделью при вызове model.to(device) или accelerator.prepare()
+        coords = make_normalized_xy_grid(device='cpu')   # (1, 2, H, W)
         self.register_buffer('coords', coords)
 
         # Проекция координат (2 → coord_embed_dim) через 1×1 conv
