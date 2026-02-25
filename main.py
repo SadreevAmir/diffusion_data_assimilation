@@ -2,7 +2,7 @@ import torch
 import sys
 import os
 from trainer import TrainingConfig, UNetTrainer
-from utils import NpyImageDataset, channel_normalize, add_noise
+from utils import NpyImageDataset, channel_normalize, add_noise, get_device
 from diffusers import UNet2DModel
 from diffusers.optimization import get_cosine_schedule_with_warmup
 
@@ -19,12 +19,14 @@ def main():
         mmap_mode='r',
     )
     
+    # pin_memory ускоряет передачу данных только на CUDA; на MPS и CPU не нужен
+    use_pin_memory = torch.cuda.is_available()
     train_dataloader = torch.utils.data.DataLoader(
-        dataset_train, 
-        batch_size=config.train_batch_size, 
-        shuffle=True, 
+        dataset_train,
+        batch_size=config.train_batch_size,
+        shuffle=True,
         num_workers=6,
-        pin_memory=True
+        pin_memory=use_pin_memory,
     )
     
     dataset_valid = NpyImageDataset(
@@ -35,11 +37,11 @@ def main():
     )
     
     valid_dataloader = torch.utils.data.DataLoader(
-        dataset_valid, 
+        dataset_valid,
         batch_size=config.eval_batch_size,
-        shuffle=False, 
+        shuffle=False,
         num_workers=4,
-        pin_memory=True
+        pin_memory=use_pin_memory,
     )
     
     model = UNet2DModel(
@@ -68,13 +70,12 @@ def main():
     
     trainer = UNetTrainer(
         config=config,
-        model=model, 
-        optimizer=optimizer, 
-        data_loader_train=train_dataloader, 
-        data_loader_val=valid_dataloader, 
-        lr_scheduler=lr_scheduler, 
-        add_noise_func=add_noise, 
-        save_dir='checkpoints'
+        model=model,
+        optimizer=optimizer,
+        data_loader_train=train_dataloader,
+        data_loader_val=valid_dataloader,
+        lr_scheduler=lr_scheduler,
+        add_noise_func=add_noise,
     )
     
     trainer.train_loop()

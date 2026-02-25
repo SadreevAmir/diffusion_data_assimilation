@@ -26,7 +26,9 @@ class TrainingConfig:
     gradient_accumulation_steps: int = 1
     learning_rate: float = 1e-4
     lr_warmup_steps: int = 500
-    mixed_precision: str = 'bf16' # 'fp16' если видеокарта старая
+    # 'bf16' работает на CUDA (Ampere+) и MPS (PyTorch 2.x+).
+    # На старых GPU используй 'fp16'. На CPU — 'no'.
+    mixed_precision: str = 'bf16'
     seed: int = 0
     push_to_hub: bool = True
     hub_model_id: str = 'amirsadreev/diffusion_data_assimilation'
@@ -112,7 +114,9 @@ class UNetTrainer:
             config=asdict(self.config)
         )
         
-        if hasattr(self.model, "enable_xformers_memory_efficient_attention"):
+        # xformers работает только на CUDA; на MPS/CPU пропускаем
+        if (self.accelerator.device.type == 'cuda'
+                and hasattr(self.model, "enable_xformers_memory_efficient_attention")):
             self.model.enable_xformers_memory_efficient_attention()
         
         self.model, self.optimizer, self.train_dataloader, self.val_dataloader, self.lr_scheduler = self.accelerator.prepare(
@@ -123,11 +127,12 @@ class UNetTrainer:
         self.ema_model = EMAModel(self.unwrapped_model.parameters(), decay=0.999)
         self.ema_model.to(self.accelerator.device)
     
+        global_step = 0
         for epoch in range(self.config.num_epochs):
             self.model.train()
             progress_bar = tqdm(total=len(self.train_dataloader), disable=not self.accelerator.is_local_main_process)
             progress_bar.set_description(f"Epoch {epoch}")
-            
+
             for step, batch in enumerate(self.train_dataloader):
                 clean_images = batch
                 bs = clean_images.shape[0]
@@ -152,8 +157,9 @@ class UNetTrainer:
                     self.ema_model.step(self.unwrapped_model.parameters())
                 
             
-                self.accelerator.log({"train_loss": loss.item()}, step=step)
-    
+                self.accelerator.log({"train_loss": loss.item()}, step=global_step)
+                global_step += 1
+
                 progress_bar.update(1)
                 progress_bar.set_postfix(loss=loss.item())
             
