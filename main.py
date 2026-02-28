@@ -3,7 +3,7 @@ import sys
 import os
 from trainer import TrainingConfig, UNetTrainer
 from utils import NpyImageDataset, channel_normalize, add_noise, get_device
-from diffusers import UNet2DModel
+from diffusers.models.unets.unet_2d import UNet2DModel
 from diffusers.optimization import get_cosine_schedule_with_warmup
 
 def main():
