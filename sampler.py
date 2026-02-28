@@ -11,9 +11,38 @@ class Sampler:
         self.noise_func = noise_func
 
     @torch.no_grad()
-    def sample_no_condition(self, num_timesteps, batch_size, device=None):
+    def sample_conditioned(self, mask, observed, size, num_timesteps, device=None):
+        """
+        Сэмплирование с conditioning через concatenation (обученная архитектура, 7 каналов).
+
+        Args:
+            mask:     (1, 1, H, W) — бинарная маска треков
+            observed: (1, 2, H, W) — нормализованные наблюдения на треках
+            size:     (H, W)
+            num_timesteps: число шагов
+            device:   устройство
+        """
         device = device or get_device()
-        grid = make_normalized_xy_grid().expand(batch_size, -1, -1, -1).to(device)
+        H, W = size
+        grid = make_normalized_xy_grid(H, W).to(device)      # (1, 2, H, W)
+        timesteps = torch.linspace(1.0, 0.001, num_timesteps, device=device)
+        dt = 1.0 / num_timesteps
+
+        x = torch.randn((1, 2, H, W), device=device)
+
+        for t in timesteps:
+            t_tensor = torch.full((1,), t.item() * 1000, device=device)
+            model_input = torch.cat([x, grid, mask, observed], dim=1)  # (1, 7, H, W)
+            v_t = self.model(model_input, t_tensor).sample
+            x = x - dt * v_t
+
+        return x  # (1, 2, H, W)
+
+    @torch.no_grad()
+    def sample_no_condition(self, size, num_timesteps, batch_size, device=None):
+        device = device or get_device()
+        H, W = size
+        grid = make_normalized_xy_grid(H, W).expand(batch_size, -1, -1, -1).to(device)
         timesteps = torch.linspace(1.0, 0.001, num_timesteps, device=device)
         dt = 1.0 / num_timesteps
 
@@ -73,7 +102,8 @@ class Sampler:
         device = device or get_device()
         timesteps = torch.linspace(1.0, 0.0, num_timesteps, device=device)
         dt = -1.0 / num_timesteps
-        grid = make_normalized_xy_grid().expand(batch_size, -1, -1, -1).to(device)
+        H, W = y.shape
+        grid = make_normalized_xy_grid(H, W).expand(batch_size, -1, -1, -1).to(device)
 
         y = y.to(device).expand(batch_size, -1, -1, -1).contiguous()
         mask = mask.to(device).expand(batch_size, -1, -1, -1).contiguous()
@@ -93,7 +123,8 @@ class Sampler:
         device = device or get_device()
         timesteps = torch.linspace(noise_val, 0.0, num_timesteps, device=device)
         dt = -noise_val / num_timesteps
-        grid = make_normalized_xy_grid().expand(batch_size, -1, -1, -1).to(device)
+        H, W = y.shape
+        grid = make_normalized_xy_grid(H, W).expand(batch_size, -1, -1, -1).to(device)
 
         y = y.to(device).expand(batch_size, -1, -1, -1).contiguous()
         mask = mask.to(device).expand(batch_size, -1, -1, -1).contiguous()

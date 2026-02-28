@@ -11,6 +11,9 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
 
+assert torch.cuda.is_available(), "CUDA is not available"
+torch.backends.cudnn.benchmark = True
+
 
 def main():
     config = TrainingConfig()
@@ -20,8 +23,6 @@ def main():
         channel_mean=config.channel_mean,
         channel_std=config.channel_std,
     )
-
-    use_pin_memory = torch.cuda.is_available()
 
     dataset_train = NpyImageDataset(
         folder=config.data_dir_train,
@@ -34,7 +35,10 @@ def main():
         batch_size=config.train_batch_size,
         shuffle=True,
         num_workers=config.num_workers_train,
-        pin_memory=use_pin_memory,
+        pin_memory=True,
+        persistent_workers=True,
+        prefetch_factor=2,
+        drop_last=True,
     )
 
     dataset_valid = NpyImageDataset(
@@ -48,7 +52,9 @@ def main():
         batch_size=config.eval_batch_size,
         shuffle=False,
         num_workers=config.num_workers_val,
-        pin_memory=use_pin_memory,
+        pin_memory=True,
+        persistent_workers=True,
+        prefetch_factor=2,
     )
 
     model = UNet2DModel(

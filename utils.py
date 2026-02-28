@@ -92,9 +92,9 @@ def channel_denormalize(images, channel_mean, channel_std):
 
 
 def make_normalized_xy_grid(
-    H: int = 320,
-    W: int = 256,
-    batch_size = 1,
+    H: int,
+    W: int,
+    batch_size: int = 1,
     device='cpu',
     dtype: torch.dtype = torch.float32,
 ):
@@ -120,43 +120,73 @@ def add_noise(images: torch.Tensor, timesteps):
   return noisy_images, eps - images
 
 
-def generate_satellite_track_mask(image_size: tuple) -> np.ndarray:
+def generate_satellite_track_mask(
+    image_size: tuple,
+    batch_size: int = 1,
+    valid_mask: Optional[np.ndarray] = None,
+) -> np.ndarray:
     """
-    Generate a binary mask with 2–5 random straight satellite tracks.
+    Generate a batch of binary masks with 0–5 random straight satellite tracks each.
 
-    For each track: picks a random point and a random direction,
-    then draws a line across the full image.
+    Fully vectorized: no Python loops. All track parameters are generated at once,
+    then scattered into the mask array in two passes (row-dominant / col-dominant).
 
     Args:
         image_size: (H, W)
+        batch_size: number of masks to generate.
+        valid_mask: float32 array of shape (H, W), 1 where observations
+                    are allowed. Defaults to all-ones (no restriction).
 
     Returns:
-        mask: float32 array of shape (H, W), 0 everywhere except tracks (1).
+        masks: float32 array of shape (batch_size, H, W).
     """
     H, W = image_size
-    mask = np.zeros((H, W), dtype=np.float32)
+    if valid_mask is None:
+        valid_mask = np.ones((H, W), dtype=np.float32)
 
-    n_tracks = np.random.randint(2, 6)  # 2, 3, 4, or 5 tracks
+    n_max = 5
+    masks = np.zeros((batch_size, H, W), dtype=np.float32)
 
-    for _ in range(n_tracks):
-        y0 = np.random.uniform(0, H)
-        x0 = np.random.uniform(0, W)
-        angle = np.random.uniform(0, np.pi)
-        dy = np.sin(angle)
-        dx = np.cos(angle)
+    # Draw all parameters at once: (bs, n_max)
+    n_tracks = np.random.randint(0, n_max + 1, size=batch_size)
+    active = (np.arange(n_max)[None, :] < n_tracks[:, None]).ravel()  # (bs*n_max,)
 
-        if abs(dy) >= abs(dx):
-            rows = np.arange(H)
-            t = (rows - y0) / dy
-            cols = np.round(x0 + t * dx).astype(int)
-            valid = (cols >= 0) & (cols < W)
-            mask[rows[valid], cols[valid]] = 1.0
-        else:
-            cols = np.arange(W)
-            t = (cols - x0) / dx
-            rows = np.round(y0 + t * dy).astype(int)
-            valid = (rows >= 0) & (rows < H)
-            mask[rows[valid], cols[valid]] = 1.0
+    y0 = np.random.uniform(0, H, size=batch_size * n_max)
+    x0 = np.random.uniform(0, W, size=batch_size * n_max)
+    angles = np.random.uniform(0, np.pi, size=batch_size * n_max)
+    dy = np.sin(angles)
+    dx = np.cos(angles)
+    use_rows = np.abs(dy) >= np.abs(dx)
 
-    return mask
+    # Batch index for each (sample, track) pair
+    batch_idx = np.repeat(np.arange(batch_size), n_max)  # (bs*n_max,)
+
+    rows_arr = np.arange(H)
+    cols_arr = np.arange(W)
+
+    # --- Row-dominant tracks: iterate over rows, compute col per row ---
+    sel = np.where(active & use_rows)[0]
+    if len(sel):
+        b = batch_idx[sel]                          # (n,)
+        cols_t = np.round(
+            x0[sel, None] + (rows_arr - y0[sel, None]) * (dx[sel] / dy[sel])[:, None]
+        ).astype(int)                               # (n, H)
+        b_exp = np.broadcast_to(b[:, None], cols_t.shape)
+        r_exp = np.broadcast_to(rows_arr,   cols_t.shape)
+        ok = (cols_t >= 0) & (cols_t < W)
+        masks[b_exp[ok], r_exp[ok], cols_t[ok]] = 1.0
+
+    # --- Col-dominant tracks: iterate over cols, compute row per col ---
+    sel = np.where(active & ~use_rows)[0]
+    if len(sel):
+        b = batch_idx[sel]                          # (n,)
+        rows_t = np.round(
+            y0[sel, None] + (cols_arr - x0[sel, None]) * (dy[sel] / dx[sel])[:, None]
+        ).astype(int)                               # (n, W)
+        b_exp = np.broadcast_to(b[:, None],  rows_t.shape)
+        c_exp = np.broadcast_to(cols_arr,    rows_t.shape)
+        ok = (rows_t >= 0) & (rows_t < H)
+        masks[b_exp[ok], rows_t[ok], c_exp[ok]] = 1.0
+
+    return masks * valid_mask[None, :]
 
