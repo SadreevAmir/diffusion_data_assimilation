@@ -20,7 +20,7 @@ class Sampler:
         x = torch.randn((batch_size, *_IMAGE_SHAPE), device=device)
 
         for t in timesteps:
-            t_tensor = torch.full((batch_size,), t * 1000, device=device)
+            t_tensor = torch.full((batch_size,), t.item() * 1000, device=device)
             v_t = self.model(torch.cat([x, grid], dim=1), t_tensor).sample
             x = x - dt * v_t
 

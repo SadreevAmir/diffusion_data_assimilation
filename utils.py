@@ -1,5 +1,5 @@
 import os
-from typing import Optional, Callable, List
+from typing import Optional, Callable, List, Literal
 import numpy as np
 import torch
 from torch.utils.data import Dataset
@@ -20,7 +20,7 @@ class NpyImageDataset(Dataset):
                  file_list: Optional[List[str]] = None,
                  transform: Optional[Callable] = None,
                  preload: bool = False,
-                 mmap_mode: Optional[str] = None):
+                 mmap_mode: Literal['r', 'r+', 'w+', 'c', None] = None):
 
         self.folder = folder
         if file_list is None:
@@ -63,6 +63,7 @@ class NpyImageDataset(Dataset):
 
     def __getitem__(self, idx):
         if self.preload:
+            assert self._data is not None
             tensor = self._data[idx]
         else:
             path = os.path.join(self.folder, self.files[idx])
@@ -75,7 +76,7 @@ class NpyImageDataset(Dataset):
 
 
 
-def channel_normalize(x: torch.Tensor, channel_mean: np.array, channel_std: np.array ) -> torch.Tensor:
+def channel_normalize(x: torch.Tensor, channel_mean, channel_std) -> torch.Tensor:
     mean = torch.as_tensor(channel_mean, device=x.device, dtype=x.dtype).view(-1, 1, 1)
     std  = torch.as_tensor(channel_std,  device=x.device, dtype=x.dtype).view(-1, 1, 1)
     return (x - mean) / std
