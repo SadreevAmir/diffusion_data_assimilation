@@ -16,3 +16,4 @@ venv/
 .venv/
 
 .dockercompose.un~
+.DS_Store
