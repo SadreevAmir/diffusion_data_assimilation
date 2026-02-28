@@ -119,3 +119,44 @@ def add_noise(images: torch.Tensor, timesteps):
 
   return noisy_images, eps - images
 
+
+def generate_satellite_track_mask(image_size: tuple) -> np.ndarray:
+    """
+    Generate a binary mask with 2–5 random straight satellite tracks.
+
+    For each track: picks a random point and a random direction,
+    then draws a line across the full image.
+
+    Args:
+        image_size: (H, W)
+
+    Returns:
+        mask: float32 array of shape (H, W), 0 everywhere except tracks (1).
+    """
+    H, W = image_size
+    mask = np.zeros((H, W), dtype=np.float32)
+
+    n_tracks = np.random.randint(2, 6)  # 2, 3, 4, or 5 tracks
+
+    for _ in range(n_tracks):
+        y0 = np.random.uniform(0, H)
+        x0 = np.random.uniform(0, W)
+        angle = np.random.uniform(0, np.pi)
+        dy = np.sin(angle)
+        dx = np.cos(angle)
+
+        if abs(dy) >= abs(dx):
+            rows = np.arange(H)
+            t = (rows - y0) / dy
+            cols = np.round(x0 + t * dx).astype(int)
+            valid = (cols >= 0) & (cols < W)
+            mask[rows[valid], cols[valid]] = 1.0
+        else:
+            cols = np.arange(W)
+            t = (cols - x0) / dx
+            rows = np.round(y0 + t * dy).astype(int)
+            valid = (rows >= 0) & (rows < H)
+            mask[rows[valid], cols[valid]] = 1.0
+
+    return mask
+

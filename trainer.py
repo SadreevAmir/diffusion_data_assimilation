@@ -38,8 +38,10 @@ class TrainingConfig:
     data_dir_valid: str = _default_data_dir() + "/valid"
 
     # Нормализация
-    channel_mean: tuple = (0.1382167, 0.1816227)
-    channel_std: tuple = (0.32978467, 0.51380478)
+    with open(os.path.join(data_dir_train, "stats.json")) as f:
+        stats = json.load(f)
+    channel_mean: tuple = tuple(stats["mean"])
+    channel_std: tuple = tuple(stats["std"])
 
     # Архитектура модели
     image_size: tuple = (320, 256)
