@@ -23,7 +23,7 @@ RUN conda install -y \
     && conda clean -afy
 
 RUN pip install --no-cache-dir \
-    torch torchvision \
+    torch==2.5.1 torchvision==0.20.1 \
     --index-url https://download.pytorch.org/whl/cu121
 
 RUN pip install --no-cache-dir \

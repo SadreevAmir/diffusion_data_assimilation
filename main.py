@@ -1,73 +1,80 @@
+import logging
 import torch
-import sys
-import os
+from functools import partial
 from trainer import TrainingConfig, UNetTrainer
-from utils import NpyImageDataset, channel_normalize, add_noise, get_device
+from utils import NpyImageDataset, channel_normalize, add_noise
 from diffusers.models.unets.unet_2d import UNet2DModel
 from diffusers.optimization import get_cosine_schedule_with_warmup
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
+
+
 def main():
-    
-    channel_mean = [0.1382167, 0.1816227]
-    channel_std = [0.32978467, 0.51380478]
-    
     config = TrainingConfig()
+
+    transform = partial(
+        channel_normalize,
+        channel_mean=config.channel_mean,
+        channel_std=config.channel_std,
+    )
+
+    use_pin_memory = torch.cuda.is_available()
+
     dataset_train = NpyImageDataset(
-        folder="/mnt/sciml/a.sadreev/sea_ice_data/train",
-        transform=lambda x: channel_normalize(x, channel_mean, channel_std),
+        folder=config.data_dir_train,
+        transform=transform,
         preload=False,
         mmap_mode='r',
     )
-    
-    # pin_memory ускоряет передачу данных только на CUDA; на MPS и CPU не нужен
-    use_pin_memory = torch.cuda.is_available()
     train_dataloader = torch.utils.data.DataLoader(
         dataset_train,
         batch_size=config.train_batch_size,
         shuffle=True,
-        num_workers=6,
+        num_workers=config.num_workers_train,
         pin_memory=use_pin_memory,
     )
-    
+
     dataset_valid = NpyImageDataset(
-        folder="/mnt/sciml/a.sadreev/sea_ice_data/valid",
-        transform=lambda x: channel_normalize(x, channel_mean, channel_std),
+        folder=config.data_dir_valid,
+        transform=transform,
         preload=False,
         mmap_mode='r',
     )
-    
     valid_dataloader = torch.utils.data.DataLoader(
         dataset_valid,
         batch_size=config.eval_batch_size,
         shuffle=False,
-        num_workers=4,
+        num_workers=config.num_workers_val,
         pin_memory=use_pin_memory,
     )
-    
+
     model = UNet2DModel(
-        sample_size=(320, 256),
-        in_channels=4,
-        out_channels=2,
+        sample_size=config.image_size,
+        in_channels=config.in_channels,
+        out_channels=config.out_channels,
         layers_per_block=2,
         block_out_channels=(64, 128, 256, 512, 512),
         down_block_types=(
-            "DownBlock2D", "DownBlock2D", "DownBlock2D", 
+            "DownBlock2D", "DownBlock2D", "DownBlock2D",
             "AttnDownBlock2D", "DownBlock2D",
         ),
         up_block_types=(
-            "UpBlock2D", "AttnUpBlock2D", "UpBlock2D", 
+            "UpBlock2D", "AttnUpBlock2D", "UpBlock2D",
             "UpBlock2D", "UpBlock2D",
         ),
     )
-    
+
     optimizer = torch.optim.AdamW(model.parameters(), lr=config.learning_rate)
-    
+
     lr_scheduler = get_cosine_schedule_with_warmup(
         optimizer=optimizer,
         num_warmup_steps=config.lr_warmup_steps,
-        num_training_steps=(len(train_dataloader) * config.num_epochs),
+        num_training_steps=len(train_dataloader) * config.num_epochs,
     )
-    
+
     trainer = UNetTrainer(
         config=config,
         model=model,
@@ -77,8 +84,9 @@ def main():
         lr_scheduler=lr_scheduler,
         add_noise_func=add_noise,
     )
-    
+
     trainer.train_loop()
+
 
 if __name__ == "__main__":
     main()

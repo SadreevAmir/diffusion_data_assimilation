@@ -12,8 +12,7 @@ checkpoints/
 *.log
 training.log
 
-
 venv/
-.env
+.venv/
 
 .dockercompose.un~

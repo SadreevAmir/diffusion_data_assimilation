@@ -83,9 +83,9 @@ def channel_normalize(x: torch.Tensor, channel_mean: np.array, channel_std: np.a
 def channel_denormalize(images, channel_mean, channel_std):
     mean = torch.as_tensor(channel_mean, device=images.device, dtype=images.dtype).view(-1, 1, 1)
     std  = torch.as_tensor(channel_std,  device=images.device, dtype=images.dtype).view(-1, 1, 1)
-    images = images*std + mean
-    images[0] = torch.clip(images[0], min=0, max=1)
-    images[1] = torch.clip(images[1], min=0)
+    images = images * std + mean
+    images[:, 0] = torch.clip(images[:, 0], min=0, max=1)
+    images[:, 1] = torch.clip(images[:, 1], min=0)
     return images
  
 
