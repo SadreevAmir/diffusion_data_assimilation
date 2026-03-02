@@ -54,9 +54,9 @@ class TrainingConfig:
     num_workers_val: int = 4
 
     # Обучение
-    train_batch_size: int = 1
+    train_batch_size: int = 24
     eval_batch_size: int = 1
-    num_epochs: int = 15
+    num_epochs: int = 20
     gradient_accumulation_steps: int = 1
     learning_rate: float = 1e-4
     lr_warmup_steps: int = 500
@@ -64,7 +64,7 @@ class TrainingConfig:
     seed: int = 0
 
     # Loss
-    masked_loss_weight: float = 1.0  # вес loss по пикселям трека
+    masked_loss_weight: float = 0.0  # вес loss по пикселям трека
 
     # Сэмплирование во время обучения
     sample_every_n_epochs: int = 1
