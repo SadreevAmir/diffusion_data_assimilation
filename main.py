@@ -57,6 +57,23 @@ def main():
         prefetch_factor=2,
     )
 
+
+    dataset_satellite_mask = NpyImageDataset(
+        folder=config.data_dir_satellite_mask,
+        transform=lambda x: x,
+        preload=False,
+        mmap_mode='r',
+    )
+    satellite_mask_dataloader = torch.utils.data.DataLoader(
+        dataset_satellite_mask,
+        batch_size=config.eval_batch_size,
+        shuffle=False,
+        num_workers=config.num_workers_val,
+        pin_memory=True,
+        persistent_workers=True,
+        prefetch_factor=2
+    )
+
     model = UNet2DModel(
         sample_size=config.image_size,
         in_channels=config.in_channels,
@@ -87,6 +104,7 @@ def main():
         optimizer=optimizer,
         data_loader_train=train_dataloader,
         data_loader_val=valid_dataloader,
+        data_loader_satellite_mask=satellite_mask_dataloader,
         lr_scheduler=lr_scheduler,
         add_noise_func=add_noise,
     )

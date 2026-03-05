@@ -22,13 +22,21 @@ class Sampler:
             num_timesteps: число шагов
             device:   устройство
         """
+        batch_size = observed.shape[0]
         device = device or get_device()
+        mask = mask.to(device)
+        observed = observed.to(device)
         H, W = size
-        grid = make_normalized_xy_grid(H, W).to(device)      # (1, 2, H, W)
+        grid = make_normalized_xy_grid(H, W).to(device).expand(batch_size, -1, -1, -1)    # (1, 2, H, W)
         timesteps = torch.linspace(1.0, 0.001, num_timesteps, device=device)
         dt = 1.0 / num_timesteps
 
-        x = torch.randn((1, 2, H, W), device=device)
+        x = torch.randn((batch_size, 2, H, W), device=device)
+        print(x.shape)
+        print(mask.shape)
+        print(observed.shape)
+        print(grid.shape)
+    
 
         for t in timesteps:
             t_tensor = torch.full((1,), t.item() * 1000, device=device)

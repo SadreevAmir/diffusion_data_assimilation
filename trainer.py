@@ -13,6 +13,7 @@ from accelerate.utils import ProjectConfiguration
 from diffusers.training_utils import EMAModel
 from huggingface_hub import upload_folder, create_repo
 from datetime import datetime
+from itertools import cycle
 
 from utils import make_normalized_xy_grid, channel_denormalize, generate_satellite_track_mask
 from sampler import Sampler
@@ -37,6 +38,7 @@ class TrainingConfig:
     # Пути к данным (выбираются автоматически по платформе)
     data_dir_train: str = _default_data_dir() + "/train"
     data_dir_valid: str = _default_data_dir() + "/valid"
+    data_dir_satellite_mask: str = _default_data_dir() + "/satellite_samples"
 
     # Нормализация
     with open(os.path.join(data_dir_train, "stats.json")) as f:
@@ -64,7 +66,7 @@ class TrainingConfig:
     seed: int = 0
 
     # Loss
-    masked_loss_weight: float = 0.0  # вес loss по пикселям трека
+    masked_loss_weight: float = 0.1  # вес loss по пикселям трека
 
     # Сэмплирование во время обучения
     sample_every_n_epochs: int = 1
@@ -79,7 +81,7 @@ class TrainingConfig:
 
 class UNetTrainer:
     def __init__(self, config: TrainingConfig, model, optimizer, data_loader_train,
-                 data_loader_val, lr_scheduler, add_noise_func):
+                 data_loader_val, data_loader_satellite_mask, lr_scheduler, add_noise_func):
 
         self.config = config
         self.run_name = datetime.now().strftime("run_%Y%m%d_%H%M%S")
@@ -117,9 +119,13 @@ class UNetTrainer:
          self.optimizer,
          self.train_dataloader,
          self.val_dataloader,
+         self.satellite_mask_dataloader,
          self.lr_scheduler) = self.accelerator.prepare(
-            model, optimizer, data_loader_train, data_loader_val, lr_scheduler
+            model, optimizer, data_loader_train, data_loader_val, data_loader_satellite_mask, lr_scheduler
         )
+
+        self.satellite_mask_iter = cycle(self.satellite_mask_dataloader)
+
 
         self.unwrapped_model = self.accelerator.unwrap_model(self.model)
         self.ema_model = EMAModel(self.unwrapped_model.parameters(), decay=0.999)
@@ -134,21 +140,22 @@ class UNetTrainer:
         self._valid_mask = np.load(mask_path).astype(np.float32)
 
     def _make_model_input(
-        self, noisy_images: torch.Tensor, clean_images: torch.Tensor
+        self, noisy_images: torch.Tensor, clean_images: torch.Tensor, satellite_mask_images:torch.Tensor
     ) -> tuple[torch.Tensor, torch.Tensor]:
         bs = noisy_images.shape[0]
-        device = noisy_images.device
 
-        masks = torch.from_numpy(
-            generate_satellite_track_mask(self.config.image_size, bs, self._valid_mask)
-        ).unsqueeze(1).to(device)  # (bs, 1, H, W)
+        #device = noisy_images.device
+        # masks = torch.from_numpy(
+        #     generate_satellite_track_mask(self.config.image_size, bs, self._valid_mask)
+        # ).unsqueeze(1).to(device)  # (bs, 1, H, W)
 
         # clean_images уже нормализованы датасетом — просто обнуляем вне треков
-        observed = clean_images * masks  # (bs, 2, H, W)
+        observed = clean_images * satellite_mask_images  # (bs, 2, H, W)
         grid = self._grid.expand(bs, -1, -1, -1)  # (bs, 2, H, W)
-
-        model_input = torch.cat([noisy_images, grid, masks, observed], dim=1)  # (bs, 7, H, W)
-        return model_input, masks
+        satellite_mask_images = satellite_mask_images.expand(bs, -1, -1, -1)
+        print(satellite_mask_images.shape)
+        model_input = torch.cat([noisy_images, grid, satellite_mask_images, observed], dim=1)  # (bs, 7, H, W)
+        return model_input
 
     def _masked_mse(self, pred: torch.Tensor, target: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
         """MSE только по пикселям трека, усреднённый по числу track-пикселей, а не по всем."""
@@ -174,15 +181,16 @@ class UNetTrainer:
             for batch in self.val_dataloader:
                 clean_images = batch
                 bs = clean_images.shape[0]
+                satellite_mask_images = next(self.satellite_mask_iter)
 
                 timesteps = torch.rand(bs, device=self.accelerator.device)
                 noisy_images, v_real = self.add_noise(clean_images, timesteps)
 
-                model_input, masks = self._make_model_input(noisy_images, clean_images)
+                model_input = self._make_model_input(noisy_images, clean_images, satellite_mask_images)
 
                 v_pred = self.model(model_input, timesteps * 1000, return_dict=False)[0]
                 loss_full   = F.mse_loss(v_pred, v_real)
-                loss_masked = self._masked_mse(v_pred, v_real, masks)
+                loss_masked = self._masked_mse(v_pred, v_real, satellite_mask_images)
 
                 total_full   += self.accelerator.gather_for_metrics(loss_full).mean().item()    # type: ignore[union-attr]
                 total_masked += self.accelerator.gather_for_metrics(loss_masked).mean().item()  # type: ignore[union-attr]
@@ -258,22 +266,23 @@ class UNetTrainer:
 
             for batch in self.train_dataloader:
                 clean_images = batch
+                satellite_mask_images = next(self.satellite_mask_iter)
                 bs = clean_images.shape[0]
                 timesteps = torch.rand(bs, device=self.accelerator.device)
                 noisy_images, v_real = self.add_noise(clean_images, timesteps)
 
                 with self.accelerator.accumulate(self.model):
-                    model_input, masks = self._make_model_input(noisy_images, clean_images)
+                    model_input = self._make_model_input(noisy_images, clean_images, satellite_mask_images)
 
                     v_pred = self.model(model_input, timesteps * 1000, return_dict=False)[0]
                     loss_full   = F.mse_loss(v_pred, v_real)
-                    loss_masked = self._masked_mse(v_pred, v_real, masks)
+                    loss_masked = self._masked_mse(v_pred, v_real, satellite_mask_images)  # ← сюда
                     loss        = loss_full + self.config.masked_loss_weight * loss_masked
 
                     self.accelerator.backward(loss)
                     if self.accelerator.sync_gradients:
                         self.accelerator.clip_grad_norm_(self.model.parameters(), 1.0)
-
+                    loss_masked = self._masked_mse(v_pred, v_real, satellite_mask_images)
                     self.optimizer.step()
                     self.lr_scheduler.step()
                     self.optimizer.zero_grad()

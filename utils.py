@@ -2,7 +2,10 @@ import os
 from typing import Optional, Callable, List, Literal
 import numpy as np
 import torch
+import matplotlib.pyplot as plt
 from torch.utils.data import Dataset
+import matplotlib.colors as mcolors
+
 
 
 def get_device() -> str:
@@ -190,3 +193,68 @@ def generate_satellite_track_mask(
 
     return masks * valid_mask[None, :]
 
+
+def make_plot(sea_ice_samples, channel_mean, channel_std, num_samples, title = ''):
+
+    sea_ice_samples = channel_denormalize(sea_ice_samples, channel_mean=channel_mean, channel_std=channel_std)
+    rows, cols = 3, 6
+    n = rows * cols
+
+    imgs = [sea_ice_samples[i][0].detach().cpu() for i in range(n)]
+    vmin = min(img.min().item() for img in imgs)
+    vmax = max(img.max().item() for img in imgs)
+
+    norm = mcolors.Normalize(vmin=vmin, vmax=vmax)
+
+    fig, axes = plt.subplots(rows, cols, figsize=(cols*2 + 1, rows*2))
+    axes = axes.flatten()
+    fig.suptitle(title, fontsize=16, y=0.98)
+
+    for idx, ax in enumerate(axes):
+        img = imgs[idx].numpy()
+        im = ax.imshow(img, norm=norm, cmap='viridis') 
+        ax.axis('off')
+
+    sm = plt.cm.ScalarMappable(cmap='viridis', norm=norm)
+    sm.set_array([])
+
+    fig.subplots_adjust(right=0.85) 
+    cbar_ax = fig.add_axes([0.88, 0.15, 0.02, 0.7])
+    cbar = fig.colorbar(sm, cax=cbar_ax)
+    plt.show()
+
+def make_difference_plot(sea_ice_samples_1, sea_ice_samples_2, channel_mean, channel_std, num_samples, title = ''):
+    sea_ice_samples_1 = channel_denormalize(sea_ice_samples_1.detach().cpu(), channel_mean=channel_mean, channel_std=channel_std)
+    sea_ice_samples_2 = channel_denormalize(sea_ice_samples_2.detach().cpu(), channel_mean=channel_mean, channel_std=channel_std)
+    rows, cols = 3, 6
+    n = rows * cols
+
+    imgs = [(sea_ice_samples_1 - sea_ice_samples_2)[i][0] for i in range(n)]
+    vmin = min(img.min().item() for img in imgs)
+    vmax = max(img.max().item() for img in imgs)
+
+    norm = mcolors.Normalize(vmin=vmin, vmax=vmax)
+
+    fig, axes = plt.subplots(rows, cols, figsize=(cols*2 + 1, rows*2 + 0.1))
+    axes = axes.flatten()
+    fig.suptitle("Conditioned samples delta", fontsize=16, y=0.98)
+
+    water_to_land_ratio = 0.56600341796875
+
+    for idx, ax in enumerate(axes):
+        img = imgs[idx].numpy()
+        im = ax.imshow(img, norm=norm, cmap='viridis')
+        ax.axis('off')
+
+        mean_square = np.mean(img**2)/water_to_land_ratio
+        ax.text(0.5, -0.1, f'MSE: {mean_square:.3f}',
+                transform=ax.transAxes, ha='center', va='top', fontsize=8)
+        
+    sm = plt.cm.ScalarMappable(cmap='viridis', norm=norm)
+    sm.set_array([])
+    fig.subplots_adjust(right=0.85, bottom=0.1)
+    cbar_ax = fig.add_axes([0.88, 0.15, 0.02, 0.7])
+    cbar = fig.colorbar(sm, cax=cbar_ax)
+
+    plt.show()
+    
