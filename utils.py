@@ -269,8 +269,9 @@ def generate_satellite_track_mask(
 def make_plot(sea_ice_samples, channel_mean, channel_std, num_samples, title = ''):
 
     sea_ice_samples = channel_denormalize(sea_ice_samples, channel_mean=channel_mean, channel_std=channel_std)
-    rows, cols = 3, 6
-    n = rows * cols
+    n = num_samples
+    cols = int(np.ceil(np.sqrt(n)))
+    rows = int(np.ceil(n / cols))
 
     imgs = [sea_ice_samples[i][0].detach().cpu() for i in range(n)]
     vmin = min(img.min().item() for img in imgs)
@@ -295,13 +296,20 @@ def make_plot(sea_ice_samples, channel_mean, channel_std, num_samples, title = '
     cbar = fig.colorbar(sm, cax=cbar_ax)
     plt.show()
 
-def make_difference_plot(sea_ice_samples_1, sea_ice_samples_2, channel_mean, channel_std, num_samples, title = ''):
+def make_difference_plot(sea_ice_samples_1, sea_ice_samples_2, channel_mean, channel_std, num_samples, land_mask, title = ''):
     sea_ice_samples_1 = channel_denormalize(sea_ice_samples_1.detach().cpu(), channel_mean=channel_mean, channel_std=channel_std)
     sea_ice_samples_2 = channel_denormalize(sea_ice_samples_2.detach().cpu(), channel_mean=channel_mean, channel_std=channel_std)
-    rows, cols = 3, 6
-    n = rows * cols
+    n = num_samples
+    cols = int(np.ceil(np.sqrt(n)))
+    rows = int(np.ceil(n / cols))
 
-    imgs = [(sea_ice_samples_1 - sea_ice_samples_2)[i][0] for i in range(n)]
+    # land_mask: 1 = water, 0 = land (or vice versa — применяем как есть)
+    mask = land_mask.detach().cpu() if isinstance(land_mask, torch.Tensor) else torch.tensor(land_mask)
+    mask_np = mask.numpy() if mask.ndim == 2 else mask[0].numpy()
+    n_water = np.sum(mask_np)
+
+    diff = (sea_ice_samples_1 - sea_ice_samples_2) * mask
+    imgs = [diff[i][0] for i in range(n)]
     vmin = min(img.min().item() for img in imgs)
     vmax = max(img.max().item() for img in imgs)
 
@@ -311,14 +319,12 @@ def make_difference_plot(sea_ice_samples_1, sea_ice_samples_2, channel_mean, cha
     axes = axes.flatten()
     fig.suptitle("Conditioned samples delta", fontsize=16, y=0.98)
 
-    water_to_land_ratio = 0.56600341796875
-
     for idx, ax in enumerate(axes):
         img = imgs[idx].numpy()
         im = ax.imshow(img, norm=norm, cmap='viridis')
         ax.axis('off')
 
-        mean_square = np.mean(img**2)/water_to_land_ratio
+        mean_square = np.sum(img**2) / n_water
         ax.text(0.5, -0.1, f'MSE: {mean_square:.3f}',
                 transform=ax.transAxes, ha='center', va='top', fontsize=8)
         
