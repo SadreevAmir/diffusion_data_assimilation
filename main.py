@@ -1,8 +1,10 @@
 import logging
+import os
+import numpy as np
 import torch
 from functools import partial
 from trainer import TrainingConfig, UNetTrainer
-from utils import NpyImageDataset, channel_normalize, add_noise
+from utils import NpyImageDataset, MixedSatelliteTrackDataset, channel_normalize, add_noise
 from diffusers.models.unets.unet_2d import UNet2DModel
 from diffusers.optimization import get_cosine_schedule_with_warmup
 
@@ -58,10 +60,17 @@ def main():
     )
 
 
-    dataset_satellite_mask = NpyImageDataset(
+    valid_mask_path = os.path.join(os.path.dirname(config.data_dir_train), "mask_padding.npy")
+    valid_mask = np.load(valid_mask_path).astype(np.float32)
+
+    dataset_satellite_mask = MixedSatelliteTrackDataset(
         folder=config.data_dir_satellite_mask,
-        transform=lambda x: x,
-        preload=False,
+        image_size=config.image_size,
+        valid_mask=valid_mask,
+        npy_fraction=0.5,
+        generate_fraction=0.3,
+        empty_fraction=0.2,
+        n_tracks_range=config.satellite_n_tracks_range,
         mmap_mode='r',
     )
     satellite_mask_dataloader = torch.utils.data.DataLoader(

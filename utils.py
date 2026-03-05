@@ -79,6 +79,76 @@ class NpyImageDataset(Dataset):
 
 
 
+class MixedSatelliteTrackDataset(Dataset):
+    """Dataset for satellite track masks with configurable source mixing.
+
+    Each item is drawn from one of three sources according to the given fractions:
+      - npy:      load a real mask from a .npy file of shape (H, W)
+      - generate: produce a synthetic track via generate_satellite_track_mask
+      - empty:    return an all-zero mask (no observations)
+
+    The fractions must sum to 1.0.  If npy_fraction > 0, the folder must contain
+    at least one .npy file.  Dataset length equals the number of .npy files found
+    (or ``length`` if provided), so the DataLoader can be wrapped in itertools.cycle.
+    """
+
+    def __init__(
+        self,
+        folder: str,
+        image_size: tuple,
+        valid_mask: Optional[np.ndarray] = None,
+        npy_fraction: float = 0.5,
+        generate_fraction: float = 0.3,
+        empty_fraction: float = 0.2,
+        n_tracks_range: tuple = (0, 5),
+        file_list: Optional[List[str]] = None,
+        mmap_mode: Literal['r', 'r+', 'w+', 'c', None] = None,
+        length: Optional[int] = None,
+    ):
+        assert abs(npy_fraction + generate_fraction + empty_fraction - 1.0) < 1e-6, \
+            "npy_fraction + generate_fraction + empty_fraction must equal 1.0"
+
+        self.folder = folder
+        self.image_size = image_size
+        self.valid_mask = valid_mask
+        self.npy_fraction = npy_fraction
+        self.generate_fraction = generate_fraction
+        self.n_tracks_range = n_tracks_range
+        self.mmap_mode = mmap_mode
+
+        if file_list is not None:
+            self.files = file_list
+        elif npy_fraction > 0:
+            self.files = sorted([f for f in os.listdir(folder) if f.endswith('.npy')])
+            if not self.files:
+                raise ValueError(f"No .npy files found in {folder} but npy_fraction={npy_fraction}")
+        else:
+            self.files = []
+
+        self._len = length if length is not None else max(len(self.files), 1)
+
+    def __len__(self):
+        return self._len
+
+    def __getitem__(self, idx):
+        r = np.random.random()
+
+        if r < self.npy_fraction and self.files:
+            path = os.path.join(self.folder, self.files[idx % len(self.files)])
+            arr = np.load(path, mmap_mode=self.mmap_mode) if self.mmap_mode else np.load(path)
+            arr = np.asarray(arr, dtype=np.float32)
+            if arr.ndim == 2:
+                arr = arr[None, :]
+            return torch.from_numpy(arr)
+
+        if r < self.npy_fraction + self.generate_fraction:
+            mask = generate_satellite_track_mask(self.image_size, 1, self.valid_mask, self.n_tracks_range)  # (1, H, W)
+            return torch.from_numpy(mask)
+
+        H, W = self.image_size
+        return torch.zeros(1, H, W, dtype=torch.float32)
+
+
 def channel_normalize(x: torch.Tensor, channel_mean, channel_std) -> torch.Tensor:
     mean = torch.as_tensor(channel_mean, device=x.device, dtype=x.dtype).view(-1, 1, 1)
     std  = torch.as_tensor(channel_std,  device=x.device, dtype=x.dtype).view(-1, 1, 1)
@@ -127,9 +197,10 @@ def generate_satellite_track_mask(
     image_size: tuple,
     batch_size: int = 1,
     valid_mask: Optional[np.ndarray] = None,
+    n_tracks_range: tuple = (0, 5),
 ) -> np.ndarray:
     """
-    Generate a batch of binary masks with 0–5 random straight satellite tracks each.
+    Generate a batch of binary masks with random straight satellite tracks each.
 
     Fully vectorized: no Python loops. All track parameters are generated at once,
     then scattered into the mask array in two passes (row-dominant / col-dominant).
@@ -139,6 +210,7 @@ def generate_satellite_track_mask(
         batch_size: number of masks to generate.
         valid_mask: float32 array of shape (H, W), 1 where observations
                     are allowed. Defaults to all-ones (no restriction).
+        n_tracks_range: (min, max) inclusive range for the number of tracks per mask.
 
     Returns:
         masks: float32 array of shape (batch_size, H, W).
@@ -147,11 +219,11 @@ def generate_satellite_track_mask(
     if valid_mask is None:
         valid_mask = np.ones((H, W), dtype=np.float32)
 
-    n_max = 5
+    n_min, n_max = n_tracks_range
     masks = np.zeros((batch_size, H, W), dtype=np.float32)
 
     # Draw all parameters at once: (bs, n_max)
-    n_tracks = np.random.randint(0, n_max + 1, size=batch_size)
+    n_tracks = np.random.randint(n_min, n_max + 1, size=batch_size)
     active = (np.arange(n_max)[None, :] < n_tracks[:, None]).ravel()  # (bs*n_max,)
 
     y0 = np.random.uniform(0, H, size=batch_size * n_max)
@@ -219,7 +291,7 @@ def make_plot(sea_ice_samples, channel_mean, channel_std, num_samples, title = '
     sm.set_array([])
 
     fig.subplots_adjust(right=0.85) 
-    cbar_ax = fig.add_axes([0.88, 0.15, 0.02, 0.7])
+    cbar_ax = fig.add_axes((0.88, 0.15, 0.02, 0.7))
     cbar = fig.colorbar(sm, cax=cbar_ax)
     plt.show()
 
@@ -253,7 +325,7 @@ def make_difference_plot(sea_ice_samples_1, sea_ice_samples_2, channel_mean, cha
     sm = plt.cm.ScalarMappable(cmap='viridis', norm=norm)
     sm.set_array([])
     fig.subplots_adjust(right=0.85, bottom=0.1)
-    cbar_ax = fig.add_axes([0.88, 0.15, 0.02, 0.7])
+    cbar_ax = fig.add_axes((0.88, 0.15, 0.02, 0.7))
     cbar = fig.colorbar(sm, cax=cbar_ax)
 
     plt.show()

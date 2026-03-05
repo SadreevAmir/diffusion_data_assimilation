@@ -65,6 +65,15 @@ class TrainingConfig:
     mixed_precision: str = field(default_factory=_default_mixed_precision)
     seed: int = 0
 
+    # Satellite track generation
+    satellite_n_tracks_range: tuple = (0, 5)  # диапазон числа полос (включительно)
+
+    # Сэмплирование моментов времени
+    # 'uniform' — равномерное (текущее поведение)
+    # 'beta'    — Beta(alpha, beta), alpha > beta сдвигает к t=1 (более шумные картинки)
+    timestep_sampler: str = 'uniform'
+    timestep_beta_params: tuple = (2.0, 1.0)  # (alpha, beta) для режима 'beta'
+
     # Loss
     masked_loss_weight: float = 0.1  # вес loss по пикселям трека
 
@@ -104,6 +113,8 @@ class UNetTrainer:
 
         if self.accelerator.is_main_process:
             os.makedirs(self.output_dir, exist_ok=True)
+            with open(os.path.join(self.output_dir, "config.json"), "w") as f:
+                json.dump({k: str(v) if isinstance(v, tuple) else v for k, v in asdict(config).items()}, f, indent=4)
             if config.push_to_hub:
                 create_repo(repo_id=config.hub_model_id, exist_ok=True)
 
@@ -139,21 +150,22 @@ class UNetTrainer:
         mask_path = os.path.join(os.path.dirname(config.data_dir_train), "mask_padding.npy")
         self._valid_mask = np.load(mask_path).astype(np.float32)
 
+    def _sample_timesteps(self, bs: int) -> torch.Tensor:
+        device = self.accelerator.device
+        if self.config.timestep_sampler == 'beta':
+            alpha, beta = self.config.timestep_beta_params
+            return torch.distributions.Beta(alpha, beta).sample((bs,)).to(device)
+        return torch.rand(bs, device=device)
+
     def _make_model_input(
         self, noisy_images: torch.Tensor, clean_images: torch.Tensor, satellite_mask_images:torch.Tensor
-    ) -> tuple[torch.Tensor, torch.Tensor]:
+    ) -> torch.Tensor:
         bs = noisy_images.shape[0]
-
-        #device = noisy_images.device
-        # masks = torch.from_numpy(
-        #     generate_satellite_track_mask(self.config.image_size, bs, self._valid_mask)
-        # ).unsqueeze(1).to(device)  # (bs, 1, H, W)
 
         # clean_images уже нормализованы датасетом — просто обнуляем вне треков
         observed = clean_images * satellite_mask_images  # (bs, 2, H, W)
         grid = self._grid.expand(bs, -1, -1, -1)  # (bs, 2, H, W)
         satellite_mask_images = satellite_mask_images.expand(bs, -1, -1, -1)
-        print(satellite_mask_images.shape)
         model_input = torch.cat([noisy_images, grid, satellite_mask_images, observed], dim=1)  # (bs, 7, H, W)
         return model_input
 
@@ -183,7 +195,7 @@ class UNetTrainer:
                 bs = clean_images.shape[0]
                 satellite_mask_images = next(self.satellite_mask_iter)
 
-                timesteps = torch.rand(bs, device=self.accelerator.device)
+                timesteps = self._sample_timesteps(bs)
                 noisy_images, v_real = self.add_noise(clean_images, timesteps)
 
                 model_input = self._make_model_input(noisy_images, clean_images, satellite_mask_images)
@@ -211,7 +223,7 @@ class UNetTrainer:
 
         # Случайная маска треков
         mask = torch.from_numpy(
-            generate_satellite_track_mask(self.config.image_size, 1, self._valid_mask)
+            generate_satellite_track_mask(self.config.image_size, 1, self._valid_mask, self.config.satellite_n_tracks_range)
         ).unsqueeze(1).to(device)  # (1, 1, H, W)
 
         observed = clean_images * mask  # (1, 2, H, W) — уже нормализовано
@@ -268,7 +280,7 @@ class UNetTrainer:
                 clean_images = batch
                 satellite_mask_images = next(self.satellite_mask_iter)
                 bs = clean_images.shape[0]
-                timesteps = torch.rand(bs, device=self.accelerator.device)
+                timesteps = self._sample_timesteps(bs)
                 noisy_images, v_real = self.add_noise(clean_images, timesteps)
 
                 with self.accelerator.accumulate(self.model):
