@@ -35,27 +35,22 @@ def _default_data_dir() -> str:
 
 @dataclass
 class TrainingConfig:
-    # Пути к данным (выбираются автоматически по платформе)
     data_dir_train: str = _default_data_dir() + "/train"
     data_dir_valid: str = _default_data_dir() + "/valid"
     data_dir_satellite_mask: str = _default_data_dir() + "/satellite_samples"
 
-    # Нормализация
     with open(os.path.join(data_dir_train, "stats.json")) as f:
         stats = json.load(f)
     channel_mean: tuple = tuple(stats["mean"])
     channel_std: tuple = tuple(stats["std"])
 
-    # Архитектура модели
     image_size: tuple = (320, 256)
-    in_channels: int = 7  # noisy(2) + grid(2) + mask(1) + observed(2)
+    in_channels: int = 7
     out_channels: int = 2
 
-    # Загрузка данных
     num_workers_train: int = 6
     num_workers_val: int = 4
 
-    # Обучение
     train_batch_size: int = 24
     eval_batch_size: int = 1
     num_epochs: int = 20
@@ -65,27 +60,20 @@ class TrainingConfig:
     mixed_precision: str = field(default_factory=_default_mixed_precision)
     seed: int = 0
 
-    # Satellite track generation
-    satellite_n_tracks_range: tuple = (0, 5)  # диапазон числа полос (включительно)
+    satellite_n_tracks_range: tuple = (0, 5)
 
-    # Сэмплирование моментов времени
-    # 'uniform' — равномерное (текущее поведение)
-    # 'beta'    — Beta(alpha, beta), alpha > beta сдвигает к t=1 (более шумные картинки)
     timestep_sampler: str = 'uniform'
-    timestep_beta_params: tuple = (2.0, 1.0)  # (alpha, beta) для режима 'beta'
+    timestep_beta_params: tuple = (2.0, 1.0)
 
-    # Loss
-    masked_loss_weight: float = 0.1  # вес loss по пикселям трека
+    masked_loss_weight: float = 0.1
 
-    # Сэмплирование во время обучения
     sample_every_n_epochs: int = 1
     num_sample_timesteps: int = 50
 
-    # Сохранение / Hub
     push_to_hub: bool = True
     hub_model_id: str = 'amirsadreev/diffusion_data_assimilation'
     base_output_dir: str = 'checkpoints'
-    resume_from_checkpoint: str = ""  # путь к last_checkpoint для возобновления
+    resume_from_checkpoint: str = ""
 
 
 class UNetTrainer:
@@ -118,7 +106,6 @@ class UNetTrainer:
             if config.push_to_hub:
                 create_repo(repo_id=config.hub_model_id, exist_ok=True)
 
-        # init_trackers принимает только int/float/str/bool — tuple сериализуем в str
         loggable_config = {k: str(v) if isinstance(v, tuple) else v for k, v in asdict(config).items()}
         self.accelerator.init_trackers("diffusion_training", config=loggable_config)
 
@@ -137,16 +124,13 @@ class UNetTrainer:
 
         self.satellite_mask_iter = cycle(self.satellite_mask_dataloader)
 
-
         self.unwrapped_model = self.accelerator.unwrap_model(self.model)
         self.ema_model = EMAModel(self.unwrapped_model.parameters(), decay=0.999)
         self.ema_model.to(self.accelerator.device)
 
-        # Grid статичен — вычисляем один раз
         H, W = config.image_size
         self._grid = make_normalized_xy_grid(H, W).to(self.accelerator.device)
 
-        # Маска валидных пикселей (суша/паддинг обнулены)
         mask_path = os.path.join(os.path.dirname(config.data_dir_train), "mask_padding.npy")
         self._valid_mask = np.load(mask_path).astype(np.float32)
 
@@ -158,32 +142,27 @@ class UNetTrainer:
         return torch.rand(bs, device=device)
 
     def _make_model_input(
-        self, noisy_images: torch.Tensor, clean_images: torch.Tensor, satellite_mask_images:torch.Tensor
+        self, noisy_images: torch.Tensor, clean_images: torch.Tensor, satellite_mask_images: torch.Tensor
     ) -> torch.Tensor:
         bs = noisy_images.shape[0]
-
-        # clean_images уже нормализованы датасетом — просто обнуляем вне треков
-        observed = clean_images * satellite_mask_images  # (bs, 2, H, W)
-        grid = self._grid.expand(bs, -1, -1, -1)  # (bs, 2, H, W)
+        observed = clean_images * satellite_mask_images
+        grid = self._grid.expand(bs, -1, -1, -1)
         satellite_mask_images = satellite_mask_images.expand(bs, -1, -1, -1)
-        model_input = torch.cat([noisy_images, grid, satellite_mask_images, observed], dim=1)  # (bs, 7, H, W)
+        model_input = torch.cat([noisy_images, grid, satellite_mask_images, observed], dim=1)
         return model_input
 
     def _masked_mse(self, pred: torch.Tensor, target: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
-        """MSE только по пикселям трека, усреднённый по числу track-пикселей, а не по всем."""
-        mask_exp = mask.expand_as(pred)  # (bs, 2, H, W)
+        mask_exp = mask.expand_as(pred)
         n = mask_exp.sum().clamp(min=1.0)
         return (F.mse_loss(pred, target, reduction='none') * mask_exp).sum() / n
 
     def save_model_custom(self, name="last_model.pth"):
-        """Сохраняет веса модели и EMA веса."""
         os.makedirs(self.output_dir, exist_ok=True)
         unwrapped = self.accelerator.unwrap_model(self.model)
         torch.save(unwrapped.state_dict(), os.path.join(self.output_dir, name))
         torch.save(self.ema_model.state_dict(), os.path.join(self.output_dir, f"ema_{name}"))
 
     def compute_val_loss(self) -> tuple[float, float, float]:
-        """Возвращает (val_loss_full, val_loss_masked, val_loss_total)."""
         self.model.eval()
         total_full = 0.0
         total_masked = 0.0
@@ -212,21 +191,17 @@ class UNetTrainer:
         return vf, vm, vf + self.config.masked_loss_weight * vm
 
     def save_samples(self, epoch: int):
-        """Берёт один val-сэмпл, применяет случайную маску треков, запускает conditioned сэмплинг.
-        Сохраняет PNG: истина / маска / предсказание для каждого канала."""
         self.model.eval()
         device = self.accelerator.device
         sampler = Sampler(self.accelerator.unwrap_model(self.model))
 
-        # Один батч из val для ground truth
-        clean_images = next(iter(self.val_dataloader))[:1]  # (1, 2, H, W)
+        clean_images = next(iter(self.val_dataloader))[:1]
 
-        # Случайная маска треков
         mask = torch.from_numpy(
             generate_satellite_track_mask(self.config.image_size, 1, self._valid_mask, self.config.satellite_n_tracks_range)
-        ).unsqueeze(1).to(device)  # (1, 1, H, W)
+        ).unsqueeze(1).to(device)
 
-        observed = clean_images * mask  # (1, 2, H, W) — уже нормализовано
+        observed = clean_images * mask
 
         sample = sampler.sample_conditioned(
             mask=mask,
@@ -234,7 +209,7 @@ class UNetTrainer:
             size=self.config.image_size,
             num_timesteps=self.config.num_sample_timesteps,
             device=device,
-        )  # (1, 2, H, W)
+        )
 
         truth  = channel_denormalize(clean_images.clone(), self.config.channel_mean, self.config.channel_std)
         sample = channel_denormalize(sample, self.config.channel_mean, self.config.channel_std)
@@ -288,13 +263,12 @@ class UNetTrainer:
 
                     v_pred = self.model(model_input, timesteps * 1000, return_dict=False)[0]
                     loss_full   = F.mse_loss(v_pred, v_real)
-                    loss_masked = self._masked_mse(v_pred, v_real, satellite_mask_images)  # ← сюда
+                    loss_masked = self._masked_mse(v_pred, v_real, satellite_mask_images)
                     loss        = loss_full + self.config.masked_loss_weight * loss_masked
 
                     self.accelerator.backward(loss)
                     if self.accelerator.sync_gradients:
                         self.accelerator.clip_grad_norm_(self.model.parameters(), 1.0)
-                    loss_masked = self._masked_mse(v_pred, v_real, satellite_mask_images)
                     self.optimizer.step()
                     self.lr_scheduler.step()
                     self.optimizer.zero_grad()

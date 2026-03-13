@@ -1,8 +1,11 @@
 import torch
+from torchdiffeq import odeint
 from utils import make_normalized_xy_grid, add_noise, get_device
 
-# (channels, H, W) — соответствует архитектуре UNet2DModel
 _IMAGE_SHAPE = (2, 320, 256)
+
+_FIXED_STEP_METHODS = {'euler', 'midpoint', 'rk4', 'heun3'}
+_ADAPTIVE_METHODS   = {'dopri5', 'dopri8', 'bosh3', 'fehlberg2', 'adaptive_heun'}
 
 
 class Sampler:
@@ -11,40 +14,42 @@ class Sampler:
         self.noise_func = noise_func
 
     @torch.no_grad()
-    def sample_conditioned(self, mask, observed, size, num_timesteps, device=None):
-        """
-        Сэмплирование с conditioning через concatenation (обученная архитектура, 7 каналов).
-
-        Args:
-            mask:     (1, 1, H, W) — бинарная маска треков
-            observed: (1, 2, H, W) — нормализованные наблюдения на треках
-            size:     (H, W)
-            num_timesteps: число шагов
-            device:   устройство
-        """
+    def sample_conditioned(
+        self,
+        mask,
+        observed,
+        size,
+        num_timesteps,
+        device=None,
+        method='euler',
+        rtol=1e-3,
+        atol=1e-4,
+    ):
         batch_size = observed.shape[0]
         device = device or get_device()
         mask = mask.to(device)
         observed = observed.to(device)
         H, W = size
-        grid = make_normalized_xy_grid(H, W).to(device).expand(batch_size, -1, -1, -1)    # (1, 2, H, W)
+        grid = make_normalized_xy_grid(H, W).to(device).expand(batch_size, -1, -1, -1)
         timesteps = torch.linspace(1.0, 0.001, num_timesteps, device=device)
-        dt = 1.0 / num_timesteps
 
-        x = torch.randn((batch_size, 2, H, W), device=device)
-        print(x.shape)
-        print(mask.shape)
-        print(observed.shape)
-        print(grid.shape)
-    
+        x0 = torch.randn((batch_size, 2, H, W), device=device)
 
-        for t in timesteps:
-            t_tensor = torch.full((1,), t.item() * 1000, device=device)
-            model_input = torch.cat([x, grid, mask, observed], dim=1)  # (1, 7, H, W)
-            v_t = self.model(model_input, t_tensor).sample
-            x = x - dt * v_t
+        def f(t, x):
+            t_tensor = t.expand(batch_size) * 1000
+            model_input = torch.cat([x, grid, mask, observed], dim=1)
+            return -self.model(model_input, t_tensor).sample
 
-        return x  # (1, 2, H, W)
+        kwargs = {}
+        if method in _FIXED_STEP_METHODS:
+            kwargs['options'] = {'step_size': 1.0 / num_timesteps}
+        else:
+            kwargs['rtol'] = rtol
+            kwargs['atol'] = atol
+
+        trajectory = odeint(f, x0, timesteps, method=method, **kwargs)
+
+        return trajectory[-1]
 
     @torch.no_grad()
     def sample_no_condition(self, size, num_timesteps, batch_size, device=None):

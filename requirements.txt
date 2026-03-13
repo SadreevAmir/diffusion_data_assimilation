@@ -9,3 +9,4 @@ huggingface-hub>=0.26.2
 xformers==0.0.28.post3
 tensorboard==2.18.0
 ipywidgets==8.1.5
+torchdiffeq>=0.2.3
