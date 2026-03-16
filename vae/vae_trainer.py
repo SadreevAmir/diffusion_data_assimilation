@@ -11,7 +11,7 @@ from accelerate.utils import ProjectConfiguration
 from huggingface_hub import upload_folder, create_repo
 from datetime import datetime
 
-from vae import vae_loss
+from vae.vae import vae_loss
 from utils import channel_denormalize
 
 torch.set_float32_matmul_precision('high')

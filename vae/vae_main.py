@@ -2,8 +2,8 @@ import logging
 import os
 import torch
 from functools import partial
-from vae import VAE
-from vae_trainer import VAETrainingConfig, VAETrainer
+from vae.vae import VAE
+from vae.vae_trainer import VAETrainingConfig, VAETrainer
 from utils import NpyImageDataset, channel_normalize
 from diffusers.optimization import get_cosine_schedule_with_warmup
 
