@@ -1,20 +1,29 @@
 mnt/
 .env
 
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
+
+# Jupyter
 .ipynb_checkpoints/
 
-.Trash-0/
-checkpoints/
+# Checkpoints & model weights
+checkpoints*/
+*.pth
+*.pt
+*.bin
 
+# Logs
 *.log
-training.log
 
+# Envs
 venv/
 .venv/
 
-.dockercompose.un~
+# OS / editor
 .DS_Store
+.Trash-0/
+.dockercompose.un~
 pictures/
