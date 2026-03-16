@@ -16,7 +16,7 @@ from datetime import datetime
 from itertools import cycle
 
 from utils import make_normalized_xy_grid, channel_denormalize, generate_satellite_track_mask
-from sampler import Sampler
+from sampler import ControlNetSampler
 
 torch.set_float32_matmul_precision('high')
 
@@ -34,7 +34,7 @@ def _default_data_dir() -> str:
 
 
 @dataclass
-class TrainingConfig:
+class ControlNetTrainingConfig:
     data_dir_train: str = _default_data_dir() + "/train"
     data_dir_valid: str = _default_data_dir() + "/valid"
     data_dir_satellite_mask: str = _default_data_dir() + "/satellite_samples"
@@ -45,8 +45,11 @@ class TrainingConfig:
     channel_std: tuple = tuple(stats["std"])
 
     image_size: tuple = (320, 256)
-    in_channels: int = 7
+    # UNet input: noisy image (2ch) + XY grid (2ch)
+    in_channels: int = 4
     out_channels: int = 2
+    # ControlNet conditioning input: mask (1ch) + observed values (2ch)
+    controlnet_conditioning_channels: int = 3
 
     num_workers_train: int = 6
     num_workers_val: int = 4
@@ -71,14 +74,15 @@ class TrainingConfig:
     num_sample_timesteps: int = 50
 
     push_to_hub: bool = True
-    hub_model_id: str = 'amirsadreev/diffusion_data_assimilation'
-    base_output_dir: str = 'checkpoints'
+    hub_model_id: str = 'amirsadreev/controlnet_sea_ice'
+    base_output_dir: str = 'checkpoints_controlnet'
     resume_from_checkpoint: str = ""
 
 
-class UNetTrainer:
-    def __init__(self, config: TrainingConfig, model, optimizer, data_loader_train,
-                 data_loader_val, data_loader_satellite_mask, lr_scheduler, add_noise_func):
+class ControlNetTrainer:
+    def __init__(self, config: ControlNetTrainingConfig, unet, controlnet, optimizer,
+                 data_loader_train, data_loader_val, data_loader_satellite_mask,
+                 lr_scheduler, add_noise_func):
 
         self.config = config
         self.run_name = datetime.now().strftime("run_%Y%m%d_%H%M%S")
@@ -107,26 +111,33 @@ class UNetTrainer:
                 create_repo(repo_id=config.hub_model_id, exist_ok=True)
 
         loggable_config = {k: str(v) if isinstance(v, tuple) else v for k, v in asdict(config).items()}
-        self.accelerator.init_trackers("diffusion_training", config=loggable_config)
+        self.accelerator.init_trackers("controlnet_training", config=loggable_config)
 
-        if (self.accelerator.device.type == 'cuda'
-                and hasattr(model, "enable_xformers_memory_efficient_attention")):
-            model.enable_xformers_memory_efficient_attention()
+        unet.requires_grad_(False)
+
+        for m in (unet, controlnet):
+            if (self.accelerator.device.type == 'cuda'
+                    and hasattr(m, "enable_xformers_memory_efficient_attention")):
+                m.enable_xformers_memory_efficient_attention()
 
         (self.model,
+         self.controlnet,
          self.optimizer,
          self.train_dataloader,
          self.val_dataloader,
          self.satellite_mask_dataloader,
          self.lr_scheduler) = self.accelerator.prepare(
-            model, optimizer, data_loader_train, data_loader_val, data_loader_satellite_mask, lr_scheduler
+            unet, controlnet, optimizer,
+            data_loader_train, data_loader_val, data_loader_satellite_mask,
+            lr_scheduler,
         )
 
         self.satellite_mask_iter = cycle(self.satellite_mask_dataloader)
 
-        self.unwrapped_model = self.accelerator.unwrap_model(self.model)
-        self.ema_model = EMAModel(self.unwrapped_model.parameters(), decay=0.999)
-        self.ema_model.to(self.accelerator.device)
+        self.ema_controlnet = EMAModel(
+            self.accelerator.unwrap_model(self.controlnet).parameters(), decay=0.999
+        )
+        self.ema_controlnet.to(self.accelerator.device)
 
         H, W = config.image_size
         self._grid = make_normalized_xy_grid(H, W).to(self.accelerator.device)
@@ -141,29 +152,61 @@ class UNetTrainer:
             return torch.distributions.Beta(alpha, beta).sample((bs,)).to(device)
         return torch.rand(bs, device=device)
 
-    def _make_model_input(
-        self, noisy_images: torch.Tensor, clean_images: torch.Tensor, satellite_mask_images: torch.Tensor
-    ) -> torch.Tensor:
+    def _make_unet_input(self, noisy_images: torch.Tensor) -> torch.Tensor:
         bs = noisy_images.shape[0]
-        observed = clean_images * satellite_mask_images
         grid = self._grid.expand(bs, -1, -1, -1)
-        satellite_mask_images = satellite_mask_images.expand(bs, -1, -1, -1)
-        model_input = torch.cat([noisy_images, grid, satellite_mask_images, observed], dim=1)
-        return model_input
+        return torch.cat([noisy_images, grid], dim=1)
+
+    def _make_controlnet_cond(
+        self, clean_images: torch.Tensor, satellite_mask: torch.Tensor
+    ) -> torch.Tensor:
+        bs = clean_images.shape[0]
+        observed = clean_images * satellite_mask
+        mask_exp = satellite_mask.expand(bs, -1, -1, -1)
+        return torch.cat([mask_exp, observed], dim=1)
+
+    def _model_forward(
+        self,
+        unet_input: torch.Tensor,
+        controlnet_cond: torch.Tensor,
+        timesteps: torch.Tensor,
+    ) -> torch.Tensor:
+        down_samples, mid_sample = self.controlnet(
+            sample=unet_input,
+            timestep=timesteps * 1000,
+            encoder_hidden_states=None,
+            controlnet_cond=controlnet_cond,
+            return_dict=False,
+        )
+        v_pred = self.model(
+            sample=unet_input,
+            timestep=timesteps * 1000,
+            encoder_hidden_states=None,
+            down_block_additional_residuals=down_samples,
+            mid_block_additional_residual=mid_sample,
+            return_dict=False,
+        )[0]
+        return v_pred
 
     def _masked_mse(self, pred: torch.Tensor, target: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
         mask_exp = mask.expand_as(pred)
         n = mask_exp.sum().clamp(min=1.0)
         return (F.mse_loss(pred, target, reduction='none') * mask_exp).sum() / n
 
-    def save_model_custom(self, name="last_model.pth"):
+    def save_model_custom(self, name: str = "last"):
         os.makedirs(self.output_dir, exist_ok=True)
-        unwrapped = self.accelerator.unwrap_model(self.model)
-        torch.save(unwrapped.state_dict(), os.path.join(self.output_dir, name))
-        torch.save(self.ema_model.state_dict(), os.path.join(self.output_dir, f"ema_{name}"))
+        torch.save(
+            self.accelerator.unwrap_model(self.controlnet).state_dict(),
+            os.path.join(self.output_dir, f"controlnet_{name}.pth"),
+        )
+        torch.save(
+            self.ema_controlnet.state_dict(),
+            os.path.join(self.output_dir, f"controlnet_ema_{name}.pth"),
+        )
 
     def compute_val_loss(self) -> tuple[float, float, float]:
         self.model.eval()
+        self.controlnet.eval()
         total_full = 0.0
         total_masked = 0.0
         n = len(self.val_dataloader)
@@ -172,19 +215,20 @@ class UNetTrainer:
             for batch in self.val_dataloader:
                 clean_images = batch
                 bs = clean_images.shape[0]
-                satellite_mask_images = next(self.satellite_mask_iter)
+                satellite_mask = next(self.satellite_mask_iter)
 
                 timesteps = self._sample_timesteps(bs)
                 noisy_images, v_real = self.add_noise(clean_images, timesteps)
 
-                model_input = self._make_model_input(noisy_images, clean_images, satellite_mask_images)
+                unet_input = self._make_unet_input(noisy_images)
+                controlnet_cond = self._make_controlnet_cond(clean_images, satellite_mask)
 
-                v_pred = self.model(model_input, timesteps * 1000, return_dict=False)[0]
+                v_pred = self._model_forward(unet_input, controlnet_cond, timesteps)
                 loss_full   = F.mse_loss(v_pred, v_real)
-                loss_masked = self._masked_mse(v_pred, v_real, satellite_mask_images)
+                loss_masked = self._masked_mse(v_pred, v_real, satellite_mask)
 
-                total_full   += self.accelerator.gather_for_metrics(loss_full).mean().item()    # type: ignore[union-attr]
-                total_masked += self.accelerator.gather_for_metrics(loss_masked).mean().item()  # type: ignore[union-attr]
+                total_full   += self.accelerator.gather_for_metrics(loss_full).mean().item()   # type: ignore[union-attr]
+                total_masked += self.accelerator.gather_for_metrics(loss_masked).mean().item() # type: ignore[union-attr]
 
         vf = total_full / n
         vm = total_masked / n
@@ -192,13 +236,19 @@ class UNetTrainer:
 
     def save_samples(self, epoch: int):
         self.model.eval()
+        self.controlnet.eval()
         device = self.accelerator.device
-        sampler = Sampler(self.accelerator.unwrap_model(self.model))
+        sampler = ControlNetSampler(
+            unet=self.accelerator.unwrap_model(self.model),
+            controlnet=self.accelerator.unwrap_model(self.controlnet),
+        )
 
         clean_images = next(iter(self.val_dataloader))[:1]
 
         mask = torch.from_numpy(
-            generate_satellite_track_mask(self.config.image_size, 1, self._valid_mask, self.config.satellite_n_tracks_range)
+            generate_satellite_track_mask(
+                self.config.image_size, 1, self._valid_mask, self.config.satellite_n_tracks_range
+            )
         ).unsqueeze(1).to(device)
 
         observed = clean_images * mask
@@ -245,6 +295,7 @@ class UNetTrainer:
 
         for epoch in range(self.config.num_epochs):
             self.model.train()
+            self.controlnet.train()
             progress_bar = tqdm(
                 total=len(self.train_dataloader),
                 disable=not self.accelerator.is_local_main_process,
@@ -253,26 +304,27 @@ class UNetTrainer:
 
             for batch in self.train_dataloader:
                 clean_images = batch
-                satellite_mask_images = next(self.satellite_mask_iter)
+                satellite_mask = next(self.satellite_mask_iter)
                 bs = clean_images.shape[0]
                 timesteps = self._sample_timesteps(bs)
                 noisy_images, v_real = self.add_noise(clean_images, timesteps)
 
-                with self.accelerator.accumulate(self.model):
-                    model_input = self._make_model_input(noisy_images, clean_images, satellite_mask_images)
+                with self.accelerator.accumulate(self.controlnet):
+                    unet_input = self._make_unet_input(noisy_images)
+                    controlnet_cond = self._make_controlnet_cond(clean_images, satellite_mask)
 
-                    v_pred = self.model(model_input, timesteps * 1000, return_dict=False)[0]
+                    v_pred = self._model_forward(unet_input, controlnet_cond, timesteps)
                     loss_full   = F.mse_loss(v_pred, v_real)
-                    loss_masked = self._masked_mse(v_pred, v_real, satellite_mask_images)
+                    loss_masked = self._masked_mse(v_pred, v_real, satellite_mask)
                     loss        = loss_full + self.config.masked_loss_weight * loss_masked
 
                     self.accelerator.backward(loss)
                     if self.accelerator.sync_gradients:
-                        self.accelerator.clip_grad_norm_(self.model.parameters(), 1.0)
+                        self.accelerator.clip_grad_norm_(self.controlnet.parameters(), 1.0)
                     self.optimizer.step()
                     self.lr_scheduler.step()
                     self.optimizer.zero_grad()
-                    self.ema_model.step(self.unwrapped_model.parameters())
+                    self.ema_controlnet.step(self.accelerator.unwrap_model(self.controlnet).parameters())
 
                 self.accelerator.log({
                     "train_loss":        loss.item(),
@@ -306,14 +358,14 @@ class UNetTrainer:
                 with open(os.path.join(self.output_dir, "metrics.json"), "w") as f:
                     json.dump(self.val_history, f, indent=4)
 
-                self.save_model_custom("last_model.pth")
+                self.save_model_custom("last")
 
                 if epoch % self.config.sample_every_n_epochs == 0:
                     self.save_samples(epoch)
 
                 if val_loss < self.best_val_loss:
                     self.best_val_loss = val_loss
-                    self.save_model_custom("best_model.pth")
+                    self.save_model_custom("best")
                     logger.info("New best model saved! val_loss: %.6f", val_loss)
 
                 if self.config.push_to_hub:
