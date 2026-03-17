@@ -34,7 +34,7 @@ class Sampler:
         def f(t, x):
             t_tensor = t.expand(batch_size) * 1000
             model_input = torch.cat([x, grid, mask, observed], dim=1)
-            return -self.model(model_input, t_tensor).sample
+            return self.model(model_input, t_tensor).sample
 
         kwargs = {}
         if method in _FIXED_STEP_METHODS:
