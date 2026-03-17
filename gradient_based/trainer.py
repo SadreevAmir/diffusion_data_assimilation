@@ -59,8 +59,8 @@ class TrainingConfig:
     num_sample_timesteps: int = 50
 
     push_to_hub: bool = True
-    hub_model_id: str = 'amirsadreev/diffusion_data_assimilation'
-    base_output_dir: str = 'checkpoints'
+    hub_model_id: str = 'amirsadreev/sea_ice_diffusion'
+    base_output_dir: str = 'checkpoints/gradient_based'
     resume_from_checkpoint: str = ""
 
 
@@ -239,7 +239,7 @@ class UNetTrainer:
                         upload_folder(
                             repo_id=self.config.hub_model_id,
                             folder_path=self.output_dir,
-                            path_in_repo=self.run_name,
+                            path_in_repo=f"gradient_based/{self.run_name}",
                             commit_message=f"Epoch {epoch} - val_loss {val_loss:.4f}",
                             ignore_patterns=["*.pth", "*.pt", "*.bin"],
                         )

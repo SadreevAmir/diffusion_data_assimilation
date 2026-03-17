@@ -74,8 +74,8 @@ class ControlNetTrainingConfig:
     num_sample_timesteps: int = 50
 
     push_to_hub: bool = True
-    hub_model_id: str = 'amirsadreev/controlnet_sea_ice'
-    base_output_dir: str = 'checkpoints_controlnet'
+    hub_model_id: str = 'amirsadreev/sea_ice_diffusion'
+    base_output_dir: str = 'checkpoints/controlnet'
     resume_from_checkpoint: str = ""
 
 
@@ -373,7 +373,7 @@ class ControlNetTrainer:
                         upload_folder(
                             repo_id=self.config.hub_model_id,
                             folder_path=self.output_dir,
-                            path_in_repo=self.run_name,
+                            path_in_repo=f"controlnet/{self.run_name}",
                             commit_message=f"Epoch {epoch} - val_loss {val_loss:.4f}",
                             ignore_patterns=["*.pth", "*.pt", "*.bin"],
                         )
