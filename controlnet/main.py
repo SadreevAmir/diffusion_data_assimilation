@@ -4,9 +4,10 @@ import numpy as np
 import torch
 from functools import partial
 from .trainer import ControlNetTrainingConfig, ControlNetTrainer
+from .model import SeaIceControlNet, ControlledUNet
 from utils import NpyImageDataset, MixedSatelliteTrackDataset, channel_normalize, add_noise
-from diffusers.models.unets.unet_2d_condition import UNet2DConditionModel
-from diffusers.models.controlnet import ControlNetModel
+from diffusers.models.unets.unet_2d import UNet2DModel
+from diffusers.training_utils import EMAModel
 from diffusers.optimization import get_cosine_schedule_with_warmup
 
 logging.basicConfig(
@@ -83,8 +84,8 @@ def main():
         prefetch_factor=2,
     )
 
-    # UNet processes: noisy ice (2ch) + XY grid (2ch) = 4 channels
-    unet = UNet2DConditionModel(
+    # UNet: та же архитектура что в gradient_based (4ch вход)
+    unet = UNet2DModel(
         sample_size=config.image_size,
         in_channels=config.in_channels,
         out_channels=config.out_channels,
@@ -98,15 +99,20 @@ def main():
             "UpBlock2D", "AttnUpBlock2D", "UpBlock2D",
             "UpBlock2D", "UpBlock2D",
         ),
-        cross_attention_dim=None,
     )
 
-    # ControlNet processes: satellite mask (1ch) + observed values (2ch) = 3 channels
-    # Initialized from UNet encoder weights
-    controlnet = ControlNetModel.from_unet(
-        unet,
-        conditioning_channels=config.controlnet_conditioning_channels,
-    )
+    # Загружаем веса из претренированной gradient_based модели
+    assert config.pretrained_unet_path, "pretrained_unet_path must be set in ControlNetTrainingConfig"
+    ema = EMAModel(unet.parameters(), decay=0.999)
+    ema.load_state_dict(torch.load(config.pretrained_unet_path, map_location="cpu", weights_only=True))
+    ema.copy_to(unet.parameters())
+    logging.info("Loaded pretrained UNet from %s", config.pretrained_unet_path)
+
+    # ControlNet копирует энкодер UNet
+    controlnet = SeaIceControlNet(unet, conditioning_channels=config.controlnet_conditioning_channels)
+
+    # ControlledUNet: UNet заморожен, обучается только ControlNet
+    model = ControlledUNet(unet, controlnet)
 
     optimizer = torch.optim.AdamW(
         controlnet.parameters(),
@@ -121,8 +127,7 @@ def main():
 
     trainer = ControlNetTrainer(
         config=config,
-        unet=unet,
-        controlnet=controlnet,
+        model=model,
         optimizer=optimizer,
         data_loader_train=train_dataloader,
         data_loader_val=valid_dataloader,
