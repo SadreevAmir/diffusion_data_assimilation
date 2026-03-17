@@ -6,9 +6,8 @@ _FIXED_STEP_METHODS = {'euler', 'midpoint', 'rk4', 'heun3'}
 
 
 class ControlNetSampler:
-    def __init__(self, unet, controlnet):
-        self.unet = unet
-        self.controlnet = controlnet
+    def __init__(self, model):
+        self.model = model
 
     def _forward(
         self,
@@ -18,26 +17,9 @@ class ControlNetSampler:
         mask: torch.Tensor,
         observed: torch.Tensor,
     ) -> torch.Tensor:
-        """Single forward pass through ControlNet + UNet."""
         unet_input = torch.cat([x, grid], dim=1)
         controlnet_cond = torch.cat([mask, observed], dim=1)
-
-        down_samples, mid_sample = self.controlnet(
-            sample=unet_input,
-            timestep=t_tensor,
-            encoder_hidden_states=None,
-            controlnet_cond=controlnet_cond,
-            return_dict=False,
-        )
-        out = self.unet(
-            sample=unet_input,
-            timestep=t_tensor,
-            encoder_hidden_states=None,
-            down_block_additional_residuals=down_samples,
-            mid_block_additional_residual=mid_sample,
-            return_dict=False,
-        )
-        return out[0]
+        return self.model(unet_input, controlnet_cond, t_tensor)
 
     @torch.no_grad()
     def sample_conditioned(
@@ -63,7 +45,7 @@ class ControlNetSampler:
 
         def f(t, x):
             t_tensor = t.expand(batch_size) * 1000
-            return -self._forward(x, t_tensor, grid, mask, observed)
+            return self._forward(x, t_tensor, grid, mask, observed)
 
         kwargs = {}
         if method in _FIXED_STEP_METHODS:

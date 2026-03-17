@@ -16,7 +16,8 @@ from datetime import datetime
 from itertools import cycle
 
 from utils import make_normalized_xy_grid, channel_denormalize, generate_satellite_track_mask
-from sampler import ControlNetSampler
+from .sampler import ControlNetSampler
+from .model import ControlledUNet
 
 torch.set_float32_matmul_precision('high')
 
@@ -73,6 +74,8 @@ class ControlNetTrainingConfig:
     sample_every_n_epochs: int = 1
     num_sample_timesteps: int = 50
 
+    pretrained_unet_path: str =  # путь к ema_best_model.pth из gradient_based
+
     push_to_hub: bool = True
     hub_model_id: str = 'amirsadreev/sea_ice_diffusion'
     base_output_dir: str = 'checkpoints/controlnet'
@@ -80,7 +83,7 @@ class ControlNetTrainingConfig:
 
 
 class ControlNetTrainer:
-    def __init__(self, config: ControlNetTrainingConfig, unet, controlnet, optimizer,
+    def __init__(self, config: ControlNetTrainingConfig, model: ControlledUNet, optimizer,
                  data_loader_train, data_loader_val, data_loader_satellite_mask,
                  lr_scheduler, add_noise_func):
 
@@ -113,21 +116,13 @@ class ControlNetTrainer:
         loggable_config = {k: str(v) if isinstance(v, tuple) else v for k, v in asdict(config).items()}
         self.accelerator.init_trackers("controlnet_training", config=loggable_config)
 
-        unet.requires_grad_(False)
-
-        for m in (unet, controlnet):
-            if (self.accelerator.device.type == 'cuda'
-                    and hasattr(m, "enable_xformers_memory_efficient_attention")):
-                m.enable_xformers_memory_efficient_attention()
-
         (self.model,
-         self.controlnet,
          self.optimizer,
          self.train_dataloader,
          self.val_dataloader,
          self.satellite_mask_dataloader,
          self.lr_scheduler) = self.accelerator.prepare(
-            unet, controlnet, optimizer,
+            model, optimizer,
             data_loader_train, data_loader_val, data_loader_satellite_mask,
             lr_scheduler,
         )
@@ -135,7 +130,7 @@ class ControlNetTrainer:
         self.satellite_mask_iter = cycle(self.satellite_mask_dataloader)
 
         self.ema_controlnet = EMAModel(
-            self.accelerator.unwrap_model(self.controlnet).parameters(), decay=0.999
+            self.accelerator.unwrap_model(self.model).controlnet.parameters(), decay=0.999
         )
         self.ema_controlnet.to(self.accelerator.device)
 
@@ -171,22 +166,7 @@ class ControlNetTrainer:
         controlnet_cond: torch.Tensor,
         timesteps: torch.Tensor,
     ) -> torch.Tensor:
-        down_samples, mid_sample = self.controlnet(
-            sample=unet_input,
-            timestep=timesteps * 1000,
-            encoder_hidden_states=None,
-            controlnet_cond=controlnet_cond,
-            return_dict=False,
-        )
-        v_pred = self.model(
-            sample=unet_input,
-            timestep=timesteps * 1000,
-            encoder_hidden_states=None,
-            down_block_additional_residuals=down_samples,
-            mid_block_additional_residual=mid_sample,
-            return_dict=False,
-        )[0]
-        return v_pred
+        return self.model(unet_input, controlnet_cond, timesteps * 1000)
 
     def _masked_mse(self, pred: torch.Tensor, target: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
         mask_exp = mask.expand_as(pred)
@@ -195,8 +175,9 @@ class ControlNetTrainer:
 
     def save_model_custom(self, name: str = "last"):
         os.makedirs(self.output_dir, exist_ok=True)
+        controlnet = self.accelerator.unwrap_model(self.model).controlnet
         torch.save(
-            self.accelerator.unwrap_model(self.controlnet).state_dict(),
+            controlnet.state_dict(),
             os.path.join(self.output_dir, f"controlnet_{name}.pth"),
         )
         torch.save(
@@ -206,7 +187,6 @@ class ControlNetTrainer:
 
     def compute_val_loss(self) -> tuple[float, float, float]:
         self.model.eval()
-        self.controlnet.eval()
         total_full = 0.0
         total_masked = 0.0
         n = len(self.val_dataloader)
@@ -236,12 +216,8 @@ class ControlNetTrainer:
 
     def save_samples(self, epoch: int):
         self.model.eval()
-        self.controlnet.eval()
         device = self.accelerator.device
-        sampler = ControlNetSampler(
-            unet=self.accelerator.unwrap_model(self.model),
-            controlnet=self.accelerator.unwrap_model(self.controlnet),
-        )
+        sampler = ControlNetSampler(self.accelerator.unwrap_model(self.model))
 
         clean_images = next(iter(self.val_dataloader))[:1]
 
@@ -295,7 +271,6 @@ class ControlNetTrainer:
 
         for epoch in range(self.config.num_epochs):
             self.model.train()
-            self.controlnet.train()
             progress_bar = tqdm(
                 total=len(self.train_dataloader),
                 disable=not self.accelerator.is_local_main_process,
@@ -309,7 +284,7 @@ class ControlNetTrainer:
                 timesteps = self._sample_timesteps(bs)
                 noisy_images, v_real = self.add_noise(clean_images, timesteps)
 
-                with self.accelerator.accumulate(self.controlnet):
+                with self.accelerator.accumulate(self.model):
                     unet_input = self._make_unet_input(noisy_images)
                     controlnet_cond = self._make_controlnet_cond(clean_images, satellite_mask)
 
@@ -320,11 +295,11 @@ class ControlNetTrainer:
 
                     self.accelerator.backward(loss)
                     if self.accelerator.sync_gradients:
-                        self.accelerator.clip_grad_norm_(self.controlnet.parameters(), 1.0)
+                        self.accelerator.clip_grad_norm_(self.model.parameters(), 1.0)
                     self.optimizer.step()
                     self.lr_scheduler.step()
                     self.optimizer.zero_grad()
-                    self.ema_controlnet.step(self.accelerator.unwrap_model(self.controlnet).parameters())
+                    self.ema_controlnet.step(self.accelerator.unwrap_model(self.model).controlnet.parameters())
 
                 self.accelerator.log({
                     "train_loss":        loss.item(),
