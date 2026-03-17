@@ -247,8 +247,8 @@ def make_plot(sea_ice_samples, channel_mean, channel_std, num_samples, title='')
     fig.suptitle(title, fontsize=16, y=0.98)
 
     for idx, ax in enumerate(axes):
-        img = imgs[idx].numpy()
-        ax.imshow(img, norm=norm, cmap='viridis')
+        if idx < n:
+            ax.imshow(imgs[idx].numpy(), norm=norm, cmap='viridis')
         ax.axis('off')
 
     sm = plt.cm.ScalarMappable(cmap='viridis', norm=norm)
@@ -283,10 +283,11 @@ def make_difference_plot(sea_ice_samples_1, sea_ice_samples_2, channel_mean, cha
     fig.suptitle("Conditioned samples delta", fontsize=16, y=0.98)
 
     for idx, ax in enumerate(axes):
+        ax.axis('off')
+        if idx >= n:
+            continue
         img = imgs[idx].numpy()
         ax.imshow(img, norm=norm, cmap='viridis')
-        ax.axis('off')
-
         mean_square = np.sum(img**2) / n_water
         ax.text(0.5, -0.1, f'MSE: {mean_square:.3f}',
                 transform=ax.transAxes, ha='center', va='top', fontsize=8)
