@@ -74,7 +74,7 @@ class ControlNetTrainingConfig:
     sample_every_n_epochs: int = 1
     num_sample_timesteps: int = 50
 
-    pretrained_unet_path: str =  # путь к ema_best_model.pth из gradient_based
+    pretrained_unet_path: str = ""  # путь к ema_best_model.pth из gradient_based
 
     push_to_hub: bool = True
     hub_model_id: str = 'amirsadreev/sea_ice_diffusion'
