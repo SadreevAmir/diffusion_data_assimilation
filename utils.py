@@ -298,3 +298,65 @@ def make_difference_plot(sea_ice_samples_1, sea_ice_samples_2, channel_mean, cha
     cbar_ax = fig.add_axes((0.88, 0.15, 0.02, 0.7))
     fig.colorbar(sm, cax=cbar_ax)
     plt.show()
+
+
+def make_scalar_plot_grid(images, num_samples, title='', cmap='magma', case_labels=None):
+    n = num_samples
+    cols = int(np.ceil(np.sqrt(n)))
+    rows = int(np.ceil(n / cols))
+
+    imgs = [images[i].detach().cpu() for i in range(n)]
+    vmin = min(img.min().item() for img in imgs)
+    vmax = max(img.max().item() for img in imgs)
+    norm = mcolors.Normalize(vmin=vmin, vmax=vmax)
+
+    fig, axes = plt.subplots(rows, cols, figsize=(cols * 2 + 1, rows * 2))
+    axes = np.atleast_1d(axes).flatten()
+    fig.suptitle(title, fontsize=16, y=0.98)
+
+    for idx, ax in enumerate(axes):
+        if idx < n:
+            ax.imshow(imgs[idx].numpy(), norm=norm, cmap=cmap)
+            if case_labels is not None:
+                ax.set_title(str(case_labels[idx]), fontsize=10)
+        ax.axis('off')
+
+    sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+    sm.set_array([])
+
+    fig.subplots_adjust(right=0.85)
+    cbar_ax = fig.add_axes((0.88, 0.15, 0.02, 0.7))
+    fig.colorbar(sm, cax=cbar_ax)
+    plt.show()
+
+
+def make_ensemble_case_plot(ensemble, channel_mean, channel_std, case_indices=None, title_prefix='Case'):
+    ensemble = channel_denormalize(
+        ensemble.detach().cpu(),
+        channel_mean=channel_mean,
+        channel_std=channel_std,
+    )
+
+    ensemble_size, n_cases = ensemble.shape[:2]
+    imgs = ensemble[:, :, 0]
+    vmin = imgs.min().item()
+    vmax = imgs.max().item()
+    norm = mcolors.Normalize(vmin=vmin, vmax=vmax)
+
+    for case_idx in range(n_cases):
+        fig, axes = plt.subplots(1, ensemble_size, figsize=(ensemble_size * 2, 2.6))
+        axes = np.atleast_1d(axes).flatten()
+
+        for member_idx, ax in enumerate(axes):
+            ax.imshow(imgs[member_idx, case_idx].numpy(), norm=norm, cmap='viridis')
+            ax.set_title(f'member {member_idx}', fontsize=9)
+            ax.axis('off')
+
+        case_label = case_idx if case_indices is None else int(case_indices[case_idx])
+        fig.suptitle(f'{title_prefix} {case_label} - Ensemble samples', fontsize=14, y=0.98)
+        fig.subplots_adjust(right=0.92)
+        cbar_ax = fig.add_axes((0.94, 0.18, 0.015, 0.64))
+        sm = plt.cm.ScalarMappable(cmap='viridis', norm=norm)
+        sm.set_array([])
+        fig.colorbar(sm, cax=cbar_ax)
+        plt.show()
