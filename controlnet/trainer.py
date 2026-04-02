@@ -128,6 +128,7 @@ class ControlNetTrainer:
         )
 
         self.satellite_mask_iter = cycle(self.satellite_mask_dataloader)
+        self._satellite_mask_buffer = None
 
         self.ema_controlnet = EMAModel(
             self.accelerator.unwrap_model(self.model).controlnet.parameters(), decay=0.999
@@ -147,6 +148,31 @@ class ControlNetTrainer:
             return torch.distributions.Beta(alpha, beta).sample((bs,)).to(device)
         return torch.rand(bs, device=device)
 
+    def _next_satellite_mask_batch(self, batch_size: int) -> torch.Tensor:
+        chunks = []
+        remaining = batch_size
+
+        if self._satellite_mask_buffer is not None and self._satellite_mask_buffer.shape[0] > 0:
+            take = min(remaining, self._satellite_mask_buffer.shape[0])
+            chunks.append(self._satellite_mask_buffer[:take])
+            self._satellite_mask_buffer = self._satellite_mask_buffer[take:]
+            remaining -= take
+
+            if self._satellite_mask_buffer.shape[0] == 0:
+                self._satellite_mask_buffer = None
+
+        while remaining > 0:
+            next_batch = next(self.satellite_mask_iter)
+            take = min(remaining, next_batch.shape[0])
+            chunks.append(next_batch[:take])
+            remaining -= take
+
+            leftover = next_batch[take:]
+            if leftover.shape[0] > 0:
+                self._satellite_mask_buffer = leftover
+
+        return torch.cat(chunks, dim=0)
+
     def _make_unet_input(self, noisy_images: torch.Tensor) -> torch.Tensor:
         bs = noisy_images.shape[0]
         grid = self._grid.expand(bs, -1, -1, -1)
@@ -155,10 +181,12 @@ class ControlNetTrainer:
     def _make_controlnet_cond(
         self, clean_images: torch.Tensor, satellite_mask: torch.Tensor
     ) -> torch.Tensor:
-        bs = clean_images.shape[0]
+        if satellite_mask.shape[0] != clean_images.shape[0]:
+            raise ValueError(
+                f"Expected {clean_images.shape[0]} satellite masks, got {satellite_mask.shape[0]}"
+            )
         observed = clean_images * satellite_mask
-        mask_exp = satellite_mask.expand(bs, -1, -1, -1)
-        return torch.cat([mask_exp, observed], dim=1)
+        return torch.cat([satellite_mask, observed], dim=1)
 
     def _model_forward(
         self,
@@ -195,7 +223,7 @@ class ControlNetTrainer:
             for batch in self.val_dataloader:
                 clean_images = batch
                 bs = clean_images.shape[0]
-                satellite_mask = next(self.satellite_mask_iter)
+                satellite_mask = self._next_satellite_mask_batch(bs)
 
                 timesteps = self._sample_timesteps(bs)
                 noisy_images, v_real = self.add_noise(clean_images, timesteps)
@@ -279,8 +307,8 @@ class ControlNetTrainer:
 
             for batch in self.train_dataloader:
                 clean_images = batch
-                satellite_mask = next(self.satellite_mask_iter)
                 bs = clean_images.shape[0]
+                satellite_mask = self._next_satellite_mask_batch(bs)
                 timesteps = self._sample_timesteps(bs)
                 noisy_images, v_real = self.add_noise(clean_images, timesteps)
 

@@ -78,9 +78,9 @@ class Sampler:
 
         y          = y.to(device).expand(batch_size, -1, -1, -1).contiguous()
         mask       = mask.to(device).expand(batch_size, -1, -1, -1).contiguous()
-        background = background.to(device)
+        background = background.to(device).expand(batch_size, -1, -1, -1).contiguous()
 
-        x, _ = add_noise(background, torch.tensor([noise_val], device=device))
+        x, _ = add_noise(background, torch.full((batch_size,), noise_val, device=device))
 
         for t in timesteps:
             x = self._guided_step(x_t=x, t=t.item(), y=y, mask=mask, grid=grid, dt=dt,

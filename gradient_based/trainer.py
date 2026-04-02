@@ -31,13 +31,19 @@ def _default_data_dir() -> str:
     return '/mnt/sciml/a.sadreev/sea_ice_data'
 
 
+def _load_channel_stats(data_dir: str) -> tuple[tuple[float, ...], tuple[float, ...]]:
+    with open(os.path.join(data_dir, "stats.json")) as f:
+        stats = json.load(f)
+    return tuple(stats["mean"]), tuple(stats["std"])
+
+
 @dataclass
 class TrainingConfig:
     data_dir_train: str = _default_data_dir() + "/train"
     data_dir_valid: str = _default_data_dir() + "/valid"
 
-    channel_mean: tuple = (0.1382167, 0.1816227)
-    channel_std: tuple = (0.32978467, 0.51380478)
+    channel_mean: tuple = field(default_factory=tuple)
+    channel_std: tuple = field(default_factory=tuple)
 
     image_size: tuple = (320, 256)
     in_channels: int = 4
@@ -62,6 +68,10 @@ class TrainingConfig:
     hub_model_id: str = 'amirsadreev/sea_ice_diffusion'
     base_output_dir: str = 'checkpoints/gradient_based'
     resume_from_checkpoint: str = ""
+
+    def __post_init__(self):
+        if not self.channel_mean or not self.channel_std:
+            self.channel_mean, self.channel_std = _load_channel_stats(self.data_dir_train)
 
 
 class UNetTrainer:
