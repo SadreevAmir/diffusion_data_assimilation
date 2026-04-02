@@ -360,3 +360,108 @@ def make_ensemble_case_plot(ensemble, channel_mean, channel_std, case_indices=No
         sm.set_array([])
         fig.colorbar(sm, cax=cbar_ax)
         plt.show()
+
+
+def _rank_histogram_probabilities(ranks: np.ndarray, ensemble_size: int) -> np.ndarray:
+    counts = np.bincount(ranks.astype(np.int64), minlength=ensemble_size + 1)
+    total = counts.sum()
+    if total == 0:
+        return np.zeros(ensemble_size + 1, dtype=np.float64)
+    return counts / total
+
+
+def _draw_rank_histogram(ax, probabilities: np.ndarray, title: str):
+    x = np.arange(len(probabilities))
+    ax.bar(x, probabilities, color='black', width=0.85)
+    ax.set_xticks(x)
+    ax.set_xlabel('Rank of truth')
+    ax.set_ylabel('Probability')
+    ax.set_title(title)
+
+
+def plot_rank_histogram(
+    ensemble,
+    truth,
+    channel=0,
+    stride=16,
+    valid_mask=None,
+    title='Rank histogram',
+    case_indices=None,
+    per_case=False,
+    per_case_cols=4,
+):
+    ensemble = ensemble.detach().cpu()
+    truth = truth.detach().cpu()
+
+    if ensemble.ndim != 5:
+        raise ValueError(f"Expected ensemble shape (M, N, C, H, W), got {tuple(ensemble.shape)}")
+    if truth.ndim != 4:
+        raise ValueError(f"Expected truth shape (N, C, H, W), got {tuple(truth.shape)}")
+    if ensemble.shape[1] != truth.shape[0]:
+        raise ValueError(
+            f"Expected matching case counts, got ensemble {ensemble.shape[1]} and truth {truth.shape[0]}"
+        )
+    if not 0 <= channel < ensemble.shape[2]:
+        raise ValueError(f"Channel {channel} is out of bounds for {ensemble.shape[2]} channels")
+
+    members = ensemble[:, :, channel, ::stride, ::stride]
+    target = truth[:, channel, ::stride, ::stride]
+
+    if valid_mask is not None:
+        mask = torch.as_tensor(valid_mask, dtype=torch.bool)
+        if mask.ndim == 3:
+            mask = mask[0]
+        mask = mask[::stride, ::stride]
+        members = members[:, :, mask]
+        target = target[:, mask]
+    else:
+        members = members.reshape(members.shape[0], members.shape[1], -1)
+        target = target.reshape(target.shape[0], -1)
+
+    members = members.permute(1, 2, 0)
+    target = target.reshape(target.shape[0], -1)
+    if members.shape[1] == 0:
+        raise ValueError('No grid points left for rank histogram after applying stride and mask')
+
+    ranks_by_case = (members < target.unsqueeze(-1)).sum(dim=-1).numpy()
+    ensemble_size = members.shape[-1]
+    case_probabilities = np.stack(
+        [_rank_histogram_probabilities(case_ranks, ensemble_size) for case_ranks in ranks_by_case],
+        axis=0,
+    )
+    all_ranks = ranks_by_case.reshape(-1)
+    all_probabilities = _rank_histogram_probabilities(all_ranks, ensemble_size)
+
+    y_max = max(all_probabilities.max(), case_probabilities.max(initial=0.0))
+    y_max = max(0.05, 1.1 * y_max)
+
+    fig, ax = plt.subplots(figsize=(8, 4))
+    _draw_rank_histogram(ax, all_probabilities, title)
+    ax.set_ylim(0, y_max)
+    plt.show()
+
+    if per_case:
+        n_cases = ranks_by_case.shape[0]
+        cols = min(per_case_cols, n_cases)
+        rows = int(np.ceil(n_cases / cols))
+        fig, axes = plt.subplots(rows, cols, figsize=(4 * cols, 3 * rows), sharex=True, sharey=True)
+        axes = np.atleast_1d(axes).flatten()
+
+        for case_idx, ax in enumerate(axes):
+            if case_idx < n_cases:
+                case_label = case_idx if case_indices is None else int(case_indices[case_idx])
+                _draw_rank_histogram(ax, case_probabilities[case_idx], f'case {case_label}')
+                ax.set_ylim(0, y_max)
+            else:
+                ax.axis('off')
+
+        fig.suptitle(f'{title} by case', fontsize=14, y=1.02)
+        plt.tight_layout()
+        plt.show()
+
+    return {
+        'all_ranks': all_ranks,
+        'ranks_by_case': ranks_by_case,
+        'all_probabilities': all_probabilities,
+        'case_probabilities': case_probabilities,
+    }
