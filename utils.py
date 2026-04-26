@@ -243,7 +243,7 @@ def make_plot(sea_ice_samples, channel_mean, channel_std, num_samples, title='')
     norm = mcolors.Normalize(vmin=vmin, vmax=vmax)
 
     fig, axes = plt.subplots(rows, cols, figsize=(cols*2 + 1, rows*2))
-    axes = axes.flatten()
+    axes = np.atleast_1d(axes).flatten()
     fig.suptitle(title, fontsize=16, y=0.98)
 
     for idx, ax in enumerate(axes):
@@ -279,7 +279,7 @@ def make_difference_plot(sea_ice_samples_1, sea_ice_samples_2, channel_mean, cha
     norm = mcolors.Normalize(vmin=vmin, vmax=vmax)
 
     fig, axes = plt.subplots(rows, cols, figsize=(cols*2 + 1, rows*2 + 0.1))
-    axes = axes.flatten()
+    axes = np.atleast_1d(axes).flatten()
     fig.suptitle("Conditioned samples delta", fontsize=16, y=0.98)
 
     for idx, ax in enumerate(axes):
