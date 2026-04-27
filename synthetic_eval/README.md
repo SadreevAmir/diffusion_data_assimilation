@@ -100,6 +100,39 @@ This produces `30 * 15 = 450` generated analysis samples for each mask/density/n
 - `arrays/*mean_error.npy` and `arrays/*crps.npy`: map diagnostics.
 - `plots/`: rank histograms, coverage reliability, spread-skill, RMSE/CRPS vs density, and example panels.
 
+## kNN Dataset Baseline By Day
+
+To search nearest train fields for each December validation day:
+
+```bash
+python -m synthetic_eval.knn_baseline \
+  --data-root /mnt/sciml/a.sadreev/sea_ice_data \
+  --output-dir /mnt/sciml/a.sadreev/sea_ice_data/knn_baseline_december \
+  --selection december \
+  --n-days 31 \
+  --k-neighbors 1 \
+  --mask-type swath \
+  --n-tracks-min 7 \
+  --n-tracks-max 7
+```
+
+To run the same search for 30 consecutive days:
+
+```bash
+python -m synthetic_eval.knn_baseline \
+  --data-root /mnt/sciml/a.sadreev/sea_ice_data \
+  --output-dir /mnt/sciml/a.sadreev/sea_ice_data/knn_baseline_30days_2022-12-01 \
+  --selection consecutive \
+  --start-date 2022-12-01 \
+  --n-days 30 \
+  --k-neighbors 1 \
+  --mask-type swath \
+  --n-tracks-min 7 \
+  --n-tracks-max 7
+```
+
+This writes `selected_references.csv`, `knn_neighbors.csv`, and `summary.json`.
+
 ## Metrics
 
 Implemented metrics include ensemble-mean RMSE, ensemble CRPS, rank histograms with random tie-breaking,
