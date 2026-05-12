@@ -18,6 +18,13 @@ checkpoints*/
 # Logs
 *.log
 
+# LaTeX build artifacts
+latex/*.aux
+latex/*.fdb_latexmk
+latex/*.fls
+latex/*.out
+latex/*.synctex.gz
+
 # Envs
 venv/
 .venv/
