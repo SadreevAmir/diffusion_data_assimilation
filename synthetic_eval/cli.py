@@ -79,7 +79,16 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--daily-stride", type=int, default=24, help="File stride for --case-selection daily on hourly data")
     parser.add_argument("--densities", default="0.01,0.05,0.10,0.25", help="Comma-separated observation densities")
     parser.add_argument("--mask-types", default="random,block", help="Comma-separated mask types: random,block,swath")
+    parser.add_argument("--swath-repeats", type=int, default=1, help="Independent swath masks per case for swath conditioning")
+    parser.add_argument("--n-tracks-min", type=int, default=1, help="Minimum generated tracks for swath masks")
+    parser.add_argument("--n-tracks-max", type=int, default=4, help="Maximum generated tracks for swath masks")
     parser.add_argument("--noise-levels", default="0.0", help="Comma-separated observation noise std values")
+    parser.add_argument(
+        "--eval-region",
+        choices=("all", "observed", "unobserved"),
+        default="all",
+        help="Spatial region used for metrics/rank histograms",
+    )
     parser.add_argument("--seed", type=int, default=1234)
     parser.add_argument("--max-timesteps", type=int, default=None, help="Smoke-test limit")
     parser.add_argument("--runner", choices=("dummy", "persistence", "concat"), default="dummy")
@@ -181,8 +190,42 @@ def write_csv(path: str, rows: list[dict[str, object]]) -> None:
         writer.writerows(rows)
 
 
-def tag_from_condition(mask_type: str, density: float, noise: float) -> str:
-    return f"{mask_type}_d{density:g}_n{noise:g}".replace(".", "p")
+def tag_from_condition(mask_type: str, density: float, noise: float, condition_index: int = 0, n_conditions: int = 1) -> str:
+    repeat = f"_r{condition_index:02d}" if n_conditions > 1 else ""
+    return f"{mask_type}{repeat}_d{density:g}_n{noise:g}".replace(".", "p")
+
+
+def build_condition_specs(
+    mask_types: list[str], densities: list[float], noise_levels: list[float], args: argparse.Namespace
+) -> list[dict[str, object]]:
+    specs: list[dict[str, object]] = []
+    for mask_type in mask_types:
+        repeats = max(1, int(args.swath_repeats)) if mask_type == "swath" else 1
+        for density in densities:
+            for noise in noise_levels:
+                for condition_index in range(repeats):
+                    specs.append(
+                        {
+                            "mask_type": mask_type,
+                            "density": density,
+                            "noise": noise,
+                            "condition_index": condition_index,
+                            "n_conditions": repeats,
+                        }
+                    )
+    return specs
+
+
+def evaluation_mask(valid: np.ndarray, observed_mask: np.ndarray, eval_region: str) -> np.ndarray:
+    valid_bool = np.asarray(valid, dtype=np.float32) > 0
+    observed_bool = np.asarray(observed_mask, dtype=np.float32) > 0
+    if eval_region == "all":
+        return valid_bool.astype(np.float32)
+    if eval_region == "observed":
+        return (valid_bool & observed_bool).astype(np.float32)
+    if eval_region == "unobserved":
+        return (valid_bool & ~observed_bool).astype(np.float32)
+    raise ValueError(f"Unknown eval_region: {eval_region}")
 
 
 def should_save_tensors(args: argparse.Namespace, local_case_index: int) -> bool:
@@ -268,7 +311,10 @@ def main() -> None:
         "ensemble_size": args.ensemble_size,
         "densities": densities,
         "mask_types": mask_types,
+        "swath_repeats": args.swath_repeats,
+        "n_tracks_range": [args.n_tracks_min, args.n_tracks_max],
         "noise_levels": noise_levels,
+        "eval_region": args.eval_region,
         "seed": args.seed,
         "n_cases": args.n_cases,
         "case_selection": args.case_selection,
@@ -293,7 +339,7 @@ def main() -> None:
     map_sums: dict[tuple[str, str, float, float, str], np.ndarray] = {}
     map_counts: dict[tuple[str, str, float, float, str], float] = {}
 
-    combos = [(mt, den, noise) for mt in mask_types for den in densities for noise in noise_levels]
+    condition_specs = build_condition_specs(mask_types, densities, noise_levels, args)
     for local_case_index, case_index in enumerate(tqdm(case_indices, desc="synthetic eval cases")):
         x_true = np.asarray(dataset[int(case_index)], dtype=np.float32)
         name = dataset.files[int(case_index)]
@@ -302,16 +348,27 @@ def main() -> None:
         season = season_from_name(name, case_index)
         regime = ice_regime(x_true, valid)
 
-        for combo_index, (mask_type, density, noise_std) in enumerate(combos):
+        for combo_index, spec in enumerate(condition_specs):
+            mask_type = str(spec["mask_type"])
+            density = float(spec["density"])
+            noise_std = float(spec["noise"])
+            condition_index = int(spec["condition_index"])
+            n_conditions = int(spec["n_conditions"])
             combo_seed = args.seed + 100000 * local_case_index + 1000 * combo_index
             rng = np.random.default_rng(combo_seed)
             obs_config = ObservationConfig(
-                mask_type=mask_type, density=density, noise_std=noise_std, seed=combo_seed, block_size=args.block_size
+                mask_type=mask_type,
+                density=density,
+                noise_std=noise_std,
+                seed=combo_seed,
+                block_size=args.block_size,
+                n_tracks_range=(args.n_tracks_min, args.n_tracks_max),
             )
             mask = make_observation_mask((h, w), obs_config, valid, rng)
+            eval_mask = evaluation_mask(valid, mask, args.eval_region)
             observed = make_sparse_observation(x_true, mask, noise_std, rng)
             ensemble = runner.run(x_true, mask, observed, args.ensemble_size, combo_seed)
-            condition_tag = tag_from_condition(mask_type, density, noise_std)
+            condition_tag = tag_from_condition(mask_type, density, noise_std, condition_index, n_conditions)
             saved_tensor_path = ""
             if should_save_tensors(args, local_case_index):
                 saved_tensor_path = save_case_tensors(
@@ -330,12 +387,12 @@ def main() -> None:
             mean = ensemble.mean(axis=0)
             crps = ensemble_crps(ensemble, x_true)
             rmse_by_var = np.array(
-                [np.sqrt(weighted_mean((mean[ch] - x_true[ch]) ** 2, valid)) for ch in range(x_true.shape[0])]
+                [np.sqrt(weighted_mean((mean[ch] - x_true[ch]) ** 2, eval_mask)) for ch in range(x_true.shape[0])]
             )
-            crps_by_var = [weighted_mean(crps[ch], valid) for ch in range(x_true.shape[0])]
+            crps_by_var = [weighted_mean(crps[ch], eval_mask) for ch in range(x_true.shape[0])]
 
             if args.energy_score_limit > 0:
-                flat_valid = np.flatnonzero(np.broadcast_to(valid[None, :, :] > 0, x_true.shape).reshape(-1))
+                flat_valid = np.flatnonzero(np.broadcast_to(eval_mask[None, :, :] > 0, x_true.shape).reshape(-1))
                 if flat_valid.size > args.energy_score_limit:
                     flat_valid = rng.choice(flat_valid, size=args.energy_score_limit, replace=False)
                 ens_flat = ensemble.reshape(args.ensemble_size, -1)[:, flat_valid]
@@ -344,9 +401,9 @@ def main() -> None:
             else:
                 e_score = float("nan")
 
-            summary = ice_summaries(mean, x_true, valid)
+            summary = ice_summaries(mean, x_true, eval_mask)
             for ch, var_name in enumerate(variables[: x_true.shape[0]]):
-                var_weights = valid
+                var_weights = eval_mask
                 ss = spread_skill(ensemble[:, ch], x_true[ch], var_weights)
                 cover = interval_coverage(ensemble[:, ch], x_true[ch], LEVELS)
                 row = {
@@ -359,7 +416,11 @@ def main() -> None:
                     "mask_type": mask_type,
                     "density": density,
                     "noise_level": noise_std,
+                    "condition_index": condition_index,
+                    "condition_tag": condition_tag,
+                    "eval_region": args.eval_region,
                     "observed_fraction": float((mask * valid).sum() / max(1.0, valid.sum())),
+                    "evaluated_fraction": float(eval_mask.sum() / max(1.0, valid.sum())),
                     "rmse": float(rmse_by_var[ch]),
                     "crps": float(crps_by_var[ch]),
                     "energy_score": e_score,
@@ -370,11 +431,11 @@ def main() -> None:
                 for level_key, hits in cover.items():
                     value = weighted_mean(hits.astype(np.float64), var_weights)
                     row[f"coverage_{level_key}"] = value
-                    coverage_hits.setdefault((var_name, mask_type, density, noise_std, level_key), []).append(value)
+                    coverage_hits.setdefault((var_name, condition_tag, density, noise_std, level_key), []).append(value)
                 case_rows.append(row)
 
-                rank_mask = (valid[:: args.rank_stride, :: args.rank_stride] > 0)
-                rank_key = (var_name, mask_type, density, noise_std)
+                rank_mask = (eval_mask[:: args.rank_stride, :: args.rank_stride] > 0)
+                rank_key = (var_name, condition_tag, density, noise_std)
                 counts = rank_histogram(
                     ensemble[:, ch, :: args.rank_stride, :: args.rank_stride],
                     x_true[ch, :: args.rank_stride, :: args.rank_stride],
@@ -383,11 +444,19 @@ def main() -> None:
                 )
                 rank_counts[rank_key] = rank_counts.get(rank_key, np.zeros_like(counts)) + counts
 
-                for bin_row in binned_spread_skill(ensemble[:, ch], x_true[ch], weights_mask=valid > 0):
-                    spread_bins.append({**bin_row, "variable": var_name, "mask_type": mask_type, "density": density, "noise_level": noise_std})
+                for bin_row in binned_spread_skill(ensemble[:, ch], x_true[ch], weights_mask=eval_mask > 0):
+                    spread_bins.append({
+                        **bin_row,
+                        "variable": var_name,
+                        "mask_type": mask_type,
+                        "condition_tag": condition_tag,
+                        "density": density,
+                        "noise_level": noise_std,
+                        "eval_region": args.eval_region,
+                    })
 
                 for map_name, arr in (("mean_error", mean[ch] - x_true[ch]), ("crps", crps[ch])):
-                    map_key = (var_name, mask_type, density, noise_std, map_name)
+                    map_key = (var_name, condition_tag, density, noise_std, map_name)
                     map_sums[map_key] = map_sums.get(map_key, np.zeros_like(arr, dtype=np.float64)) + arr
                     map_counts[map_key] = map_counts.get(map_key, 0.0) + 1.0
 
@@ -399,11 +468,19 @@ def main() -> None:
 
     grouped: dict[tuple[object, ...], list[dict[str, object]]] = {}
     for row in case_rows:
-        key = (row["variable"], row["mask_type"], row["density"], row["noise_level"])
+        key = (row["variable"], row["mask_type"], row["condition_tag"], row["density"], row["noise_level"], row["eval_region"])
         grouped.setdefault(key, []).append(row)
     aggregate_rows = []
-    for (var_name, mask_type, density, noise), rows in grouped.items():
-        out: dict[str, object] = {"variable": var_name, "mask_type": mask_type, "density": density, "noise_level": noise, "n_cases": len(rows)}
+    for (var_name, mask_type, condition_tag, density, noise, eval_region), rows in grouped.items():
+        out: dict[str, object] = {
+            "variable": var_name,
+            "mask_type": mask_type,
+            "condition_tag": condition_tag,
+            "density": density,
+            "noise_level": noise,
+            "eval_region": eval_region,
+            "n_cases": len(rows),
+        }
         for metric in ("rmse", "crps", "energy_score", "spread", "skill_rmse", "spread_skill_ratio"):
             out[metric] = float(np.nanmean([float(r[metric]) for r in rows]))
         for level in LEVELS:
@@ -416,21 +493,28 @@ def main() -> None:
 
     np.savez_compressed(
         os.path.join(arrays_dir, "rank_histograms.npz"),
-        **{f"{k[0]}__{k[1]}__d{k[2]:g}__n{k[3]:g}".replace(".", "p"): v for k, v in rank_counts.items()},
+        **{f"{k[0]}__{k[1]}".replace(".", "p"): v for k, v in rank_counts.items()},
     )
     for key, total in map_sums.items():
-        var_name, mask_type, density, noise, map_name = key
-        tag = f"{var_name}__{mask_type}__d{density:g}__n{noise:g}__{map_name}".replace(".", "p")
+        var_name, condition_tag, density, noise, map_name = key
+        tag = f"{var_name}__{condition_tag}__{map_name}".replace(".", "p")
         np.save(os.path.join(arrays_dir, f"{tag}.npy"), (total / map_counts[key]).astype(np.float32))
 
     if not args.no_plots:
         for key, counts in rank_counts.items():
-            var_name, mask_type, density, noise = key
-            tag = f"{var_name}_{mask_type}_d{density:g}_n{noise:g}".replace(".", "p")
+            var_name, condition_tag, density, noise = key
+            tag = f"{var_name}_{condition_tag}".replace(".", "p")
             plot_rank_histogram(counts, os.path.join(plots_dir, f"rank_hist_{tag}.png"), f"Rank histogram: {tag}")
-            empirical = [float(np.mean(coverage_hits[(var_name, mask_type, density, noise, f'{level:g}')])) for level in LEVELS]
+            empirical = [float(np.mean(coverage_hits[(var_name, condition_tag, density, noise, f'{level:g}')])) for level in LEVELS]
             plot_coverage(list(LEVELS), empirical, os.path.join(plots_dir, f"coverage_{tag}.png"), f"Coverage: {tag}")
-            rows = [r for r in spread_bins if r["variable"] == var_name and r["mask_type"] == mask_type and r["density"] == density and r["noise_level"] == noise]
+            rows = [
+                r
+                for r in spread_bins
+                if r["variable"] == var_name
+                and r["condition_tag"] == condition_tag
+                and r["density"] == density
+                and r["noise_level"] == noise
+            ]
             plot_spread_skill(rows, os.path.join(plots_dir, f"spread_skill_{tag}.png"), f"Spread-skill: {tag}")
         plot_density_curve(case_rows, os.path.join(plots_dir, "rmse_vs_density.png"), "rmse")
         plot_density_curve(case_rows, os.path.join(plots_dir, "crps_vs_density.png"), "crps")
