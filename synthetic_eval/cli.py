@@ -431,11 +431,11 @@ def main() -> None:
                 for level_key, hits in cover.items():
                     value = weighted_mean(hits.astype(np.float64), var_weights)
                     row[f"coverage_{level_key}"] = value
-                    coverage_hits.setdefault((var_name, condition_tag, density, noise_std, level_key), []).append(value)
+                    coverage_hits.setdefault((var_name, mask_type, density, noise_std, level_key), []).append(value)
                 case_rows.append(row)
 
                 rank_mask = (eval_mask[:: args.rank_stride, :: args.rank_stride] > 0)
-                rank_key = (var_name, condition_tag, density, noise_std)
+                rank_key = (var_name, mask_type, density, noise_std)
                 counts = rank_histogram(
                     ensemble[:, ch, :: args.rank_stride, :: args.rank_stride],
                     x_true[ch, :: args.rank_stride, :: args.rank_stride],
@@ -456,7 +456,7 @@ def main() -> None:
                     })
 
                 for map_name, arr in (("mean_error", mean[ch] - x_true[ch]), ("crps", crps[ch])):
-                    map_key = (var_name, condition_tag, density, noise_std, map_name)
+                    map_key = (var_name, mask_type, density, noise_std, map_name)
                     map_sums[map_key] = map_sums.get(map_key, np.zeros_like(arr, dtype=np.float64)) + arr
                     map_counts[map_key] = map_counts.get(map_key, 0.0) + 1.0
 
@@ -468,18 +468,18 @@ def main() -> None:
 
     grouped: dict[tuple[object, ...], list[dict[str, object]]] = {}
     for row in case_rows:
-        key = (row["variable"], row["mask_type"], row["condition_tag"], row["density"], row["noise_level"], row["eval_region"])
+        key = (row["variable"], row["mask_type"], row["density"], row["noise_level"], row["eval_region"])
         grouped.setdefault(key, []).append(row)
     aggregate_rows = []
-    for (var_name, mask_type, condition_tag, density, noise, eval_region), rows in grouped.items():
+    for (var_name, mask_type, density, noise, eval_region), rows in grouped.items():
         out: dict[str, object] = {
             "variable": var_name,
             "mask_type": mask_type,
-            "condition_tag": condition_tag,
             "density": density,
             "noise_level": noise,
             "eval_region": eval_region,
-            "n_cases": len(rows),
+            "n_condition_cases": len(rows),
+            "n_unique_cases": len({int(r["case_index"]) for r in rows}),
         }
         for metric in ("rmse", "crps", "energy_score", "spread", "skill_rmse", "spread_skill_ratio"):
             out[metric] = float(np.nanmean([float(r[metric]) for r in rows]))
@@ -496,22 +496,22 @@ def main() -> None:
         **{f"{k[0]}__{k[1]}".replace(".", "p"): v for k, v in rank_counts.items()},
     )
     for key, total in map_sums.items():
-        var_name, condition_tag, density, noise, map_name = key
-        tag = f"{var_name}__{condition_tag}__{map_name}".replace(".", "p")
+        var_name, mask_type, density, noise, map_name = key
+        tag = f"{var_name}__{mask_type}__d{density:g}__n{noise:g}__{map_name}".replace(".", "p")
         np.save(os.path.join(arrays_dir, f"{tag}.npy"), (total / map_counts[key]).astype(np.float32))
 
     if not args.no_plots:
         for key, counts in rank_counts.items():
-            var_name, condition_tag, density, noise = key
-            tag = f"{var_name}_{condition_tag}".replace(".", "p")
+            var_name, mask_type, density, noise = key
+            tag = f"{var_name}_{mask_type}_d{density:g}_n{noise:g}".replace(".", "p")
             plot_rank_histogram(counts, os.path.join(plots_dir, f"rank_hist_{tag}.png"), f"Rank histogram: {tag}")
-            empirical = [float(np.mean(coverage_hits[(var_name, condition_tag, density, noise, f'{level:g}')])) for level in LEVELS]
+            empirical = [float(np.mean(coverage_hits[(var_name, mask_type, density, noise, f'{level:g}')])) for level in LEVELS]
             plot_coverage(list(LEVELS), empirical, os.path.join(plots_dir, f"coverage_{tag}.png"), f"Coverage: {tag}")
             rows = [
                 r
                 for r in spread_bins
                 if r["variable"] == var_name
-                and r["condition_tag"] == condition_tag
+                and r["mask_type"] == mask_type
                 and r["density"] == density
                 and r["noise_level"] == noise
             ]
