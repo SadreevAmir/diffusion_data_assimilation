@@ -93,6 +93,19 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--block-size", type=int, default=16)
     parser.add_argument("--rank-stride", type=int, default=4, help="Subsample grid for rank histograms")
     parser.add_argument("--energy-score-limit", type=int, default=20000, help="Max flattened points for energy score; <=0 disables")
+    parser.add_argument("--save-tensors", action="store_true", help="Save per-case ensemble/truth/mask/observed tensors")
+    parser.add_argument(
+        "--save-tensor-limit",
+        type=int,
+        default=None,
+        help="Maximum number of local cases for tensor saving; default saves all selected cases",
+    )
+    parser.add_argument(
+        "--save-tensor-format",
+        choices=("npz", "npz_compressed"),
+        default="npz",
+        help="Tensor archive format. npz is faster; npz_compressed uses less disk and more CPU.",
+    )
     parser.add_argument("--no-plots", action="store_true")
     return parser.parse_args()
 
@@ -168,6 +181,53 @@ def write_csv(path: str, rows: list[dict[str, object]]) -> None:
         writer.writerows(rows)
 
 
+def tag_from_condition(mask_type: str, density: float, noise: float) -> str:
+    return f"{mask_type}_d{density:g}_n{noise:g}".replace(".", "p")
+
+
+def should_save_tensors(args: argparse.Namespace, local_case_index: int) -> bool:
+    if not args.save_tensors:
+        return False
+    if args.save_tensor_limit is None:
+        return True
+    return local_case_index < int(args.save_tensor_limit)
+
+
+def save_case_tensors(
+    samples_dir: str,
+    args: argparse.Namespace,
+    local_case_index: int,
+    case_index: int,
+    case_name: str,
+    condition_tag: str,
+    combo_seed: int,
+    x_true: np.ndarray,
+    mask: np.ndarray,
+    observed: np.ndarray,
+    ensemble: np.ndarray,
+) -> str:
+    condition_dir = os.path.join(samples_dir, condition_tag)
+    os.makedirs(condition_dir, exist_ok=True)
+    safe_name = os.path.basename(case_name).replace(os.sep, "_")
+    out_path = os.path.join(condition_dir, f"case{local_case_index:04d}_idx{case_index}_{safe_name}.npz")
+    payload = {
+        "ensemble": ensemble.astype(np.float32, copy=False),
+        "truth": x_true.astype(np.float32, copy=False),
+        "mask": mask.astype(np.float32, copy=False),
+        "observed": observed.astype(np.float32, copy=False),
+        "local_case_index": np.array(local_case_index, dtype=np.int64),
+        "case_index": np.array(case_index, dtype=np.int64),
+        "case_name": np.array(case_name),
+        "condition_tag": np.array(condition_tag),
+        "combo_seed": np.array(combo_seed, dtype=np.int64),
+    }
+    if args.save_tensor_format == "npz_compressed":
+        np.savez_compressed(out_path, **payload)
+    else:
+        np.savez(out_path, **payload)
+    return out_path
+
+
 def main() -> None:
     args = parse_args()
     if not args.no_plots:
@@ -186,8 +246,11 @@ def main() -> None:
     os.makedirs(args.output_dir, exist_ok=True)
     plots_dir = os.path.join(args.output_dir, "plots")
     arrays_dir = os.path.join(args.output_dir, "arrays")
+    samples_dir = os.path.join(args.output_dir, "samples")
     os.makedirs(plots_dir, exist_ok=True)
     os.makedirs(arrays_dir, exist_ok=True)
+    if args.save_tensors:
+        os.makedirs(samples_dir, exist_ok=True)
 
     dataset = NpyImageDataset(input_dir, preload=False, mmap_mode="r")
     runner = load_runner(args, channel_mean, channel_std)
@@ -214,6 +277,10 @@ def main() -> None:
         "max_timesteps": args.max_timesteps,
         "runner": args.runner,
         "rank_stride": args.rank_stride,
+        "save_tensors": args.save_tensors,
+        "save_tensor_limit": args.save_tensor_limit,
+        "save_tensor_format": args.save_tensor_format,
+        "samples_dir": os.path.abspath(samples_dir) if args.save_tensors else None,
         "note": "Synthetic benchmark evaluates posterior ensemble directly against full x_true.",
     }
     with open(os.path.join(args.output_dir, "metadata.json"), "w") as f:
@@ -244,6 +311,22 @@ def main() -> None:
             mask = make_observation_mask((h, w), obs_config, valid, rng)
             observed = make_sparse_observation(x_true, mask, noise_std, rng)
             ensemble = runner.run(x_true, mask, observed, args.ensemble_size, combo_seed)
+            condition_tag = tag_from_condition(mask_type, density, noise_std)
+            saved_tensor_path = ""
+            if should_save_tensors(args, local_case_index):
+                saved_tensor_path = save_case_tensors(
+                    samples_dir=samples_dir,
+                    args=args,
+                    local_case_index=int(local_case_index),
+                    case_index=int(case_index),
+                    case_name=name,
+                    condition_tag=condition_tag,
+                    combo_seed=int(combo_seed),
+                    x_true=x_true,
+                    mask=mask,
+                    observed=observed,
+                    ensemble=ensemble,
+                )
             mean = ensemble.mean(axis=0)
             crps = ensemble_crps(ensemble, x_true)
             rmse_by_var = np.array(
@@ -280,6 +363,7 @@ def main() -> None:
                     "rmse": float(rmse_by_var[ch]),
                     "crps": float(crps_by_var[ch]),
                     "energy_score": e_score,
+                    "tensor_path": saved_tensor_path,
                     **ss,
                     **summary,
                 }
@@ -308,8 +392,7 @@ def main() -> None:
                     map_counts[map_key] = map_counts.get(map_key, 0.0) + 1.0
 
             if not args.no_plots and case_index == 0:
-                tag = f"{mask_type}_d{density:g}_n{noise_std:g}".replace(".", "p")
-                plot_example_panel(x_true, mask, ensemble, os.path.join(plots_dir, f"example_{tag}.png"))
+                plot_example_panel(x_true, mask, ensemble, os.path.join(plots_dir, f"example_{condition_tag}.png"))
 
     write_csv(os.path.join(args.output_dir, "per_case_metrics.csv"), case_rows)
     write_csv(os.path.join(args.output_dir, "spread_skill_bins.csv"), spread_bins)
