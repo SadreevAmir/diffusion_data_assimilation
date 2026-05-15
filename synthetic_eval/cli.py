@@ -322,6 +322,7 @@ def main() -> None:
         "selected_case_indices": case_indices.tolist(),
         "max_timesteps": args.max_timesteps,
         "runner": args.runner,
+        "runner_checkpoint_metadata": getattr(runner, "checkpoint_metadata", None),
         "rank_stride": args.rank_stride,
         "save_tensors": args.save_tensors,
         "save_tensor_limit": args.save_tensor_limit,

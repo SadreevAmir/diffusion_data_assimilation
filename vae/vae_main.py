@@ -49,11 +49,11 @@ def main():
     )
 
     model = VAE(
-        in_channels=2,
-        latent_channels=8,
-        base_channels=64,
-        scale_factor=8,
-        max_channels=512,
+        in_channels=config.in_channels,
+        latent_channels=config.latent_channels,
+        base_channels=config.base_channels,
+        scale_factor=config.scale_factor,
+        max_channels=config.max_channels,
     )
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=config.learning_rate)

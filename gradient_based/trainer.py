@@ -13,6 +13,7 @@ from diffusers.training_utils import EMAModel
 from huggingface_hub import upload_folder, create_repo
 from datetime import datetime
 
+from checkpointing import save_training_checkpoint
 from utils import make_normalized_xy_grid, channel_denormalize
 from .sampler import Sampler
 
@@ -48,6 +49,16 @@ class TrainingConfig:
     image_size: tuple = (320, 256)
     in_channels: int = 4
     out_channels: int = 2
+    layers_per_block: int = 2
+    block_out_channels: tuple = (64, 128, 256, 512, 512)
+    down_block_types: tuple = (
+        "DownBlock2D", "DownBlock2D", "DownBlock2D",
+        "AttnDownBlock2D", "DownBlock2D",
+    )
+    up_block_types: tuple = (
+        "UpBlock2D", "AttnUpBlock2D", "UpBlock2D",
+        "UpBlock2D", "UpBlock2D",
+    )
 
     num_workers_train: int = 6
     num_workers_val: int = 4
@@ -126,11 +137,37 @@ class UNetTrainer:
         H, W = config.image_size
         self._grid = make_normalized_xy_grid(H, W).to(self.accelerator.device)
 
-    def save_model_custom(self, name="last_model.pth"):
+        if self.accelerator.is_main_process:
+            self.save_model_custom("initial_model.pth", epoch=-1, global_step=0)
+
+    def save_model_custom(self, name="last_model.pth", epoch: int | None = None, global_step: int | None = None):
         os.makedirs(self.output_dir, exist_ok=True)
         unwrapped = self.accelerator.unwrap_model(self.model)
-        torch.save(unwrapped.state_dict(), os.path.join(self.output_dir, name))
-        torch.save(self.ema_model.state_dict(), os.path.join(self.output_dir, f"ema_{name}"))
+        save_training_checkpoint(
+            os.path.join(self.output_dir, name),
+            model=unwrapped,
+            config=self.config,
+            run_name=self.run_name,
+            model_state_dict=unwrapped.state_dict(),
+            optimizer=self.optimizer,
+            lr_scheduler=self.lr_scheduler,
+            epoch=epoch,
+            global_step=global_step,
+            best_val_loss=self.best_val_loss,
+        )
+        save_training_checkpoint(
+            os.path.join(self.output_dir, f"ema_{name}"),
+            model=unwrapped,
+            config=self.config,
+            run_name=self.run_name,
+            model_state_dict=unwrapped.state_dict(),
+            ema_state_dict=self.ema_model.state_dict(),
+            optimizer=self.optimizer,
+            lr_scheduler=self.lr_scheduler,
+            epoch=epoch,
+            global_step=global_step,
+            best_val_loss=self.best_val_loss,
+        )
 
     def compute_val_loss(self) -> float:
         self.model.eval()
@@ -234,14 +271,14 @@ class UNetTrainer:
                 with open(os.path.join(self.output_dir, "metrics.json"), "w") as f:
                     json.dump(self.val_history, f, indent=4)
 
-                self.save_model_custom("last_model.pth")
+                self.save_model_custom("last_model.pth", epoch=epoch, global_step=global_step)
 
                 if epoch % self.config.sample_every_n_epochs == 0:
                     self.save_samples(epoch)
 
                 if val_loss < self.best_val_loss:
                     self.best_val_loss = val_loss
-                    self.save_model_custom("best_model.pth")
+                    self.save_model_custom("best_model.pth", epoch=epoch, global_step=global_step)
                     logger.info("New best model saved! val_loss: %.6f", val_loss)
 
                 if self.config.push_to_hub:

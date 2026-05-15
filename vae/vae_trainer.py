@@ -11,6 +11,7 @@ from accelerate.utils import ProjectConfiguration
 from huggingface_hub import upload_folder, create_repo
 from datetime import datetime
 
+from checkpointing import save_training_checkpoint
 from vae.vae import vae_loss
 from utils import channel_denormalize
 
@@ -40,6 +41,11 @@ class VAETrainingConfig:
     channel_std: tuple = tuple(stats["std"])
 
     image_size: tuple = (320, 256)
+    in_channels: int = 2
+    latent_channels: int = 8
+    base_channels: int = 64
+    scale_factor: int = 8
+    max_channels: int = 512
 
     num_workers_train: int = 6
     num_workers_val: int = 4
@@ -103,10 +109,24 @@ class VAETrainer:
             model, optimizer, data_loader_train, data_loader_val, lr_scheduler
         )
 
-    def save_model(self, name="last_model.pth"):
+        if self.accelerator.is_main_process:
+            self.save_model("initial_model.pth", epoch=-1, global_step=0)
+
+    def save_model(self, name="last_model.pth", epoch: int | None = None, global_step: int | None = None):
         os.makedirs(self.output_dir, exist_ok=True)
         unwrapped = self.accelerator.unwrap_model(self.model)
-        torch.save(unwrapped.state_dict(), os.path.join(self.output_dir, name))
+        save_training_checkpoint(
+            os.path.join(self.output_dir, name),
+            model=unwrapped,
+            config=self.config,
+            run_name=self.run_name,
+            model_state_dict=unwrapped.state_dict(),
+            optimizer=self.optimizer,
+            lr_scheduler=self.lr_scheduler,
+            epoch=epoch,
+            global_step=global_step,
+            best_val_loss=self.best_val_loss,
+        )
 
     def compute_val_loss(self) -> tuple[float, float, float]:
         self.model.eval()
@@ -208,14 +228,14 @@ class VAETrainer:
                 with open(os.path.join(self.output_dir, "metrics.json"), "w") as f:
                     json.dump(self.val_history, f, indent=4)
 
-                self.save_model("last_model.pth")
+                self.save_model("last_model.pth", epoch=epoch, global_step=global_step)
 
                 if epoch % self.config.sample_every_n_epochs == 0:
                     self.save_samples(epoch)
 
                 if val_loss < self.best_val_loss:
                     self.best_val_loss = val_loss
-                    self.save_model("best_model.pth")
+                    self.save_model("best_model.pth", epoch=epoch, global_step=global_step)
                     logger.info("New best model saved! val_loss: %.6f", val_loss)
 
                 if self.config.push_to_hub:

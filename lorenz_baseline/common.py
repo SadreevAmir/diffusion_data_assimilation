@@ -4,6 +4,7 @@ import math
 import random
 import warnings
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -14,6 +15,8 @@ from scipy.spatial.distance import cdist
 from torch import nn
 from torch.utils.data import DataLoader, Dataset
 from tqdm.auto import tqdm
+
+from checkpointing import save_training_checkpoint
 
 torch.set_float32_matmul_precision("high")
 
@@ -148,6 +151,13 @@ class FlowMatchingMLP(nn.Module):
         super().__init__()
         self.state_dim = state_dim
         self.conditional = conditional
+        self.config = {
+            "state_dim": state_dim,
+            "conditional": conditional,
+            "hidden_dim": hidden_dim,
+            "hidden_layers": hidden_layers,
+            "time_embed_dim": time_embed_dim,
+        }
         cond_dim = state_dim * 2 if conditional else 0
         self.time_embedding = SinusoidalTimeEmbedding(time_embed_dim)
 
@@ -373,9 +383,45 @@ def fit_flow_matching(
     weight_decay: float = 1e-4,
     conditioning_mode: str = "random",
     observed_loss_weight: float = 1.0,
+    output_dir: str | Path = "checkpoints/lorenz_baseline",
+    run_name: str | None = None,
+    save_checkpoints: bool = True,
 ) -> dict[str, list[float]]:
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
     history = {"train_loss": [], "val_loss": []}
+    best_val_loss = float("inf")
+    run_name = run_name or datetime.now().strftime("run_%Y%m%d_%H%M%S")
+    checkpoint_dir = Path(output_dir) / run_name
+    training_config = {
+        "conditional": conditional,
+        "epochs": epochs,
+        "lr": lr,
+        "weight_decay": weight_decay,
+        "conditioning_mode": conditioning_mode,
+        "observed_loss_weight": observed_loss_weight,
+        "device": str(device),
+        "standardizer_mean": standardizer.mean.tolist(),
+        "standardizer_std": standardizer.std.tolist(),
+    }
+
+    def save_checkpoint(name: str, epoch: int | None, global_step: int | None) -> None:
+        if not save_checkpoints:
+            return
+        checkpoint_dir.mkdir(parents=True, exist_ok=True)
+        save_training_checkpoint(
+            str(checkpoint_dir / name),
+            model=model,
+            config=training_config,
+            run_name=run_name or "",
+            model_state_dict=model.state_dict(),
+            optimizer=optimizer,
+            epoch=epoch,
+            global_step=global_step,
+            best_val_loss=best_val_loss,
+        )
+
+    global_step = 0
+    save_checkpoint("initial_model.pth", epoch=-1, global_step=global_step)
 
     for epoch in range(epochs):
         model.train()
@@ -398,6 +444,7 @@ def fit_flow_matching(
             )
             loss.backward()
             optimizer.step()
+            global_step += 1
             train_loss += loss.item() * states_raw.shape[0]
             train_bar.set_postfix(loss=f"{loss.item():.4f}")
 
@@ -432,6 +479,10 @@ def fit_flow_matching(
             f"train_loss={train_epoch_loss:.6f} | "
             f"val_loss={val_epoch_loss:.6f}"
         )
+        save_checkpoint("last_model.pth", epoch=epoch, global_step=global_step)
+        if val_epoch_loss < best_val_loss:
+            best_val_loss = val_epoch_loss
+            save_checkpoint("best_model.pth", epoch=epoch, global_step=global_step)
 
     return history
 

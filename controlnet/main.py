@@ -5,6 +5,7 @@ import torch
 from functools import partial
 from .trainer import ControlNetTrainingConfig, ControlNetTrainer
 from .model import SeaIceControlNet, ControlledUNet
+from checkpointing import extract_state_dict, safe_torch_load
 from utils import NpyImageDataset, MixedSatelliteTrackDataset, channel_normalize, add_noise
 from diffusers.models.unets.unet_2d import UNet2DModel
 from diffusers.training_utils import EMAModel
@@ -89,23 +90,22 @@ def main():
         sample_size=config.image_size,
         in_channels=config.in_channels,
         out_channels=config.out_channels,
-        layers_per_block=2,
-        block_out_channels=(64, 128, 256, 512, 512),
-        down_block_types=(
-            "DownBlock2D", "DownBlock2D", "DownBlock2D",
-            "AttnDownBlock2D", "DownBlock2D",
-        ),
-        up_block_types=(
-            "UpBlock2D", "AttnUpBlock2D", "UpBlock2D",
-            "UpBlock2D", "UpBlock2D",
-        ),
+        layers_per_block=config.layers_per_block,
+        block_out_channels=config.block_out_channels,
+        down_block_types=config.down_block_types,
+        up_block_types=config.up_block_types,
     )
 
     # Загружаем веса из претренированной gradient_based модели
     assert config.pretrained_unet_path, "pretrained_unet_path must be set in ControlNetTrainingConfig"
-    ema = EMAModel(unet.parameters(), decay=0.999)
-    ema.load_state_dict(torch.load(config.pretrained_unet_path, map_location="cpu", weights_only=True))
-    ema.copy_to(unet.parameters())
+    checkpoint = safe_torch_load(config.pretrained_unet_path)
+    state = extract_state_dict(checkpoint, ("ema_state_dict", "model_state_dict"))
+    try:
+        ema = EMAModel(unet.parameters(), decay=0.999)
+        ema.load_state_dict(state)
+        ema.copy_to(unet.parameters())
+    except (KeyError, RuntimeError, ValueError):
+        unet.load_state_dict(state)
     logging.info("Loaded pretrained UNet from %s", config.pretrained_unet_path)
 
     # ControlNet копирует энкодер UNet

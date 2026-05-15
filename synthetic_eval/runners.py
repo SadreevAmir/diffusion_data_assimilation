@@ -63,6 +63,7 @@ class ConcatRunner(EnsembleRunner):
         if not os.path.isdir(run_dir):
             raise FileNotFoundError(run_dir)
         self.sampler = load_concat_sampler(run_dir, checkpoint_name, self.device)
+        self.checkpoint_metadata = getattr(self.sampler, "checkpoint_metadata", None)
 
     def run(self, x_true: np.ndarray, mask: np.ndarray, observed: np.ndarray, ensemble_size: int, seed: int) -> np.ndarray:
         import torch

@@ -11,6 +11,7 @@ from diffusers.training_utils import EMAModel
 from torch.utils.data import DataLoader, Dataset
 from tqdm.auto import tqdm
 
+from checkpointing import checkpoint_metadata, extract_state_dict, safe_torch_load
 from concat.sampler import Sampler as ConcatSampler
 from fid.inception_fid import default_data_root, default_stats_json_path, load_channel_stats
 from utils import (
@@ -41,13 +42,6 @@ class NamedNpyDataset(Dataset):
         return self.base[idx], self.base.files[idx]
 
 
-def _safe_torch_load(path: str):
-    try:
-        return torch.load(path, map_location="cpu", weights_only=True)
-    except TypeError:
-        return torch.load(path, map_location="cpu")
-
-
 def _default_concat_run_dir(repo_root: str, checkpoint_name: str) -> str:
     candidates = sorted(glob.glob(os.path.join(repo_root, "checkpoints", "**", checkpoint_name), recursive=True))
     if not candidates:
@@ -55,34 +49,48 @@ def _default_concat_run_dir(repo_root: str, checkpoint_name: str) -> str:
     return str(Path(candidates[-1]).parent)
 
 
+def _tuple_or_default(config: dict, key: str, default):
+    value = config.get(key, default)
+    return tuple(value) if isinstance(value, list) else value
+
+
 def load_concat_sampler(run_dir: str, checkpoint_name: str, device: str | torch.device):
+    checkpoint_path = os.path.join(run_dir, checkpoint_name)
+    checkpoint = safe_torch_load(checkpoint_path)
+    config = checkpoint.get("config", {}) if isinstance(checkpoint, dict) else {}
+
     model = UNet2DModel(
-        sample_size=IMAGE_SIZE,
-        in_channels=7,
-        out_channels=2,
-        layers_per_block=2,
-        block_out_channels=(64, 128, 256, 512, 512),
-        down_block_types=(
+        sample_size=_tuple_or_default(config, "image_size", IMAGE_SIZE),
+        in_channels=int(config.get("in_channels", 7)),
+        out_channels=int(config.get("out_channels", 2)),
+        layers_per_block=int(config.get("layers_per_block", 2)),
+        block_out_channels=_tuple_or_default(config, "block_out_channels", (64, 128, 256, 512, 512)),
+        down_block_types=_tuple_or_default(config, "down_block_types", (
             "DownBlock2D",
             "DownBlock2D",
             "DownBlock2D",
             "AttnDownBlock2D",
             "DownBlock2D",
-        ),
-        up_block_types=(
+        )),
+        up_block_types=_tuple_or_default(config, "up_block_types", (
             "UpBlock2D",
             "AttnUpBlock2D",
             "UpBlock2D",
             "UpBlock2D",
             "UpBlock2D",
-        ),
+        )),
     )
-    checkpoint_path = os.path.join(run_dir, checkpoint_name)
-    ema = EMAModel(model.parameters(), decay=0.999)
-    ema.load_state_dict(_safe_torch_load(checkpoint_path))
-    ema.copy_to(model.parameters())
+    state = extract_state_dict(checkpoint, ("ema_state_dict", "model_state_dict"))
+    try:
+        ema = EMAModel(model.parameters(), decay=0.999)
+        ema.load_state_dict(state)
+        ema.copy_to(model.parameters())
+    except (KeyError, RuntimeError, ValueError):
+        model.load_state_dict(state)
     model.eval().to(device)
-    return ConcatSampler(model)
+    sampler = ConcatSampler(model)
+    sampler.checkpoint_metadata = checkpoint_metadata(checkpoint)
+    return sampler
 
 
 def parse_args():
@@ -182,6 +190,7 @@ def main():
         "source_dir": os.path.abspath(source_dir),
         "concat_run_dir": os.path.abspath(concat_run_dir),
         "checkpoint_name": args.checkpoint_name,
+        "checkpoint_metadata": getattr(sampler, "checkpoint_metadata", None),
         "num_exported": exported,
         "num_timesteps": args.num_timesteps,
         "method": args.method,
