@@ -1,0 +1,13 @@
+{
+  "project_name": "assimilation_smoke",
+  "task_name": "smoke_identity",
+  "model_name": "identity",
+  "model_config": "config/methods/identity.json",
+  "data_config": "config/data/smoke.json",
+  "outputs": {
+    "out_dir": "outputs/smoke_identity"
+  },
+  "clearml": {
+    "enabled": false
+  }
+}
