@@ -13,6 +13,12 @@ def _denormalize_channel(values, channel: int, means, stds):
     return values * std + mean
 
 
+def _clip_display(values, channel: int):
+    if channel == 0:
+        return np.clip(values, 0.0, 1.0)
+    return values
+
+
 def make_background_condition_assim_figure(
     background,
     obs_values,
@@ -49,9 +55,9 @@ def make_background_condition_assim_figure(
 
     for row, channel in enumerate(channels):
         field_name = fields[channel] if channel < len(fields) else f"ch{channel}"
-        bg = _denormalize_channel(background[channel], channel, means, stds)
-        an = _denormalize_channel(assim[channel], channel, means, stds)
-        cond = _denormalize_channel(obs_values[channel], channel, means, stds)
+        bg = _clip_display(_denormalize_channel(background[channel], channel, means, stds), channel)
+        an = _clip_display(_denormalize_channel(assim[channel], channel, means, stds), channel)
+        cond = _clip_display(_denormalize_channel(obs_values[channel], channel, means, stds), channel)
         cond = np.where(obs_mask[channel], cond, np.nan)
 
         finite_values = [arr[np.isfinite(arr)] for arr in (bg, an, cond)]
