@@ -226,6 +226,34 @@ class UNetTrainer:
         self.clearml.report_scalar("loss/full", "validation", loss_full, step)
         self.clearml.report_scalar("loss/observed", "validation", loss_obs, step)
 
+    @staticmethod
+    def _meta_mean(value):
+        if torch.is_tensor(value):
+            if value.numel() == 0:
+                return None
+            return float(value.to(dtype=torch.float32).mean().item())
+        if isinstance(value, (list, tuple)):
+            numeric = [float(item) for item in value if isinstance(item, (int, float))]
+            if not numeric:
+                return None
+            return float(sum(numeric) / len(numeric))
+        if isinstance(value, (int, float)):
+            return float(value)
+        return None
+
+    def _report_condition_diagnostics(self, raw_batch: dict, step: int, series: str):
+        if self.clearml is None or "meta" not in raw_batch:
+            return
+        meta = raw_batch["meta"]
+        if not isinstance(meta, dict):
+            return
+        for key in ("obs_count", "observed_fraction", "sral_files_used", "empty_obs_days"):
+            if key not in meta:
+                continue
+            value = self._meta_mean(meta[key])
+            if value is not None:
+                self.clearml.report_scalar(f"condition/{key}", series, value, step)
+
     def _upload_clearml_artifacts(self):
         if self.clearml is None:
             return
@@ -386,6 +414,7 @@ class UNetTrainer:
                         f"epoch {epoch} first batch "
                         f"loss={loss.item():.6f} full={loss_full.item():.6f} obs={loss_obs.item():.6f}"
                     )
+                    self._report_condition_diagnostics(raw_batch, global_step, "train")
                 self._report_train_metrics(loss, loss_full, loss_obs, global_step)
                 if self.config.tracker:
                     self.accelerator.log({
@@ -414,6 +443,10 @@ class UNetTrainer:
                     "val_loss_obs": val_loss_obs,
                 }, step=global_step)
             self._report_val_metrics(val_loss_full, val_loss_obs, val_loss, global_step)
+            try:
+                self._report_condition_diagnostics(next(iter(self.val_dataloader)), global_step, "validation")
+            except StopIteration:
+                pass
             _debug(f"epoch {epoch} validation total={val_loss:.6f}")
             logger.info("Epoch %d val_loss %.6f full %.6f obs %.6f", epoch, val_loss, val_loss_full, val_loss_obs)
 

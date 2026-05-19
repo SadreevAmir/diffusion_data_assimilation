@@ -15,8 +15,9 @@
   "observed_channels": [0],
   "assimilation_range": 3,
   "observation_mask": {
-    "kind": "generated_track",
-    "n_tracks_range": [1, 4]
+    "kind": "sral_tracks",
+    "sral_transform_index": 11,
+    "max_observed_fraction": 0.05
   },
   "train": {
     "back_start_day": "2015-01-01",

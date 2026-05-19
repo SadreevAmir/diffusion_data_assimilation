@@ -68,6 +68,73 @@ def _field_at_hour(path: Path, hour_index: int):
     raise ValueError(f"Expected forecast array [V,T,H,W] or [V,H,W], got {field.shape} in {path}")
 
 
+def _sral_transform(arr: np.ndarray, index: int) -> np.ndarray:
+    if arr.ndim == 2:
+        return arr.astype(np.float32, copy=False)
+    if arr.ndim != 3:
+        raise ValueError(f"Expected SRAL array [C,H,W] or [H,W], got {arr.shape}")
+
+    if index == 1:
+        out = np.round(arr[1].astype(np.float32, copy=True), decimals=0)
+        out[out == 2.0] = 1.0
+        out[out == 3.0] = np.nan
+        return out
+
+    if index == 8:
+        ice_class = np.round(arr[1].astype(np.float32, copy=True), decimals=0)
+        ice_class[ice_class == 2.0] = 1.0
+        ice_class[ice_class == 3.0] = 1.0
+        out = arr[7].astype(np.float32, copy=True)
+        out[np.isnan(ice_class)] = np.nan
+        return out
+
+    if index in (10, 11):
+        ice_class = np.round(arr[1].astype(np.float32, copy=True), decimals=0)
+        out = arr[7].astype(np.float32, copy=True)
+        out[np.isnan(ice_class)] = np.nan
+        out[ice_class == 1.0] = 1.0
+        out[ice_class == 2.0] = 1.0
+        return out
+
+    if index == 13:
+        return 0.5 * _sral_transform(arr, 8) + 0.5 * _sral_transform(arr, 10)
+
+    if index == 14:
+        ice_class = np.round(arr[1].astype(np.float32, copy=True), decimals=0)
+        amsr = arr[7].astype(np.float32, copy=True)
+        out = np.full(amsr.shape, np.nan, dtype=np.float32)
+        finite_amsr = np.isfinite(amsr)
+        open_agree = (ice_class == 0.0) & finite_amsr & (amsr <= 0.15)
+        ice_agree = ((ice_class == 1.0) | (ice_class == 2.0)) & finite_amsr & (amsr >= 0.15)
+        out[open_agree | ice_agree] = amsr[open_agree | ice_agree]
+        return out
+
+    if index == 15:
+        ice_class = np.round(arr[1].astype(np.float32, copy=True), decimals=0)
+        amsr = arr[7].astype(np.float32, copy=True)
+        out = np.full(amsr.shape, np.nan, dtype=np.float32)
+        finite_amsr = np.isfinite(amsr)
+        open_water = (ice_class == 0.0) & finite_amsr
+        ice = ((ice_class == 1.0) | (ice_class == 2.0)) & finite_amsr
+        out[open_water] = 0.5 * amsr[open_water]
+        out[ice] = 0.5 * amsr[ice] + 0.5
+        return out
+
+    raise ValueError(f"Unsupported sral_transform_index={index}")
+
+
+def _combine_sral_files(paths: list[Path]) -> np.ndarray | None:
+    combined = None
+    for path in paths:
+        arr = np.load(path)
+        if combined is None or combined.shape != arr.shape:
+            combined = np.full(arr.shape, np.nan, dtype=np.float32)
+        finite = np.isfinite(arr)
+        fill = np.isnan(combined) & finite
+        combined[fill] = arr[fill]
+    return combined
+
+
 def _generate_track_mask(image_size: tuple[int, int], valid_mask: torch.Tensor, n_tracks_range, rng) -> torch.Tensor:
     height, width = image_size
     n_min, n_max = int(n_tracks_range[0]), int(n_tracks_range[1])
@@ -108,6 +175,21 @@ def _make_mask(image_size, valid_mask, config, rng) -> torch.Tensor:
         return _generate_track_mask(image_size, valid_mask, mask_config.get("n_tracks_range", [1, 4]), rng)
     if kind == "random":
         return _random_mask(image_size, valid_mask, float(mask_config.get("density", 0.05)), rng)
+    if kind == "uniform_points":
+        valid_2d = valid_mask[0].detach().cpu().numpy() > 0 if valid_mask.ndim == 3 else valid_mask.detach().cpu().numpy() > 0
+        coords = np.argwhere(valid_2d)
+        mask = np.zeros(image_size, dtype=np.float32)
+        if coords.size == 0:
+            return torch.from_numpy(mask)
+        density = float(mask_config.get("density", 0.01))
+        max_points = mask_config.get("max_points")
+        count = max(1, int(round(coords.shape[0] * density)))
+        if max_points is not None:
+            count = min(count, int(max_points))
+        count = min(count, coords.shape[0])
+        chosen = coords[rng.choice(coords.shape[0], size=count, replace=False)]
+        mask[chosen[:, 0], chosen[:, 1]] = 1.0
+        return torch.from_numpy(mask)
     raise ValueError(f"Unknown observation_mask kind: {kind}")
 
 
@@ -192,6 +274,7 @@ class M2MForecastDataset(Dataset):
             raise ValueError("Observation/target date range is too short for background range and assimilation_range")
 
         self.sral_records = self._load_sral_records()
+        self.records_by_date = {record.date: record for record in records}
         self.base_valid_mask = self._load_base_valid_mask()
 
     def _load_base_valid_mask(self) -> torch.Tensor:
@@ -222,22 +305,86 @@ class M2MForecastDataset(Dataset):
     def __len__(self):
         return len(self.back_data)
 
+    def _sral_track_observations(self, target_date: date, valid_mask: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, dict]:
+        obs_values = torch.zeros((len(self.indices), *self.image_size), dtype=torch.float32)
+        obs_mask = torch.zeros_like(obs_values)
+        diagnostics = {
+            "mask_kind": "sral_tracks",
+            "sral_files_used": 0,
+            "empty_obs_days": 0,
+            "obs_count": 0,
+            "observed_fraction": 0.0,
+        }
+        if not self.sral_records:
+            diagnostics["empty_obs_days"] = self.assimilation_range
+            return obs_values, obs_mask, diagnostics
+
+        mask_config = self.config.get("observation_mask", {})
+        transform_index = int(mask_config.get("sral_transform_index", self.config.get("sral_transform_index", 11)))
+        for offset in range(self.assimilation_range):
+            current_date = target_date - timedelta(days=offset)
+            sral_paths = self.sral_records.get(current_date, [])
+            model_record = self.records_by_date.get(current_date)
+            if not sral_paths or model_record is None:
+                diagnostics["empty_obs_days"] += 1
+                continue
+
+            combined_sral = _combine_sral_files(sral_paths)
+            if combined_sral is None:
+                diagnostics["empty_obs_days"] += 1
+                continue
+            transformed_sral = _sral_transform(combined_sral, transform_index)
+            spatial_mask = torch.as_tensor(np.isfinite(transformed_sral).astype(np.float32))
+            spatial_mask = pad_to_size(spatial_mask, self.image_size, fill_value=0.0)[0]
+            spatial_mask = spatial_mask * valid_mask[0]
+            if not torch.any(spatial_mask > 0):
+                diagnostics["empty_obs_days"] += 1
+                continue
+
+            track_field, track_finite = prepare_model_field(
+                _field_at_hour(model_record.path, self.hour_index),
+                self.indices,
+                self.means,
+                self.stds,
+                self.padding_values,
+                self.image_size,
+            )
+            diagnostics["sral_files_used"] += len(sral_paths)
+            for channel in self.observed_channels:
+                fill_mask = (obs_mask[channel] == 0) & (spatial_mask > 0) & (track_finite[channel] > 0)
+                obs_values[channel][fill_mask] = track_field[channel][fill_mask]
+                obs_mask[channel][fill_mask] = 1.0
+
+        valid_count = float(valid_mask[0].sum().item())
+        obs_count = int(obs_mask[self.observed_channels].sum().item()) if self.observed_channels else 0
+        diagnostics["obs_count"] = obs_count
+        diagnostics["observed_fraction"] = obs_count / max(valid_count, 1.0)
+        max_fraction = mask_config.get("max_observed_fraction")
+        if max_fraction is not None and diagnostics["observed_fraction"] > float(max_fraction):
+            raise ValueError(
+                f"SRAL track condition is too dense for {target_date}: "
+                f"observed_fraction={diagnostics['observed_fraction']:.6f} > {float(max_fraction):.6f}. "
+                "Check sral_transform_index and SRAL files."
+            )
+        return obs_values, obs_mask, diagnostics
+
     def _sral_spatial_mask(self, target_date: date) -> torch.Tensor | None:
         if not self.sral_records:
             return None
         mask = torch.zeros(self.image_size, dtype=torch.float32)
-        channel = self.config.get("sral_mask_channel")
         for offset in range(self.assimilation_range):
             current_date = target_date - timedelta(days=offset)
-            for path in self.sral_records.get(current_date, []):
-                arr = np.load(path)
-                if channel is not None and arr.ndim == 3:
-                    arr = arr[int(channel)]
-                elif arr.ndim == 3:
-                    arr = np.any(np.isfinite(arr), axis=0)
-                finite = torch.as_tensor(np.isfinite(arr).astype(np.float32))
-                finite = pad_to_size(finite, self.image_size, fill_value=0.0)[0]
-                mask = torch.maximum(mask, finite)
+            sral_paths = self.sral_records.get(current_date, [])
+            combined_sral = _combine_sral_files(sral_paths)
+            if combined_sral is None:
+                continue
+            transformed_sral = _sral_transform(
+                combined_sral,
+                int(self.config.get("observation_mask", {}).get("sral_transform_index", self.config.get("sral_transform_index", 11))),
+            )
+            finite = torch.as_tensor(np.isfinite(transformed_sral).astype(np.float32))
+            finite = pad_to_size(finite, self.image_size, fill_value=0.0)[0]
+            mask = torch.maximum(mask, finite)
         return mask if torch.any(mask > 0) else None
 
     def __getitem__(self, idx):
@@ -261,12 +408,22 @@ class M2MForecastDataset(Dataset):
         )
         valid_mask = self.base_valid_mask * background_finite * truth_finite
 
-        spatial_mask = self._sral_spatial_mask(target_record.date)
-        if spatial_mask is None:
+        mask_kind = self.config.get("observation_mask", {}).get("kind", "generated_track")
+        if mask_kind == "sral_tracks":
+            obs_values, obs_mask, obs_diagnostics = self._sral_track_observations(target_record.date, valid_mask)
+        else:
             rng = np.random.default_rng(self.seed + idx)
             spatial_mask = _make_mask(self.image_size, valid_mask, self.config, rng)
-        spatial_mask = spatial_mask * valid_mask[0]
-        obs_values, obs_mask = make_observation_tensors(truth, spatial_mask, self.observed_channels)
+            spatial_mask = spatial_mask * valid_mask[0]
+            obs_values, obs_mask = make_observation_tensors(truth, spatial_mask, self.observed_channels)
+            valid_count = float(valid_mask[0].sum().item())
+            obs_diagnostics = {
+                "mask_kind": mask_kind,
+                "sral_files_used": 0,
+                "empty_obs_days": 0,
+                "obs_count": int(obs_mask[self.observed_channels].sum().item()) if self.observed_channels else 0,
+                "observed_fraction": float(obs_mask[self.observed_channels].sum().item()) / max(valid_count, 1.0) if self.observed_channels else 0.0,
+            }
 
         return {
             "truth": truth,
@@ -281,6 +438,7 @@ class M2MForecastDataset(Dataset):
                 "background_path": str(back_record.path),
                 "target_path": str(target_record.path),
                 "split": self.split,
+                **obs_diagnostics,
             },
         }
 
