@@ -1,0 +1,19 @@
+{
+  "dataset_name": "SmokeM2MDataset",
+  "fields": ["siconc", "sithic", "sitemp", "sosstsst"],
+  "channels": 4,
+  "image_size": [16, 16],
+  "observed_channels": [0],
+  "background_noise_std": 0.25,
+  "seed": 7,
+  "observation_mask": {
+    "kind": "random",
+    "density": 0.25
+  },
+  "train": {
+    "n_cases": 4
+  },
+  "valid": {
+    "n_cases": 2
+  }
+}

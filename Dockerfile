@@ -36,4 +36,6 @@ RUN pip install --no-cache-dir -r /tmp/requirements.txt
 WORKDIR /home/
 EXPOSE 8888
 
-CMD ["jupyter", "lab", "--ip=0.0.0.0", "--port=8888", "--no-browser", "--allow-root"]
+COPY ./entrypoint.sh /sh/
+RUN ["chmod", "755", "/sh/entrypoint.sh"]
+ENTRYPOINT ["/sh/entrypoint.sh"]
