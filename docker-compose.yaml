@@ -1,5 +1,5 @@
 services:
-  v.ivanov_diffusion_data_assimilation:
+  diffusion_data_assimilation:
     build: .
     image: ${USER}/diffusion_data_assimilation
     container_name: ${USER}_diffusion_data_assimilation
