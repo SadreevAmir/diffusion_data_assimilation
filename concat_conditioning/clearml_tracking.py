@@ -85,6 +85,23 @@ class ClearMLTracker:
     def report_single_value(self, name: str, value: float) -> None:
         self.logger.report_single_value(name=name, value=float(value))
 
+    def report_figure(self, title: str, series: str, figure, iteration: int) -> None:
+        try:
+            self.logger.report_matplotlib_figure(
+                title=title,
+                series=series,
+                figure=figure,
+                iteration=int(iteration),
+                report_interactive=False,
+            )
+        except TypeError:
+            self.logger.report_matplotlib_figure(
+                title=title,
+                series=series,
+                figure=figure,
+                iteration=int(iteration),
+            )
+
     def upload_artifact(self, name: str, path: str | Path) -> None:
         path = Path(path)
         if path.exists():

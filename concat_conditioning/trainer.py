@@ -16,6 +16,7 @@ from tqdm.auto import tqdm
 from utils import make_normalized_xy_grid
 
 from .clearml_tracking import ClearMLTracker
+from .dashboard import make_background_condition_assim_figure
 from .sampler import Sampler
 
 
@@ -60,6 +61,10 @@ class TrainingConfig:
     clearml_output_uri: str | None = None
     clearml_env_path: str | None = None
     clearml_upload_checkpoints: bool = False
+    dashboard_every_n_epochs: int = 1
+    dashboard_num_cases: int = 1
+    dashboard_num_timesteps: int = 10
+    dashboard_channels: tuple[int, ...] = ()
 
     block_out_channels: tuple[int, ...] = (64, 128, 256, 512, 512)
     layers_per_block: int = 2
@@ -90,6 +95,7 @@ class TrainingConfig:
             "down_block_types",
             "up_block_types",
             "clearml_tags",
+            "dashboard_channels",
         }
         for key in tuple_keys:
             if key in values:
@@ -108,6 +114,10 @@ class UNetTrainer:
         self.best_val_loss = float("inf")
         self.val_history = []
         self.clearml = None
+        self.data_config = data_config or {}
+        self.fields = list(self.data_config.get("fields", [f"ch{i}" for i in range(config.out_channels)]))
+        self.channel_means = list(self.data_config.get("means", [0.0] * config.out_channels))
+        self.channel_stds = list(self.data_config.get("stds", [1.0] * config.out_channels))
 
         logging_dir = os.path.join(self.output_dir, "logs")
         _debug(f"output_dir={self.output_dir}")
@@ -277,6 +287,64 @@ class UNetTrainer:
             os.path.join(samples_dir, f"epoch_{epoch:04d}.pt"),
         )
 
+    @torch.no_grad()
+    def report_dashboard_samples(self, epoch: int):
+        if self.config.dashboard_every_n_epochs <= 0:
+            return
+        if epoch % self.config.dashboard_every_n_epochs != 0:
+            return
+
+        _debug(f"dashboard sampling start epoch={epoch}")
+        self.model.eval()
+        raw_batch = next(iter(self.val_dataloader))
+        batch = self._batch_to_device(raw_batch)
+        case_count = min(int(self.config.dashboard_num_cases), batch["truth"].shape[0])
+        sampler = Sampler(self.accelerator.unwrap_model(self.model))
+        samples_dir = os.path.join(self.output_dir, "samples")
+        os.makedirs(samples_dir, exist_ok=True)
+
+        for case_idx in range(case_count):
+            one = {key: value[case_idx:case_idx + 1] for key, value in batch.items()}
+            assim = sampler.sample_conditioned(
+                background=one["background"],
+                obs_values=one["obs_values"],
+                obs_mask=one["obs_mask"],
+                size=self.config.image_size,
+                num_timesteps=self.config.dashboard_num_timesteps,
+                device=self.accelerator.device,
+            )[0]
+            title = f"background | condition | assim, epoch {epoch}, case {case_idx}"
+            fig = make_background_condition_assim_figure(
+                background=one["background"][0],
+                obs_values=one["obs_values"][0],
+                obs_mask=one["obs_mask"][0],
+                assim=assim,
+                fields=self.fields,
+                means=self.channel_means,
+                stds=self.channel_stds,
+                channels=self.config.dashboard_channels,
+                title=title,
+            )
+            figure_path = os.path.join(
+                samples_dir,
+                f"epoch_{epoch:04d}_case_{case_idx:04d}_background_condition_assim.png",
+            )
+            fig.savefig(figure_path, dpi=120, bbox_inches="tight")
+            if self.clearml is not None:
+                self.clearml.report_figure(
+                    title="samples/background_condition_assim",
+                    series=f"case_{case_idx:04d}",
+                    figure=fig,
+                    iteration=epoch,
+                )
+                self.clearml.upload_artifact(
+                    f"sample_panel_epoch_{epoch:04d}_case_{case_idx:04d}",
+                    figure_path,
+                )
+            import matplotlib.pyplot as plt
+            plt.close(fig)
+        _debug(f"dashboard sampling done epoch={epoch}")
+
     def train_loop(self):
         global_step = 0
         _debug(f"training start epochs={self.config.num_epochs} train_batches={len(self.train_dataloader)}")
@@ -353,6 +421,7 @@ class UNetTrainer:
                 if self.config.sample_every_n_epochs > 0 and epoch % self.config.sample_every_n_epochs == 0:
                     self.save_samples(epoch)
                     _debug("saved sample artifact")
+                self.report_dashboard_samples(epoch)
                 if val_loss < self.best_val_loss:
                     self.best_val_loss = val_loss
                     self.save_model_custom("best_model.pth")
