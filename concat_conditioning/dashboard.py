@@ -23,6 +23,8 @@ def make_background_condition_assim_figure(
     stds,
     channels,
     title: str,
+    panel_width: float = 7.0,
+    panel_height: float = 6.0,
 ):
     import matplotlib.pyplot as plt
 
@@ -36,8 +38,14 @@ def make_background_condition_assim_figure(
         channels = list(range(background.shape[0]))
 
     nrows = len(channels)
-    fig, axes = plt.subplots(nrows, 3, figsize=(12, 3.4 * nrows), squeeze=False)
-    fig.suptitle(title)
+    fig, axes = plt.subplots(
+        nrows,
+        3,
+        figsize=(3 * panel_width, nrows * panel_height),
+        squeeze=False,
+        constrained_layout=True,
+    )
+    fig.suptitle(title, fontsize=16)
 
     for row, channel in enumerate(channels):
         field_name = fields[channel] if channel < len(fields) else f"ch{channel}"
@@ -62,8 +70,8 @@ def make_background_condition_assim_figure(
         for col, (panel_name, values) in enumerate(panels):
             ax = axes[row, col]
             masked_values = np.ma.masked_invalid(values)
-            image = ax.imshow(masked_values, cmap=cmap, vmin=vmin, vmax=vmax)
-            ax.set_title(f"{field_name} {panel_name}")
+            image = ax.imshow(masked_values, cmap=cmap, vmin=vmin, vmax=vmax, interpolation="nearest")
+            ax.set_title(f"{field_name} {panel_name}", fontsize=14)
             ax.axis("off")
             if panel_name == "condition" and not np.isfinite(values).any():
                 ax.text(
@@ -77,7 +85,6 @@ def make_background_condition_assim_figure(
                     fontsize=11,
                     bbox={"facecolor": "black", "alpha": 0.55, "pad": 4},
                 )
-            fig.colorbar(image, ax=ax, fraction=0.046, pad=0.02)
+            fig.colorbar(image, ax=ax, fraction=0.035, pad=0.015)
 
-    fig.tight_layout(rect=(0, 0, 1, 0.97))
     return fig

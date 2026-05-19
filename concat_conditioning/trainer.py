@@ -65,6 +65,9 @@ class TrainingConfig:
     dashboard_num_cases: int = 1
     dashboard_num_timesteps: int = 10
     dashboard_channels: tuple[int, ...] = ()
+    dashboard_dpi: int = 200
+    dashboard_panel_width: float = 7.0
+    dashboard_panel_height: float = 6.0
 
     block_out_channels: tuple[int, ...] = (64, 128, 256, 512, 512)
     layers_per_block: int = 2
@@ -324,12 +327,14 @@ class UNetTrainer:
                 stds=self.channel_stds,
                 channels=self.config.dashboard_channels,
                 title=title,
+                panel_width=self.config.dashboard_panel_width,
+                panel_height=self.config.dashboard_panel_height,
             )
             figure_path = os.path.join(
                 samples_dir,
                 f"epoch_{epoch:04d}_case_{case_idx:04d}_background_condition_assim.png",
             )
-            fig.savefig(figure_path, dpi=120, bbox_inches="tight")
+            fig.savefig(figure_path, dpi=self.config.dashboard_dpi, bbox_inches="tight")
             if self.clearml is not None:
                 self.clearml.report_figure(
                     title="samples/background_condition_assim",
