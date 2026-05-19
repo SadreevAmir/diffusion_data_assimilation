@@ -28,7 +28,11 @@ services:
         limits:
           cpus: '6.0'
 <<<<<<< HEAD
+<<<<<<< HEAD
           memory: 24G
+=======
+          memory: 64G
+>>>>>>> 2efa1e110fcb978c186faf55f0dfd5bf279c39aa
 =======
           memory: 64G
 >>>>>>> 2efa1e110fcb978c186faf55f0dfd5bf279c39aa
