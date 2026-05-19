@@ -23,10 +23,13 @@
     "obs_loss_weight": 0.1,
     "sample_every_n_epochs": 0,
     "num_sample_timesteps": 2,
+<<<<<<< HEAD
     "dashboard_every_n_epochs": 1,
     "dashboard_num_cases": 1,
     "dashboard_num_timesteps": 2,
     "dashboard_channels": [0, 1, 2, 3],
+=======
+>>>>>>> 2efa1e110fcb978c186faf55f0dfd5bf279c39aa
     "base_output_dir": "outputs/concat_conditioning_smoke",
     "run_name": "smoke",
     "tracker": null,

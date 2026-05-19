@@ -21,10 +21,13 @@
   "run_name": "",
   "tracker": null,
   "clearml_upload_checkpoints": false,
+<<<<<<< HEAD
   "dashboard_every_n_epochs": 1,
   "dashboard_num_cases": 1,
   "dashboard_num_timesteps": 10,
   "dashboard_channels": [0, 1, 2, 3],
+=======
+>>>>>>> 2efa1e110fcb978c186faf55f0dfd5bf279c39aa
   "block_out_channels": [64, 128, 256, 512, 512],
   "layers_per_block": 2,
   "down_block_types": ["DownBlock2D", "DownBlock2D", "DownBlock2D", "AttnDownBlock2D", "DownBlock2D"],
