@@ -1,5 +1,5 @@
 services:
-  experiments:
+  v.ivanov_diffusion_data_assimilation:
     build: .
     image: ${USER}/diffusion_data_assimilation
     container_name: ${USER}_diffusion_data_assimilation
@@ -13,8 +13,6 @@ services:
       - CLEARML_WEB_HOST=${CLEARML_WEB_HOST:-}
       - CLEARML_FILES_HOST=${CLEARML_FILES_HOST:-}
       - WANDB_SILENT=true 
-    ports:
-      - "9123:8888" 
     volumes:
       - "/mnt:/mnt"
       - "./:/home/"
@@ -29,4 +27,8 @@ services:
             capabilities: [gpu]
         limits:
           cpus: '6.0'
+<<<<<<< HEAD
           memory: 24G
+=======
+          memory: 64G
+>>>>>>> 2efa1e110fcb978c186faf55f0dfd5bf279c39aa
