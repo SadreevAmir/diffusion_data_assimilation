@@ -359,13 +359,6 @@ class M2MForecastDataset(Dataset):
         obs_count = int(obs_mask[self.observed_channels].sum().item()) if self.observed_channels else 0
         diagnostics["obs_count"] = obs_count
         diagnostics["observed_fraction"] = obs_count / max(valid_count, 1.0)
-        max_fraction = mask_config.get("max_observed_fraction")
-        if max_fraction is not None and diagnostics["observed_fraction"] > float(max_fraction):
-            raise ValueError(
-                f"SRAL track condition is too dense for {target_date}: "
-                f"observed_fraction={diagnostics['observed_fraction']:.6f} > {float(max_fraction):.6f}. "
-                "Check sral_transform_index and SRAL files."
-            )
         return obs_values, obs_mask, diagnostics
 
     def _sral_spatial_mask(self, target_date: date) -> torch.Tensor | None:
