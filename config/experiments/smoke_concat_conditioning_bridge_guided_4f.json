@@ -1,10 +1,10 @@
 {
   "project_name": "smoke_concat_conditioning",
-  "task_name": "smoke_concat_conditioning_bridge_guided_4f",
+  "task_name": "smoke_concat_conditioning_bridge_guided_soft_4f",
   "data_config": "../data/smoke_m2m_4f.json",
   "model_config": "../methods/concat_conditioning_bridge_guided_4f.json",
   "clearml": {
-    "tags": ["smoke", "concat_conditioning", "bridge", "guided", "m2m"],
+    "tags": ["smoke", "concat_conditioning", "bridge", "guided", "soft_obs", "m2m"],
     "upload_checkpoints": true
   },
   "training": {
