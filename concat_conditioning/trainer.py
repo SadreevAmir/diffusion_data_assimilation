@@ -76,6 +76,7 @@ class TrainingConfig:
     dashboard_dpi: int = 200
     dashboard_panel_width: float = 7.0
     dashboard_panel_height: float = 6.0
+    dashboard_upload_artifacts: bool = False
 
     block_out_channels: tuple[int, ...] = (64, 128, 256, 512, 512)
     layers_per_block: int = 2
@@ -378,6 +379,22 @@ class UNetTrainer:
         )
 
     @torch.no_grad()
+    def _dashboard_cases(self) -> list[dict[str, torch.Tensor]]:
+        cases = []
+        max_cases = max(int(self.config.dashboard_num_cases), 0)
+        if max_cases == 0:
+            return cases
+
+        for raw_batch in self.val_dataloader:
+            batch = self._batch_to_device(raw_batch)
+            batch_size = batch["truth"].shape[0]
+            for batch_idx in range(batch_size):
+                cases.append({key: value[batch_idx:batch_idx + 1] for key, value in batch.items()})
+                if len(cases) >= max_cases:
+                    return cases
+        return cases
+
+    @torch.no_grad()
     def report_dashboard_samples(self, epoch: int):
         if self.config.dashboard_every_n_epochs <= 0:
             return
@@ -386,16 +403,16 @@ class UNetTrainer:
 
         _debug(f"dashboard sampling start epoch={epoch}")
         self.model.eval()
-        raw_batch = next(iter(self.val_dataloader))
-        batch = self._batch_to_device(raw_batch)
-        case_count = min(int(self.config.dashboard_num_cases), batch["truth"].shape[0])
+        cases = self._dashboard_cases()
+        if not cases:
+            _debug(f"dashboard sampling skipped epoch={epoch}: no validation cases")
+            return
         samples_dir = os.path.join(self.output_dir, "samples")
         os.makedirs(samples_dir, exist_ok=True)
 
         with self._sampling_model() as sample_model:
             sampler = Sampler(sample_model)
-            for case_idx in range(case_count):
-                one = {key: value[case_idx:case_idx + 1] for key, value in batch.items()}
+            for case_idx, one in enumerate(cases):
                 assim = sampler.sample_conditioned(
                     background=one["background"],
                     obs_values=one["obs_values"],
@@ -453,15 +470,16 @@ class UNetTrainer:
                 fig.savefig(figure_path, dpi=self.config.dashboard_dpi, bbox_inches="tight")
                 if self.clearml is not None:
                     self.clearml.report_figure(
-                        title="samples/background_condition_assim",
-                        series=f"case_{case_idx:04d}",
+                        title="samples/latest_background_condition_assim",
+                        series=f"latest/case_{case_idx:04d}",
                         figure=fig,
                         iteration=epoch,
                     )
-                    self.clearml.upload_artifact(
-                        f"sample_panel_epoch_{epoch:04d}_case_{case_idx:04d}",
-                        figure_path,
-                    )
+                    if self.config.dashboard_upload_artifacts:
+                        self.clearml.upload_artifact(
+                            f"latest_sample_panel_case_{case_idx:04d}",
+                            figure_path,
+                        )
                 import matplotlib.pyplot as plt
                 plt.close(fig)
         _debug(f"dashboard sampling done epoch={epoch}")
