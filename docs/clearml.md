@@ -16,5 +16,5 @@ CLEARML_API_HOST=...
 Run the ClearML-reported smoke experiment inside the container or another environment with project dependencies installed:
 
 ```bash
-python -m concat_conditioning.main --config config/experiments/smoke_concat_conditioning_4f.json
+python -m assim_lib.main --config config/experiments/smoke_concat_conditioning_4f.json
 ```

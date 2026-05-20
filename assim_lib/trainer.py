@@ -25,7 +25,7 @@ logger = get_logger(__name__)
 
 
 def _debug(message: str) -> None:
-    print(f"[concat_conditioning][trainer] {message}", flush=True)
+    print(f"[assim_lib][trainer] {message}", flush=True)
 
 
 def _default_mixed_precision() -> str:

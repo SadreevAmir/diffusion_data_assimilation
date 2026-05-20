@@ -15,7 +15,7 @@ REQUIRED_ENV = (
 
 
 def _debug(message: str) -> None:
-    print(f"[concat_conditioning][clearml] {message}", flush=True)
+    print(f"[assim_lib][clearml] {message}", flush=True)
 
 
 def load_clearml_env(env_path: str | None = None) -> None:

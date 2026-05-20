@@ -18,7 +18,7 @@ def resolve_path(path: str | Path, base_dir: Path) -> Path:
 
 
 def _debug(message: str) -> None:
-    print(f"[concat_conditioning] {message}", flush=True)
+    print(f"[assim_lib] {message}", flush=True)
 
 
 def _loader(dataset, batch_size: int, num_workers: int, shuffle: bool):
@@ -44,7 +44,7 @@ def main(config: dict, config_dir: Path):
     _debug(f"loading model config: {model_config_path}")
     model_config_raw = load_json(model_config_path)
 
-    _debug("importing torch/diffusers and concat_conditioning modules")
+    _debug("importing torch/diffusers and assim_lib modules")
     import numpy as np
     import torch
     from diffusers.optimization import get_cosine_schedule_with_warmup
