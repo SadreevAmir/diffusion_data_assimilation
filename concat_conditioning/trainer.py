@@ -57,6 +57,8 @@ class TrainingConfig:
     sample_start_mode: str = "background"
     sample_start_noise_level: float = 0.5
     sample_enforce_observations: bool = True
+    sample_obs_guidance_scale: float = 0.0
+    sample_obs_guidance_eps: float = 1e-8
     base_output_dir: str = "checkpoints/concat_conditioning"
     run_name: str = ""
     tracker: str | None = None
@@ -357,6 +359,8 @@ class UNetTrainer:
                 start_noise_level=self.config.sample_start_noise_level,
                 enforce_observations=self.config.sample_enforce_observations,
                 valid_mask=one["valid_mask"],
+                obs_guidance_scale=self.config.sample_obs_guidance_scale,
+                obs_guidance_eps=self.config.sample_obs_guidance_eps,
             )
         samples_dir = os.path.join(self.output_dir, "samples")
         os.makedirs(samples_dir, exist_ok=True)
@@ -403,6 +407,8 @@ class UNetTrainer:
                     start_noise_level=self.config.sample_start_noise_level,
                     enforce_observations=self.config.sample_enforce_observations,
                     valid_mask=one["valid_mask"],
+                    obs_guidance_scale=self.config.sample_obs_guidance_scale,
+                    obs_guidance_eps=self.config.sample_obs_guidance_eps,
                 )[0]
 
                 analysis_mae, analysis_rmse = self._masked_error_metrics(

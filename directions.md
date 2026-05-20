@@ -42,7 +42,7 @@ Risks: if the background is strongly biased, the analysis may stay too close to 
 
 During sampling, add a gradient-based observation penalty such as `||H(x) - y||`, where `H` is the observation operator.
 
-Status: not implemented for `concat_conditioning`.
+Status: implemented as sampling-time observation guidance controlled by `sample_obs_guidance_scale`.
 
 Strengths: works with sparse tracks and can support arbitrary observation operators.
 
@@ -94,4 +94,4 @@ Risks: increases input size and may require explicit time-lag embeddings.
 2. Add stepwise data consistency inside the sampler if final consistency is not enough.
 3. Add validation metrics against the background baseline and monitor analysis skill in ClearML.
 4. Run the background-to-truth bridge experiment and compare against the 200-step concat baseline.
-5. If sparse SRAL tracks still have weak influence, add guidance-based conditioning or observation-token conditioning.
+5. If sparse SRAL tracks still have weak influence, sweep sampling-time guidance strength before considering observation-token conditioning.
