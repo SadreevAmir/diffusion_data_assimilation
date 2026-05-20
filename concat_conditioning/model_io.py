@@ -4,6 +4,7 @@ import os
 
 import torch
 from diffusers.models.unets.unet_2d import UNet2DModel
+from diffusers.training_utils import EMAModel
 
 from .sampler import Sampler
 from .trainer import TrainingConfig
@@ -30,7 +31,12 @@ def load_sampler(run_dir: str, checkpoint_name: str, model_config: dict, device=
         state = torch.load(checkpoint_path, map_location="cpu", weights_only=True)
     except TypeError:
         state = torch.load(checkpoint_path, map_location="cpu")
-    model.load_state_dict(state)
+    if isinstance(state, dict) and "shadow_params" in state:
+        ema_model = EMAModel(model.parameters())
+        ema_model.load_state_dict(state)
+        ema_model.copy_to(model.parameters())
+    else:
+        model.load_state_dict(state)
     model.eval()
     if device is not None:
         model.to(device)

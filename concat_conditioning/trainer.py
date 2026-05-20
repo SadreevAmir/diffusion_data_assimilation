@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 
@@ -51,6 +52,10 @@ class TrainingConfig:
     obs_loss_weight: float = 0.1
     sample_every_n_epochs: int = 1
     num_sample_timesteps: int = 50
+    sample_use_ema: bool = True
+    sample_start_mode: str = "background"
+    sample_start_noise_level: float = 0.5
+    sample_enforce_observations: bool = True
     base_output_dir: str = "checkpoints/concat_conditioning"
     run_name: str = ""
     tracker: str | None = None
@@ -63,7 +68,7 @@ class TrainingConfig:
     clearml_upload_checkpoints: bool = False
     dashboard_every_n_epochs: int = 1
     dashboard_num_cases: int = 1
-    dashboard_num_timesteps: int = 10
+    dashboard_num_timesteps: int = 50
     dashboard_channels: tuple[int, ...] = ()
     dashboard_dpi: int = 200
     dashboard_panel_width: float = 7.0
@@ -200,11 +205,34 @@ class UNetTrainer:
             dim=1,
         )
 
+    @contextmanager
+    def _sampling_model(self):
+        unwrapped = self.accelerator.unwrap_model(self.model)
+        if not self.config.sample_use_ema:
+            yield unwrapped
+            return
+
+        self.ema_model.store(unwrapped.parameters())
+        self.ema_model.copy_to(unwrapped.parameters())
+        try:
+            yield unwrapped
+        finally:
+            self.ema_model.restore(unwrapped.parameters())
+
     @staticmethod
     def _masked_mse(pred: torch.Tensor, target: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
         mask = mask.expand_as(pred)
         denom = mask.sum().clamp(min=1.0)
         return (F.mse_loss(pred, target, reduction="none") * mask).sum() / denom
+
+    @staticmethod
+    def _masked_error_metrics(pred: torch.Tensor, target: torch.Tensor, mask: torch.Tensor) -> tuple[float, float]:
+        mask = mask.expand_as(pred)
+        denom = mask.sum().clamp(min=1.0)
+        diff = (pred - target) * mask
+        mae = diff.abs().sum() / denom
+        rmse = torch.sqrt((diff.square().sum() / denom).clamp(min=0.0))
+        return float(mae.item()), float(rmse.item())
 
     def save_model_custom(self, name: str = "last_model.pth"):
         os.makedirs(self.output_dir, exist_ok=True)
@@ -297,15 +325,20 @@ class UNetTrainer:
         raw_batch = next(iter(self.val_dataloader))
         batch = self._batch_to_device(raw_batch)
         one = {key: value[:1] for key, value in batch.items()}
-        sampler = Sampler(self.accelerator.unwrap_model(self.model))
-        sample = sampler.sample_conditioned(
-            background=one["background"],
-            obs_values=one["obs_values"],
-            obs_mask=one["obs_mask"],
-            size=self.config.image_size,
-            num_timesteps=self.config.num_sample_timesteps,
-            device=self.accelerator.device,
-        )
+        with self._sampling_model() as sample_model:
+            sampler = Sampler(sample_model)
+            sample = sampler.sample_conditioned(
+                background=one["background"],
+                obs_values=one["obs_values"],
+                obs_mask=one["obs_mask"],
+                size=self.config.image_size,
+                num_timesteps=self.config.num_sample_timesteps,
+                device=self.accelerator.device,
+                start_mode=self.config.sample_start_mode,
+                start_noise_level=self.config.sample_start_noise_level,
+                enforce_observations=self.config.sample_enforce_observations,
+                valid_mask=one["valid_mask"],
+            )
         samples_dir = os.path.join(self.output_dir, "samples")
         os.makedirs(samples_dir, exist_ok=True)
         torch.save(
@@ -313,7 +346,9 @@ class UNetTrainer:
                 "sample": sample.detach().cpu(),
                 "truth": one["truth"].detach().cpu(),
                 "background": one["background"].detach().cpu(),
+                "obs_values": one["obs_values"].detach().cpu(),
                 "obs_mask": one["obs_mask"].detach().cpu(),
+                "valid_mask": one["valid_mask"].detach().cpu(),
             },
             os.path.join(samples_dir, f"epoch_{epoch:04d}.pt"),
         )
@@ -330,52 +365,78 @@ class UNetTrainer:
         raw_batch = next(iter(self.val_dataloader))
         batch = self._batch_to_device(raw_batch)
         case_count = min(int(self.config.dashboard_num_cases), batch["truth"].shape[0])
-        sampler = Sampler(self.accelerator.unwrap_model(self.model))
         samples_dir = os.path.join(self.output_dir, "samples")
         os.makedirs(samples_dir, exist_ok=True)
 
-        for case_idx in range(case_count):
-            one = {key: value[case_idx:case_idx + 1] for key, value in batch.items()}
-            assim = sampler.sample_conditioned(
-                background=one["background"],
-                obs_values=one["obs_values"],
-                obs_mask=one["obs_mask"],
-                size=self.config.image_size,
-                num_timesteps=self.config.dashboard_num_timesteps,
-                device=self.accelerator.device,
-            )[0]
-            title = f"background | condition | assim, epoch {epoch}, case {case_idx}"
-            fig = make_background_condition_assim_figure(
-                background=one["background"][0],
-                obs_values=one["obs_values"][0],
-                obs_mask=one["obs_mask"][0],
-                assim=assim,
-                fields=self.fields,
-                means=self.channel_means,
-                stds=self.channel_stds,
-                channels=self.config.dashboard_channels,
-                title=title,
-                panel_width=self.config.dashboard_panel_width,
-                panel_height=self.config.dashboard_panel_height,
-            )
-            figure_path = os.path.join(
-                samples_dir,
-                f"epoch_{epoch:04d}_case_{case_idx:04d}_background_condition_assim.png",
-            )
-            fig.savefig(figure_path, dpi=self.config.dashboard_dpi, bbox_inches="tight")
-            if self.clearml is not None:
-                self.clearml.report_figure(
-                    title="samples/background_condition_assim",
-                    series=f"case_{case_idx:04d}",
-                    figure=fig,
-                    iteration=epoch,
+        with self._sampling_model() as sample_model:
+            sampler = Sampler(sample_model)
+            for case_idx in range(case_count):
+                one = {key: value[case_idx:case_idx + 1] for key, value in batch.items()}
+                assim = sampler.sample_conditioned(
+                    background=one["background"],
+                    obs_values=one["obs_values"],
+                    obs_mask=one["obs_mask"],
+                    size=self.config.image_size,
+                    num_timesteps=self.config.dashboard_num_timesteps,
+                    device=self.accelerator.device,
+                    start_mode=self.config.sample_start_mode,
+                    start_noise_level=self.config.sample_start_noise_level,
+                    enforce_observations=self.config.sample_enforce_observations,
+                    valid_mask=one["valid_mask"],
+                )[0]
+
+                analysis_mae, analysis_rmse = self._masked_error_metrics(
+                    assim,
+                    one["truth"][0],
+                    one["valid_mask"][0],
                 )
-                self.clearml.upload_artifact(
-                    f"sample_panel_epoch_{epoch:04d}_case_{case_idx:04d}",
-                    figure_path,
+                background_mae, background_rmse = self._masked_error_metrics(
+                    one["background"][0],
+                    one["truth"][0],
+                    one["valid_mask"][0],
                 )
-            import matplotlib.pyplot as plt
-            plt.close(fig)
+                skill = 0.0 if background_rmse <= 0.0 else 1.0 - analysis_rmse / background_rmse
+                if self.clearml is not None:
+                    series = f"case_{case_idx:04d}"
+                    self.clearml.report_scalar("sample/rmse_analysis", series, analysis_rmse, epoch)
+                    self.clearml.report_scalar("sample/rmse_background", series, background_rmse, epoch)
+                    self.clearml.report_scalar("sample/mae_analysis", series, analysis_mae, epoch)
+                    self.clearml.report_scalar("sample/mae_background", series, background_mae, epoch)
+                    self.clearml.report_scalar("sample/rmse_skill", series, skill, epoch)
+
+                title = f"background | condition | assim, epoch {epoch}, case {case_idx}"
+                fig = make_background_condition_assim_figure(
+                    background=one["background"][0],
+                    obs_values=one["obs_values"][0],
+                    obs_mask=one["obs_mask"][0],
+                    assim=assim,
+                    fields=self.fields,
+                    means=self.channel_means,
+                    stds=self.channel_stds,
+                    channels=self.config.dashboard_channels,
+                    title=title,
+                    panel_width=self.config.dashboard_panel_width,
+                    panel_height=self.config.dashboard_panel_height,
+                    valid_mask=one["valid_mask"][0],
+                )
+                figure_path = os.path.join(
+                    samples_dir,
+                    f"epoch_{epoch:04d}_case_{case_idx:04d}_background_condition_assim.png",
+                )
+                fig.savefig(figure_path, dpi=self.config.dashboard_dpi, bbox_inches="tight")
+                if self.clearml is not None:
+                    self.clearml.report_figure(
+                        title="samples/background_condition_assim",
+                        series=f"case_{case_idx:04d}",
+                        figure=fig,
+                        iteration=epoch,
+                    )
+                    self.clearml.upload_artifact(
+                        f"sample_panel_epoch_{epoch:04d}_case_{case_idx:04d}",
+                        figure_path,
+                    )
+                import matplotlib.pyplot as plt
+                plt.close(fig)
         _debug(f"dashboard sampling done epoch={epoch}")
 
     def train_loop(self):

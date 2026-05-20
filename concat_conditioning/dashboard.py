@@ -4,6 +4,8 @@ import numpy as np
 
 
 def _as_numpy(tensor):
+    if isinstance(tensor, np.ndarray):
+        return tensor
     return tensor.detach().cpu().numpy()
 
 
@@ -19,6 +21,19 @@ def _clip_display(values, channel: int):
     return values
 
 
+def _channel_mask(mask, channel: int):
+    if mask is None:
+        return None
+    if mask.ndim == 2:
+        return mask > 0
+    if mask.ndim == 3:
+        if mask.shape[0] == 1:
+            return mask[0] > 0
+        if channel < mask.shape[0]:
+            return mask[channel] > 0
+    raise ValueError(f"Expected valid_mask [H,W] or [C,H,W], got shape {mask.shape}")
+
+
 def make_background_condition_assim_figure(
     background,
     obs_values,
@@ -31,6 +46,7 @@ def make_background_condition_assim_figure(
     title: str,
     panel_width: float = 7.0,
     panel_height: float = 6.0,
+    valid_mask=None,
 ):
     import matplotlib.pyplot as plt
 
@@ -38,6 +54,7 @@ def make_background_condition_assim_figure(
     obs_values = _as_numpy(obs_values)
     obs_mask = _as_numpy(obs_mask) > 0
     assim = _as_numpy(assim)
+    valid_mask = _as_numpy(valid_mask) if valid_mask is not None else None
 
     channels = list(channels)
     if not channels:
@@ -58,7 +75,14 @@ def make_background_condition_assim_figure(
         bg = _clip_display(_denormalize_channel(background[channel], channel, means, stds), channel)
         an = _clip_display(_denormalize_channel(assim[channel], channel, means, stds), channel)
         cond = _clip_display(_denormalize_channel(obs_values[channel], channel, means, stds), channel)
-        cond = np.where(obs_mask[channel], cond, np.nan)
+        channel_valid = _channel_mask(valid_mask, channel)
+        if channel_valid is not None:
+            bg = np.where(channel_valid, bg, np.nan)
+            an = np.where(channel_valid, an, np.nan)
+        cond_mask = obs_mask[channel]
+        if channel_valid is not None:
+            cond_mask = cond_mask & channel_valid
+        cond = np.where(cond_mask, cond, np.nan)
 
         finite_values = [arr[np.isfinite(arr)] for arr in (bg, an, cond)]
         finite_values = [arr for arr in finite_values if arr.size]
