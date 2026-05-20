@@ -47,11 +47,12 @@ class TrainingConfig:
     lr_warmup_steps: int = 500
     mixed_precision: str = field(default_factory=_default_mixed_precision)
     seed: int = 0
+    training_objective: str = "diffusion"
     timestep_sampler: str = "uniform"
     timestep_beta_params: tuple[float, float] = (2.0, 1.0)
     obs_loss_weight: float = 0.1
     sample_every_n_epochs: int = 1
-    num_sample_timesteps: int = 50
+    num_sample_timesteps: int = 200
     sample_use_ema: bool = True
     sample_start_mode: str = "background"
     sample_start_noise_level: float = 0.5
@@ -68,7 +69,7 @@ class TrainingConfig:
     clearml_upload_checkpoints: bool = False
     dashboard_every_n_epochs: int = 1
     dashboard_num_cases: int = 1
-    dashboard_num_timesteps: int = 50
+    dashboard_num_timesteps: int = 200
     dashboard_channels: tuple[int, ...] = ()
     dashboard_dpi: int = 200
     dashboard_panel_width: float = 7.0
@@ -205,6 +206,24 @@ class UNetTrainer:
             dim=1,
         )
 
+    def _make_training_pair(
+        self,
+        truth: torch.Tensor,
+        batch: dict[str, torch.Tensor],
+        timesteps: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        if self.config.training_objective == "diffusion":
+            return self.add_noise(truth, timesteps)
+        if self.config.training_objective == "bridge":
+            t = timesteps.view(-1, *([1] * (truth.dim() - 1)))
+            state = (1.0 - t) * truth + t * batch["background"]
+            target_velocity = batch["background"] - truth
+            return state, target_velocity
+        raise ValueError(
+            f"Unknown training_objective={self.config.training_objective!r}; "
+            "expected 'diffusion' or 'bridge'"
+        )
+
     @contextmanager
     def _sampling_model(self):
         unwrapped = self.accelerator.unwrap_model(self.model)
@@ -305,9 +324,9 @@ class UNetTrainer:
                 truth = batch["truth"]
                 batch_size = truth.shape[0]
                 timesteps = self._sample_timesteps(batch_size)
-                noisy_truth, v_real = self.add_noise(truth, timesteps)
+                model_state, v_real = self._make_training_pair(truth, batch, timesteps)
 
-                model_input = self._make_model_input(noisy_truth, batch)
+                model_input = self._make_model_input(model_state, batch)
                 v_pred = self.model(model_input, timesteps * 1000, return_dict=False)[0]
                 loss_full = self._masked_mse(v_pred, v_real, batch["valid_mask"])
                 loss_obs = self._masked_mse(v_pred, v_real, batch["obs_mask"])
@@ -453,10 +472,10 @@ class UNetTrainer:
                 truth = batch["truth"]
                 batch_size = truth.shape[0]
                 timesteps = self._sample_timesteps(batch_size)
-                noisy_truth, v_real = self.add_noise(truth, timesteps)
+                model_state, v_real = self._make_training_pair(truth, batch, timesteps)
 
                 with self.accelerator.accumulate(self.model):
-                    model_input = self._make_model_input(noisy_truth, batch)
+                    model_input = self._make_model_input(model_state, batch)
                     v_pred = self.model(model_input, timesteps * 1000, return_dict=False)[0]
                     loss_full = self._masked_mse(v_pred, v_real, batch["valid_mask"])
                     loss_obs = self._masked_mse(v_pred, v_real, batch["obs_mask"])

@@ -56,8 +56,11 @@ class Sampler:
             start_t = min(max(float(start_noise_level), 0.001), 1.0)
             eps = torch.randn_like(background)
             x0 = (1.0 - start_t) * background + start_t * eps
+        elif start_mode == "bridge":
+            start_t = 1.0
+            x0 = background
         else:
-            raise ValueError(f"Unknown start_mode={start_mode!r}; expected 'noise' or 'background'")
+            raise ValueError(f"Unknown start_mode={start_mode!r}; expected 'noise', 'background', or 'bridge'")
 
         timesteps = torch.linspace(start_t, 0.001, num_timesteps, device=device)
 

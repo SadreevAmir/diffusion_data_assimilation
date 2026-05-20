@@ -21,6 +21,10 @@ def _clip_display(values, channel: int):
     return values
 
 
+def _empty_display_value(channel: int):
+    return 0.0 if channel == 0 else np.nan
+
+
 def _channel_mask(mask, channel: int):
     if mask is None:
         return None
@@ -82,18 +86,24 @@ def make_background_condition_assim_figure(
         cond_mask = obs_mask[channel]
         if channel_valid is not None:
             cond_mask = cond_mask & channel_valid
-        cond = np.where(cond_mask, cond, np.nan)
+        condition_has_obs = bool(np.any(cond_mask))
+        cond = np.where(cond_mask, cond, _empty_display_value(channel))
+        if channel_valid is not None:
+            cond = np.where(channel_valid, cond, np.nan)
 
-        finite_values = [arr[np.isfinite(arr)] for arr in (bg, an, cond)]
-        finite_values = [arr for arr in finite_values if arr.size]
-        if finite_values:
-            combined = np.concatenate(finite_values)
-            vmin = float(np.nanpercentile(combined, 1.0))
-            vmax = float(np.nanpercentile(combined, 99.0))
-            if vmin == vmax:
-                vmin, vmax = None, None
+        if channel == 0:
+            vmin, vmax = 0.0, 1.0
         else:
-            vmin, vmax = None, None
+            finite_values = [arr[np.isfinite(arr)] for arr in (bg, an, cond)]
+            finite_values = [arr for arr in finite_values if arr.size]
+            if finite_values:
+                combined = np.concatenate(finite_values)
+                vmin = float(np.nanpercentile(combined, 1.0))
+                vmax = float(np.nanpercentile(combined, 99.0))
+                if vmin == vmax:
+                    vmin, vmax = None, None
+            else:
+                vmin, vmax = None, None
 
         cmap = "Blues_r" if channel == 0 else "viridis"
         panels = (("background", bg), ("condition", cond), ("assim", an))
@@ -103,7 +113,7 @@ def make_background_condition_assim_figure(
             image = ax.imshow(masked_values, cmap=cmap, vmin=vmin, vmax=vmax, interpolation="nearest")
             ax.set_title(f"{field_name} {panel_name}", fontsize=14)
             ax.axis("off")
-            if panel_name == "condition" and not np.isfinite(values).any():
+            if panel_name == "condition" and not condition_has_obs:
                 ax.text(
                     0.5,
                     0.5,

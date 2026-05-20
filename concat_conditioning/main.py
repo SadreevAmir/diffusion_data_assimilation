@@ -68,7 +68,8 @@ def main(config: dict, config_dir: Path):
     _debug(
         "training config "
         f"image_size={train_config.image_size} in_channels={train_config.in_channels} "
-        f"out_channels={train_config.out_channels} epochs={train_config.num_epochs}"
+        f"out_channels={train_config.out_channels} epochs={train_config.num_epochs} "
+        f"objective={train_config.training_objective}"
     )
 
     _debug(f"setting random seed: {train_config.seed}")
