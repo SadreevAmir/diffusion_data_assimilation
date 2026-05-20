@@ -195,7 +195,7 @@ class UNetTrainer:
     def _batch_to_device(self, batch: dict) -> dict[str, torch.Tensor]:
         return {
             key: batch[key].to(self.accelerator.device, dtype=torch.float32)
-            for key in ("truth", "background", "obs_values", "obs_mask", "valid_mask")
+            for key in ("truth", "background", "obs_values", "obs_mask", "valid_mask", "water_mask")
         }
 
     def _make_model_input(self, noisy_truth: torch.Tensor, batch: dict[str, torch.Tensor]) -> torch.Tensor:
@@ -368,6 +368,7 @@ class UNetTrainer:
                 "obs_values": one["obs_values"].detach().cpu(),
                 "obs_mask": one["obs_mask"].detach().cpu(),
                 "valid_mask": one["valid_mask"].detach().cpu(),
+                "water_mask": one["water_mask"].detach().cpu(),
             },
             os.path.join(samples_dir, f"epoch_{epoch:04d}.pt"),
         )
@@ -437,6 +438,7 @@ class UNetTrainer:
                     panel_width=self.config.dashboard_panel_width,
                     panel_height=self.config.dashboard_panel_height,
                     valid_mask=one["valid_mask"][0],
+                    water_mask=one["water_mask"][0],
                 )
                 figure_path = os.path.join(
                     samples_dir,

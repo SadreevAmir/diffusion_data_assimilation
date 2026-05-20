@@ -239,6 +239,7 @@ class SmokeM2MDataset(Dataset):
             "obs_values": obs_values,
             "obs_mask": obs_mask,
             "valid_mask": self.valid_mask,
+            "water_mask": self.valid_mask,
             "meta": {"case_id": f"{self.split}_{idx:04d}", "split": self.split},
         }
 
@@ -424,6 +425,7 @@ class M2MForecastDataset(Dataset):
             "obs_values": obs_values,
             "obs_mask": obs_mask,
             "valid_mask": valid_mask,
+            "water_mask": self.base_valid_mask,
             "meta": {
                 "case_id": target_record.date.isoformat(),
                 "background_date": back_record.date.isoformat(),

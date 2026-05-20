@@ -51,6 +51,7 @@ def make_background_condition_assim_figure(
     panel_width: float = 7.0,
     panel_height: float = 6.0,
     valid_mask=None,
+    water_mask=None,
 ):
     import matplotlib.pyplot as plt
 
@@ -59,6 +60,8 @@ def make_background_condition_assim_figure(
     obs_mask = _as_numpy(obs_mask) > 0
     assim = _as_numpy(assim)
     valid_mask = _as_numpy(valid_mask) if valid_mask is not None else None
+    water_mask = _as_numpy(water_mask) if water_mask is not None else None
+    display_mask = water_mask if water_mask is not None else valid_mask
 
     channels = list(channels)
     if not channels:
@@ -79,17 +82,17 @@ def make_background_condition_assim_figure(
         bg = _clip_display(_denormalize_channel(background[channel], channel, means, stds), channel)
         an = _clip_display(_denormalize_channel(assim[channel], channel, means, stds), channel)
         cond = _clip_display(_denormalize_channel(obs_values[channel], channel, means, stds), channel)
-        channel_valid = _channel_mask(valid_mask, channel)
-        if channel_valid is not None:
-            bg = np.where(channel_valid, bg, np.nan)
-            an = np.where(channel_valid, an, np.nan)
+        channel_water = _channel_mask(display_mask, channel)
+        if channel_water is not None:
+            bg = np.where(channel_water, bg, np.nan)
+            an = np.where(channel_water, an, np.nan)
         cond_mask = obs_mask[channel]
-        if channel_valid is not None:
-            cond_mask = cond_mask & channel_valid
+        if channel_water is not None:
+            cond_mask = cond_mask & channel_water
         condition_has_obs = bool(np.any(cond_mask))
         cond = np.where(cond_mask, cond, _empty_display_value(channel))
-        if channel_valid is not None:
-            cond = np.where(channel_valid, cond, np.nan)
+        if channel_water is not None:
+            cond = np.where(channel_water, cond, np.nan)
 
         if channel == 0:
             vmin, vmax = 0.0, 1.0
