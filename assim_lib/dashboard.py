@@ -38,6 +38,42 @@ def _channel_mask(mask, channel: int):
     raise ValueError(f"Expected valid_mask [H,W] or [C,H,W], got shape {mask.shape}")
 
 
+def _display_panels(background, obs_values, obs_mask, assim, channel: int, means, stds,
+                    valid_mask=None, water_mask=None):
+    bg = _clip_display(_denormalize_channel(background[channel], channel, means, stds), channel)
+    an = _clip_display(_denormalize_channel(assim[channel], channel, means, stds), channel)
+    cond = _clip_display(_denormalize_channel(obs_values[channel], channel, means, stds), channel)
+    display_mask = water_mask if water_mask is not None else valid_mask
+    channel_water = _channel_mask(display_mask, channel)
+    if channel_water is not None:
+        bg = np.where(channel_water, bg, np.nan)
+        an = np.where(channel_water, an, np.nan)
+    cond_mask = obs_mask[channel]
+    if channel_water is not None:
+        cond_mask = cond_mask & channel_water
+    condition_has_obs = bool(np.any(cond_mask))
+    cond = np.where(cond_mask, cond, _empty_display_value(channel))
+    if channel_water is not None:
+        cond = np.where(channel_water, cond, np.nan)
+
+    if channel == 0:
+        vmin, vmax = 0.0, 1.0
+    else:
+        finite_values = [arr[np.isfinite(arr)] for arr in (bg, an, cond)]
+        finite_values = [arr for arr in finite_values if arr.size]
+        if finite_values:
+            combined = np.concatenate(finite_values)
+            vmin = float(np.nanpercentile(combined, 1.0))
+            vmax = float(np.nanpercentile(combined, 99.0))
+            if vmin == vmax:
+                vmin, vmax = None, None
+        else:
+            vmin, vmax = None, None
+
+    cmap = "Blues_r" if channel == 0 else "viridis"
+    return bg, cond, an, condition_has_obs, vmin, vmax, cmap
+
+
 def make_background_condition_assim_figure(
     background,
     obs_values,
@@ -61,7 +97,6 @@ def make_background_condition_assim_figure(
     assim = _as_numpy(assim)
     valid_mask = _as_numpy(valid_mask) if valid_mask is not None else None
     water_mask = _as_numpy(water_mask) if water_mask is not None else None
-    display_mask = water_mask if water_mask is not None else valid_mask
 
     channels = list(channels)
     if not channels:
@@ -79,36 +114,17 @@ def make_background_condition_assim_figure(
 
     for row, channel in enumerate(channels):
         field_name = fields[channel] if channel < len(fields) else f"ch{channel}"
-        bg = _clip_display(_denormalize_channel(background[channel], channel, means, stds), channel)
-        an = _clip_display(_denormalize_channel(assim[channel], channel, means, stds), channel)
-        cond = _clip_display(_denormalize_channel(obs_values[channel], channel, means, stds), channel)
-        channel_water = _channel_mask(display_mask, channel)
-        if channel_water is not None:
-            bg = np.where(channel_water, bg, np.nan)
-            an = np.where(channel_water, an, np.nan)
-        cond_mask = obs_mask[channel]
-        if channel_water is not None:
-            cond_mask = cond_mask & channel_water
-        condition_has_obs = bool(np.any(cond_mask))
-        cond = np.where(cond_mask, cond, _empty_display_value(channel))
-        if channel_water is not None:
-            cond = np.where(channel_water, cond, np.nan)
-
-        if channel == 0:
-            vmin, vmax = 0.0, 1.0
-        else:
-            finite_values = [arr[np.isfinite(arr)] for arr in (bg, an, cond)]
-            finite_values = [arr for arr in finite_values if arr.size]
-            if finite_values:
-                combined = np.concatenate(finite_values)
-                vmin = float(np.nanpercentile(combined, 1.0))
-                vmax = float(np.nanpercentile(combined, 99.0))
-                if vmin == vmax:
-                    vmin, vmax = None, None
-            else:
-                vmin, vmax = None, None
-
-        cmap = "Blues_r" if channel == 0 else "viridis"
+        bg, cond, an, condition_has_obs, vmin, vmax, cmap = _display_panels(
+            background,
+            obs_values,
+            obs_mask,
+            assim,
+            channel,
+            means,
+            stds,
+            valid_mask=valid_mask,
+            water_mask=water_mask,
+        )
         panels = (("background", bg), ("condition", cond), ("assim", an))
         for col, (panel_name, values) in enumerate(panels):
             ax = axes[row, col]
@@ -129,5 +145,82 @@ def make_background_condition_assim_figure(
                     bbox={"facecolor": "black", "alpha": 0.55, "pad": 4},
                 )
             fig.colorbar(image, ax=ax, fraction=0.035, pad=0.015)
+
+    return fig
+
+
+def make_multi_case_background_condition_assim_figure(
+    cases,
+    fields,
+    means,
+    stds,
+    channels,
+    title: str,
+    panel_width: float = 4.2,
+    panel_height: float = 3.2,
+):
+    import matplotlib.pyplot as plt
+
+    cases = list(cases)
+    if not cases:
+        raise ValueError("At least one dashboard case is required")
+
+    channels = list(channels)
+    first_background = _as_numpy(cases[0]["background"])
+    if not channels:
+        channels = list(range(first_background.shape[0]))
+
+    nrows = len(cases) * len(channels)
+    fig, axes = plt.subplots(
+        nrows,
+        3,
+        figsize=(3 * panel_width, nrows * panel_height),
+        squeeze=False,
+        constrained_layout=True,
+    )
+    fig.suptitle(title, fontsize=16)
+
+    for case_row, case in enumerate(cases):
+        background = _as_numpy(case["background"])
+        obs_values = _as_numpy(case["obs_values"])
+        obs_mask = _as_numpy(case["obs_mask"]) > 0
+        assim = _as_numpy(case["assim"])
+        valid_mask = _as_numpy(case["valid_mask"]) if case.get("valid_mask") is not None else None
+        water_mask = _as_numpy(case["water_mask"]) if case.get("water_mask") is not None else None
+        case_idx = int(case.get("case_idx", case_row))
+
+        for channel_row, channel in enumerate(channels):
+            row = case_row * len(channels) + channel_row
+            field_name = fields[channel] if channel < len(fields) else f"ch{channel}"
+            bg, cond, an, condition_has_obs, vmin, vmax, cmap = _display_panels(
+                background,
+                obs_values,
+                obs_mask,
+                assim,
+                channel,
+                means,
+                stds,
+                valid_mask=valid_mask,
+                water_mask=water_mask,
+            )
+            panels = (("background", bg), ("condition", cond), ("assim", an))
+            for col, (panel_name, values) in enumerate(panels):
+                ax = axes[row, col]
+                masked_values = np.ma.masked_invalid(values)
+                ax.imshow(masked_values, cmap=cmap, vmin=vmin, vmax=vmax, interpolation="nearest")
+                ax.set_title(f"case {case_idx:04d} {field_name} {panel_name}", fontsize=10)
+                ax.axis("off")
+                if panel_name == "condition" and not condition_has_obs:
+                    ax.text(
+                        0.5,
+                        0.5,
+                        "no direct obs",
+                        ha="center",
+                        va="center",
+                        transform=ax.transAxes,
+                        color="white",
+                        fontsize=9,
+                        bbox={"facecolor": "black", "alpha": 0.55, "pad": 4},
+                    )
 
     return fig

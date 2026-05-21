@@ -18,7 +18,7 @@ from tqdm.auto import tqdm
 from utils import make_normalized_xy_grid
 
 from .clearml_tracking import ClearMLTracker
-from .dashboard import make_background_condition_assim_figure
+from .dashboard import make_multi_case_background_condition_assim_figure
 from .sampler import Sampler
 
 
@@ -551,9 +551,9 @@ class UNetTrainer:
                     return cases
         return cases
 
-    def _remember_dashboard_epoch(self, epoch: int, records: list[dict]) -> None:
+    def _remember_dashboard_epoch(self, epoch: int, path: str) -> None:
         max_history = max(int(self.config.dashboard_history_epochs), 1)
-        self.dashboard_history.insert(0, {"epoch": int(epoch), "records": records})
+        self.dashboard_history.insert(0, {"epoch": int(epoch), "path": path})
         del self.dashboard_history[max_history:]
 
     @staticmethod
@@ -562,31 +562,15 @@ class UNetTrainer:
             return "latest"
         return f"previous_{index}"
 
-    def _report_figure_path(self, title: str, series: str, path: str) -> None:
-        if self.clearml is None or not os.path.exists(path):
-            return
-        import matplotlib.pyplot as plt
-
-        image = plt.imread(path)
-        height, width = image.shape[:2]
-        fig_width = max(width / 200.0, 1.0)
-        fig_height = max(height / 200.0, 1.0)
-        fig, ax = plt.subplots(figsize=(fig_width, fig_height), dpi=200)
-        ax.imshow(image)
-        ax.axis("off")
-        fig.subplots_adjust(left=0, right=1, bottom=0, top=1)
-        self.clearml.report_figure(title=title, series=series, figure=fig, iteration=0)
-        plt.close(fig)
-
     def _report_dashboard_history(self) -> None:
-        if self.clearml is None:
+        if self.clearml is None or not self.config.dashboard_upload_artifacts:
             return
         for slot_idx, entry in enumerate(self.dashboard_history):
             slot = self._dashboard_slot_name(slot_idx)
-            title = f"samples/{slot}_background_condition_assim"
-            for record in entry["records"]:
-                series = f"case_{record['case_idx']:04d}"
-                self._report_figure_path(title=title, series=series, path=record["path"])
+            self.clearml.upload_artifact(
+                f"dashboard_{slot}_background_condition_assim",
+                entry["path"],
+            )
 
     @torch.no_grad()
     def report_dashboard_samples(self, epoch: int):
@@ -603,7 +587,7 @@ class UNetTrainer:
             return
         samples_dir = os.path.join(self.output_dir, "samples")
         os.makedirs(samples_dir, exist_ok=True)
-        current_records = []
+        dashboard_cases = []
 
         with self._sampling_model() as sample_model:
             sampler = Sampler(sample_model)
@@ -642,37 +626,33 @@ class UNetTrainer:
                     self.clearml.report_scalar("sample/mae_background", series, background_mae, epoch)
                     self.clearml.report_scalar("sample/rmse_skill", series, skill, epoch)
 
-                title = f"background | condition | assim, epoch {epoch}, case {case_idx}"
-                fig = make_background_condition_assim_figure(
-                    background=one["background"][0],
-                    obs_values=one["obs_values"][0],
-                    obs_mask=one["obs_mask"][0],
-                    assim=assim,
-                    fields=self.fields,
-                    means=self.channel_means,
-                    stds=self.channel_stds,
-                    channels=self.config.dashboard_channels,
-                    title=title,
-                    panel_width=self.config.dashboard_panel_width,
-                    panel_height=self.config.dashboard_panel_height,
-                    valid_mask=one["valid_mask"][0],
-                    water_mask=one["water_mask"][0],
-                )
-                figure_path = os.path.join(
-                    samples_dir,
-                    f"epoch_{epoch:04d}_case_{case_idx:04d}_background_condition_assim.png",
-                )
-                fig.savefig(figure_path, dpi=self.config.dashboard_dpi, bbox_inches="tight")
-                current_records.append({"case_idx": case_idx, "path": figure_path})
-                if self.clearml is not None:
-                    if self.config.dashboard_upload_artifacts:
-                        self.clearml.upload_artifact(
-                            f"latest_sample_panel_case_{case_idx:04d}",
-                            figure_path,
-                        )
-                import matplotlib.pyplot as plt
-                plt.close(fig)
-        self._remember_dashboard_epoch(epoch, current_records)
+                dashboard_cases.append({
+                    "case_idx": case_idx,
+                    "background": one["background"][0],
+                    "obs_values": one["obs_values"][0],
+                    "obs_mask": one["obs_mask"][0],
+                    "assim": assim,
+                    "valid_mask": one["valid_mask"][0],
+                    "water_mask": one["water_mask"][0],
+                })
+
+        title = f"background | condition | assim, epoch {epoch}, cases {len(dashboard_cases)}"
+        fig = make_multi_case_background_condition_assim_figure(
+            cases=dashboard_cases,
+            fields=self.fields,
+            means=self.channel_means,
+            stds=self.channel_stds,
+            channels=self.config.dashboard_channels,
+            title=title,
+            panel_width=self.config.dashboard_panel_width,
+            panel_height=self.config.dashboard_panel_height,
+        )
+        figure_path = os.path.join(samples_dir, f"epoch_{epoch:04d}_dashboard_background_condition_assim.png")
+        fig.savefig(figure_path, dpi=self.config.dashboard_dpi, bbox_inches="tight")
+        import matplotlib.pyplot as plt
+        plt.close(fig)
+
+        self._remember_dashboard_epoch(epoch, figure_path)
         self._report_dashboard_history()
         _debug(f"dashboard sampling done epoch={epoch}")
 
