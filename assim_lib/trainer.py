@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field
@@ -77,6 +78,10 @@ class TrainingConfig:
     dashboard_panel_width: float = 7.0
     dashboard_panel_height: float = 6.0
     dashboard_upload_artifacts: bool = False
+    dashboard_history_epochs: int = 3
+    metric_every_n_epochs: int = 1
+    metric_num_cases: int = 16
+    metric_num_timesteps: int = 0
 
     block_out_channels: tuple[int, ...] = (64, 128, 256, 512, 512)
     layers_per_block: int = 2
@@ -125,6 +130,7 @@ class UNetTrainer:
         self.add_noise = add_noise_func
         self.best_val_loss = float("inf")
         self.val_history = []
+        self.dashboard_history = []
         self.clearml = None
         self.data_config = data_config or {}
         self.fields = list(self.data_config.get("fields", [f"ch{i}" for i in range(config.out_channels)]))
@@ -256,6 +262,21 @@ class UNetTrainer:
         rmse = torch.sqrt((diff.square().sum() / denom).clamp(min=0.0))
         return float(mae.item()), float(rmse.item())
 
+    @staticmethod
+    def _masked_error_sums(
+        pred: torch.Tensor,
+        target: torch.Tensor,
+        mask: torch.Tensor,
+    ) -> tuple[float, float, float]:
+        mask = mask.expand_as(pred)
+        count = mask.sum()
+        diff = (pred - target) * mask
+        return (
+            float(diff.abs().sum().item()),
+            float(diff.square().sum().item()),
+            float(count.item()),
+        )
+
     def save_model_custom(self, name: str = "last_model.pth"):
         os.makedirs(self.output_dir, exist_ok=True)
         unwrapped = self.accelerator.unwrap_model(self.model)
@@ -275,6 +296,29 @@ class UNetTrainer:
         self.clearml.report_scalar("loss/total", "validation", loss, step)
         self.clearml.report_scalar("loss/full", "validation", loss_full, step)
         self.clearml.report_scalar("loss/observed", "validation", loss_obs, step)
+
+    def _report_sample_validation_metrics(self, metrics: dict[str, float], step: int):
+        if self.clearml is None or not metrics:
+            return
+
+        scalar_map = (
+            ("analysis_mae_full", "metric/analysis_mae", "full"),
+            ("analysis_rmse_full", "metric/analysis_rmse", "full"),
+            ("background_mae_full", "metric/background_mae", "full"),
+            ("background_rmse_full", "metric/background_rmse", "full"),
+            ("analysis_rmse_skill_full", "metric/analysis_rmse_skill", "full"),
+            ("analysis_mae_obs", "metric/analysis_mae", "obs"),
+            ("analysis_rmse_obs", "metric/analysis_rmse", "obs"),
+            ("background_mae_obs", "metric/background_mae", "obs"),
+            ("background_rmse_obs", "metric/background_rmse", "obs"),
+            ("analysis_rmse_skill_obs", "metric/analysis_rmse_skill", "obs"),
+            ("metric_count_full", "metric/count", "full"),
+            ("metric_count_obs", "metric/count", "obs"),
+        )
+        for key, title, series in scalar_map:
+            value = metrics.get(key)
+            if value is not None and math.isfinite(float(value)):
+                self.clearml.report_scalar(title, series, value, step)
 
     @staticmethod
     def _meta_mean(value):
@@ -342,6 +386,119 @@ class UNetTrainer:
         _debug(f"validation done loss_full={loss_full:.6f} loss_obs={loss_obs:.6f}")
         return loss_full, loss_obs, loss_full + self.config.obs_loss_weight * loss_obs
 
+    @staticmethod
+    def _empty_metric_totals() -> dict[str, float]:
+        return {
+            "analysis_abs": 0.0,
+            "analysis_sq": 0.0,
+            "background_abs": 0.0,
+            "background_sq": 0.0,
+            "count": 0.0,
+        }
+
+    @staticmethod
+    def _finalize_metric_totals(prefix: str, totals: dict[str, float]) -> dict[str, float]:
+        count = totals["count"]
+        if count <= 0.0:
+            return {
+                f"analysis_mae_{prefix}": float("nan"),
+                f"analysis_rmse_{prefix}": float("nan"),
+                f"background_mae_{prefix}": float("nan"),
+                f"background_rmse_{prefix}": float("nan"),
+                f"analysis_rmse_skill_{prefix}": float("nan"),
+                f"metric_count_{prefix}": 0.0,
+            }
+
+        analysis_mae = totals["analysis_abs"] / count
+        analysis_rmse = math.sqrt(max(totals["analysis_sq"] / count, 0.0))
+        background_mae = totals["background_abs"] / count
+        background_rmse = math.sqrt(max(totals["background_sq"] / count, 0.0))
+        skill = float("nan") if background_rmse <= 0.0 else 1.0 - analysis_rmse / background_rmse
+        return {
+            f"analysis_mae_{prefix}": analysis_mae,
+            f"analysis_rmse_{prefix}": analysis_rmse,
+            f"background_mae_{prefix}": background_mae,
+            f"background_rmse_{prefix}": background_rmse,
+            f"analysis_rmse_skill_{prefix}": skill,
+            f"metric_count_{prefix}": count,
+        }
+
+    def _validation_cases(self, max_cases: int) -> list[dict[str, torch.Tensor]]:
+        cases = []
+        if max_cases <= 0:
+            return cases
+
+        for raw_batch in self.val_dataloader:
+            batch = self._batch_to_device(raw_batch)
+            batch_size = batch["truth"].shape[0]
+            for batch_idx in range(batch_size):
+                cases.append({key: value[batch_idx:batch_idx + 1] for key, value in batch.items()})
+                if len(cases) >= max_cases:
+                    return cases
+        return cases
+
+    @torch.no_grad()
+    def compute_sample_validation_metrics(self) -> dict[str, float]:
+        max_cases = int(self.config.metric_num_cases)
+        cases = self._validation_cases(max_cases)
+        if not cases:
+            return {}
+
+        metric_timesteps = int(self.config.metric_num_timesteps)
+        if metric_timesteps <= 0:
+            metric_timesteps = int(self.config.num_sample_timesteps)
+        _debug(f"sample validation metrics start cases={len(cases)} timesteps={metric_timesteps}")
+
+        totals = {
+            "full": self._empty_metric_totals(),
+            "obs": self._empty_metric_totals(),
+        }
+
+        self.model.eval()
+        with self._sampling_model() as sample_model:
+            sampler = Sampler(sample_model)
+            for one in cases:
+                analysis = sampler.sample_conditioned(
+                    background=one["background"],
+                    obs_values=one["obs_values"],
+                    obs_mask=one["obs_mask"],
+                    size=self.config.image_size,
+                    num_timesteps=metric_timesteps,
+                    device=self.accelerator.device,
+                    start_mode=self.config.sample_start_mode,
+                    start_noise_level=self.config.sample_start_noise_level,
+                    enforce_observations=self.config.sample_enforce_observations,
+                    valid_mask=one["valid_mask"],
+                    obs_guidance_scale=self.config.sample_obs_guidance_scale,
+                    obs_guidance_eps=self.config.sample_obs_guidance_eps,
+                )
+
+                for name, mask in (("full", one["valid_mask"]), ("obs", one["obs_mask"])):
+                    analysis_abs, analysis_sq, count = self._masked_error_sums(analysis, one["truth"], mask)
+                    background_abs, background_sq, background_count = self._masked_error_sums(
+                        one["background"],
+                        one["truth"],
+                        mask,
+                    )
+                    totals[name]["analysis_abs"] += analysis_abs
+                    totals[name]["analysis_sq"] += analysis_sq
+                    totals[name]["background_abs"] += background_abs
+                    totals[name]["background_sq"] += background_sq
+                    totals[name]["count"] += min(count, background_count)
+
+        metrics = {
+            "metric_num_cases": float(len(cases)),
+            "metric_num_timesteps": float(metric_timesteps),
+        }
+        metrics.update(self._finalize_metric_totals("full", totals["full"]))
+        metrics.update(self._finalize_metric_totals("obs", totals["obs"]))
+        _debug(
+            "sample validation metrics done "
+            f"analysis_rmse_full={metrics['analysis_rmse_full']:.6f} "
+            f"analysis_rmse_obs={metrics['analysis_rmse_obs']:.6f}"
+        )
+        return metrics
+
     def save_samples(self, epoch: int):
         self.model.eval()
         raw_batch = next(iter(self.val_dataloader))
@@ -394,6 +551,43 @@ class UNetTrainer:
                     return cases
         return cases
 
+    def _remember_dashboard_epoch(self, epoch: int, records: list[dict]) -> None:
+        max_history = max(int(self.config.dashboard_history_epochs), 1)
+        self.dashboard_history.insert(0, {"epoch": int(epoch), "records": records})
+        del self.dashboard_history[max_history:]
+
+    @staticmethod
+    def _dashboard_slot_name(index: int) -> str:
+        if index == 0:
+            return "latest"
+        return f"previous_{index}"
+
+    def _report_figure_path(self, title: str, series: str, path: str) -> None:
+        if self.clearml is None or not os.path.exists(path):
+            return
+        import matplotlib.pyplot as plt
+
+        image = plt.imread(path)
+        height, width = image.shape[:2]
+        fig_width = max(width / 200.0, 1.0)
+        fig_height = max(height / 200.0, 1.0)
+        fig, ax = plt.subplots(figsize=(fig_width, fig_height), dpi=200)
+        ax.imshow(image)
+        ax.axis("off")
+        fig.subplots_adjust(left=0, right=1, bottom=0, top=1)
+        self.clearml.report_figure(title=title, series=series, figure=fig, iteration=0)
+        plt.close(fig)
+
+    def _report_dashboard_history(self) -> None:
+        if self.clearml is None:
+            return
+        for slot_idx, entry in enumerate(self.dashboard_history):
+            slot = self._dashboard_slot_name(slot_idx)
+            title = f"samples/{slot}_background_condition_assim"
+            for record in entry["records"]:
+                series = f"case_{record['case_idx']:04d}"
+                self._report_figure_path(title=title, series=series, path=record["path"])
+
     @torch.no_grad()
     def report_dashboard_samples(self, epoch: int):
         if self.config.dashboard_every_n_epochs <= 0:
@@ -409,6 +603,7 @@ class UNetTrainer:
             return
         samples_dir = os.path.join(self.output_dir, "samples")
         os.makedirs(samples_dir, exist_ok=True)
+        current_records = []
 
         with self._sampling_model() as sample_model:
             sampler = Sampler(sample_model)
@@ -468,13 +663,8 @@ class UNetTrainer:
                     f"epoch_{epoch:04d}_case_{case_idx:04d}_background_condition_assim.png",
                 )
                 fig.savefig(figure_path, dpi=self.config.dashboard_dpi, bbox_inches="tight")
+                current_records.append({"case_idx": case_idx, "path": figure_path})
                 if self.clearml is not None:
-                    self.clearml.report_figure(
-                        title="samples/latest_background_condition_assim",
-                        series=f"latest/case_{case_idx:04d}",
-                        figure=fig,
-                        iteration=epoch,
-                    )
                     if self.config.dashboard_upload_artifacts:
                         self.clearml.upload_artifact(
                             f"latest_sample_panel_case_{case_idx:04d}",
@@ -482,6 +672,8 @@ class UNetTrainer:
                         )
                 import matplotlib.pyplot as plt
                 plt.close(fig)
+        self._remember_dashboard_epoch(epoch, current_records)
+        self._report_dashboard_history()
         _debug(f"dashboard sampling done epoch={epoch}")
 
     def train_loop(self):
@@ -534,14 +726,22 @@ class UNetTrainer:
 
             progress_bar.close()
             val_loss_full, val_loss_obs, val_loss = self.compute_val_loss()
-            self.val_history.append({
+            sample_metrics = {}
+            if (self.accelerator.is_main_process
+                    and self.config.metric_every_n_epochs > 0
+                    and epoch % self.config.metric_every_n_epochs == 0):
+                sample_metrics = self.compute_sample_validation_metrics()
+
+            history_entry = {
                 "epoch": epoch,
                 "val_loss": val_loss,
                 "val_loss_full": val_loss_full,
                 "val_loss_obs": val_loss_obs,
                 "step": global_step,
                 "timestamp": datetime.now().isoformat(),
-            })
+            }
+            history_entry.update(sample_metrics)
+            self.val_history.append(history_entry)
             if self.config.tracker:
                 self.accelerator.log({
                     "val_loss": val_loss,
@@ -549,6 +749,7 @@ class UNetTrainer:
                     "val_loss_obs": val_loss_obs,
                 }, step=global_step)
             self._report_val_metrics(val_loss_full, val_loss_obs, val_loss, global_step)
+            self._report_sample_validation_metrics(sample_metrics, global_step)
             try:
                 self._report_condition_diagnostics(next(iter(self.val_dataloader)), global_step, "validation")
             except StopIteration:
