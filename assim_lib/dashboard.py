@@ -156,8 +156,8 @@ def make_multi_case_background_condition_assim_figure(
     stds,
     channels,
     title: str,
-    panel_width: float = 4.2,
-    panel_height: float = 3.2,
+    panel_width: float = 3.6,
+    panel_height: float = 2.5,
 ):
     import matplotlib.pyplot as plt
 
@@ -179,6 +179,7 @@ def make_multi_case_background_condition_assim_figure(
         constrained_layout=True,
     )
     fig.suptitle(title, fontsize=16)
+    column_titles = ("background", "condition", "assim")
 
     for case_row, case in enumerate(cases):
         background = _as_numpy(case["background"])
@@ -208,7 +209,19 @@ def make_multi_case_background_condition_assim_figure(
                 ax = axes[row, col]
                 masked_values = np.ma.masked_invalid(values)
                 ax.imshow(masked_values, cmap=cmap, vmin=vmin, vmax=vmax, interpolation="nearest")
-                ax.set_title(f"case {case_idx:04d} {field_name} {panel_name}", fontsize=10)
+                if row == 0:
+                    ax.set_title(column_titles[col], fontsize=12)
+                if col == 0:
+                    ax.text(
+                        -0.06,
+                        0.5,
+                        f"case {case_idx:04d}\n{field_name}",
+                        ha="right",
+                        va="center",
+                        transform=ax.transAxes,
+                        fontsize=10,
+                        clip_on=False,
+                    )
                 ax.axis("off")
                 if panel_name == "condition" and not condition_has_obs:
                     ax.text(

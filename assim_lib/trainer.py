@@ -25,6 +25,16 @@ from .sampler import Sampler
 logger = get_logger(__name__)
 
 
+_DASHBOARD_EVERY_N_EPOCHS = 1
+_DASHBOARD_NUM_CASES = 8
+_DASHBOARD_HISTORY_EPOCHS = 3
+_DASHBOARD_CASES_PER_PAGE = 4
+_DASHBOARD_CHANNELS = (0,)
+_DASHBOARD_DPI = 200
+_DASHBOARD_PANEL_WIDTH = 3.6
+_DASHBOARD_PANEL_HEIGHT = 2.5
+
+
 def _debug(message: str) -> None:
     print(f"[assim_lib][trainer] {message}", flush=True)
 
@@ -70,15 +80,6 @@ class TrainingConfig:
     clearml_output_uri: str | None = None
     clearml_env_path: str | None = None
     clearml_upload_checkpoints: bool = False
-    dashboard_every_n_epochs: int = 1
-    dashboard_num_cases: int = 1
-    dashboard_num_timesteps: int = 200
-    dashboard_channels: tuple[int, ...] = ()
-    dashboard_dpi: int = 200
-    dashboard_panel_width: float = 7.0
-    dashboard_panel_height: float = 6.0
-    dashboard_upload_artifacts: bool = False
-    dashboard_history_epochs: int = 3
     metric_every_n_epochs: int = 1
     metric_num_cases: int = 16
     metric_num_timesteps: int = 0
@@ -112,7 +113,6 @@ class TrainingConfig:
             "down_block_types",
             "up_block_types",
             "clearml_tags",
-            "dashboard_channels",
         }
         for key in tuple_keys:
             if key in values:
@@ -538,7 +538,7 @@ class UNetTrainer:
     @torch.no_grad()
     def _dashboard_cases(self) -> list[dict[str, torch.Tensor]]:
         cases = []
-        max_cases = max(int(self.config.dashboard_num_cases), 0)
+        max_cases = max(_DASHBOARD_NUM_CASES, 0)
         if max_cases == 0:
             return cases
 
@@ -551,9 +551,9 @@ class UNetTrainer:
                     return cases
         return cases
 
-    def _remember_dashboard_epoch(self, epoch: int, path: str) -> None:
-        max_history = max(int(self.config.dashboard_history_epochs), 1)
-        self.dashboard_history.insert(0, {"epoch": int(epoch), "path": path})
+    def _remember_dashboard_epoch(self, epoch: int, pages: list[dict]) -> None:
+        max_history = max(_DASHBOARD_HISTORY_EPOCHS, 1)
+        self.dashboard_history.insert(0, {"epoch": int(epoch), "pages": pages})
         del self.dashboard_history[max_history:]
 
     @staticmethod
@@ -563,20 +563,30 @@ class UNetTrainer:
         return f"previous_{index}"
 
     def _report_dashboard_history(self) -> None:
-        if self.clearml is None or not self.config.dashboard_upload_artifacts:
+        if self.clearml is None:
             return
         for slot_idx, entry in enumerate(self.dashboard_history):
             slot = self._dashboard_slot_name(slot_idx)
-            self.clearml.upload_artifact(
-                f"dashboard_{slot}_background_condition_assim",
-                entry["path"],
-            )
+            for page in entry["pages"]:
+                page_idx = int(page["page_idx"])
+                self.clearml.report_image(
+                    title=f"dashboard/{slot}_background_condition_assim",
+                    series=f"page_{page_idx:02d}",
+                    path=page["path"],
+                    iteration=0,
+                )
+
+    @staticmethod
+    def _chunks(values: list, size: int):
+        size = max(int(size), 1)
+        for start in range(0, len(values), size):
+            yield start // size, values[start:start + size]
 
     @torch.no_grad()
     def report_dashboard_samples(self, epoch: int):
-        if self.config.dashboard_every_n_epochs <= 0:
+        if _DASHBOARD_EVERY_N_EPOCHS <= 0:
             return
-        if epoch % self.config.dashboard_every_n_epochs != 0:
+        if epoch % _DASHBOARD_EVERY_N_EPOCHS != 0:
             return
 
         _debug(f"dashboard sampling start epoch={epoch}")
@@ -597,7 +607,7 @@ class UNetTrainer:
                     obs_values=one["obs_values"],
                     obs_mask=one["obs_mask"],
                     size=self.config.image_size,
-                    num_timesteps=self.config.dashboard_num_timesteps,
+                    num_timesteps=self.config.num_sample_timesteps,
                     device=self.accelerator.device,
                     start_mode=self.config.sample_start_mode,
                     start_noise_level=self.config.sample_start_noise_level,
@@ -636,23 +646,33 @@ class UNetTrainer:
                     "water_mask": one["water_mask"][0],
                 })
 
-        title = f"background | condition | assim, epoch {epoch}, cases {len(dashboard_cases)}"
-        fig = make_multi_case_background_condition_assim_figure(
-            cases=dashboard_cases,
-            fields=self.fields,
-            means=self.channel_means,
-            stds=self.channel_stds,
-            channels=self.config.dashboard_channels,
-            title=title,
-            panel_width=self.config.dashboard_panel_width,
-            panel_height=self.config.dashboard_panel_height,
-        )
-        figure_path = os.path.join(samples_dir, f"epoch_{epoch:04d}_dashboard_background_condition_assim.png")
-        fig.savefig(figure_path, dpi=self.config.dashboard_dpi, bbox_inches="tight")
         import matplotlib.pyplot as plt
-        plt.close(fig)
+        current_pages = []
+        cases_per_page = max(_DASHBOARD_CASES_PER_PAGE, 1)
+        for page_idx, page_cases in self._chunks(dashboard_cases, cases_per_page):
+            title = (
+                f"background | condition | assim, epoch {epoch}, "
+                f"page {page_idx}, cases {len(page_cases)}"
+            )
+            fig = make_multi_case_background_condition_assim_figure(
+                cases=page_cases,
+                fields=self.fields,
+                means=self.channel_means,
+                stds=self.channel_stds,
+                channels=_DASHBOARD_CHANNELS,
+                title=title,
+                panel_width=_DASHBOARD_PANEL_WIDTH,
+                panel_height=_DASHBOARD_PANEL_HEIGHT,
+            )
+            figure_path = os.path.join(
+                samples_dir,
+                f"epoch_{epoch:04d}_dashboard_page_{page_idx:02d}_background_condition_assim.png",
+            )
+            fig.savefig(figure_path, dpi=_DASHBOARD_DPI, bbox_inches="tight")
+            plt.close(fig)
+            current_pages.append({"page_idx": page_idx, "path": figure_path})
 
-        self._remember_dashboard_epoch(epoch, figure_path)
+        self._remember_dashboard_epoch(epoch, current_pages)
         self._report_dashboard_history()
         _debug(f"dashboard sampling done epoch={epoch}")
 

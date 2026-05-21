@@ -102,6 +102,19 @@ class ClearMLTracker:
                 iteration=int(iteration),
             )
 
+    def report_image(self, title: str, series: str, path: str | Path, iteration: int) -> None:
+        path = Path(path)
+        if path.exists():
+            _debug(f"report image title={title} series={series} path={path}")
+            self.logger.report_image(
+                title=title,
+                series=series,
+                local_path=str(path),
+                iteration=int(iteration),
+            )
+        else:
+            _debug(f"skip missing image title={title} series={series} path={path}")
+
     def upload_artifact(self, name: str, path: str | Path) -> None:
         path = Path(path)
         if path.exists():
