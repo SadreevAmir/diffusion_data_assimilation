@@ -1,0 +1,42 @@
+{
+  "project_name": "smoke_concat_conditioning",
+  "task_name": "smoke_concat_conditioning_bridge_4f",
+  "data_config": "../data/smoke_m2m_4f.json",
+  "model_config": "../methods/concat_conditioning_bridge_4f.json",
+  "clearml": {
+    "tags": ["smoke", "concat_conditioning", "bridge", "m2m"],
+    "upload_checkpoints": true
+  },
+  "training": {
+    "image_size": [16, 16],
+    "in_channels": 18,
+    "out_channels": 4,
+    "train_batch_size": 2,
+    "eval_batch_size": 1,
+    "num_workers_train": 0,
+    "num_workers_val": 0,
+    "num_epochs": 1,
+    "learning_rate": 0.0001,
+    "lr_warmup_steps": 0,
+    "mixed_precision": "no",
+    "seed": 11,
+    "obs_loss_weight": 0.1,
+    "sample_every_n_epochs": 0,
+    "num_sample_timesteps": 2,
+    "dashboard_every_n_epochs": 1,
+    "dashboard_num_cases": 1,
+    "dashboard_num_timesteps": 2,
+    "dashboard_channels": [0],
+    "dashboard_dpi": 200,
+    "dashboard_panel_width": 7.0,
+    "dashboard_panel_height": 6.0,
+    "base_output_dir": "outputs/concat_conditioning_bridge_smoke",
+    "run_name": "smoke_bridge",
+    "tracker": null,
+    "block_out_channels": [16, 32],
+    "layers_per_block": 1,
+    "down_block_types": ["DownBlock2D", "DownBlock2D"],
+    "up_block_types": ["UpBlock2D", "UpBlock2D"],
+    "norm_num_groups": 8
+  }
+}

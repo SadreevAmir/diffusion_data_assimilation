@@ -1,13 +1,18 @@
 services:
-  experiments:
+  diffusion_data_assimilation:
     build: .
     image: ${USER}/diffusion_data_assimilation
     container_name: ${USER}_diffusion_data_assimilation
+    env_file:
+      - .env
     environment:
-      - HF_TOKEN=${HF_TOKEN}
+      - HF_TOKEN=${HF_TOKEN:-}
+      - CLEARML_API_ACCESS_KEY=${CLEARML_API_ACCESS_KEY:-}
+      - CLEARML_API_SECRET_KEY=${CLEARML_API_SECRET_KEY:-}
+      - CLEARML_API_HOST=${CLEARML_API_HOST:-}
+      - CLEARML_WEB_HOST=${CLEARML_WEB_HOST:-}
+      - CLEARML_FILES_HOST=${CLEARML_FILES_HOST:-}
       - WANDB_SILENT=true 
-    ports:
-      - "9123:8888" 
     volumes:
       - "/mnt:/mnt"
       - "./:/home/"
@@ -22,4 +27,4 @@ services:
             capabilities: [gpu]
         limits:
           cpus: '6.0'
-          memory: 24G
+          memory: 64G
