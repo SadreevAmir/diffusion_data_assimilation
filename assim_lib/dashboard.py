@@ -61,6 +61,10 @@ def _display_panels(background, obs_values, obs_mask, assim, channel: int, means
     if channel_water is not None:
         cond = np.where(channel_water, cond, np.nan)
 
+    mask_display = cond_mask.astype(np.float32)
+    if channel_water is not None:
+        mask_display = np.where(channel_water, mask_display, np.nan)
+
     if channel == 0:
         vmin, vmax = 0.0, 1.0
     else:
@@ -79,7 +83,7 @@ def _display_panels(background, obs_values, obs_mask, assim, channel: int, means
             vmin, vmax = None, None
 
     cmap = "Blues_r" if channel == 0 else "viridis"
-    return bg, cond, an, target, condition_has_obs, vmin, vmax, cmap
+    return bg, cond, mask_display, an, target, condition_has_obs, vmin, vmax, cmap
 
 
 def make_background_condition_assim_figure(
@@ -113,7 +117,7 @@ def make_background_condition_assim_figure(
         channels = list(range(background.shape[0]))
 
     nrows = len(channels)
-    ncols = 4 if truth is not None else 3
+    ncols = 5 if truth is not None else 4
     fig, axes = plt.subplots(
         nrows,
         ncols,
@@ -125,7 +129,7 @@ def make_background_condition_assim_figure(
 
     for row, channel in enumerate(channels):
         field_name = fields[channel] if channel < len(fields) else f"ch{channel}"
-        bg, cond, an, target, condition_has_obs, vmin, vmax, cmap = _display_panels(
+        bg, cond, mask_display, an, target, condition_has_obs, vmin, vmax, cmap = _display_panels(
             background,
             obs_values,
             obs_mask,
@@ -137,16 +141,23 @@ def make_background_condition_assim_figure(
             water_mask=water_mask,
             truth=truth,
         )
-        panels = [("background", bg), ("condition", cond), ("assim", an)]
+        panels = [
+            ("background", bg, cmap, vmin, vmax),
+            ("condition", cond, cmap, vmin, vmax),
+            ("mask", mask_display, "gray", 0.0, 1.0),
+            ("assim", an, cmap, vmin, vmax),
+        ]
         if target is not None:
-            panels.append(("truth", target))
-        for col, (panel_name, values) in enumerate(panels):
+            panels.append(("truth", target, cmap, vmin, vmax))
+        for col, (panel_name, values, panel_cmap, panel_vmin, panel_vmax) in enumerate(panels):
             ax = axes[row, col]
             masked_values = np.ma.masked_invalid(values)
-            image = ax.imshow(masked_values, cmap=cmap, vmin=vmin, vmax=vmax, interpolation="nearest")
+            image = ax.imshow(
+                masked_values, cmap=panel_cmap, vmin=panel_vmin, vmax=panel_vmax, interpolation="nearest"
+            )
             ax.set_title(f"{field_name} {panel_name}", fontsize=14)
             ax.axis("off")
-            if panel_name == "condition" and not condition_has_obs:
+            if panel_name in ("condition", "mask") and not condition_has_obs:
                 ax.text(
                     0.5,
                     0.5,
@@ -186,7 +197,7 @@ def make_multi_case_background_condition_assim_figure(
 
     nrows = len(cases) * len(channels)
     has_truth = all(case.get("truth") is not None for case in cases)
-    ncols = 4 if has_truth else 3
+    ncols = 5 if has_truth else 4
     fig, axes = plt.subplots(
         nrows,
         ncols,
@@ -195,10 +206,10 @@ def make_multi_case_background_condition_assim_figure(
         constrained_layout=True,
     )
     fig.suptitle(title, fontsize=16)
-    column_titles = ("background", "condition", "assim", "truth") if has_truth else (
-        "background",
-        "condition",
-        "assim",
+    column_titles = (
+        ("background", "condition", "mask", "assim", "truth")
+        if has_truth
+        else ("background", "condition", "mask", "assim")
     )
 
     for case_row, case in enumerate(cases):
@@ -215,7 +226,7 @@ def make_multi_case_background_condition_assim_figure(
         for channel_row, channel in enumerate(channels):
             row = case_row * len(channels) + channel_row
             field_name = fields[channel] if channel < len(fields) else f"ch{channel}"
-            bg, cond, an, target, condition_has_obs, vmin, vmax, cmap = _display_panels(
+            bg, cond, mask_display, an, target, condition_has_obs, vmin, vmax, cmap = _display_panels(
                 background,
                 obs_values,
                 obs_mask,
@@ -227,13 +238,20 @@ def make_multi_case_background_condition_assim_figure(
                 water_mask=water_mask,
                 truth=truth,
             )
-            panels = [("background", bg), ("condition", cond), ("assim", an)]
+            panels = [
+                ("background", bg, cmap, vmin, vmax),
+                ("condition", cond, cmap, vmin, vmax),
+                ("mask", mask_display, "gray", 0.0, 1.0),
+                ("assim", an, cmap, vmin, vmax),
+            ]
             if target is not None:
-                panels.append(("truth", target))
-            for col, (panel_name, values) in enumerate(panels):
+                panels.append(("truth", target, cmap, vmin, vmax))
+            for col, (panel_name, values, panel_cmap, panel_vmin, panel_vmax) in enumerate(panels):
                 ax = axes[row, col]
                 masked_values = np.ma.masked_invalid(values)
-                ax.imshow(masked_values, cmap=cmap, vmin=vmin, vmax=vmax, interpolation="nearest")
+                ax.imshow(
+                    masked_values, cmap=panel_cmap, vmin=panel_vmin, vmax=panel_vmax, interpolation="nearest"
+                )
                 if row == 0:
                     ax.set_title(column_titles[col], fontsize=12)
                 if col == 0:
@@ -248,7 +266,7 @@ def make_multi_case_background_condition_assim_figure(
                         clip_on=False,
                     )
                 ax.axis("off")
-                if panel_name == "condition" and not condition_has_obs:
+                if panel_name in ("condition", "mask") and not condition_has_obs:
                     ax.text(
                         0.5,
                         0.5,

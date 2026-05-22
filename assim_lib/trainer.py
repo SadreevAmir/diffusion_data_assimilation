@@ -50,7 +50,7 @@ class TrainingConfig:
     in_channels: int = 18
     out_channels: int = 4
     train_batch_size: int = 8
-    eval_batch_size: int = 1
+    eval_batch_size: int = 4
     num_workers_train: int = 4
     num_workers_val: int = 2
     num_epochs: int = 20
@@ -444,48 +444,63 @@ class UNetTrainer:
                     return cases
         return cases
 
+    def _iter_validation_batches(self, max_cases: int):
+        if max_cases <= 0:
+            return
+        remaining = max_cases
+        for raw_batch in self.val_dataloader:
+            if remaining <= 0:
+                return
+            batch = self._batch_to_device(raw_batch)
+            batch_size = batch["truth"].shape[0]
+            take = min(batch_size, remaining)
+            if take < batch_size:
+                batch = {key: value[:take] for key, value in batch.items()}
+            remaining -= take
+            yield batch
+
     @torch.no_grad()
     def compute_sample_validation_metrics(self) -> dict[str, float]:
         max_cases = int(self.config.metric_num_cases)
-        cases = self._validation_cases(max_cases)
-        if not cases:
+        if max_cases <= 0:
             return {}
 
         metric_timesteps = int(self.config.metric_num_timesteps)
         if metric_timesteps <= 0:
             metric_timesteps = int(self.config.num_sample_timesteps)
-        _debug(f"sample validation metrics start cases={len(cases)} timesteps={metric_timesteps}")
 
         totals = {
             "full": self._empty_metric_totals(),
             "obs": self._empty_metric_totals(),
         }
+        total_processed = 0
 
         self.model.eval()
         with self._sampling_model() as sample_model:
             sampler = Sampler(sample_model)
-            for one in cases:
+            for batch in self._iter_validation_batches(max_cases):
+                batch_size = batch["truth"].shape[0]
                 analysis = sampler.sample_conditioned(
-                    background=one["background"],
-                    obs_values=one["obs_values"],
-                    obs_mask=one["obs_mask"],
-                    water_mask=one["water_mask"],
+                    background=batch["background"],
+                    obs_values=batch["obs_values"],
+                    obs_mask=batch["obs_mask"],
+                    water_mask=batch["water_mask"],
                     size=self.config.image_size,
                     num_timesteps=metric_timesteps,
                     device=self.accelerator.device,
                     start_mode=self.config.sample_start_mode,
                     start_noise_level=self.config.sample_start_noise_level,
                     enforce_observations=self.config.sample_enforce_observations,
-                    valid_mask=one["valid_mask"],
+                    valid_mask=batch["valid_mask"],
                     obs_guidance_scale=self.config.sample_obs_guidance_scale,
                     obs_guidance_eps=self.config.sample_obs_guidance_eps,
                 )
 
-                for name, mask in (("full", one["valid_mask"]), ("obs", one["obs_mask"])):
-                    analysis_abs, analysis_sq, count = self._masked_error_sums(analysis, one["truth"], mask)
+                for name, mask in (("full", batch["valid_mask"]), ("obs", batch["obs_mask"])):
+                    analysis_abs, analysis_sq, count = self._masked_error_sums(analysis, batch["truth"], mask)
                     background_abs, background_sq, background_count = self._masked_error_sums(
-                        one["background"],
-                        one["truth"],
+                        batch["background"],
+                        batch["truth"],
                         mask,
                     )
                     totals[name]["analysis_abs"] += analysis_abs
@@ -493,9 +508,14 @@ class UNetTrainer:
                     totals[name]["background_abs"] += background_abs
                     totals[name]["background_sq"] += background_sq
                     totals[name]["count"] += min(count, background_count)
+                total_processed += batch_size
 
+        if total_processed == 0:
+            return {}
+
+        _debug(f"sample validation metrics start cases={total_processed} timesteps={metric_timesteps}")
         metrics = {
-            "metric_num_cases": float(len(cases)),
+            "metric_num_cases": float(total_processed),
             "metric_num_timesteps": float(metric_timesteps),
         }
         metrics.update(self._finalize_metric_totals("full", totals["full"]))
