@@ -16,7 +16,13 @@
   "assimilation_range": 3,
   "observation_mask": {
     "kind": "sral_tracks",
-    "sral_transform_index": 11
+    "sral_transform_index": 11,
+    "synthetic_probability": 0.5,
+    "empty_probability": 0.25,
+    "synthetic": {
+      "kind": "generated_track",
+      "n_tracks_range": [1, 4]
+    }
   },
   "train": {
     "back_start_day": "2015-01-01",

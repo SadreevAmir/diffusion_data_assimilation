@@ -10,6 +10,39 @@ from assim_lib.transforms import make_conditioned_model_input
 
 
 class AssimLibConditioningTests(unittest.TestCase):
+    @staticmethod
+    def _write_m2m_pair(root: Path, channels: int = 2, size: tuple[int, int] = (4, 4)) -> Path:
+        preds = root / "dataset" / "preds"
+        preds.mkdir(parents=True)
+        height, width = size
+        background = np.ones((channels, height, width), dtype=np.float32)
+        truth = np.full((channels, height, width), 2.0, dtype=np.float32)
+        np.save(preds / "ocean+atmosphere_24_20200101.npy", background)
+        np.save(preds / "ocean+atmosphere_24_20200102.npy", truth)
+        return root / "dataset"
+
+    @staticmethod
+    def _m2m_config(dataset_dir: Path, observation_mask: dict) -> dict:
+        return {
+            "dataset_name": "M2MForecastDataset",
+            "dataset_dir": str(dataset_dir),
+            "lead_time_hours": 24,
+            "fields": ["var0", "var1"],
+            "indices": [0, 1],
+            "means": [0.0, 0.0],
+            "stds": [1.0, 1.0],
+            "padding_values": [0.0, 0.0],
+            "image_size": [4, 4],
+            "observed_channels": [0],
+            "observation_mask": observation_mask,
+            "train": {
+                "back_start_day": "2020-01-01",
+                "back_end_day": "2020-01-01",
+                "obs_start_day": "2020-01-02",
+                "obs_end_day": "2020-01-02",
+            },
+        }
+
     def test_water_mask_is_single_conditioning_channel(self):
         state = torch.zeros((1, 4, 3, 2))
         grid = torch.zeros((1, 2, 3, 2))
@@ -112,6 +145,50 @@ class AssimLibConditioningTests(unittest.TestCase):
         self.assertEqual(float(sample["valid_mask"][1, 1, 1]), 1.0)
         self.assertEqual(float(sample["obs_mask"][0, 1, 1]), 0.0)
         self.assertEqual(float(sample["obs_mask"][1, 1, 1]), 0.0)
+
+    def test_sral_mix_can_force_synthetic_generated_tracks(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            dataset_dir = self._write_m2m_pair(root)
+            dataset = M2MForecastDataset(
+                self._m2m_config(
+                    dataset_dir,
+                    {
+                        "kind": "sral_tracks",
+                        "synthetic_probability": 1.0,
+                        "empty_probability": 0.0,
+                        "synthetic": {"kind": "generated_track", "n_tracks_range": [1, 1]},
+                    },
+                ),
+                split="train",
+            )
+            sample = dataset[0]
+
+        self.assertEqual(sample["meta"]["mask_kind"], "synthetic_generated_track")
+        self.assertEqual(sample["meta"]["sral_files_used"], 0)
+        self.assertGreater(float(sample["obs_mask"].sum()), 0.0)
+
+    def test_sral_mix_can_force_empty_conditioning(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            dataset_dir = self._write_m2m_pair(root)
+            dataset = M2MForecastDataset(
+                self._m2m_config(
+                    dataset_dir,
+                    {
+                        "kind": "sral_tracks",
+                        "synthetic_probability": 0.0,
+                        "empty_probability": 1.0,
+                        "synthetic": {"kind": "generated_track", "n_tracks_range": [1, 1]},
+                    },
+                ),
+                split="train",
+            )
+            sample = dataset[0]
+
+        self.assertEqual(sample["meta"]["mask_kind"], "empty")
+        self.assertEqual(float(sample["obs_mask"].sum()), 0.0)
+        self.assertEqual(float(sample["obs_values"].sum()), 0.0)
 
 
 if __name__ == "__main__":

@@ -168,8 +168,8 @@ def _random_mask(image_size: tuple[int, int], valid_mask: torch.Tensor, density:
     return torch.from_numpy(mask * (valid_2d > 0)).to(dtype=torch.float32)
 
 
-def _make_mask(image_size, valid_mask, config, rng) -> torch.Tensor:
-    mask_config = config.get("observation_mask", {})
+def _make_mask(image_size, valid_mask, config, rng, mask_config=None) -> torch.Tensor:
+    mask_config = config.get("observation_mask", {}) if mask_config is None else mask_config
     kind = mask_config.get("kind", "generated_track")
     if kind == "generated_track":
         return _generate_track_mask(image_size, valid_mask, mask_config.get("n_tracks_range", [1, 4]), rng)
@@ -277,6 +277,30 @@ class M2MForecastDataset(Dataset):
         self.sral_records = self._load_sral_records()
         self.records_by_date = {record.date: record for record in records}
         self.base_valid_mask = self._load_base_valid_mask()
+        self._validate_observation_mask_config()
+
+    def _validate_observation_mask_config(self) -> None:
+        mask_config = self.config.get("observation_mask", {})
+        if mask_config.get("kind", "generated_track") != "sral_tracks":
+            return
+
+        synthetic_probability = float(mask_config.get("synthetic_probability", 0.0))
+        empty_probability = float(mask_config.get("empty_probability", 0.0))
+        for name, value in (
+            ("synthetic_probability", synthetic_probability),
+            ("empty_probability", empty_probability),
+        ):
+            if not 0.0 <= value <= 1.0:
+                raise ValueError(f"observation_mask.{name} must be within [0, 1], got {value}")
+        if synthetic_probability + empty_probability > 1.0:
+            raise ValueError("observation_mask synthetic_probability + empty_probability must be <= 1")
+
+        synthetic_config = mask_config.get("synthetic", {})
+        if synthetic_probability > 0.0 and not isinstance(synthetic_config, dict):
+            raise ValueError("observation_mask.synthetic must be an object when synthetic_probability > 0")
+        synthetic_kind = synthetic_config.get("kind", "generated_track") if isinstance(synthetic_config, dict) else None
+        if synthetic_kind == "sral_tracks":
+            raise ValueError("observation_mask.synthetic.kind cannot be 'sral_tracks'")
 
     def _load_base_valid_mask(self) -> torch.Tensor:
         channels = len(self.indices)
@@ -306,19 +330,50 @@ class M2MForecastDataset(Dataset):
     def __len__(self):
         return len(self.back_data)
 
+    def _observation_diagnostics(
+        self,
+        mask_kind: str,
+        obs_mask: torch.Tensor,
+        valid_mask: torch.Tensor,
+        sral_files_used: int = 0,
+        empty_obs_days: int = 0,
+    ) -> dict:
+        valid_count = float(valid_mask[0].sum().item())
+        obs_count = int(obs_mask[self.observed_channels].sum().item()) if self.observed_channels else 0
+        return {
+            "mask_kind": mask_kind,
+            "sral_files_used": int(sral_files_used),
+            "empty_obs_days": int(empty_obs_days),
+            "obs_count": obs_count,
+            "observed_fraction": obs_count / max(valid_count, 1.0),
+        }
+
+    def _empty_observations(
+        self,
+        valid_mask: torch.Tensor,
+        mask_kind: str = "empty",
+        empty_obs_days: int = 0,
+    ) -> tuple[torch.Tensor, torch.Tensor, dict]:
+        obs_values = torch.zeros((len(self.indices), *self.image_size), dtype=torch.float32)
+        obs_mask = torch.zeros_like(obs_values)
+        return obs_values, obs_mask, self._observation_diagnostics(
+            mask_kind,
+            obs_mask,
+            valid_mask,
+            empty_obs_days=empty_obs_days,
+        )
+
     def _sral_track_observations(self, target_date: date, valid_mask: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, dict]:
         obs_values = torch.zeros((len(self.indices), *self.image_size), dtype=torch.float32)
         obs_mask = torch.zeros_like(obs_values)
-        diagnostics = {
-            "mask_kind": "sral_tracks",
-            "sral_files_used": 0,
-            "empty_obs_days": 0,
-            "obs_count": 0,
-            "observed_fraction": 0.0,
-        }
+        sral_files_used = 0
+        empty_obs_days = 0
         if not self.sral_records:
-            diagnostics["empty_obs_days"] = self.assimilation_range
-            return obs_values, obs_mask, diagnostics
+            return self._empty_observations(
+                valid_mask,
+                mask_kind="sral_tracks",
+                empty_obs_days=self.assimilation_range,
+            )
 
         mask_config = self.config.get("observation_mask", {})
         transform_index = int(mask_config.get("sral_transform_index", self.config.get("sral_transform_index", 11)))
@@ -327,19 +382,19 @@ class M2MForecastDataset(Dataset):
             sral_paths = self.sral_records.get(current_date, [])
             model_record = self.records_by_date.get(current_date)
             if not sral_paths or model_record is None:
-                diagnostics["empty_obs_days"] += 1
+                empty_obs_days += 1
                 continue
 
             combined_sral = _combine_sral_files(sral_paths)
             if combined_sral is None:
-                diagnostics["empty_obs_days"] += 1
+                empty_obs_days += 1
                 continue
             transformed_sral = _sral_transform(combined_sral, transform_index)
             spatial_mask = torch.as_tensor(np.isfinite(transformed_sral).astype(np.float32))
             spatial_mask = pad_to_size(spatial_mask, self.image_size, fill_value=0.0)[0]
             spatial_mask = spatial_mask * valid_mask[0]
             if not torch.any(spatial_mask > 0):
-                diagnostics["empty_obs_days"] += 1
+                empty_obs_days += 1
                 continue
 
             track_field, track_finite = prepare_model_field(
@@ -350,17 +405,49 @@ class M2MForecastDataset(Dataset):
                 self.padding_values,
                 self.image_size,
             )
-            diagnostics["sral_files_used"] += len(sral_paths)
+            sral_files_used += len(sral_paths)
             for channel in self.observed_channels:
                 fill_mask = (obs_mask[channel] == 0) & (spatial_mask > 0) & (track_finite[channel] > 0)
                 obs_values[channel][fill_mask] = track_field[channel][fill_mask]
                 obs_mask[channel][fill_mask] = 1.0
 
-        valid_count = float(valid_mask[0].sum().item())
-        obs_count = int(obs_mask[self.observed_channels].sum().item()) if self.observed_channels else 0
-        diagnostics["obs_count"] = obs_count
-        diagnostics["observed_fraction"] = obs_count / max(valid_count, 1.0)
-        return obs_values, obs_mask, diagnostics
+        return obs_values, obs_mask, self._observation_diagnostics(
+            "sral_tracks",
+            obs_mask,
+            valid_mask,
+            sral_files_used=sral_files_used,
+            empty_obs_days=empty_obs_days,
+        )
+
+    def _selected_sral_conditioning(self, mask_config: dict, rng) -> str:
+        draw = float(rng.random())
+        empty_probability = float(mask_config.get("empty_probability", 0.0))
+        synthetic_probability = float(mask_config.get("synthetic_probability", 0.0))
+        if draw < empty_probability:
+            return "empty"
+        if draw < empty_probability + synthetic_probability:
+            return "synthetic"
+        return "sral_tracks"
+
+    def _synthetic_observations(
+        self,
+        truth: torch.Tensor,
+        valid_mask: torch.Tensor,
+        mask_config: dict,
+        rng,
+    ) -> tuple[torch.Tensor, torch.Tensor, dict]:
+        synthetic_config = mask_config.get("synthetic", {})
+        if not synthetic_config:
+            synthetic_config = {"kind": "generated_track", "n_tracks_range": [1, 4]}
+        synthetic_kind = synthetic_config.get("kind", "generated_track")
+        spatial_mask = _make_mask(self.image_size, valid_mask, self.config, rng, mask_config=synthetic_config)
+        spatial_mask = spatial_mask * valid_mask[0]
+        obs_values, obs_mask = make_observation_tensors(truth, spatial_mask, self.observed_channels)
+        return obs_values, obs_mask, self._observation_diagnostics(
+            f"synthetic_{synthetic_kind}",
+            obs_mask,
+            valid_mask,
+        )
 
     def _sral_spatial_mask(self, target_date: date) -> torch.Tensor | None:
         if not self.sral_records:
@@ -402,22 +489,30 @@ class M2MForecastDataset(Dataset):
         )
         valid_mask = self.base_valid_mask * background_finite * truth_finite
 
-        mask_kind = self.config.get("observation_mask", {}).get("kind", "generated_track")
+        rng = np.random.default_rng(self.seed + idx)
+        mask_config = self.config.get("observation_mask", {})
+        mask_kind = mask_config.get("kind", "generated_track")
         if mask_kind == "sral_tracks":
-            obs_values, obs_mask, obs_diagnostics = self._sral_track_observations(target_record.date, valid_mask)
+            conditioning_kind = self._selected_sral_conditioning(mask_config, rng)
+            if conditioning_kind == "sral_tracks":
+                obs_values, obs_mask, obs_diagnostics = self._sral_track_observations(target_record.date, valid_mask)
+            elif conditioning_kind == "synthetic":
+                obs_values, obs_mask, obs_diagnostics = self._synthetic_observations(
+                    truth,
+                    valid_mask,
+                    mask_config,
+                    rng,
+                )
+            else:
+                obs_values, obs_mask, obs_diagnostics = self._empty_observations(
+                    valid_mask,
+                    empty_obs_days=self.assimilation_range,
+                )
         else:
-            rng = np.random.default_rng(self.seed + idx)
-            spatial_mask = _make_mask(self.image_size, valid_mask, self.config, rng)
+            spatial_mask = _make_mask(self.image_size, valid_mask, self.config, rng, mask_config=mask_config)
             spatial_mask = spatial_mask * valid_mask[0]
             obs_values, obs_mask = make_observation_tensors(truth, spatial_mask, self.observed_channels)
-            valid_count = float(valid_mask[0].sum().item())
-            obs_diagnostics = {
-                "mask_kind": mask_kind,
-                "sral_files_used": 0,
-                "empty_obs_days": 0,
-                "obs_count": int(obs_mask[self.observed_channels].sum().item()) if self.observed_channels else 0,
-                "observed_fraction": float(obs_mask[self.observed_channels].sum().item()) / max(valid_count, 1.0) if self.observed_channels else 0.0,
-            }
+            obs_diagnostics = self._observation_diagnostics(mask_kind, obs_mask, valid_mask)
 
         return {
             "truth": truth,
