@@ -124,7 +124,7 @@ class AssimLibConditioningTests(unittest.TestCase):
             )
             sample = dataset[0]
 
-        self.assertEqual(tuple(sample["water_mask"].shape), (2, 3, 4))
+        self.assertEqual(tuple(sample["water_mask"].shape), (1, 3, 4))
         self.assertEqual(tuple(sample["valid_mask"].shape), (2, 3, 4))
         self.assertEqual(tuple(sample["obs_mask"].shape), (2, 3, 4))
 

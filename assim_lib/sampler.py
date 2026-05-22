@@ -21,6 +21,13 @@ def _model_output(output):
 class Sampler:
     def __init__(self, model):
         self.model = model
+        self._grids = {}
+
+    def _grid(self, height: int, width: int, device, dtype: torch.dtype) -> torch.Tensor:
+        key = (int(height), int(width), str(device), dtype)
+        if key not in self._grids:
+            self._grids[key] = make_normalized_xy_grid(height, width, device=device, dtype=dtype)
+        return self._grids[key]
 
     @torch.no_grad()
     def sample_conditioned(
@@ -52,7 +59,7 @@ class Sampler:
         batch_size, channels = background.shape[:2]
         height, width = size
         num_timesteps = max(int(num_timesteps), 2)
-        grid = make_normalized_xy_grid(height, width).to(device).expand(batch_size, -1, -1, -1)
+        grid = self._grid(height, width, device, background.dtype).expand(batch_size, -1, -1, -1)
 
         if start_mode == "noise":
             start_t = 1.0

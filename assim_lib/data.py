@@ -60,11 +60,11 @@ def _forecast_records(preds_dir: Path, lead_time_hours: int | None) -> list[Fore
 
 
 def _field_at_hour(path: Path, hour_index: int):
-    field = np.load(path)
+    field = np.load(path, mmap_mode="r")
     if field.ndim == 4:
-        return field[:, hour_index]
+        return np.array(field[:, hour_index], copy=True)
     if field.ndim == 3:
-        return field
+        return np.array(field, copy=True)
     raise ValueError(f"Expected forecast array [V,T,H,W] or [V,H,W], got {field.shape} in {path}")
 
 
@@ -239,7 +239,7 @@ class SmokeM2MDataset(Dataset):
             "obs_values": obs_values,
             "obs_mask": obs_mask,
             "valid_mask": self.valid_mask,
-            "water_mask": self.valid_mask,
+            "water_mask": self.valid_mask[:1],
             "meta": {"case_id": f"{self.split}_{idx:04d}", "split": self.split},
         }
 
@@ -520,7 +520,7 @@ class M2MForecastDataset(Dataset):
             "obs_values": obs_values,
             "obs_mask": obs_mask,
             "valid_mask": valid_mask,
-            "water_mask": self.base_valid_mask,
+            "water_mask": self.base_valid_mask[:1],
             "meta": {
                 "case_id": target_record.date.isoformat(),
                 "background_date": back_record.date.isoformat(),

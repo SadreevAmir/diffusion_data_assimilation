@@ -204,7 +204,7 @@ class UNetTrainer:
 
     def _batch_to_device(self, batch: dict) -> dict[str, torch.Tensor]:
         return {
-            key: batch[key].to(self.accelerator.device, dtype=torch.float32)
+            key: batch[key].to(self.accelerator.device, dtype=torch.float32, non_blocking=True)
             for key in ("truth", "background", "obs_values", "obs_mask", "valid_mask", "water_mask")
         }
 

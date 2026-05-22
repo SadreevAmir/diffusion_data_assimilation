@@ -31,6 +31,7 @@ def _loader(dataset, batch_size: int, num_workers: int, shuffle: bool):
         shuffle=shuffle,
         num_workers=num_workers,
         pin_memory=torch.cuda.is_available(),
+        persistent_workers=num_workers > 0,
         drop_last=shuffle,
     )
 
