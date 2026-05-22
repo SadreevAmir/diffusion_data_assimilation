@@ -20,6 +20,7 @@ from utils import make_normalized_xy_grid
 from .clearml_tracking import ClearMLTracker
 from .dashboard import make_multi_case_background_condition_assim_figure
 from .sampler import Sampler
+from .transforms import make_conditioned_model_input
 
 
 logger = get_logger(__name__)
@@ -210,9 +211,13 @@ class UNetTrainer:
     def _make_model_input(self, noisy_truth: torch.Tensor, batch: dict[str, torch.Tensor]) -> torch.Tensor:
         batch_size = noisy_truth.shape[0]
         grid = self._grid.expand(batch_size, -1, -1, -1)
-        return torch.cat(
-            [noisy_truth, grid, batch["background"], batch["obs_values"], batch["obs_mask"]],
-            dim=1,
+        return make_conditioned_model_input(
+            noisy_truth,
+            grid,
+            batch["background"],
+            batch["obs_values"],
+            batch["obs_mask"],
+            batch["water_mask"],
         )
 
     def _make_training_pair(
@@ -462,6 +467,7 @@ class UNetTrainer:
                     background=one["background"],
                     obs_values=one["obs_values"],
                     obs_mask=one["obs_mask"],
+                    water_mask=one["water_mask"],
                     size=self.config.image_size,
                     num_timesteps=metric_timesteps,
                     device=self.accelerator.device,
@@ -510,6 +516,7 @@ class UNetTrainer:
                 background=one["background"],
                 obs_values=one["obs_values"],
                 obs_mask=one["obs_mask"],
+                water_mask=one["water_mask"],
                 size=self.config.image_size,
                 num_timesteps=self.config.num_sample_timesteps,
                 device=self.accelerator.device,
@@ -606,6 +613,7 @@ class UNetTrainer:
                     background=one["background"],
                     obs_values=one["obs_values"],
                     obs_mask=one["obs_mask"],
+                    water_mask=one["water_mask"],
                     size=self.config.image_size,
                     num_timesteps=self.config.num_sample_timesteps,
                     device=self.accelerator.device,

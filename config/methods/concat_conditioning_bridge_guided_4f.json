@@ -1,6 +1,6 @@
 {
   "image_size": [320, 256],
-  "in_channels": 18,
+  "in_channels": 19,
   "out_channels": 4,
   "train_batch_size": 8,
   "eval_batch_size": 1,

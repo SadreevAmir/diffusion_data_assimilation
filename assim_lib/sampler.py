@@ -4,6 +4,7 @@ import torch
 from torchdiffeq import odeint
 
 from utils import get_device, make_normalized_xy_grid
+from .transforms import make_conditioned_model_input
 
 
 _FIXED_STEP_METHODS = {"euler", "midpoint", "rk4", "heun3"}
@@ -27,6 +28,7 @@ class Sampler:
         background: torch.Tensor,
         obs_values: torch.Tensor,
         obs_mask: torch.Tensor,
+        water_mask: torch.Tensor,
         size: tuple[int, int],
         num_timesteps: int,
         device=None,
@@ -44,6 +46,7 @@ class Sampler:
         background = background.to(device)
         obs_values = obs_values.to(device)
         obs_mask = obs_mask.to(device)
+        water_mask = water_mask.to(device)
         if valid_mask is not None:
             valid_mask = valid_mask.to(device)
         batch_size, channels = background.shape[:2]
@@ -74,6 +77,7 @@ class Sampler:
                 background=background,
                 obs_values=obs_values,
                 obs_mask=obs_mask,
+                water_mask=water_mask,
                 obs_guidance_scale=float(obs_guidance_scale),
                 obs_guidance_eps=float(obs_guidance_eps),
             )
@@ -85,7 +89,7 @@ class Sampler:
 
         def f(t, x):
             t_tensor = t.expand(batch_size) * 1000
-            model_input = torch.cat([x, grid, background, obs_values, obs_mask], dim=1)
+            model_input = make_conditioned_model_input(x, grid, background, obs_values, obs_mask, water_mask)
             return _model_output(self.model(model_input, t_tensor))
 
         kwargs = {}
@@ -112,6 +116,7 @@ class Sampler:
         background: torch.Tensor,
         obs_values: torch.Tensor,
         obs_mask: torch.Tensor,
+        water_mask: torch.Tensor,
         obs_guidance_scale: float,
         obs_guidance_eps: float,
     ) -> torch.Tensor:
@@ -126,7 +131,14 @@ class Sampler:
             t_tensor = t.expand(batch_size) * 1000
 
             with torch.enable_grad():
-                model_input = torch.cat([x_t, grid, background, obs_values, obs_mask], dim=1)
+                model_input = make_conditioned_model_input(
+                    x_t,
+                    grid,
+                    background,
+                    obs_values,
+                    obs_mask,
+                    water_mask,
+                )
                 v_pred = _model_output(self.model(model_input, t_tensor))
                 x_hat = x_t - t * v_pred
                 obs_error = (x_hat - obs_values) * obs_mask

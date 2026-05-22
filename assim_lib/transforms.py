@@ -30,6 +30,31 @@ def channel_denormalize(field: torch.Tensor, means, stds) -> torch.Tensor:
     return field * stds + means
 
 
+def first_mask_channel(mask: torch.Tensor, reference: torch.Tensor, name: str) -> torch.Tensor:
+    if mask.ndim != 4:
+        raise ValueError(f"Expected {name} [B,C,H,W], got shape {tuple(mask.shape)}")
+    if mask.shape[0] != reference.shape[0] or mask.shape[-2:] != reference.shape[-2:]:
+        raise ValueError(
+            f"Expected {name} batch/spatial shape {(reference.shape[0], *reference.shape[-2:])}, "
+            f"got {(mask.shape[0], *mask.shape[-2:])}"
+        )
+    if mask.shape[1] < 1:
+        raise ValueError(f"Expected {name} to have at least one channel")
+    return mask[:, :1].to(device=reference.device, dtype=reference.dtype)
+
+
+def make_conditioned_model_input(
+    state: torch.Tensor,
+    grid: torch.Tensor,
+    background: torch.Tensor,
+    obs_values: torch.Tensor,
+    obs_mask: torch.Tensor,
+    water_mask: torch.Tensor,
+) -> torch.Tensor:
+    water_condition = first_mask_channel(water_mask, state, "water_mask")
+    return torch.cat([state, grid, background, obs_values, obs_mask, water_condition], dim=1)
+
+
 def pad_to_size(field: torch.Tensor, image_size: tuple[int, int], fill_value=0.0) -> torch.Tensor:
     field = as_3d_tensor(field, dtype=field.dtype)
     channels, height, width = field.shape
