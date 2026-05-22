@@ -37,6 +37,8 @@ class Sampler:
         start_noise_level: float = 1.0,
         enforce_observations: bool = False,
         valid_mask: torch.Tensor | None = None,
+        obs_guidance_scale: float = 0.0,
+        obs_guidance_eps: float = 1e-8,
     ) -> torch.Tensor:
         device = device or get_device()
         background = background.to(device)
@@ -64,6 +66,23 @@ class Sampler:
 
         timesteps = torch.linspace(start_t, 0.001, num_timesteps, device=device)
 
+        if obs_guidance_scale > 0:
+            sample = self._sample_guided_euler(
+                x0=x0,
+                timesteps=timesteps,
+                grid=grid,
+                background=background,
+                obs_values=obs_values,
+                obs_mask=obs_mask,
+                obs_guidance_scale=float(obs_guidance_scale),
+                obs_guidance_eps=float(obs_guidance_eps),
+            )
+            if enforce_observations:
+                sample = torch.where(obs_mask > 0, obs_values, sample)
+            if valid_mask is not None:
+                sample = torch.where(valid_mask > 0, sample, background)
+            return sample
+
         def f(t, x):
             t_tensor = t.expand(batch_size) * 1000
             model_input = torch.cat([x, grid, background, obs_values, obs_mask], dim=1)
@@ -84,3 +103,40 @@ class Sampler:
         if valid_mask is not None:
             sample = torch.where(valid_mask > 0, sample, background)
         return sample
+
+    def _sample_guided_euler(
+        self,
+        x0: torch.Tensor,
+        timesteps: torch.Tensor,
+        grid: torch.Tensor,
+        background: torch.Tensor,
+        obs_values: torch.Tensor,
+        obs_mask: torch.Tensor,
+        obs_guidance_scale: float,
+        obs_guidance_eps: float,
+    ) -> torch.Tensor:
+        batch_size = x0.shape[0]
+        x = x0
+        obs_den = obs_mask.reshape(batch_size, -1).sum(dim=1).clamp(min=1.0)
+
+        for index in range(timesteps.numel() - 1):
+            t = timesteps[index]
+            dt = timesteps[index + 1] - t
+            x_t = x.detach().requires_grad_(True)
+            t_tensor = t.expand(batch_size) * 1000
+
+            with torch.enable_grad():
+                model_input = torch.cat([x_t, grid, background, obs_values, obs_mask], dim=1)
+                v_pred = _model_output(self.model(model_input, t_tensor))
+                x_hat = x_t - t * v_pred
+                obs_error = (x_hat - obs_values) * obs_mask
+                obs_loss = (obs_error.square().reshape(batch_size, -1).sum(dim=1) / obs_den).mean()
+                grad = torch.autograd.grad(obs_loss, x_t)[0]
+
+            grad = grad.detach()
+            v_pred = v_pred.detach()
+            grad_norm = grad.reshape(batch_size, -1).norm(dim=1).view(batch_size, 1, 1, 1)
+            v_guided = v_pred + obs_guidance_scale * grad / (grad_norm + obs_guidance_eps)
+            x = x_t.detach() + dt * v_guided
+
+        return x

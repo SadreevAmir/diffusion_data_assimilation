@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field
@@ -17,15 +18,25 @@ from tqdm.auto import tqdm
 from utils import make_normalized_xy_grid
 
 from .clearml_tracking import ClearMLTracker
-from .dashboard import make_background_condition_assim_figure
+from .dashboard import make_multi_case_background_condition_assim_figure
 from .sampler import Sampler
 
 
 logger = get_logger(__name__)
 
 
+_DASHBOARD_EVERY_N_EPOCHS = 1
+_DASHBOARD_NUM_CASES = 1
+_DASHBOARD_HISTORY_EPOCHS = 1
+_DASHBOARD_CASES_PER_PAGE = 1
+_DASHBOARD_CHANNELS = (0,)
+_DASHBOARD_DPI = 200
+_DASHBOARD_PANEL_WIDTH = 5.2
+_DASHBOARD_PANEL_HEIGHT = 4.0
+
+
 def _debug(message: str) -> None:
-    print(f"[concat_conditioning][trainer] {message}", flush=True)
+    print(f"[assim_lib][trainer] {message}", flush=True)
 
 
 def _default_mixed_precision() -> str:
@@ -57,6 +68,8 @@ class TrainingConfig:
     sample_start_mode: str = "background"
     sample_start_noise_level: float = 0.5
     sample_enforce_observations: bool = True
+    sample_obs_guidance_scale: float = 0.0
+    sample_obs_guidance_eps: float = 1e-8
     base_output_dir: str = "checkpoints/concat_conditioning"
     run_name: str = ""
     tracker: str | None = None
@@ -67,13 +80,9 @@ class TrainingConfig:
     clearml_output_uri: str | None = None
     clearml_env_path: str | None = None
     clearml_upload_checkpoints: bool = False
-    dashboard_every_n_epochs: int = 1
-    dashboard_num_cases: int = 1
-    dashboard_num_timesteps: int = 200
-    dashboard_channels: tuple[int, ...] = ()
-    dashboard_dpi: int = 200
-    dashboard_panel_width: float = 7.0
-    dashboard_panel_height: float = 6.0
+    metric_every_n_epochs: int = 1
+    metric_num_cases: int = 16
+    metric_num_timesteps: int = 0
 
     block_out_channels: tuple[int, ...] = (64, 128, 256, 512, 512)
     layers_per_block: int = 2
@@ -104,7 +113,6 @@ class TrainingConfig:
             "down_block_types",
             "up_block_types",
             "clearml_tags",
-            "dashboard_channels",
         }
         for key in tuple_keys:
             if key in values:
@@ -122,6 +130,7 @@ class UNetTrainer:
         self.add_noise = add_noise_func
         self.best_val_loss = float("inf")
         self.val_history = []
+        self.dashboard_history = []
         self.clearml = None
         self.data_config = data_config or {}
         self.fields = list(self.data_config.get("fields", [f"ch{i}" for i in range(config.out_channels)]))
@@ -253,6 +262,21 @@ class UNetTrainer:
         rmse = torch.sqrt((diff.square().sum() / denom).clamp(min=0.0))
         return float(mae.item()), float(rmse.item())
 
+    @staticmethod
+    def _masked_error_sums(
+        pred: torch.Tensor,
+        target: torch.Tensor,
+        mask: torch.Tensor,
+    ) -> tuple[float, float, float]:
+        mask = mask.expand_as(pred)
+        count = mask.sum()
+        diff = (pred - target) * mask
+        return (
+            float(diff.abs().sum().item()),
+            float(diff.square().sum().item()),
+            float(count.item()),
+        )
+
     def save_model_custom(self, name: str = "last_model.pth"):
         os.makedirs(self.output_dir, exist_ok=True)
         unwrapped = self.accelerator.unwrap_model(self.model)
@@ -272,6 +296,29 @@ class UNetTrainer:
         self.clearml.report_scalar("loss/total", "validation", loss, step)
         self.clearml.report_scalar("loss/full", "validation", loss_full, step)
         self.clearml.report_scalar("loss/observed", "validation", loss_obs, step)
+
+    def _report_sample_validation_metrics(self, metrics: dict[str, float], step: int):
+        if self.clearml is None or not metrics:
+            return
+
+        scalar_map = (
+            ("analysis_mae_full", "metric/analysis_mae", "full"),
+            ("analysis_rmse_full", "metric/analysis_rmse", "full"),
+            ("background_mae_full", "metric/background_mae", "full"),
+            ("background_rmse_full", "metric/background_rmse", "full"),
+            ("analysis_rmse_skill_full", "metric/analysis_rmse_skill", "full"),
+            ("analysis_mae_obs", "metric/analysis_mae", "obs"),
+            ("analysis_rmse_obs", "metric/analysis_rmse", "obs"),
+            ("background_mae_obs", "metric/background_mae", "obs"),
+            ("background_rmse_obs", "metric/background_rmse", "obs"),
+            ("analysis_rmse_skill_obs", "metric/analysis_rmse_skill", "obs"),
+            ("metric_count_full", "metric/count", "full"),
+            ("metric_count_obs", "metric/count", "obs"),
+        )
+        for key, title, series in scalar_map:
+            value = metrics.get(key)
+            if value is not None and math.isfinite(float(value)):
+                self.clearml.report_scalar(title, series, value, step)
 
     @staticmethod
     def _meta_mean(value):
@@ -339,6 +386,119 @@ class UNetTrainer:
         _debug(f"validation done loss_full={loss_full:.6f} loss_obs={loss_obs:.6f}")
         return loss_full, loss_obs, loss_full + self.config.obs_loss_weight * loss_obs
 
+    @staticmethod
+    def _empty_metric_totals() -> dict[str, float]:
+        return {
+            "analysis_abs": 0.0,
+            "analysis_sq": 0.0,
+            "background_abs": 0.0,
+            "background_sq": 0.0,
+            "count": 0.0,
+        }
+
+    @staticmethod
+    def _finalize_metric_totals(prefix: str, totals: dict[str, float]) -> dict[str, float]:
+        count = totals["count"]
+        if count <= 0.0:
+            return {
+                f"analysis_mae_{prefix}": float("nan"),
+                f"analysis_rmse_{prefix}": float("nan"),
+                f"background_mae_{prefix}": float("nan"),
+                f"background_rmse_{prefix}": float("nan"),
+                f"analysis_rmse_skill_{prefix}": float("nan"),
+                f"metric_count_{prefix}": 0.0,
+            }
+
+        analysis_mae = totals["analysis_abs"] / count
+        analysis_rmse = math.sqrt(max(totals["analysis_sq"] / count, 0.0))
+        background_mae = totals["background_abs"] / count
+        background_rmse = math.sqrt(max(totals["background_sq"] / count, 0.0))
+        skill = float("nan") if background_rmse <= 0.0 else 1.0 - analysis_rmse / background_rmse
+        return {
+            f"analysis_mae_{prefix}": analysis_mae,
+            f"analysis_rmse_{prefix}": analysis_rmse,
+            f"background_mae_{prefix}": background_mae,
+            f"background_rmse_{prefix}": background_rmse,
+            f"analysis_rmse_skill_{prefix}": skill,
+            f"metric_count_{prefix}": count,
+        }
+
+    def _validation_cases(self, max_cases: int) -> list[dict[str, torch.Tensor]]:
+        cases = []
+        if max_cases <= 0:
+            return cases
+
+        for raw_batch in self.val_dataloader:
+            batch = self._batch_to_device(raw_batch)
+            batch_size = batch["truth"].shape[0]
+            for batch_idx in range(batch_size):
+                cases.append({key: value[batch_idx:batch_idx + 1] for key, value in batch.items()})
+                if len(cases) >= max_cases:
+                    return cases
+        return cases
+
+    @torch.no_grad()
+    def compute_sample_validation_metrics(self) -> dict[str, float]:
+        max_cases = int(self.config.metric_num_cases)
+        cases = self._validation_cases(max_cases)
+        if not cases:
+            return {}
+
+        metric_timesteps = int(self.config.metric_num_timesteps)
+        if metric_timesteps <= 0:
+            metric_timesteps = int(self.config.num_sample_timesteps)
+        _debug(f"sample validation metrics start cases={len(cases)} timesteps={metric_timesteps}")
+
+        totals = {
+            "full": self._empty_metric_totals(),
+            "obs": self._empty_metric_totals(),
+        }
+
+        self.model.eval()
+        with self._sampling_model() as sample_model:
+            sampler = Sampler(sample_model)
+            for one in cases:
+                analysis = sampler.sample_conditioned(
+                    background=one["background"],
+                    obs_values=one["obs_values"],
+                    obs_mask=one["obs_mask"],
+                    size=self.config.image_size,
+                    num_timesteps=metric_timesteps,
+                    device=self.accelerator.device,
+                    start_mode=self.config.sample_start_mode,
+                    start_noise_level=self.config.sample_start_noise_level,
+                    enforce_observations=self.config.sample_enforce_observations,
+                    valid_mask=one["valid_mask"],
+                    obs_guidance_scale=self.config.sample_obs_guidance_scale,
+                    obs_guidance_eps=self.config.sample_obs_guidance_eps,
+                )
+
+                for name, mask in (("full", one["valid_mask"]), ("obs", one["obs_mask"])):
+                    analysis_abs, analysis_sq, count = self._masked_error_sums(analysis, one["truth"], mask)
+                    background_abs, background_sq, background_count = self._masked_error_sums(
+                        one["background"],
+                        one["truth"],
+                        mask,
+                    )
+                    totals[name]["analysis_abs"] += analysis_abs
+                    totals[name]["analysis_sq"] += analysis_sq
+                    totals[name]["background_abs"] += background_abs
+                    totals[name]["background_sq"] += background_sq
+                    totals[name]["count"] += min(count, background_count)
+
+        metrics = {
+            "metric_num_cases": float(len(cases)),
+            "metric_num_timesteps": float(metric_timesteps),
+        }
+        metrics.update(self._finalize_metric_totals("full", totals["full"]))
+        metrics.update(self._finalize_metric_totals("obs", totals["obs"]))
+        _debug(
+            "sample validation metrics done "
+            f"analysis_rmse_full={metrics['analysis_rmse_full']:.6f} "
+            f"analysis_rmse_obs={metrics['analysis_rmse_obs']:.6f}"
+        )
+        return metrics
+
     def save_samples(self, epoch: int):
         self.model.eval()
         raw_batch = next(iter(self.val_dataloader))
@@ -357,6 +517,8 @@ class UNetTrainer:
                 start_noise_level=self.config.sample_start_noise_level,
                 enforce_observations=self.config.sample_enforce_observations,
                 valid_mask=one["valid_mask"],
+                obs_guidance_scale=self.config.sample_obs_guidance_scale,
+                obs_guidance_eps=self.config.sample_obs_guidance_eps,
             )
         samples_dir = os.path.join(self.output_dir, "samples")
         os.makedirs(samples_dir, exist_ok=True)
@@ -374,35 +536,85 @@ class UNetTrainer:
         )
 
     @torch.no_grad()
-    def report_dashboard_samples(self, epoch: int):
-        if self.config.dashboard_every_n_epochs <= 0:
+    def _dashboard_cases(self) -> list[dict[str, torch.Tensor]]:
+        cases = []
+        max_cases = max(_DASHBOARD_NUM_CASES, 0)
+        if max_cases == 0:
+            return cases
+
+        for raw_batch in self.val_dataloader:
+            batch = self._batch_to_device(raw_batch)
+            batch_size = batch["truth"].shape[0]
+            for batch_idx in range(batch_size):
+                cases.append({key: value[batch_idx:batch_idx + 1] for key, value in batch.items()})
+                if len(cases) >= max_cases:
+                    return cases
+        return cases
+
+    def _remember_dashboard_epoch(self, epoch: int, pages: list[dict]) -> None:
+        max_history = max(_DASHBOARD_HISTORY_EPOCHS, 1)
+        self.dashboard_history.insert(0, {"epoch": int(epoch), "pages": pages})
+        del self.dashboard_history[max_history:]
+
+    @staticmethod
+    def _dashboard_slot_name(index: int) -> str:
+        if index == 0:
+            return "latest"
+        return f"previous_{index}"
+
+    def _report_dashboard_history(self) -> None:
+        if self.clearml is None:
             return
-        if epoch % self.config.dashboard_every_n_epochs != 0:
+        for slot_idx, entry in enumerate(self.dashboard_history):
+            slot = self._dashboard_slot_name(slot_idx)
+            for page in entry["pages"]:
+                page_idx = int(page["page_idx"])
+                self.clearml.report_image(
+                    title=f"dashboard/{slot}_background_condition_assim",
+                    series=f"page_{page_idx:02d}",
+                    path=page["path"],
+                    iteration=0,
+                )
+
+    @staticmethod
+    def _chunks(values: list, size: int):
+        size = max(int(size), 1)
+        for start in range(0, len(values), size):
+            yield start // size, values[start:start + size]
+
+    @torch.no_grad()
+    def report_dashboard_samples(self, epoch: int):
+        if _DASHBOARD_EVERY_N_EPOCHS <= 0:
+            return
+        if epoch % _DASHBOARD_EVERY_N_EPOCHS != 0:
             return
 
         _debug(f"dashboard sampling start epoch={epoch}")
         self.model.eval()
-        raw_batch = next(iter(self.val_dataloader))
-        batch = self._batch_to_device(raw_batch)
-        case_count = min(int(self.config.dashboard_num_cases), batch["truth"].shape[0])
+        cases = self._dashboard_cases()
+        if not cases:
+            _debug(f"dashboard sampling skipped epoch={epoch}: no validation cases")
+            return
         samples_dir = os.path.join(self.output_dir, "samples")
         os.makedirs(samples_dir, exist_ok=True)
+        dashboard_cases = []
 
         with self._sampling_model() as sample_model:
             sampler = Sampler(sample_model)
-            for case_idx in range(case_count):
-                one = {key: value[case_idx:case_idx + 1] for key, value in batch.items()}
+            for case_idx, one in enumerate(cases):
                 assim = sampler.sample_conditioned(
                     background=one["background"],
                     obs_values=one["obs_values"],
                     obs_mask=one["obs_mask"],
                     size=self.config.image_size,
-                    num_timesteps=self.config.dashboard_num_timesteps,
+                    num_timesteps=self.config.num_sample_timesteps,
                     device=self.accelerator.device,
                     start_mode=self.config.sample_start_mode,
                     start_noise_level=self.config.sample_start_noise_level,
                     enforce_observations=self.config.sample_enforce_observations,
                     valid_mask=one["valid_mask"],
+                    obs_guidance_scale=self.config.sample_obs_guidance_scale,
+                    obs_guidance_eps=self.config.sample_obs_guidance_eps,
                 )[0]
 
                 analysis_mae, analysis_rmse = self._masked_error_metrics(
@@ -424,40 +636,44 @@ class UNetTrainer:
                     self.clearml.report_scalar("sample/mae_background", series, background_mae, epoch)
                     self.clearml.report_scalar("sample/rmse_skill", series, skill, epoch)
 
-                title = f"background | condition | assim, epoch {epoch}, case {case_idx}"
-                fig = make_background_condition_assim_figure(
-                    background=one["background"][0],
-                    obs_values=one["obs_values"][0],
-                    obs_mask=one["obs_mask"][0],
-                    assim=assim,
-                    fields=self.fields,
-                    means=self.channel_means,
-                    stds=self.channel_stds,
-                    channels=self.config.dashboard_channels,
-                    title=title,
-                    panel_width=self.config.dashboard_panel_width,
-                    panel_height=self.config.dashboard_panel_height,
-                    valid_mask=one["valid_mask"][0],
-                    water_mask=one["water_mask"][0],
-                )
-                figure_path = os.path.join(
-                    samples_dir,
-                    f"epoch_{epoch:04d}_case_{case_idx:04d}_background_condition_assim.png",
-                )
-                fig.savefig(figure_path, dpi=self.config.dashboard_dpi, bbox_inches="tight")
-                if self.clearml is not None:
-                    self.clearml.report_figure(
-                        title="samples/background_condition_assim",
-                        series=f"case_{case_idx:04d}",
-                        figure=fig,
-                        iteration=epoch,
-                    )
-                    self.clearml.upload_artifact(
-                        f"sample_panel_epoch_{epoch:04d}_case_{case_idx:04d}",
-                        figure_path,
-                    )
-                import matplotlib.pyplot as plt
-                plt.close(fig)
+                dashboard_cases.append({
+                    "case_idx": case_idx,
+                    "background": one["background"][0],
+                    "obs_values": one["obs_values"][0],
+                    "obs_mask": one["obs_mask"][0],
+                    "assim": assim,
+                    "valid_mask": one["valid_mask"][0],
+                    "water_mask": one["water_mask"][0],
+                })
+
+        import matplotlib.pyplot as plt
+        current_pages = []
+        cases_per_page = max(_DASHBOARD_CASES_PER_PAGE, 1)
+        for page_idx, page_cases in self._chunks(dashboard_cases, cases_per_page):
+            title = (
+                f"background | condition | assim, epoch {epoch}, "
+                f"page {page_idx}, cases {len(page_cases)}"
+            )
+            fig = make_multi_case_background_condition_assim_figure(
+                cases=page_cases,
+                fields=self.fields,
+                means=self.channel_means,
+                stds=self.channel_stds,
+                channels=_DASHBOARD_CHANNELS,
+                title=title,
+                panel_width=_DASHBOARD_PANEL_WIDTH,
+                panel_height=_DASHBOARD_PANEL_HEIGHT,
+            )
+            figure_path = os.path.join(
+                samples_dir,
+                f"epoch_{epoch:04d}_dashboard_page_{page_idx:02d}_background_condition_assim.png",
+            )
+            fig.savefig(figure_path, dpi=_DASHBOARD_DPI, bbox_inches="tight")
+            plt.close(fig)
+            current_pages.append({"page_idx": page_idx, "path": figure_path})
+
+        self._remember_dashboard_epoch(epoch, current_pages)
+        self._report_dashboard_history()
         _debug(f"dashboard sampling done epoch={epoch}")
 
     def train_loop(self):
@@ -510,14 +726,22 @@ class UNetTrainer:
 
             progress_bar.close()
             val_loss_full, val_loss_obs, val_loss = self.compute_val_loss()
-            self.val_history.append({
+            sample_metrics = {}
+            if (self.accelerator.is_main_process
+                    and self.config.metric_every_n_epochs > 0
+                    and epoch % self.config.metric_every_n_epochs == 0):
+                sample_metrics = self.compute_sample_validation_metrics()
+
+            history_entry = {
                 "epoch": epoch,
                 "val_loss": val_loss,
                 "val_loss_full": val_loss_full,
                 "val_loss_obs": val_loss_obs,
                 "step": global_step,
                 "timestamp": datetime.now().isoformat(),
-            })
+            }
+            history_entry.update(sample_metrics)
+            self.val_history.append(history_entry)
             if self.config.tracker:
                 self.accelerator.log({
                     "val_loss": val_loss,
@@ -525,6 +749,7 @@ class UNetTrainer:
                     "val_loss_obs": val_loss_obs,
                 }, step=global_step)
             self._report_val_metrics(val_loss_full, val_loss_obs, val_loss, global_step)
+            self._report_sample_validation_metrics(sample_metrics, global_step)
             try:
                 self._report_condition_diagnostics(next(iter(self.val_dataloader)), global_step, "validation")
             except StopIteration:

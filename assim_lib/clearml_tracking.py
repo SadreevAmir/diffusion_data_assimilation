@@ -15,7 +15,7 @@ REQUIRED_ENV = (
 
 
 def _debug(message: str) -> None:
-    print(f"[concat_conditioning][clearml] {message}", flush=True)
+    print(f"[assim_lib][clearml] {message}", flush=True)
 
 
 def load_clearml_env(env_path: str | None = None) -> None:
@@ -101,6 +101,19 @@ class ClearMLTracker:
                 figure=figure,
                 iteration=int(iteration),
             )
+
+    def report_image(self, title: str, series: str, path: str | Path, iteration: int) -> None:
+        path = Path(path)
+        if path.exists():
+            _debug(f"report image title={title} series={series} path={path}")
+            self.logger.report_image(
+                title=title,
+                series=series,
+                local_path=str(path),
+                iteration=int(iteration),
+            )
+        else:
+            _debug(f"skip missing image title={title} series={series} path={path}")
 
     def upload_artifact(self, name: str, path: str | Path) -> None:
         path = Path(path)
