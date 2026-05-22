@@ -190,6 +190,40 @@ class AssimLibConditioningTests(unittest.TestCase):
         self.assertEqual(float(sample["obs_mask"].sum()), 0.0)
         self.assertEqual(float(sample["obs_values"].sum()), 0.0)
 
+    def test_strided_case_indices_follow_target_dates(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            preds = root / "dataset" / "preds"
+            preds.mkdir(parents=True)
+            field = np.ones((2, 4, 4), dtype=np.float32)
+            for stamp in ("20200101", "20200130", "20200131", "20200301"):
+                np.save(preds / f"ocean+atmosphere_24_{stamp}.npy", field)
+
+            dataset = M2MForecastDataset(
+                {
+                    "dataset_name": "M2MForecastDataset",
+                    "dataset_dir": str(root / "dataset"),
+                    "lead_time_hours": 24,
+                    "fields": ["var0", "var1"],
+                    "indices": [0, 1],
+                    "means": [0.0, 0.0],
+                    "stds": [1.0, 1.0],
+                    "padding_values": [0.0, 0.0],
+                    "image_size": [4, 4],
+                    "observed_channels": [0],
+                    "observation_mask": {"kind": "generated_track", "n_tracks_range": [1, 1]},
+                    "train": {
+                        "back_start_day": "2020-01-01",
+                        "back_end_day": "2020-03-01",
+                        "obs_start_day": "2020-01-01",
+                        "obs_end_day": "2020-03-01",
+                    },
+                },
+                split="train",
+            )
+
+        self.assertEqual(dataset.strided_case_indices(stride_days=30), [0, 2, 3])
+
 
 if __name__ == "__main__":
     unittest.main()

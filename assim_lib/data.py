@@ -330,6 +330,24 @@ class M2MForecastDataset(Dataset):
     def __len__(self):
         return len(self.back_data)
 
+    def strided_case_indices(self, max_cases: int = 12, stride_days: int = 30) -> list[int]:
+        max_cases = max(int(max_cases), 0)
+        if max_cases == 0:
+            return []
+
+        indices = []
+        next_date = None
+        stride = timedelta(days=max(int(stride_days), 1))
+        for idx in range(len(self.back_data)):
+            target_date = self.obs_data[idx + self.obs_shift].date
+            if next_date is not None and target_date < next_date:
+                continue
+            indices.append(idx)
+            next_date = target_date + stride
+            if len(indices) >= max_cases:
+                break
+        return indices
+
     def _observation_diagnostics(
         self,
         mask_kind: str,

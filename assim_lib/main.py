@@ -109,6 +109,7 @@ def main(config: dict, config_dir: Path):
         experiment_config=config,
         model_config=model_config_raw,
         data_config=data_config,
+        dashboard_dataset=valid_dataset,
     )
     _debug("starting training loop")
     output_dir = trainer.train_loop()

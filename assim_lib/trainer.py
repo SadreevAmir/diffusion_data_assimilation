@@ -27,13 +27,13 @@ logger = get_logger(__name__)
 
 
 _DASHBOARD_EVERY_N_EPOCHS = 1
-_DASHBOARD_NUM_CASES = 1
+_DASHBOARD_NUM_CASES = 12
 _DASHBOARD_HISTORY_EPOCHS = 1
-_DASHBOARD_CASES_PER_PAGE = 1
+_DASHBOARD_CASES_PER_PAGE = 12
 _DASHBOARD_CHANNELS = (0,)
 _DASHBOARD_DPI = 200
-_DASHBOARD_PANEL_WIDTH = 5.2
-_DASHBOARD_PANEL_HEIGHT = 4.0
+_DASHBOARD_PANEL_WIDTH = 3.6
+_DASHBOARD_PANEL_HEIGHT = 2.5
 
 
 def _debug(message: str) -> None:
@@ -124,7 +124,8 @@ class TrainingConfig:
 class UNetTrainer:
     def __init__(self, config: TrainingConfig, model, optimizer, data_loader_train,
                  data_loader_val, lr_scheduler, add_noise_func,
-                 experiment_config=None, model_config=None, data_config=None):
+                 experiment_config=None, model_config=None, data_config=None,
+                 dashboard_dataset=None):
         self.config = config
         self.run_name = config.run_name or datetime.now().strftime("run_%Y%m%d_%H%M%S")
         self.output_dir = os.path.join(config.base_output_dir, self.run_name)
@@ -134,6 +135,7 @@ class UNetTrainer:
         self.dashboard_history = []
         self.clearml = None
         self.data_config = data_config or {}
+        self.dashboard_dataset = dashboard_dataset
         self.fields = list(self.data_config.get("fields", [f"ch{i}" for i in range(config.out_channels)]))
         self.channel_means = list(self.data_config.get("means", [0.0] * config.out_channels))
         self.channel_stds = list(self.data_config.get("stds", [1.0] * config.out_channels))
@@ -544,19 +546,44 @@ class UNetTrainer:
 
     @torch.no_grad()
     def _dashboard_cases(self) -> list[dict[str, torch.Tensor]]:
-        cases = []
         max_cases = max(_DASHBOARD_NUM_CASES, 0)
         if max_cases == 0:
-            return cases
+            return []
 
+        strided_dataset = self.dashboard_dataset
+        if strided_dataset is None:
+            strided_dataset = getattr(self.val_dataloader, "dataset", None)
+        if strided_dataset is not None and hasattr(strided_dataset, "strided_case_indices"):
+            strided_indices = strided_dataset.strided_case_indices(max_cases, stride_days=30)
+            if strided_indices:
+                from torch.utils.data import default_collate
+
+                samples = [strided_dataset[index] for index in strided_indices]
+                labels = [sample.get("meta", {}).get("target_date") for sample in samples]
+                return self._dashboard_cases_from_raw_batch(default_collate(samples), labels=labels)
+
+        cases = []
         for raw_batch in self.val_dataloader:
-            batch = self._batch_to_device(raw_batch)
-            batch_size = batch["truth"].shape[0]
-            for batch_idx in range(batch_size):
-                cases.append({key: value[batch_idx:batch_idx + 1] for key, value in batch.items()})
-                if len(cases) >= max_cases:
-                    return cases
+            cases.extend(self._dashboard_cases_from_raw_batch(raw_batch))
+            if len(cases) >= max_cases:
+                return cases[:max_cases]
         return cases
+
+    def _dashboard_cases_from_raw_batch(self, raw_batch: dict, labels=None) -> list[dict[str, torch.Tensor]]:
+        batch = self._batch_to_device(raw_batch)
+        labels = list(labels or [])
+        cases = []
+        for batch_idx in range(batch["truth"].shape[0]):
+            case = {key: value[batch_idx:batch_idx + 1] for key, value in batch.items()}
+            if batch_idx < len(labels) and labels[batch_idx]:
+                case["case_label"] = str(labels[batch_idx])
+            cases.append(case)
+        return cases
+
+    @staticmethod
+    def _dashboard_batch(cases: list[dict[str, torch.Tensor]]) -> dict[str, torch.Tensor]:
+        keys = ("truth", "background", "obs_values", "obs_mask", "valid_mask", "water_mask")
+        return {key: torch.cat([case[key] for case in cases], dim=0) for key in keys}
 
     def _remember_dashboard_epoch(self, epoch: int, pages: list[dict]) -> None:
         max_history = max(_DASHBOARD_HISTORY_EPOCHS, 1)
@@ -577,7 +604,7 @@ class UNetTrainer:
             for page in entry["pages"]:
                 page_idx = int(page["page_idx"])
                 self.clearml.report_image(
-                    title=f"dashboard/{slot}_background_condition_assim",
+                    title=f"dashboard/{slot}_background_condition_assim_truth",
                     series=f"page_{page_idx:02d}",
                     path=page["path"],
                     iteration=0,
@@ -605,25 +632,27 @@ class UNetTrainer:
         samples_dir = os.path.join(self.output_dir, "samples")
         os.makedirs(samples_dir, exist_ok=True)
         dashboard_cases = []
+        dashboard_batch = self._dashboard_batch(cases)
 
         with self._sampling_model() as sample_model:
             sampler = Sampler(sample_model)
-            for case_idx, one in enumerate(cases):
-                assim = sampler.sample_conditioned(
-                    background=one["background"],
-                    obs_values=one["obs_values"],
-                    obs_mask=one["obs_mask"],
-                    water_mask=one["water_mask"],
-                    size=self.config.image_size,
-                    num_timesteps=self.config.num_sample_timesteps,
-                    device=self.accelerator.device,
-                    start_mode=self.config.sample_start_mode,
-                    start_noise_level=self.config.sample_start_noise_level,
-                    enforce_observations=self.config.sample_enforce_observations,
-                    valid_mask=one["valid_mask"],
-                    obs_guidance_scale=self.config.sample_obs_guidance_scale,
-                    obs_guidance_eps=self.config.sample_obs_guidance_eps,
-                )[0]
+            assim_batch = sampler.sample_conditioned(
+                background=dashboard_batch["background"],
+                obs_values=dashboard_batch["obs_values"],
+                obs_mask=dashboard_batch["obs_mask"],
+                water_mask=dashboard_batch["water_mask"],
+                size=self.config.image_size,
+                num_timesteps=self.config.num_sample_timesteps,
+                device=self.accelerator.device,
+                start_mode=self.config.sample_start_mode,
+                start_noise_level=self.config.sample_start_noise_level,
+                enforce_observations=self.config.sample_enforce_observations,
+                valid_mask=dashboard_batch["valid_mask"],
+                obs_guidance_scale=self.config.sample_obs_guidance_scale,
+                obs_guidance_eps=self.config.sample_obs_guidance_eps,
+            )
+
+            for case_idx, (one, assim) in enumerate(zip(cases, assim_batch)):
 
                 analysis_mae, analysis_rmse = self._masked_error_metrics(
                     assim,
@@ -646,10 +675,12 @@ class UNetTrainer:
 
                 dashboard_cases.append({
                     "case_idx": case_idx,
+                    "case_label": one.get("case_label"),
                     "background": one["background"][0],
                     "obs_values": one["obs_values"][0],
                     "obs_mask": one["obs_mask"][0],
                     "assim": assim,
+                    "truth": one["truth"][0],
                     "valid_mask": one["valid_mask"][0],
                     "water_mask": one["water_mask"][0],
                 })
@@ -659,7 +690,7 @@ class UNetTrainer:
         cases_per_page = max(_DASHBOARD_CASES_PER_PAGE, 1)
         for page_idx, page_cases in self._chunks(dashboard_cases, cases_per_page):
             title = (
-                f"background | condition | assim, epoch {epoch}, "
+                f"background | condition | assim | truth, epoch {epoch}, "
                 f"page {page_idx}, cases {len(page_cases)}"
             )
             fig = make_multi_case_background_condition_assim_figure(
@@ -674,7 +705,7 @@ class UNetTrainer:
             )
             figure_path = os.path.join(
                 samples_dir,
-                f"epoch_{epoch:04d}_dashboard_page_{page_idx:02d}_background_condition_assim.png",
+                f"epoch_{epoch:04d}_dashboard_page_{page_idx:02d}_background_condition_assim_truth.png",
             )
             fig.savefig(figure_path, dpi=_DASHBOARD_DPI, bbox_inches="tight")
             plt.close(fig)
