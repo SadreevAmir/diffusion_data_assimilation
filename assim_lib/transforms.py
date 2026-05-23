@@ -12,8 +12,10 @@ def as_3d_tensor(x, dtype=torch.float32) -> torch.Tensor:
     return tensor
 
 
-def select_channels(field, indices: list[int]) -> torch.Tensor:
+def select_channels(field, indices: list[int] | None) -> torch.Tensor:
     tensor = as_3d_tensor(field)
+    if indices is None:
+        return tensor
     index = torch.as_tensor(indices, dtype=torch.long)
     return tensor.index_select(0, index)
 
@@ -89,7 +91,7 @@ def load_valid_mask(mask, channels: int, image_size: tuple[int, int]) -> torch.T
 
 
 def prepare_model_field(field, indices, means, stds, padding_values, image_size) -> tuple[torch.Tensor, torch.Tensor]:
-    selected = select_channels(field, list(indices))
+    selected = select_channels(field, None if indices is None else list(indices))
     finite = torch.isfinite(selected).to(torch.float32)
     padding = torch.as_tensor(padding_values, dtype=selected.dtype).view(-1, 1, 1)
     selected = torch.where(torch.isfinite(selected), selected, padding)

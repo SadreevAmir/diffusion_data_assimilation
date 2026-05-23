@@ -190,6 +190,46 @@ class AssimLibConditioningTests(unittest.TestCase):
         self.assertEqual(float(sample["obs_mask"].sum()), 0.0)
         self.assertEqual(float(sample["obs_values"].sum()), 0.0)
 
+    def test_real_sral_all_hours_uses_sample_hour_for_observation_values(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            preds = root / "dataset" / "preds"
+            preds.mkdir(parents=True)
+            sral_dir = root / "sral"
+            sral_dir.mkdir()
+
+            background = np.zeros((2, 24, 4, 4), dtype=np.float32)
+            truth = np.zeros((2, 24, 4, 4), dtype=np.float32)
+            for hour in range(24):
+                truth[0, hour] = float(hour)
+                truth[1, hour] = float(hour + 100)
+            np.save(preds / "ocean+atmosphere_24_20200101.npy", background)
+            np.save(preds / "ocean+atmosphere_24_20200102.npy", truth)
+
+            sral = np.zeros((8, 4, 4), dtype=np.float32)
+            sral[7] = 0.5
+            np.save(sral_dir / "sral_20200102.npy", sral)
+
+            config = self._m2m_config(
+                root / "dataset",
+                {
+                    "kind": "sral_tracks",
+                    "sral_transform_index": 11,
+                    "synthetic_probability": 0.0,
+                    "empty_probability": 0.0,
+                },
+            )
+            config["sral_dir"] = str(sral_dir)
+            config["hour_mode"] = "all"
+            config["target_hour_index"] = 23
+            dataset = M2MForecastDataset(config, split="train")
+            sample = dataset[5]
+
+        self.assertEqual(sample["meta"]["hour"], 5)
+        self.assertEqual(sample["meta"]["mask_kind"], "sral_tracks")
+        self.assertGreater(float(sample["obs_mask"][0].sum()), 0.0)
+        self.assertEqual(float(sample["obs_values"][0, 0, 0]), 5.0)
+
     def test_strided_case_indices_follow_target_dates(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)

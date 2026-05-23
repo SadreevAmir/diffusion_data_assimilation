@@ -65,12 +65,14 @@ def _forecast_records(preds_dir: Path, lead_time_hours: int | None) -> list[Fore
     return records
 
 
-def _field_at_hour(path: Path, hour_index: int):
+def _field_at_hour(path: Path, hour_index: int, indices: list[int] | None = None):
     field = _open_npy_mmap(str(path))
     if field.ndim == 4:
-        return np.array(field[:, hour_index], copy=True)
+        selected = field[:, hour_index] if indices is None else field[indices, hour_index]
+        return np.array(selected, copy=True)
     if field.ndim == 3:
-        return np.array(field, copy=True)
+        selected = field if indices is None else field[indices]
+        return np.array(selected, copy=True)
     raise ValueError(f"Expected forecast array [V,T,H,W] or [V,H,W], got {field.shape} in {path}")
 
 
@@ -409,7 +411,12 @@ class M2MForecastDataset(Dataset):
             empty_obs_days=empty_obs_days,
         )
 
-    def _sral_track_observations(self, target_date: date, valid_mask: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, dict]:
+    def _sral_track_observations(
+        self,
+        target_date: date,
+        hour: int,
+        valid_mask: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor, dict]:
         obs_values = torch.zeros((len(self.indices), *self.image_size), dtype=torch.float32)
         obs_mask = torch.zeros_like(obs_values)
         sral_files_used = 0
@@ -423,6 +430,10 @@ class M2MForecastDataset(Dataset):
 
         mask_config = self.config.get("observation_mask", {})
         transform_index = int(mask_config.get("sral_transform_index", self.config.get("sral_transform_index", 11)))
+        observed_source_indices = [self.indices[channel] for channel in self.observed_channels]
+        observed_means = [self.means[channel] for channel in self.observed_channels]
+        observed_stds = [self.stds[channel] for channel in self.observed_channels]
+        observed_padding = [self.padding_values[channel] for channel in self.observed_channels]
         for offset in range(self.assimilation_range):
             current_date = target_date - timedelta(days=offset)
             sral_paths = self.sral_records.get(current_date, [])
@@ -444,17 +455,17 @@ class M2MForecastDataset(Dataset):
                 continue
 
             track_field, track_finite = prepare_model_field(
-                _field_at_hour(model_record.path, self.hour_index),
-                self.indices,
-                self.means,
-                self.stds,
-                self.padding_values,
+                _field_at_hour(model_record.path, hour, observed_source_indices),
+                None,
+                observed_means,
+                observed_stds,
+                observed_padding,
                 self.image_size,
             )
             sral_files_used += len(sral_paths)
-            for channel in self.observed_channels:
-                fill_mask = (obs_mask[channel] == 0) & (spatial_mask > 0) & (track_finite[channel] > 0)
-                obs_values[channel][fill_mask] = track_field[channel][fill_mask]
+            for observed_idx, channel in enumerate(self.observed_channels):
+                fill_mask = (obs_mask[channel] == 0) & (spatial_mask > 0) & (track_finite[observed_idx] > 0)
+                obs_values[channel][fill_mask] = track_field[observed_idx][fill_mask]
                 obs_mask[channel][fill_mask] = 1.0
 
         return obs_values, obs_mask, self._observation_diagnostics(
@@ -561,16 +572,16 @@ class M2MForecastDataset(Dataset):
             target_record.date, idx, day_idx
         )
         background, background_finite = prepare_model_field(
-            _field_at_hour(back_record.path, hour),
-            self.indices,
+            _field_at_hour(back_record.path, hour, self.indices),
+            None,
             self.means,
             self.stds,
             self.padding_values,
             self.image_size,
         )
         truth, truth_finite = prepare_model_field(
-            _field_at_hour(target_record.path, hour),
-            self.indices,
+            _field_at_hour(target_record.path, hour, self.indices),
+            None,
             self.means,
             self.stds,
             self.padding_values,
@@ -584,7 +595,11 @@ class M2MForecastDataset(Dataset):
         if mask_kind == "sral_tracks":
             conditioning_kind = self._selected_sral_conditioning(mask_config, rng)
             if conditioning_kind == "sral_tracks":
-                obs_values, obs_mask, obs_diagnostics = self._sral_track_observations(target_record.date, valid_mask)
+                obs_values, obs_mask, obs_diagnostics = self._sral_track_observations(
+                    target_record.date,
+                    hour,
+                    valid_mask,
+                )
             elif conditioning_kind == "synthetic":
                 obs_values, obs_mask, obs_diagnostics = self._synthetic_observations(
                     truth,
