@@ -11,6 +11,7 @@ from functools import partial
 from pathlib import Path
 
 import numpy as np
+from tqdm.auto import tqdm
 
 
 @dataclass(frozen=True)
@@ -177,39 +178,39 @@ def _water_mask(config: dict, channels: int) -> np.ndarray | None:
     return mask
 
 
-def _partial_stats_for_hour(
-    field: np.ndarray,
-    indices: np.ndarray,
+def _stats_from_block(
+    block: np.ndarray,
     water_mask: np.ndarray | None,
     source_path: Path,
 ) -> ChannelStats:
-    if field.ndim != 3:
-        raise ValueError(f"Expected selected field [V,H,W], got {field.shape} in {source_path}")
-    if np.any(indices < 0) or int(indices.max()) >= field.shape[0]:
-        raise IndexError(f"Configured indices {indices.tolist()} exceed {field.shape[0]} channels in {source_path}")
-
-    selected = np.asarray(field[indices], dtype=np.float64)
-    valid = np.isfinite(selected)
+    block = np.asarray(block, dtype=np.float64)
+    if block.ndim not in (3, 4):
+        raise ValueError(f"Expected selected block [C,H,W] or [C,T,H,W], got {block.shape} in {source_path}")
+    valid = np.isfinite(block)
     if water_mask is not None:
-        height, width = selected.shape[-2:]
+        height, width = block.shape[-2:]
         if height > water_mask.shape[-2] or width > water_mask.shape[-1]:
             raise ValueError(f"Field shape {(height, width)} is larger than mask shape {water_mask.shape[-2:]}")
-        valid &= water_mask[:, :height, :width]
+        cropped = water_mask[:, :height, :width]
+        broadcast = cropped[:, None, :, :] if block.ndim == 4 else cropped
+        valid &= broadcast
 
-    values = np.where(valid, selected, 0.0)
-    counts = np.count_nonzero(valid, axis=(1, 2)).astype(np.int64, copy=False)
+    values = np.where(valid, block, 0.0)
+    reduce_dims = tuple(range(1, block.ndim))
+    counts = np.count_nonzero(valid, axis=reduce_dims).astype(np.int64, copy=False)
     try:
         with np.errstate(over="raise", invalid="raise", divide="raise"):
-            sums = np.sum(values, axis=(1, 2), dtype=np.float64)
+            sums = np.sum(values, axis=reduce_dims, dtype=np.float64)
             means = np.divide(
                 sums,
                 counts,
-                out=np.zeros(selected.shape[0], dtype=np.float64),
+                out=np.zeros(block.shape[0], dtype=np.float64),
                 where=counts > 0,
             )
-            centered = values - means[:, None, None]
+            mean_view_shape = (block.shape[0],) + (1,) * (block.ndim - 1)
+            centered = values - means.reshape(mean_view_shape)
             centered[~valid] = 0.0
-            m2 = np.sum(centered * centered, axis=(1, 2), dtype=np.float64)
+            m2 = np.sum(centered * centered, axis=reduce_dims, dtype=np.float64)
     except FloatingPointError as exc:
         raise FloatingPointError(f"Reducing {source_path} exceeded float64 range") from exc
     return ChannelStats(counts=counts, means=means, m2=m2)
@@ -222,20 +223,25 @@ def _partial_stats_for_record(
     water_mask: np.ndarray | None,
 ) -> ChannelStats:
     field = np.load(record.path, mmap_mode="r")
-    accum = ChannelStats.empty(int(indices.size))
-    for hour in hours:
-        if field.ndim == 4:
-            if not -field.shape[1] <= hour < field.shape[1]:
-                raise IndexError(f"hour={hour} is outside the {field.shape[1]} time slices in {record.path}")
-            slab = np.array(field[:, hour], copy=True)
-        elif field.ndim == 3:
-            slab = np.asarray(field)
+    if np.any(indices < 0) or int(indices.max()) >= field.shape[0]:
+        raise IndexError(f"Configured indices {indices.tolist()} exceed {field.shape[0]} channels in {record.path}")
+
+    if field.ndim == 4:
+        n_hours = field.shape[1]
+        for hour in hours:
+            if not -n_hours <= hour < n_hours:
+                raise IndexError(f"hour={hour} is outside the {n_hours} time slices in {record.path}")
+        selected_channels = np.array(field[indices], copy=True)  # [C, T, H, W]
+        if len(hours) == n_hours and list(hours) == list(range(n_hours)):
+            block = selected_channels
         else:
-            raise ValueError(f"Expected forecast array [V,T,H,W] or [V,H,W], got {field.shape} in {record.path}")
-        accum.merge(_partial_stats_for_hour(slab, indices, water_mask, record.path))
-        if field.ndim == 3:
-            break  # single hour available; skip remaining requested hours
-    return accum
+            block = selected_channels[:, list(hours)]
+    elif field.ndim == 3:
+        block = np.array(field[indices], copy=True)  # [C, H, W]
+    else:
+        raise ValueError(f"Expected forecast array [V,T,H,W] or [V,H,W], got {field.shape} in {record.path}")
+
+    return _stats_from_block(block, water_mask, record.path)
 
 
 def _default_workers() -> int:
@@ -272,14 +278,20 @@ def compute_m2m_channel_stats(
 
     stats = ChannelStats.empty(int(indices.size))
     worker = partial(_partial_stats_for_record, indices=indices, hours=hours, water_mask=water_mask)
-    if workers == 1:
-        partial_stats = map(worker, records)
-        for record_stats in partial_stats:
-            stats.merge(record_stats)
-    else:
-        with ThreadPoolExecutor(max_workers=workers) as executor:
-            for record_stats in executor.map(worker, records):
+    desc = f"m2m_stats {split} hour_mode={resolved_hour_mode}"
+    progress = tqdm(total=len(records), desc=desc, unit="file")
+    try:
+        if workers == 1:
+            for record_stats in map(worker, records):
                 stats.merge(record_stats)
+                progress.update(1)
+        else:
+            with ThreadPoolExecutor(max_workers=workers) as executor:
+                for record_stats in executor.map(worker, records):
+                    stats.merge(record_stats)
+                    progress.update(1)
+    finally:
+        progress.close()
 
     if np.any(stats.counts == 0):
         raise ValueError(f"At least one selected channel has no valid values: counts={stats.counts.tolist()}")
