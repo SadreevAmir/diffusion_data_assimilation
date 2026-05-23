@@ -177,17 +177,16 @@ def _water_mask(config: dict, channels: int) -> np.ndarray | None:
     return mask
 
 
-def _partial_stats_for_record(
-    record: ForecastRecord,
+def _partial_stats_for_hour(
+    field: np.ndarray,
     indices: np.ndarray,
-    hour_index: int,
     water_mask: np.ndarray | None,
+    source_path: Path,
 ) -> ChannelStats:
-    field = _field_at_hour(record.path, hour_index)
     if field.ndim != 3:
-        raise ValueError(f"Expected selected field [V,H,W], got {field.shape} in {record.path}")
+        raise ValueError(f"Expected selected field [V,H,W], got {field.shape} in {source_path}")
     if np.any(indices < 0) or int(indices.max()) >= field.shape[0]:
-        raise IndexError(f"Configured indices {indices.tolist()} exceed {field.shape[0]} channels in {record.path}")
+        raise IndexError(f"Configured indices {indices.tolist()} exceed {field.shape[0]} channels in {source_path}")
 
     selected = np.asarray(field[indices], dtype=np.float64)
     valid = np.isfinite(selected)
@@ -212,8 +211,31 @@ def _partial_stats_for_record(
             centered[~valid] = 0.0
             m2 = np.sum(centered * centered, axis=(1, 2), dtype=np.float64)
     except FloatingPointError as exc:
-        raise FloatingPointError(f"Reducing {record.path} exceeded float64 range") from exc
+        raise FloatingPointError(f"Reducing {source_path} exceeded float64 range") from exc
     return ChannelStats(counts=counts, means=means, m2=m2)
+
+
+def _partial_stats_for_record(
+    record: ForecastRecord,
+    indices: np.ndarray,
+    hours: list[int],
+    water_mask: np.ndarray | None,
+) -> ChannelStats:
+    field = np.load(record.path, mmap_mode="r")
+    accum = ChannelStats.empty(int(indices.size))
+    for hour in hours:
+        if field.ndim == 4:
+            if not -field.shape[1] <= hour < field.shape[1]:
+                raise IndexError(f"hour={hour} is outside the {field.shape[1]} time slices in {record.path}")
+            slab = np.array(field[:, hour], copy=True)
+        elif field.ndim == 3:
+            slab = np.asarray(field)
+        else:
+            raise ValueError(f"Expected forecast array [V,T,H,W] or [V,H,W], got {field.shape} in {record.path}")
+        accum.merge(_partial_stats_for_hour(slab, indices, water_mask, record.path))
+        if field.ndim == 3:
+            break  # single hour available; skip remaining requested hours
+    return accum
 
 
 def _default_workers() -> int:
@@ -225,6 +247,7 @@ def compute_m2m_channel_stats(
     split: str = "train",
     use_water_mask: bool = True,
     workers: int | None = None,
+    hour_mode: str | None = None,
 ) -> dict:
     if config.get("dataset_name") != "M2MForecastDataset":
         raise ValueError("M2M channel statistics require dataset_name=M2MForecastDataset")
@@ -238,13 +261,17 @@ def compute_m2m_channel_stats(
         raise ValueError("fields and indices must have the same length")
 
     hour_index = int(merged.get("target_hour_index", 23))
+    resolved_hour_mode = hour_mode if hour_mode is not None else str(merged.get("hour_mode", "fixed"))
+    if resolved_hour_mode not in ("fixed", "all"):
+        raise ValueError(f"Unknown hour_mode={resolved_hour_mode!r}; expected 'fixed' or 'all'")
+    hours = list(range(24)) if resolved_hour_mode == "all" else [hour_index]
     water_mask = _water_mask(merged, int(indices.size)) if use_water_mask else None
     workers = _default_workers() if workers is None else int(workers)
     if workers < 1:
         raise ValueError(f"workers must be >= 1, got {workers}")
 
     stats = ChannelStats.empty(int(indices.size))
-    worker = partial(_partial_stats_for_record, indices=indices, hour_index=hour_index, water_mask=water_mask)
+    worker = partial(_partial_stats_for_record, indices=indices, hours=hours, water_mask=water_mask)
     if workers == 1:
         partial_stats = map(worker, records)
         for record_stats in partial_stats:
@@ -269,6 +296,8 @@ def compute_m2m_channel_stats(
         "split": split,
         "record_set": "truth",
         "lead_time_hours": merged.get("lead_time_hours"),
+        "hour_mode": resolved_hour_mode,
+        "hours": hours,
         "target_hour_index": hour_index,
         "use_water_mask": bool(use_water_mask and water_mask is not None),
         "mask_path": merged.get("mask_path") if use_water_mask else None,
@@ -324,17 +353,25 @@ def parse_args():
         action="store_true",
         help="Write computed mean/std values into --config after the computation succeeds",
     )
+    parser.add_argument(
+        "--hour-mode",
+        choices=("fixed", "all", "auto"),
+        default="auto",
+        help="'fixed' uses target_hour_index, 'all' iterates 24 hours per file, 'auto' reads hour_mode from the config",
+    )
     return parser.parse_args()
 
 
 def main():
     args = parse_args()
     config_path = Path(args.config)
+    hour_mode_override = None if args.hour_mode == "auto" else args.hour_mode
     payload = compute_m2m_channel_stats(
         load_json(config_path),
         split=args.split,
         use_water_mask=not args.include_land,
         workers=args.workers,
+        hour_mode=hour_mode_override,
     )
     if args.output:
         write_json(args.output, payload)
