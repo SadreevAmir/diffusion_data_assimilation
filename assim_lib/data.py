@@ -287,6 +287,7 @@ class M2MForecastDataset(Dataset):
 
         self.sral_records = self._load_sral_records()
         self.records_by_date = {record.date: record for record in records}
+        self._sorted_record_dates = sorted(self.records_by_date.keys())
         self.base_valid_mask = self._load_base_valid_mask()
         self._validate_observation_mask_config()
 
@@ -507,6 +508,22 @@ class M2MForecastDataset(Dataset):
             mask = torch.maximum(mask, finite)
         return mask if torch.any(mask > 0) else None
 
+    def _nearest_record(self, target: date):
+        if not self._sorted_record_dates:
+            return None
+        import bisect
+
+        pos = bisect.bisect_left(self._sorted_record_dates, target)
+        options = []
+        if pos < len(self._sorted_record_dates):
+            options.append(self._sorted_record_dates[pos])
+        if pos > 0:
+            options.append(self._sorted_record_dates[pos - 1])
+        if not options:
+            return None
+        closest = min(options, key=lambda d: abs((d - target).days))
+        return self.records_by_date[closest]
+
     def _select_background_record(self, target_date, idx: int, day_idx: int):
         if self.background_strategy == "indexed":
             return self.back_data[day_idx], (target_date - self.back_data[day_idx].date).days
@@ -517,10 +534,12 @@ class M2MForecastDataset(Dataset):
             if record is not None:
                 candidates.append(record)
         if not candidates:
-            raise FileNotFoundError(
-                f"No background record within ±{self.background_jitter_days} days of {base} "
-                f"(for target {target_date})"
-            )
+            fallback = self._nearest_record(base)
+            if fallback is None:
+                raise FileNotFoundError(
+                    f"No background record available anywhere in the archive for target {target_date}"
+                )
+            candidates = [fallback]
         if self.split == "train":
             choice = int(np.random.randint(len(candidates)))
         else:
