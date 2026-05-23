@@ -13,9 +13,7 @@
   "image_size": [320, 256],
   "target_hour_index": 23,
   "hour_mode": "all",
-  "background_strategy": "year_ago_jitter",
-  "background_jitter_days": 7,
-  "background_year_offset_days": 365,
+  "background_strategy": "indexed",
   "observed_channels": [0],
   "assimilation_range": 3,
   "observation_mask": {
@@ -25,7 +23,7 @@
     "empty_probability": 0.25,
     "synthetic": {
       "kind": "generated_track",
-      "n_tracks_range": [1, 4]
+      "n_tracks_range": [5, 9]
     }
   },
   "train": {

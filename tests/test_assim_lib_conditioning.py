@@ -1,11 +1,13 @@
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 import torch
 
 from assim_lib.data import M2MForecastDataset
+from assim_lib.trainer import UNetTrainer
 from assim_lib.transforms import make_conditioned_model_input
 
 
@@ -70,6 +72,27 @@ class AssimLibConditioningTests(unittest.TestCase):
 
         self.assertEqual(tuple(model_input.shape), (1, 19, 3, 2))
         torch.testing.assert_close(model_input[:, -1:], water_mask[:, :1])
+
+    def test_background_dropout_only_zeroes_train_conditioning_input(self):
+        trainer = object.__new__(UNetTrainer)
+        trainer.config = SimpleNamespace(background_dropout_probability=1.0)
+        trainer.model = SimpleNamespace(training=True)
+        trainer._grid = torch.zeros((1, 2, 2, 2))
+        state = torch.zeros((2, 2, 2, 2))
+        batch = {
+            "background": torch.ones((2, 2, 2, 2)),
+            "obs_values": torch.zeros((2, 2, 2, 2)),
+            "obs_mask": torch.zeros((2, 2, 2, 2)),
+            "water_mask": torch.ones((2, 1, 2, 2)),
+        }
+
+        model_input = trainer._make_model_input(state, batch)
+        torch.testing.assert_close(model_input[:, 4:6], torch.zeros_like(batch["background"]))
+        torch.testing.assert_close(batch["background"], torch.ones_like(batch["background"]))
+
+        trainer.model.training = False
+        model_input = trainer._make_model_input(state, batch)
+        torch.testing.assert_close(model_input[:, 4:6], batch["background"])
 
     def test_m2m_masks_are_zero_in_land_invalid_and_padding_regions(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -263,6 +286,39 @@ class AssimLibConditioningTests(unittest.TestCase):
             )
 
         self.assertEqual(dataset.strided_case_indices(stride_days=30), [0, 2, 3])
+
+    def test_sample_metrics_select_strided_days_at_legacy_hour_for_all_hours_data(self):
+        class DailyDataset:
+            hours_per_day = 24
+            hour_index = 23
+
+            @staticmethod
+            def strided_case_indices(max_cases, stride_days):
+                assert (max_cases, stride_days) == (3, 15)
+                return [0, 30 * 24, 60 * 24]
+
+        trainer = object.__new__(UNetTrainer)
+        trainer.val_dataloader = SimpleNamespace(dataset=DailyDataset())
+
+        self.assertEqual(trainer._metric_case_indices(3, stride_days=15), [23, (30 * 24) + 23, (60 * 24) + 23])
+
+    def test_legacy_metric_aggregation_is_pixel_weighted(self):
+        metrics = UNetTrainer._finalize_metric_totals(
+            "obs",
+            {
+                "analysis_abs": 4.0,
+                "analysis_sq": 8.0,
+                "background_abs": 6.0,
+                "background_sq": 18.0,
+                "count": 2.0,
+            },
+        )
+
+        self.assertEqual(metrics["analysis_mae_obs"], 2.0)
+        self.assertEqual(metrics["background_mae_obs"], 3.0)
+        self.assertEqual(metrics["analysis_rmse_obs"], 2.0)
+        self.assertEqual(metrics["background_rmse_obs"], 3.0)
+        self.assertAlmostEqual(metrics["analysis_rmse_skill_obs"], 1.0 - (2.0 / 3.0))
 
 
 if __name__ == "__main__":
