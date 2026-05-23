@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
+from functools import lru_cache
 from pathlib import Path
 
 import numpy as np
@@ -10,6 +11,11 @@ import torch
 from torch.utils.data import Dataset
 
 from .transforms import load_valid_mask, make_observation_tensors, pad_to_size, prepare_model_field
+
+
+@lru_cache(maxsize=128)
+def _open_npy_mmap(path_str: str) -> np.ndarray:
+    return np.load(path_str, mmap_mode="r")
 
 
 @dataclass(frozen=True)
@@ -60,7 +66,7 @@ def _forecast_records(preds_dir: Path, lead_time_hours: int | None) -> list[Fore
 
 
 def _field_at_hour(path: Path, hour_index: int):
-    field = np.load(path, mmap_mode="r")
+    field = _open_npy_mmap(str(path))
     if field.ndim == 4:
         return np.array(field[:, hour_index], copy=True)
     if field.ndim == 3:

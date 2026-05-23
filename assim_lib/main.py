@@ -25,8 +25,7 @@ def _loader(dataset, batch_size: int, num_workers: int, shuffle: bool):
     import torch
     from torch.utils.data import DataLoader
 
-    return DataLoader(
-        dataset,
+    kwargs = dict(
         batch_size=batch_size,
         shuffle=shuffle,
         num_workers=num_workers,
@@ -34,6 +33,9 @@ def _loader(dataset, batch_size: int, num_workers: int, shuffle: bool):
         persistent_workers=num_workers > 0,
         drop_last=shuffle,
     )
+    if num_workers > 0:
+        kwargs["prefetch_factor"] = 4
+    return DataLoader(dataset, **kwargs)
 
 
 def main(config: dict, config_dir: Path):
