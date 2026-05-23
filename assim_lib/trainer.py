@@ -141,6 +141,8 @@ class UNetTrainer:
         self.fields = list(self.data_config.get("fields", [f"ch{i}" for i in range(config.out_channels)]))
         self.channel_means = list(self.data_config.get("means", [0.0] * config.out_channels))
         self.channel_stds = list(self.data_config.get("stds", [1.0] * config.out_channels))
+        self._shared_viz_obs_mask: torch.Tensor | None = None
+        self._shared_viz_obs_mask_attempted = False
 
         logging_dir = os.path.join(self.output_dir, "logs")
         _debug(f"output_dir={self.output_dir}")
@@ -653,6 +655,63 @@ class UNetTrainer:
             os.path.join(samples_dir, f"epoch_{epoch:04d}.pt"),
         )
 
+    def _ensure_shared_viz_obs_mask(self) -> torch.Tensor | None:
+        if self._shared_viz_obs_mask is not None or self._shared_viz_obs_mask_attempted:
+            return self._shared_viz_obs_mask
+        self._shared_viz_obs_mask_attempted = True
+
+        val_dataset = self.dashboard_dataset
+        if val_dataset is None:
+            val_dataset = getattr(self.val_dataloader, "dataset", None)
+        if val_dataset is None:
+            return None
+        if hasattr(val_dataset, "strided_case_indices"):
+            scan_indices = val_dataset.strided_case_indices(30, stride_days=5)
+        else:
+            scan_indices = list(range(min(30, len(val_dataset))))
+
+        best_mask = None
+        best_count = 0.0
+        for idx in scan_indices:
+            try:
+                sample = val_dataset[idx]
+            except Exception as exc:
+                _debug(f"shared viz mask scan idx={idx} failed: {exc}")
+                continue
+            meta = sample.get("meta", {})
+            if meta.get("mask_kind") != "sral_tracks":
+                continue
+            if int(meta.get("sral_files_used", 0)) <= 0:
+                continue
+            mask = sample["obs_mask"]
+            if not torch.is_tensor(mask):
+                mask = torch.as_tensor(mask)
+            count = float(mask.sum().item())
+            if count > best_count:
+                best_count = count
+                best_mask = mask.detach().clone()
+                if best_count >= 200.0:
+                    break
+
+        if best_mask is None:
+            _debug("shared viz obs_mask: no real SRAL case found in scan; using per-case masks")
+        else:
+            _debug(f"shared viz obs_mask: selected mask with count={best_count:.0f}")
+        self._shared_viz_obs_mask = best_mask
+        return self._shared_viz_obs_mask
+
+    def _apply_shared_viz_mask(self, cases: list[dict[str, torch.Tensor]]) -> None:
+        if not cases:
+            return
+        shared_mask = self._ensure_shared_viz_obs_mask()
+        if shared_mask is None:
+            return
+        shared_mask = shared_mask.to(device=self.accelerator.device, dtype=torch.float32)
+        for case in cases:
+            mask = shared_mask.unsqueeze(0).clone()
+            case["obs_mask"] = mask
+            case["obs_values"] = case["truth"] * mask
+
     @torch.no_grad()
     def _dashboard_cases(self) -> list[dict[str, torch.Tensor]]:
         max_cases = max(_DASHBOARD_NUM_CASES, 0)
@@ -669,13 +728,17 @@ class UNetTrainer:
 
                 samples = [strided_dataset[index] for index in strided_indices]
                 labels = [sample.get("meta", {}).get("target_date") for sample in samples]
-                return self._dashboard_cases_from_raw_batch(default_collate(samples), labels=labels)
+                cases = self._dashboard_cases_from_raw_batch(default_collate(samples), labels=labels)
+                self._apply_shared_viz_mask(cases)
+                return cases
 
         cases = []
         for raw_batch in self.val_dataloader:
             cases.extend(self._dashboard_cases_from_raw_batch(raw_batch))
             if len(cases) >= max_cases:
-                return cases[:max_cases]
+                cases = cases[:max_cases]
+                break
+        self._apply_shared_viz_mask(cases)
         return cases
 
     def _dashboard_cases_from_raw_batch(self, raw_batch: dict, labels=None) -> list[dict[str, torch.Tensor]]:
