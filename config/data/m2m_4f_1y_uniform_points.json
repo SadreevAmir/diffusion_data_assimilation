@@ -13,27 +13,21 @@
   "image_size": [320, 256],
   "target_hour_index": 23,
   "observed_channels": [0],
-  "assimilation_range": 3,
+  "assimilation_range": 1,
   "observation_mask": {
-    "kind": "sral_tracks",
-    "sral_transform_index": 11,
-    "synthetic_probability": 0.5,
-    "empty_probability": 0.25,
-    "synthetic": {
-      "kind": "generated_track",
-      "n_tracks_range": [1, 4]
-    }
+    "kind": "uniform_points",
+    "density": 0.05
   },
   "train": {
     "back_start_day": "2015-01-01",
-    "back_end_day": "2021-12-31",
+    "back_end_day": "2020-12-31",
     "obs_start_day": "2016-01-01",
-    "obs_end_day": "2022-12-31"
+    "obs_end_day": "2021-12-31"
   },
   "valid": {
     "back_start_day": "2022-01-01",
-    "back_end_day": "2022-07-19",
+    "back_end_day": "2022-12-31",
     "obs_start_day": "2023-01-01",
-    "obs_end_day": "2023-07-19"
+    "obs_end_day": "2023-12-31"
   }
 }

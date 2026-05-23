@@ -1,7 +1,7 @@
 {
   "project_name": "m2m_concat_conditioning",
-  "task_name": "concat_conditioning_4f_200d",
-  "data_config": "../data/m2m_4f_200d.json",
+  "task_name": "concat_conditioning_4f_1y",
+  "data_config": "../data/m2m_4f_1y.json",
   "model_config": "../methods/concat_conditioning_4f.json",
   "clearml": {
     "tags": ["m2m", "concat_conditioning", "4f"],
