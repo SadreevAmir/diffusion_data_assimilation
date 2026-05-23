@@ -82,8 +82,10 @@ class TrainingConfig:
     clearml_env_path: str | None = None
     clearml_upload_checkpoints: bool = False
     metric_every_n_epochs: int = 1
-    metric_num_cases: int = 16
-    metric_num_timesteps: int = 0
+    metric_num_cases: int = 24
+    metric_num_timesteps: int = 50
+    metric_num_ensemble: int = 10
+    metric_stride_days: int = 15
 
     block_out_channels: tuple[int, ...] = (64, 128, 256, 512, 512)
     layers_per_block: int = 2
@@ -284,6 +286,18 @@ class UNetTrainer:
             float(count.item()),
         )
 
+    @staticmethod
+    def _per_case_error(pred: torch.Tensor, target: torch.Tensor, mask: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        mask = mask.expand_as(pred)
+        diff = (pred - target) * mask
+        dims = list(range(1, diff.dim()))
+        abs_sum = diff.abs().sum(dim=dims)
+        sq_sum = diff.square().sum(dim=dims)
+        count = mask.sum(dim=dims).clamp(min=1.0)
+        mae = abs_sum / count
+        rmse = (sq_sum / count).clamp(min=0.0).sqrt()
+        return mae, rmse
+
     def save_model_custom(self, name: str = "last_model.pth"):
         os.makedirs(self.output_dir, exist_ok=True)
         unwrapped = self.accelerator.unwrap_model(self.model)
@@ -308,24 +322,35 @@ class UNetTrainer:
         if self.clearml is None or not metrics:
             return
 
-        scalar_map = (
-            ("analysis_mae_full", "metric/analysis_mae", "full"),
-            ("analysis_rmse_full", "metric/analysis_rmse", "full"),
-            ("background_mae_full", "metric/background_mae", "full"),
-            ("background_rmse_full", "metric/background_rmse", "full"),
-            ("analysis_rmse_skill_full", "metric/analysis_rmse_skill", "full"),
-            ("analysis_mae_obs", "metric/analysis_mae", "obs"),
-            ("analysis_rmse_obs", "metric/analysis_rmse", "obs"),
-            ("background_mae_obs", "metric/background_mae", "obs"),
-            ("background_rmse_obs", "metric/background_rmse", "obs"),
-            ("analysis_rmse_skill_obs", "metric/analysis_rmse_skill", "obs"),
-            ("metric_count_full", "metric/count", "full"),
-            ("metric_count_obs", "metric/count", "obs"),
-        )
-        for key, title, series in scalar_map:
+        def _report(title: str, series: str, key: str):
             value = metrics.get(key)
-            if value is not None and math.isfinite(float(value)):
+            if value is None:
+                return
+            try:
+                value = float(value)
+            except (TypeError, ValueError):
+                return
+            if math.isfinite(value):
                 self.clearml.report_scalar(title, series, value, step)
+
+        aggs = ("mean", "min", "max", "of_mean")
+        regions = ("full", "obs")
+        for kind in ("mae", "rmse"):
+            for region in regions:
+                for agg in aggs:
+                    _report(f"metric/analysis_{kind}", f"{agg}_{region}", f"analysis_{kind}_{agg}_{region}")
+                # Overlay background on the same plot as analysis aggregates for direct comparison.
+                _report(f"metric/analysis_{kind}", f"background_{region}", f"background_{kind}_{region}")
+                # And keep the standalone background plot for solo inspection.
+                _report(f"metric/background_{kind}", region, f"background_{kind}_{region}")
+            if kind == "rmse":
+                for region in regions:
+                    for agg in aggs:
+                        _report(
+                            "metric/analysis_rmse_skill",
+                            f"{agg}_{region}",
+                            f"analysis_rmse_skill_{agg}_{region}",
+                        )
 
     @staticmethod
     def _meta_mean(value):
@@ -459,71 +484,135 @@ class UNetTrainer:
             remaining -= take
             yield batch
 
+    def _metric_case_indices(self, max_cases: int, stride_days: int) -> list[int]:
+        val_dataset = getattr(self.val_dataloader, "dataset", None)
+        if val_dataset is None or max_cases <= 0:
+            return []
+        if hasattr(val_dataset, "strided_case_indices"):
+            indices = val_dataset.strided_case_indices(max_cases, stride_days=stride_days)
+            if indices:
+                return indices
+        return list(range(min(max_cases, len(val_dataset))))
+
+    def _iter_indexed_batches(self, indices: list[int], batch_size: int):
+        val_dataset = getattr(self.val_dataloader, "dataset", None)
+        if val_dataset is None or not indices:
+            return
+        from torch.utils.data import default_collate
+
+        batch_size = max(int(batch_size), 1)
+        for start in range(0, len(indices), batch_size):
+            chunk = indices[start:start + batch_size]
+            samples = [val_dataset[idx] for idx in chunk]
+            raw_batch = default_collate(samples)
+            yield self._batch_to_device(raw_batch)
+
+    @staticmethod
+    def _mean_or_nan(values: list[float]) -> float:
+        return float(sum(values) / len(values)) if values else float("nan")
+
     @torch.no_grad()
     def compute_sample_validation_metrics(self) -> dict[str, float]:
         max_cases = int(self.config.metric_num_cases)
         if max_cases <= 0:
             return {}
 
+        num_ensemble = max(int(getattr(self.config, "metric_num_ensemble", 1)), 1)
+        stride_days = max(int(getattr(self.config, "metric_stride_days", 30)), 1)
         metric_timesteps = int(self.config.metric_num_timesteps)
         if metric_timesteps <= 0:
             metric_timesteps = int(self.config.num_sample_timesteps)
 
-        totals = {
-            "full": self._empty_metric_totals(),
-            "obs": self._empty_metric_totals(),
+        indices = self._metric_case_indices(max_cases, stride_days)
+        if not indices:
+            return {}
+
+        _debug(
+            f"sample validation metrics start cases={len(indices)} "
+            f"ensemble={num_ensemble} timesteps={metric_timesteps} stride_days={stride_days}"
+        )
+
+        accum: dict[str, dict[str, list[float]]] = {
+            region: {
+                "analysis_mae_mean": [], "analysis_mae_min": [], "analysis_mae_max": [], "analysis_mae_of_mean": [],
+                "analysis_rmse_mean": [], "analysis_rmse_min": [], "analysis_rmse_max": [], "analysis_rmse_of_mean": [],
+                "background_mae": [], "background_rmse": [],
+            }
+            for region in ("full", "obs")
         }
-        total_processed = 0
 
         self.model.eval()
         with self._sampling_model() as sample_model:
             sampler = Sampler(sample_model)
-            for batch in self._iter_validation_batches(max_cases):
-                batch_size = batch["truth"].shape[0]
-                analysis = sampler.sample_conditioned(
-                    background=batch["background"],
-                    obs_values=batch["obs_values"],
-                    obs_mask=batch["obs_mask"],
-                    water_mask=batch["water_mask"],
-                    size=self.config.image_size,
-                    num_timesteps=metric_timesteps,
-                    device=self.accelerator.device,
-                    start_mode=self.config.sample_start_mode,
-                    start_noise_level=self.config.sample_start_noise_level,
-                    enforce_observations=self.config.sample_enforce_observations,
-                    valid_mask=batch["valid_mask"],
-                    obs_guidance_scale=self.config.sample_obs_guidance_scale,
-                    obs_guidance_eps=self.config.sample_obs_guidance_eps,
-                )
-
-                for name, mask in (("full", batch["valid_mask"]), ("obs", batch["obs_mask"])):
-                    analysis_abs, analysis_sq, count = self._masked_error_sums(analysis, batch["truth"], mask)
-                    background_abs, background_sq, background_count = self._masked_error_sums(
-                        batch["background"],
-                        batch["truth"],
-                        mask,
+            for batch in self._iter_indexed_batches(indices, self.config.eval_batch_size):
+                ensemble = []
+                for _ in range(num_ensemble):
+                    analysis = sampler.sample_conditioned(
+                        background=batch["background"],
+                        obs_values=batch["obs_values"],
+                        obs_mask=batch["obs_mask"],
+                        water_mask=batch["water_mask"],
+                        size=self.config.image_size,
+                        num_timesteps=metric_timesteps,
+                        device=self.accelerator.device,
+                        start_mode=self.config.sample_start_mode,
+                        start_noise_level=self.config.sample_start_noise_level,
+                        enforce_observations=self.config.sample_enforce_observations,
+                        valid_mask=batch["valid_mask"],
+                        obs_guidance_scale=self.config.sample_obs_guidance_scale,
+                        obs_guidance_eps=self.config.sample_obs_guidance_eps,
                     )
-                    totals[name]["analysis_abs"] += analysis_abs
-                    totals[name]["analysis_sq"] += analysis_sq
-                    totals[name]["background_abs"] += background_abs
-                    totals[name]["background_sq"] += background_sq
-                    totals[name]["count"] += min(count, background_count)
-                total_processed += batch_size
+                    ensemble.append(analysis)
+                ensemble_tensor = torch.stack(ensemble, dim=0)  # [E, B, C, H, W]
+                ensemble_mean = ensemble_tensor.mean(dim=0)
 
-        if total_processed == 0:
+                for region, mask in (("full", batch["valid_mask"]), ("obs", batch["obs_mask"])):
+                    bg_mae, bg_rmse = self._per_case_error(batch["background"], batch["truth"], mask)
+                    accum[region]["background_mae"].extend(bg_mae.tolist())
+                    accum[region]["background_rmse"].extend(bg_rmse.tolist())
+
+                    mae_per_member, rmse_per_member = [], []
+                    for j in range(num_ensemble):
+                        a_mae, a_rmse = self._per_case_error(ensemble_tensor[j], batch["truth"], mask)
+                        mae_per_member.append(a_mae)
+                        rmse_per_member.append(a_rmse)
+                    mae_stack = torch.stack(mae_per_member, dim=0)   # [E, B]
+                    rmse_stack = torch.stack(rmse_per_member, dim=0)
+
+                    accum[region]["analysis_mae_mean"].extend(mae_stack.mean(dim=0).tolist())
+                    accum[region]["analysis_mae_min"].extend(mae_stack.min(dim=0).values.tolist())
+                    accum[region]["analysis_mae_max"].extend(mae_stack.max(dim=0).values.tolist())
+                    accum[region]["analysis_rmse_mean"].extend(rmse_stack.mean(dim=0).tolist())
+                    accum[region]["analysis_rmse_min"].extend(rmse_stack.min(dim=0).values.tolist())
+                    accum[region]["analysis_rmse_max"].extend(rmse_stack.max(dim=0).values.tolist())
+
+                    em_mae, em_rmse = self._per_case_error(ensemble_mean, batch["truth"], mask)
+                    accum[region]["analysis_mae_of_mean"].extend(em_mae.tolist())
+                    accum[region]["analysis_rmse_of_mean"].extend(em_rmse.tolist())
+
+        if not accum["full"]["analysis_mae_mean"]:
             return {}
 
-        _debug(f"sample validation metrics start cases={total_processed} timesteps={metric_timesteps}")
-        metrics = {
-            "metric_num_cases": float(total_processed),
+        metrics: dict[str, float] = {
+            "metric_num_cases": float(len(indices)),
             "metric_num_timesteps": float(metric_timesteps),
+            "metric_num_ensemble": float(num_ensemble),
+            "metric_stride_days": float(stride_days),
         }
-        metrics.update(self._finalize_metric_totals("full", totals["full"]))
-        metrics.update(self._finalize_metric_totals("obs", totals["obs"]))
+        for region in ("full", "obs"):
+            for key, values in accum[region].items():
+                metrics[f"{key}_{region}"] = self._mean_or_nan(values)
+            bg_rmse = accum[region]["background_rmse"]
+            for agg in ("mean", "min", "max", "of_mean"):
+                rmse_arr = accum[region][f"analysis_rmse_{agg}"]
+                skills = [1.0 - r / b for r, b in zip(rmse_arr, bg_rmse) if b > 0.0]
+                metrics[f"analysis_rmse_skill_{agg}_{region}"] = self._mean_or_nan(skills)
+
         _debug(
             "sample validation metrics done "
-            f"analysis_rmse_full={metrics['analysis_rmse_full']:.6f} "
-            f"analysis_rmse_obs={metrics['analysis_rmse_obs']:.6f}"
+            f"analysis_rmse_mean_full={metrics['analysis_rmse_mean_full']:.6f} "
+            f"analysis_rmse_of_mean_full={metrics['analysis_rmse_of_mean_full']:.6f} "
+            f"background_rmse_full={metrics['background_rmse_full']:.6f}"
         )
         return metrics
 

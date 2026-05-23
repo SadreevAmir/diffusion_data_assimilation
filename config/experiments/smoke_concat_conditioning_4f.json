@@ -26,6 +26,8 @@
     "metric_every_n_epochs": 1,
     "metric_num_cases": 1,
     "metric_num_timesteps": 2,
+    "metric_num_ensemble": 2,
+    "metric_stride_days": 1,
     "base_output_dir": "outputs/concat_conditioning_smoke",
     "run_name": "smoke",
     "tracker": null,

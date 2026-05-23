@@ -256,10 +256,21 @@ class M2MForecastDataset(Dataset):
         self.padding_values = self.config["padding_values"]
         self.image_size = tuple(int(v) for v in self.config.get("image_size", [320, 256]))
         self.hour_index = int(self.config.get("target_hour_index", 23))
+        self.hour_mode = str(self.config.get("hour_mode", "fixed"))
+        if self.hour_mode not in ("fixed", "all"):
+            raise ValueError(f"Unknown hour_mode={self.hour_mode!r}; expected 'fixed' or 'all'")
+        self.hours_per_day = 24 if self.hour_mode == "all" else 1
         self.observed_channels = [int(v) for v in self.config.get("observed_channels", [0])]
         self.assimilation_range = int(self.config.get("assimilation_range", 1))
         self.obs_shift = max(0, self.assimilation_range - 1)
         self.seed = int(self.config.get("seed", 1234)) + (10000 if split == "valid" else 0)
+        self.background_strategy = str(self.config.get("background_strategy", "indexed"))
+        if self.background_strategy not in ("indexed", "year_ago_jitter"):
+            raise ValueError(
+                f"Unknown background_strategy={self.background_strategy!r}; expected 'indexed' or 'year_ago_jitter'"
+            )
+        self.background_year_offset_days = int(self.config.get("background_year_offset_days", 365))
+        self.background_jitter_days = int(self.config.get("background_jitter_days", 7))
 
         preds_dir = Path(self.config["dataset_dir"]) / "preds"
         lead = self.config.get("lead_time_hours", None)
@@ -327,8 +338,18 @@ class M2MForecastDataset(Dataset):
                 out.setdefault(parsed, []).append(path)
         return out
 
-    def __len__(self):
+    def _num_days(self) -> int:
+        if self.background_strategy == "year_ago_jitter":
+            return max(len(self.obs_data) - self.obs_shift, 0)
         return len(self.back_data)
+
+    def __len__(self):
+        return self._num_days() * self.hours_per_day
+
+    def _resolve_index(self, idx: int) -> tuple[int, int]:
+        day_idx, hour_in_day = divmod(int(idx), self.hours_per_day)
+        hour = hour_in_day if self.hour_mode == "all" else self.hour_index
+        return day_idx, hour
 
     def strided_case_indices(self, max_cases: int = 12, stride_days: int = 30) -> list[int]:
         max_cases = max(int(max_cases), 0)
@@ -338,11 +359,11 @@ class M2MForecastDataset(Dataset):
         indices = []
         next_date = None
         stride = timedelta(days=max(int(stride_days), 1))
-        for idx in range(len(self.back_data)):
-            target_date = self.obs_data[idx + self.obs_shift].date
+        for day_idx in range(self._num_days()):
+            target_date = self.obs_data[day_idx + self.obs_shift].date
             if next_date is not None and target_date < next_date:
                 continue
-            indices.append(idx)
+            indices.append(day_idx * self.hours_per_day)
             next_date = target_date + stride
             if len(indices) >= max_cases:
                 break
@@ -486,11 +507,36 @@ class M2MForecastDataset(Dataset):
             mask = torch.maximum(mask, finite)
         return mask if torch.any(mask > 0) else None
 
+    def _select_background_record(self, target_date, idx: int, day_idx: int):
+        if self.background_strategy == "indexed":
+            return self.back_data[day_idx], (target_date - self.back_data[day_idx].date).days
+        base = target_date - timedelta(days=self.background_year_offset_days)
+        candidates = []
+        for offset in range(-self.background_jitter_days, self.background_jitter_days + 1):
+            record = self.records_by_date.get(base + timedelta(days=offset))
+            if record is not None:
+                candidates.append(record)
+        if not candidates:
+            raise FileNotFoundError(
+                f"No background record within ±{self.background_jitter_days} days of {base} "
+                f"(for target {target_date})"
+            )
+        if self.split == "train":
+            choice = int(np.random.randint(len(candidates)))
+        else:
+            rng = np.random.default_rng((self.seed + idx) & 0xFFFFFFFF)
+            choice = int(rng.integers(len(candidates)))
+        record = candidates[choice]
+        return record, (target_date - record.date).days
+
     def __getitem__(self, idx):
-        back_record = self.back_data[idx]
-        target_record = self.obs_data[idx + self.obs_shift]
+        day_idx, hour = self._resolve_index(idx)
+        target_record = self.obs_data[day_idx + self.obs_shift]
+        back_record, background_offset_days = self._select_background_record(
+            target_record.date, idx, day_idx
+        )
         background, background_finite = prepare_model_field(
-            _field_at_hour(back_record.path, self.hour_index),
+            _field_at_hour(back_record.path, hour),
             self.indices,
             self.means,
             self.stds,
@@ -498,7 +544,7 @@ class M2MForecastDataset(Dataset):
             self.image_size,
         )
         truth, truth_finite = prepare_model_field(
-            _field_at_hour(target_record.path, self.hour_index),
+            _field_at_hour(target_record.path, hour),
             self.indices,
             self.means,
             self.stds,
@@ -540,9 +586,11 @@ class M2MForecastDataset(Dataset):
             "valid_mask": valid_mask,
             "water_mask": self.base_valid_mask[:1],
             "meta": {
-                "case_id": target_record.date.isoformat(),
+                "case_id": f"{target_record.date.isoformat()}_h{hour:02d}",
                 "background_date": back_record.date.isoformat(),
                 "target_date": target_record.date.isoformat(),
+                "background_offset_days": int(background_offset_days),
+                "hour": hour,
                 "background_path": str(back_record.path),
                 "target_path": str(target_record.path),
                 "split": self.split,
