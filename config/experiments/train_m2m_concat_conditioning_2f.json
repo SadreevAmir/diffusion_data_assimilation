@@ -1,0 +1,10 @@
+{
+  "project_name": "m2m_concat_conditioning",
+  "task_name": "concat_conditioning_residual_2f_1y",
+  "data_config": "../data/m2m_2f_1y.json",
+  "model_config": "../methods/concat_conditioning_2f.json",
+  "clearml": {
+    "tags": ["m2m", "concat_conditioning", "residual", "2f", "50steps"],
+    "upload_checkpoints": false
+  }
+}

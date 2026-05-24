@@ -1,12 +1,15 @@
 import tempfile
 import unittest
+from contextlib import nullcontext
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
 
 import numpy as np
 import torch
 
 from assim_lib.data import M2MForecastDataset
+from assim_lib.sampler import Sampler
 from assim_lib.trainer import UNetTrainer
 from assim_lib.transforms import make_conditioned_model_input
 
@@ -73,6 +76,50 @@ class AssimLibConditioningTests(unittest.TestCase):
         self.assertEqual(tuple(model_input.shape), (1, 19, 3, 2))
         torch.testing.assert_close(model_input[:, -1:], water_mask[:, :1])
 
+    def test_sampler_uses_provided_initial_noise(self):
+        initial_noise = torch.full((2, 1, 2, 2), 3.0)
+        zeros = torch.zeros_like(initial_noise)
+        sampler = Sampler(model=object())
+
+        with patch("assim_lib.sampler.odeint") as odeint:
+            odeint.side_effect = lambda f, x0, timesteps, **kwargs: torch.stack([x0, x0], dim=0)
+            sample = sampler.sample_conditioned(
+                background=zeros,
+                obs_values=zeros,
+                obs_mask=zeros,
+                water_mask=torch.ones_like(zeros),
+                size=(2, 2),
+                num_timesteps=2,
+                device=torch.device("cpu"),
+                start_mode="noise",
+                initial_noise=initial_noise,
+            )
+
+        torch.testing.assert_close(sample, initial_noise)
+
+    def test_residual_sampler_returns_background_plus_generated_correction(self):
+        background = torch.full((1, 1, 2, 2), 5.0)
+        correction = torch.full_like(background, 2.0)
+        hidden_background = torch.zeros_like(background)
+        sampler = Sampler(model=object())
+
+        with patch("assim_lib.sampler.odeint") as odeint:
+            odeint.side_effect = lambda f, x0, timesteps, **kwargs: torch.stack([x0, correction], dim=0)
+            analysis = sampler.sample_conditioned(
+                background=hidden_background,
+                obs_values=torch.zeros_like(background),
+                obs_mask=torch.zeros_like(background),
+                water_mask=torch.ones_like(background),
+                size=(2, 2),
+                num_timesteps=2,
+                device=torch.device("cpu"),
+                start_mode="noise",
+                sample_target="residual",
+                reconstruction_background=background,
+            )
+
+        torch.testing.assert_close(analysis, torch.full_like(background, 7.0))
+
     def test_background_dropout_only_zeroes_train_conditioning_input(self):
         trainer = object.__new__(UNetTrainer)
         trainer.config = SimpleNamespace(background_dropout_probability=1.0)
@@ -93,6 +140,22 @@ class AssimLibConditioningTests(unittest.TestCase):
         trainer.model.training = False
         model_input = trainer._make_model_input(state, batch)
         torch.testing.assert_close(model_input[:, 4:6], batch["background"])
+
+    def test_residual_diffusion_trains_on_truth_minus_background(self):
+        trainer = object.__new__(UNetTrainer)
+        trainer.config = SimpleNamespace(training_objective="diffusion_residual")
+        trainer.add_noise = lambda target, timesteps: (target, target)
+        truth = torch.full((1, 1, 2, 2), 5.0)
+        background = torch.full_like(truth, 2.0)
+
+        model_state, target = trainer._make_training_pair(
+            truth,
+            {"background": background},
+            torch.tensor([0.5]),
+        )
+
+        torch.testing.assert_close(model_state, torch.full_like(truth, 3.0))
+        torch.testing.assert_close(target, torch.full_like(truth, 3.0))
 
     def test_m2m_masks_are_zero_in_land_invalid_and_padding_regions(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -319,6 +382,59 @@ class AssimLibConditioningTests(unittest.TestCase):
         self.assertEqual(metrics["analysis_rmse_obs"], 2.0)
         self.assertEqual(metrics["background_rmse_obs"], 3.0)
         self.assertAlmostEqual(metrics["analysis_rmse_skill_obs"], 1.0 - (2.0 / 3.0))
+
+    def test_sample_metrics_can_save_generated_ensemble(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            trainer = object.__new__(UNetTrainer)
+            trainer.config = SimpleNamespace(
+                metric_num_cases=2,
+                metric_num_ensemble=2,
+                metric_stride_days=15,
+                metric_num_timesteps=3,
+                num_sample_timesteps=3,
+                eval_batch_size=2,
+                image_size=(2, 2),
+                sample_start_mode="noise",
+                sample_start_noise_level=0.5,
+                sample_enforce_observations=False,
+                sample_obs_guidance_scale=0.0,
+                sample_obs_guidance_eps=1e-8,
+                metric_save_ensemble_samples=True,
+                metric_ensemble_save_dtype="float16",
+                training_objective="diffusion",
+            )
+            trainer.output_dir = tmp_dir
+            trainer.accelerator = SimpleNamespace(device=torch.device("cpu"))
+            trainer.model = SimpleNamespace(eval=lambda: None)
+            trainer._sampling_model = lambda: nullcontext(object())
+            trainer._metric_case_indices = lambda max_cases, stride_days: [7, 11]
+            batch = {
+                "truth": torch.zeros((2, 1, 2, 2)),
+                "background": torch.ones((2, 1, 2, 2)),
+                "obs_values": torch.zeros((2, 1, 2, 2)),
+                "obs_mask": torch.ones((2, 1, 2, 2)),
+                "valid_mask": torch.ones((2, 1, 2, 2)),
+                "water_mask": torch.ones((2, 1, 2, 2)),
+            }
+            trainer._iter_indexed_batches = lambda indices, batch_size: [batch]
+
+            with patch("assim_lib.trainer.Sampler") as sampler_cls:
+                sampler_cls.return_value.sample_conditioned.side_effect = [
+                    torch.full((2, 1, 2, 2), 2.0),
+                    torch.full((2, 1, 2, 2), 4.0),
+                ]
+                trainer.compute_sample_validation_metrics(epoch=3)
+
+            artifact = torch.load(
+                Path(tmp_dir) / "samples" / "epoch_0003_metric_ensemble.pt",
+                map_location="cpu",
+                weights_only=True,
+            )
+            self.assertEqual(tuple(artifact["samples"].shape), (2, 2, 1, 2, 2))
+            self.assertEqual(artifact["samples"].dtype, torch.float16)
+            self.assertTrue(torch.equal(artifact["case_indices"], torch.tensor([7, 11])))
+            self.assertEqual(float(artifact["samples"][0, 0, 0, 0, 0]), 2.0)
+            self.assertEqual(float(artifact["samples"][0, 1, 0, 0, 0]), 4.0)
 
 
 if __name__ == "__main__":

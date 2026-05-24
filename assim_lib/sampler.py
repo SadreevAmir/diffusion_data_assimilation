@@ -48,6 +48,9 @@ class Sampler:
         valid_mask: torch.Tensor | None = None,
         obs_guidance_scale: float = 0.0,
         obs_guidance_eps: float = 1e-8,
+        initial_noise: torch.Tensor | None = None,
+        sample_target: str = "state",
+        reconstruction_background: torch.Tensor | None = None,
     ) -> torch.Tensor:
         device = device or get_device()
         background = background.to(device)
@@ -56,19 +59,35 @@ class Sampler:
         water_mask = water_mask.to(device)
         if valid_mask is not None:
             valid_mask = valid_mask.to(device)
+        if reconstruction_background is None:
+            reconstruction_background = background
+        else:
+            reconstruction_background = reconstruction_background.to(device=device, dtype=background.dtype)
         batch_size, channels = background.shape[:2]
         height, width = size
         num_timesteps = max(int(num_timesteps), 2)
+        if sample_target not in ("state", "residual"):
+            raise ValueError(f"Unknown sample_target={sample_target!r}; expected 'state' or 'residual'")
         grid = self._grid(height, width, device, background.dtype).expand(batch_size, -1, -1, -1)
+        if initial_noise is not None:
+            expected_shape = (batch_size, channels, height, width)
+            if tuple(initial_noise.shape) != expected_shape:
+                raise ValueError(
+                    f"initial_noise must have shape {expected_shape}, got {tuple(initial_noise.shape)}"
+                )
+            initial_noise = initial_noise.to(device=device, dtype=background.dtype)
 
         if start_mode == "noise":
             start_t = 1.0
-            x0 = torch.randn((batch_size, channels, height, width), device=device)
+            x0 = initial_noise if initial_noise is not None else torch.randn_like(background)
         elif start_mode == "background":
             start_t = min(max(float(start_noise_level), 0.001), 1.0)
-            eps = torch.randn_like(background)
-            x0 = (1.0 - start_t) * background + start_t * eps
+            eps = initial_noise if initial_noise is not None else torch.randn_like(background)
+            clean_start = torch.zeros_like(background) if sample_target == "residual" else background
+            x0 = (1.0 - start_t) * clean_start + start_t * eps
         elif start_mode == "bridge":
+            if sample_target == "residual":
+                raise ValueError("sample_target='residual' is not compatible with start_mode='bridge'")
             start_t = 1.0
             x0 = background
         else:
@@ -76,8 +95,17 @@ class Sampler:
 
         timesteps = torch.linspace(start_t, 0.001, num_timesteps, device=device)
 
+        def finalize(state_sample: torch.Tensor) -> torch.Tensor:
+            analysis = reconstruction_background + state_sample if sample_target == "residual" else state_sample
+            if enforce_observations:
+                analysis = torch.where(obs_mask > 0, obs_values, analysis)
+            if valid_mask is not None:
+                fill_value = reconstruction_background if sample_target == "residual" else background
+                analysis = torch.where(valid_mask > 0, analysis, fill_value)
+            return analysis
+
         if obs_guidance_scale > 0:
-            sample = self._sample_guided_euler(
+            state_sample = self._sample_guided_euler(
                 x0=x0,
                 timesteps=timesteps,
                 grid=grid,
@@ -87,12 +115,10 @@ class Sampler:
                 water_mask=water_mask,
                 obs_guidance_scale=float(obs_guidance_scale),
                 obs_guidance_eps=float(obs_guidance_eps),
+                sample_target=sample_target,
+                reconstruction_background=reconstruction_background,
             )
-            if enforce_observations:
-                sample = torch.where(obs_mask > 0, obs_values, sample)
-            if valid_mask is not None:
-                sample = torch.where(valid_mask > 0, sample, background)
-            return sample
+            return finalize(state_sample)
 
         def f(t, x):
             t_tensor = t.expand(batch_size) * 1000
@@ -108,12 +134,7 @@ class Sampler:
             kwargs["atol"] = atol
 
         trajectory = odeint(f, x0, timesteps, method=method, **kwargs)
-        sample = trajectory[-1]
-        if enforce_observations:
-            sample = torch.where(obs_mask > 0, obs_values, sample)
-        if valid_mask is not None:
-            sample = torch.where(valid_mask > 0, sample, background)
-        return sample
+        return finalize(trajectory[-1])
 
     def _sample_guided_euler(
         self,
@@ -126,6 +147,8 @@ class Sampler:
         water_mask: torch.Tensor,
         obs_guidance_scale: float,
         obs_guidance_eps: float,
+        sample_target: str,
+        reconstruction_background: torch.Tensor,
     ) -> torch.Tensor:
         batch_size = x0.shape[0]
         x = x0
@@ -148,7 +171,8 @@ class Sampler:
                 )
                 v_pred = _model_output(self.model(model_input, t_tensor))
                 x_hat = x_t - t * v_pred
-                obs_error = (x_hat - obs_values) * obs_mask
+                analysis_hat = reconstruction_background + x_hat if sample_target == "residual" else x_hat
+                obs_error = (analysis_hat - obs_values) * obs_mask
                 obs_loss = (obs_error.square().reshape(batch_size, -1).sum(dim=1) / obs_den).mean()
                 grad = torch.autograd.grad(obs_loss, x_t)[0]
 

@@ -195,9 +195,18 @@ def make_multi_case_background_condition_assim_figure(
     if not channels:
         channels = list(range(first_background.shape[0]))
 
+    analysis_columns = [("both", "assim")]
+    optional_columns = [
+        ("background only", "assim_background_only"),
+        ("obs only / bg base", "assim_observation_only"),
+        ("neither / bg base", "assim_neither"),
+    ]
+    analysis_columns.extend(
+        (title, key) for title, key in optional_columns if all(case.get(key) is not None for case in cases)
+    )
     nrows = len(cases) * len(channels)
     has_truth = all(case.get("truth") is not None for case in cases)
-    ncols = 5 if has_truth else 4
+    ncols = 3 + len(analysis_columns) + int(has_truth)
     fig, axes = plt.subplots(
         nrows,
         ncols,
@@ -206,11 +215,9 @@ def make_multi_case_background_condition_assim_figure(
         constrained_layout=True,
     )
     fig.suptitle(title, fontsize=16)
-    column_titles = (
-        ("background", "condition", "mask", "assim", "truth")
-        if has_truth
-        else ("background", "condition", "mask", "assim")
-    )
+    column_titles = ["background", "condition", "mask", *[title for title, _ in analysis_columns]]
+    if has_truth:
+        column_titles.append("truth")
 
     for case_row, case in enumerate(cases):
         background = _as_numpy(case["background"])
@@ -242,8 +249,15 @@ def make_multi_case_background_condition_assim_figure(
                 ("background", bg, cmap, vmin, vmax),
                 ("condition", cond, cmap, vmin, vmax),
                 ("mask", mask_display, "gray", 0.0, 1.0),
-                ("assim", an, cmap, vmin, vmax),
+                (analysis_columns[0][0], an, cmap, vmin, vmax),
             ]
+            for panel_name, key in analysis_columns[1:]:
+                analysis = _as_numpy(case[key])
+                values = _clip_display(_denormalize_channel(analysis[channel], channel, means, stds), channel)
+                channel_water = _channel_mask(water_mask if water_mask is not None else valid_mask, channel)
+                if channel_water is not None:
+                    values = np.where(channel_water, values, np.nan)
+                panels.append((panel_name, values, cmap, vmin, vmax))
             if target is not None:
                 panels.append(("truth", target, cmap, vmin, vmax))
             for col, (panel_name, values, panel_cmap, panel_vmin, panel_vmax) in enumerate(panels):

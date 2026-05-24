@@ -87,6 +87,8 @@ class TrainingConfig:
     metric_num_timesteps: int = 200
     metric_num_ensemble: int = 10
     metric_stride_days: int = 15
+    metric_save_ensemble_samples: bool = False
+    metric_ensemble_save_dtype: str = "float16"
 
     block_out_channels: tuple[int, ...] = (64, 128, 256, 512, 512)
     layers_per_block: int = 2
@@ -247,6 +249,8 @@ class UNetTrainer:
     ) -> tuple[torch.Tensor, torch.Tensor]:
         if self.config.training_objective == "diffusion":
             return self.add_noise(truth, timesteps)
+        if self.config.training_objective == "diffusion_residual":
+            return self.add_noise(truth - batch["background"], timesteps)
         if self.config.training_objective == "bridge":
             t = timesteps.view(-1, *([1] * (truth.dim() - 1)))
             state = (1.0 - t) * truth + t * batch["background"]
@@ -254,8 +258,11 @@ class UNetTrainer:
             return state, target_velocity
         raise ValueError(
             f"Unknown training_objective={self.config.training_objective!r}; "
-            "expected 'diffusion' or 'bridge'"
+            "expected 'diffusion', 'diffusion_residual', or 'bridge'"
         )
+
+    def _sample_target(self) -> str:
+        return "residual" if self.config.training_objective == "diffusion_residual" else "state"
 
     @contextmanager
     def _sampling_model(self):
@@ -512,7 +519,7 @@ class UNetTrainer:
             yield self._batch_to_device(raw_batch)
 
     @torch.no_grad()
-    def compute_sample_validation_metrics(self) -> dict[str, float]:
+    def compute_sample_validation_metrics(self, epoch: int | None = None) -> dict[str, float]:
         max_cases = int(self.config.metric_num_cases)
         if max_cases <= 0:
             return {}
@@ -540,6 +547,21 @@ class UNetTrainer:
             for region in ("full", "obs")
         }
         total_processed = 0
+        save_ensemble = bool(getattr(self.config, "metric_save_ensemble_samples", False)) and epoch is not None
+        saved_batches = []
+        if save_ensemble:
+            save_dtype_name = str(getattr(self.config, "metric_ensemble_save_dtype", "float16")).lower()
+            save_dtypes = {
+                "float16": torch.float16,
+                "float32": torch.float32,
+                "bfloat16": torch.bfloat16,
+            }
+            if save_dtype_name not in save_dtypes:
+                raise ValueError(
+                    "metric_ensemble_save_dtype must be one of "
+                    f"{sorted(save_dtypes)}, got {save_dtype_name!r}"
+                )
+            save_dtype = save_dtypes[save_dtype_name]
 
         self.model.eval()
         with self._sampling_model() as sample_model:
@@ -562,9 +584,21 @@ class UNetTrainer:
                             valid_mask=batch["valid_mask"],
                             obs_guidance_scale=self.config.sample_obs_guidance_scale,
                             obs_guidance_eps=self.config.sample_obs_guidance_eps,
+                            sample_target=self._sample_target(),
                         )
                     )
-                ensemble_mean = torch.stack(ensemble, dim=0).mean(dim=0)
+                ensemble_tensor = torch.stack(ensemble, dim=1)
+                ensemble_mean = ensemble_tensor.mean(dim=1)
+                if save_ensemble:
+                    saved_batches.append({
+                        "samples": ensemble_tensor.detach().to(device="cpu", dtype=save_dtype),
+                        "truth": batch["truth"].detach().to(device="cpu", dtype=save_dtype),
+                        "background": batch["background"].detach().to(device="cpu", dtype=save_dtype),
+                        "obs_values": batch["obs_values"].detach().to(device="cpu", dtype=save_dtype),
+                        "obs_mask": batch["obs_mask"].detach().to(device="cpu", dtype=save_dtype),
+                        "valid_mask": batch["valid_mask"].detach().to(device="cpu", dtype=save_dtype),
+                        "water_mask": batch["water_mask"].detach().to(device="cpu", dtype=save_dtype),
+                    })
                 for region, mask in (("full", batch["valid_mask"]), ("obs", batch["obs_mask"])):
                     background_abs, background_sq, background_count = self._masked_error_sums(
                         batch["background"], batch["truth"], mask
@@ -629,6 +663,24 @@ class UNetTrainer:
             metrics[f"analysis_rmse_skill_min_{region}"] = max(skill_values)
             metrics[f"analysis_rmse_skill_max_{region}"] = min(skill_values)
             metrics[f"analysis_rmse_skill_of_mean_{region}"] = mean_field_metrics[f"analysis_rmse_skill_{region}"]
+        if saved_batches:
+            samples_dir = os.path.join(self.output_dir, "samples")
+            os.makedirs(samples_dir, exist_ok=True)
+            artifact = {
+                key: torch.cat([batch[key] for batch in saved_batches], dim=0)
+                for key in ("samples", "truth", "background", "obs_values", "obs_mask", "valid_mask", "water_mask")
+            }
+            artifact.update({
+                "case_indices": torch.as_tensor(indices[:total_processed], dtype=torch.long),
+                "epoch": int(epoch),
+                "num_timesteps": int(metric_timesteps),
+                "num_ensemble": int(num_ensemble),
+                "stride_days": int(stride_days),
+                "save_dtype": save_dtype_name,
+            })
+            artifact_path = os.path.join(samples_dir, f"epoch_{epoch:04d}_metric_ensemble.pt")
+            torch.save(artifact, artifact_path)
+            _debug(f"saved sample validation ensemble: {artifact_path}")
         _debug(
             "sample validation metrics done "
             f"analysis_rmse_mean_full={metrics['analysis_rmse_mean_full']:.6f} "
@@ -658,6 +710,7 @@ class UNetTrainer:
                 valid_mask=one["valid_mask"],
                 obs_guidance_scale=self.config.sample_obs_guidance_scale,
                 obs_guidance_eps=self.config.sample_obs_guidance_eps,
+                sample_target=self._sample_target(),
             )
         samples_dir = os.path.join(self.output_dir, "samples")
         os.makedirs(samples_dir, exist_ok=True)
@@ -795,7 +848,7 @@ class UNetTrainer:
             for page in entry["pages"]:
                 page_idx = int(page["page_idx"])
                 self.clearml.report_image(
-                    title=f"dashboard/{slot}_background_condition_assim_truth",
+                    title=f"dashboard/{slot}_conditioning_ablation",
                     series=f"page_{page_idx:02d}",
                     path=page["path"],
                     iteration=0,
@@ -827,23 +880,47 @@ class UNetTrainer:
 
         with self._sampling_model() as sample_model:
             sampler = Sampler(sample_model)
-            assim_batch = sampler.sample_conditioned(
-                background=dashboard_batch["background"],
-                obs_values=dashboard_batch["obs_values"],
-                obs_mask=dashboard_batch["obs_mask"],
-                water_mask=dashboard_batch["water_mask"],
-                size=self.config.image_size,
-                num_timesteps=self.config.num_sample_timesteps,
-                device=self.accelerator.device,
-                start_mode=self.config.sample_start_mode,
-                start_noise_level=self.config.sample_start_noise_level,
-                enforce_observations=self.config.sample_enforce_observations,
-                valid_mask=dashboard_batch["valid_mask"],
-                obs_guidance_scale=self.config.sample_obs_guidance_scale,
-                obs_guidance_eps=self.config.sample_obs_guidance_eps,
-            )
+            initial_noise = torch.randn_like(dashboard_batch["background"])
+            zero_background = torch.zeros_like(dashboard_batch["background"])
+            zero_obs_values = torch.zeros_like(dashboard_batch["obs_values"])
+            zero_obs_mask = torch.zeros_like(dashboard_batch["obs_mask"])
+            sample_target = self._sample_target()
 
-            for case_idx, (one, assim) in enumerate(zip(cases, assim_batch)):
+            def sample_variant(background, obs_values, obs_mask):
+                return sampler.sample_conditioned(
+                    background=background,
+                    obs_values=obs_values,
+                    obs_mask=obs_mask,
+                    water_mask=dashboard_batch["water_mask"],
+                    size=self.config.image_size,
+                    num_timesteps=self.config.num_sample_timesteps,
+                    device=self.accelerator.device,
+                    start_mode=self.config.sample_start_mode,
+                    start_noise_level=self.config.sample_start_noise_level,
+                    enforce_observations=self.config.sample_enforce_observations,
+                    valid_mask=dashboard_batch["valid_mask"],
+                    obs_guidance_scale=self.config.sample_obs_guidance_scale,
+                    obs_guidance_eps=self.config.sample_obs_guidance_eps,
+                    initial_noise=initial_noise,
+                    sample_target=sample_target,
+                    reconstruction_background=(
+                        dashboard_batch["background"] if sample_target == "residual" else background
+                    ),
+                )
+
+            assim_batch = sample_variant(
+                dashboard_batch["background"], dashboard_batch["obs_values"], dashboard_batch["obs_mask"]
+            )
+            assim_background_only_batch = sample_variant(
+                dashboard_batch["background"], zero_obs_values, zero_obs_mask
+            )
+            assim_observation_only_batch = sample_variant(
+                zero_background, dashboard_batch["obs_values"], dashboard_batch["obs_mask"]
+            )
+            assim_neither_batch = sample_variant(zero_background, zero_obs_values, zero_obs_mask)
+
+            for case_idx, one in enumerate(cases):
+                assim = assim_batch[case_idx]
 
                 analysis_mae, analysis_rmse = self._masked_error_metrics(
                     assim,
@@ -871,6 +948,9 @@ class UNetTrainer:
                     "obs_values": one["obs_values"][0],
                     "obs_mask": one["obs_mask"][0],
                     "assim": assim,
+                    "assim_background_only": assim_background_only_batch[case_idx],
+                    "assim_observation_only": assim_observation_only_batch[case_idx],
+                    "assim_neither": assim_neither_batch[case_idx],
                     "truth": one["truth"][0],
                     "valid_mask": one["valid_mask"][0],
                     "water_mask": one["water_mask"][0],
@@ -881,7 +961,7 @@ class UNetTrainer:
         cases_per_page = max(_DASHBOARD_CASES_PER_PAGE, 1)
         for page_idx, page_cases in self._chunks(dashboard_cases, cases_per_page):
             title = (
-                f"background | condition | assim | truth, epoch {epoch}, "
+                f"conditioning ablation, shared initial noise, epoch {epoch}, "
                 f"page {page_idx}, cases {len(page_cases)}"
             )
             fig = make_multi_case_background_condition_assim_figure(
@@ -896,7 +976,7 @@ class UNetTrainer:
             )
             figure_path = os.path.join(
                 samples_dir,
-                f"epoch_{epoch:04d}_dashboard_page_{page_idx:02d}_background_condition_assim_truth.png",
+                f"epoch_{epoch:04d}_dashboard_page_{page_idx:02d}_conditioning_ablation.png",
             )
             fig.savefig(figure_path, dpi=_DASHBOARD_DPI, bbox_inches="tight")
             plt.close(fig)
@@ -960,7 +1040,7 @@ class UNetTrainer:
             if (self.accelerator.is_main_process
                     and self.config.metric_every_n_epochs > 0
                     and epoch % self.config.metric_every_n_epochs == 0):
-                sample_metrics = self.compute_sample_validation_metrics()
+                sample_metrics = self.compute_sample_validation_metrics(epoch=epoch)
 
             history_entry = {
                 "epoch": epoch,

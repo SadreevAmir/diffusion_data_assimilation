@@ -1,0 +1,41 @@
+{
+  "project_name": "smoke_concat_conditioning",
+  "task_name": "smoke_concat_conditioning_residual_2f",
+  "data_config": "../data/smoke_m2m_2f.json",
+  "model_config": "../methods/concat_conditioning_2f.json",
+  "clearml": {
+    "tags": ["smoke", "concat_conditioning", "residual", "2f", "m2m"],
+    "upload_checkpoints": true
+  },
+  "training": {
+    "image_size": [16, 16],
+    "in_channels": 11,
+    "out_channels": 2,
+    "train_batch_size": 2,
+    "eval_batch_size": 2,
+    "num_workers_train": 0,
+    "num_workers_val": 0,
+    "num_epochs": 1,
+    "learning_rate": 0.0001,
+    "lr_warmup_steps": 0,
+    "mixed_precision": "no",
+    "seed": 11,
+    "obs_loss_weight": 0.1,
+    "sample_every_n_epochs": 0,
+    "num_sample_timesteps": 2,
+    "metric_every_n_epochs": 1,
+    "metric_num_cases": 1,
+    "metric_num_timesteps": 2,
+    "metric_num_ensemble": 2,
+    "metric_stride_days": 1,
+    "metric_save_ensemble_samples": false,
+    "base_output_dir": "outputs/concat_conditioning_residual_2f_smoke",
+    "run_name": "smoke",
+    "tracker": null,
+    "block_out_channels": [16, 32],
+    "layers_per_block": 1,
+    "down_block_types": ["DownBlock2D", "DownBlock2D"],
+    "up_block_types": ["UpBlock2D", "UpBlock2D"],
+    "norm_num_groups": 8
+  }
+}
