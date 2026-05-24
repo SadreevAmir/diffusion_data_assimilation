@@ -50,7 +50,6 @@ class Sampler:
         obs_guidance_eps: float = 1e-8,
         initial_noise: torch.Tensor | None = None,
         sample_target: str = "state",
-        reconstruction_background: torch.Tensor | None = None,
     ) -> torch.Tensor:
         device = device or get_device()
         background = background.to(device)
@@ -59,10 +58,6 @@ class Sampler:
         water_mask = water_mask.to(device)
         if valid_mask is not None:
             valid_mask = valid_mask.to(device)
-        if reconstruction_background is None:
-            reconstruction_background = background
-        else:
-            reconstruction_background = reconstruction_background.to(device=device, dtype=background.dtype)
         batch_size, channels = background.shape[:2]
         height, width = size
         num_timesteps = max(int(num_timesteps), 2)
@@ -96,12 +91,11 @@ class Sampler:
         timesteps = torch.linspace(start_t, 0.001, num_timesteps, device=device)
 
         def finalize(state_sample: torch.Tensor) -> torch.Tensor:
-            analysis = reconstruction_background + state_sample if sample_target == "residual" else state_sample
+            analysis = background + state_sample if sample_target == "residual" else state_sample
             if enforce_observations:
                 analysis = torch.where(obs_mask > 0, obs_values, analysis)
             if valid_mask is not None:
-                fill_value = reconstruction_background if sample_target == "residual" else background
-                analysis = torch.where(valid_mask > 0, analysis, fill_value)
+                analysis = torch.where(valid_mask > 0, analysis, background)
             return analysis
 
         if obs_guidance_scale > 0:
@@ -116,7 +110,6 @@ class Sampler:
                 obs_guidance_scale=float(obs_guidance_scale),
                 obs_guidance_eps=float(obs_guidance_eps),
                 sample_target=sample_target,
-                reconstruction_background=reconstruction_background,
             )
             return finalize(state_sample)
 
@@ -148,7 +141,6 @@ class Sampler:
         obs_guidance_scale: float,
         obs_guidance_eps: float,
         sample_target: str,
-        reconstruction_background: torch.Tensor,
     ) -> torch.Tensor:
         batch_size = x0.shape[0]
         x = x0
@@ -171,7 +163,7 @@ class Sampler:
                 )
                 v_pred = _model_output(self.model(model_input, t_tensor))
                 x_hat = x_t - t * v_pred
-                analysis_hat = reconstruction_background + x_hat if sample_target == "residual" else x_hat
+                analysis_hat = background + x_hat if sample_target == "residual" else x_hat
                 obs_error = (analysis_hat - obs_values) * obs_mask
                 obs_loss = (obs_error.square().reshape(batch_size, -1).sum(dim=1) / obs_den).mean()
                 grad = torch.autograd.grad(obs_loss, x_t)[0]

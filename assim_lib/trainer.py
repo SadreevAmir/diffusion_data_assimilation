@@ -217,9 +217,7 @@ class UNetTrainer:
             for key in ("truth", "background", "obs_values", "obs_mask", "valid_mask", "water_mask")
         }
 
-    def _make_model_input(self, noisy_truth: torch.Tensor, batch: dict[str, torch.Tensor]) -> torch.Tensor:
-        batch_size = noisy_truth.shape[0]
-        grid = self._grid.expand(batch_size, -1, -1, -1)
+    def _conditioned_background(self, batch: dict[str, torch.Tensor]) -> torch.Tensor:
         background = batch["background"]
         dropout_probability = float(getattr(self.config, "background_dropout_probability", 0.0))
         if not 0.0 <= dropout_probability <= 1.0:
@@ -229,9 +227,21 @@ class UNetTrainer:
             )
         if self.model.training and dropout_probability > 0.0:
             keep = (
-                torch.rand((batch_size, 1, 1, 1), device=background.device) >= dropout_probability
+                torch.rand((background.shape[0], 1, 1, 1), device=background.device) >= dropout_probability
             ).to(dtype=background.dtype)
             background = background * keep
+        return background
+
+    def _make_model_input(
+        self,
+        noisy_truth: torch.Tensor,
+        batch: dict[str, torch.Tensor],
+        background: torch.Tensor | None = None,
+    ) -> torch.Tensor:
+        batch_size = noisy_truth.shape[0]
+        grid = self._grid.expand(batch_size, -1, -1, -1)
+        if background is None:
+            background = self._conditioned_background(batch)
         return make_conditioned_model_input(
             noisy_truth,
             grid,
@@ -246,11 +256,13 @@ class UNetTrainer:
         truth: torch.Tensor,
         batch: dict[str, torch.Tensor],
         timesteps: torch.Tensor,
+        residual_background: torch.Tensor | None = None,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         if self.config.training_objective == "diffusion":
             return self.add_noise(truth, timesteps)
         if self.config.training_objective == "diffusion_residual":
-            return self.add_noise(truth - batch["background"], timesteps)
+            background = batch["background"] if residual_background is None else residual_background
+            return self.add_noise(truth - background, timesteps)
         if self.config.training_objective == "bridge":
             t = timesteps.view(-1, *([1] * (truth.dim() - 1)))
             state = (1.0 - t) * truth + t * batch["background"]
@@ -410,9 +422,12 @@ class UNetTrainer:
                 truth = batch["truth"]
                 batch_size = truth.shape[0]
                 timesteps = self._sample_timesteps(batch_size)
-                model_state, v_real = self._make_training_pair(truth, batch, timesteps)
+                background = self._conditioned_background(batch)
+                model_state, v_real = self._make_training_pair(
+                    truth, batch, timesteps, residual_background=background
+                )
 
-                model_input = self._make_model_input(model_state, batch)
+                model_input = self._make_model_input(model_state, batch, background=background)
                 v_pred = self.model(model_input, timesteps * 1000, return_dict=False)[0]
                 loss_full = self._masked_mse(v_pred, v_real, batch["valid_mask"])
                 loss_obs = self._masked_mse(v_pred, v_real, batch["obs_mask"])
@@ -903,9 +918,6 @@ class UNetTrainer:
                     obs_guidance_eps=self.config.sample_obs_guidance_eps,
                     initial_noise=initial_noise,
                     sample_target=sample_target,
-                    reconstruction_background=(
-                        dashboard_batch["background"] if sample_target == "residual" else background
-                    ),
                 )
 
             assim_batch = sample_variant(
@@ -1000,10 +1012,13 @@ class UNetTrainer:
                 truth = batch["truth"]
                 batch_size = truth.shape[0]
                 timesteps = self._sample_timesteps(batch_size)
-                model_state, v_real = self._make_training_pair(truth, batch, timesteps)
+                background = self._conditioned_background(batch)
+                model_state, v_real = self._make_training_pair(
+                    truth, batch, timesteps, residual_background=background
+                )
 
                 with self.accelerator.accumulate(self.model):
-                    model_input = self._make_model_input(model_state, batch)
+                    model_input = self._make_model_input(model_state, batch, background=background)
                     v_pred = self.model(model_input, timesteps * 1000, return_dict=False)[0]
                     loss_full = self._masked_mse(v_pred, v_real, batch["valid_mask"])
                     loss_obs = self._masked_mse(v_pred, v_real, batch["obs_mask"])

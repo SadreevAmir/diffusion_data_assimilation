@@ -100,13 +100,12 @@ class AssimLibConditioningTests(unittest.TestCase):
     def test_residual_sampler_returns_background_plus_generated_correction(self):
         background = torch.full((1, 1, 2, 2), 5.0)
         correction = torch.full_like(background, 2.0)
-        hidden_background = torch.zeros_like(background)
         sampler = Sampler(model=object())
 
         with patch("assim_lib.sampler.odeint") as odeint:
             odeint.side_effect = lambda f, x0, timesteps, **kwargs: torch.stack([x0, correction], dim=0)
             analysis = sampler.sample_conditioned(
-                background=hidden_background,
+                background=background,
                 obs_values=torch.zeros_like(background),
                 obs_mask=torch.zeros_like(background),
                 water_mask=torch.ones_like(background),
@@ -115,10 +114,30 @@ class AssimLibConditioningTests(unittest.TestCase):
                 device=torch.device("cpu"),
                 start_mode="noise",
                 sample_target="residual",
-                reconstruction_background=background,
             )
 
         torch.testing.assert_close(analysis, torch.full_like(background, 7.0))
+
+    def test_residual_sampler_with_zero_background_returns_absolute_prediction(self):
+        background = torch.zeros((1, 1, 2, 2))
+        correction = torch.full_like(background, 2.0)
+        sampler = Sampler(model=object())
+
+        with patch("assim_lib.sampler.odeint") as odeint:
+            odeint.side_effect = lambda f, x0, timesteps, **kwargs: torch.stack([x0, correction], dim=0)
+            analysis = sampler.sample_conditioned(
+                background=background,
+                obs_values=torch.zeros_like(background),
+                obs_mask=torch.zeros_like(background),
+                water_mask=torch.ones_like(background),
+                size=(2, 2),
+                num_timesteps=2,
+                device=torch.device("cpu"),
+                start_mode="noise",
+                sample_target="residual",
+            )
+
+        torch.testing.assert_close(analysis, correction)
 
     def test_background_dropout_only_zeroes_train_conditioning_input(self):
         trainer = object.__new__(UNetTrainer)
@@ -156,6 +175,22 @@ class AssimLibConditioningTests(unittest.TestCase):
 
         torch.testing.assert_close(model_state, torch.full_like(truth, 3.0))
         torch.testing.assert_close(target, torch.full_like(truth, 3.0))
+
+    def test_residual_diffusion_uses_dropped_background_for_target(self):
+        trainer = object.__new__(UNetTrainer)
+        trainer.config = SimpleNamespace(training_objective="diffusion_residual")
+        trainer.add_noise = lambda target, timesteps: (target, target)
+        truth = torch.full((1, 1, 2, 2), 5.0)
+        dropped_background = torch.zeros_like(truth)
+
+        _, target = trainer._make_training_pair(
+            truth,
+            {"background": torch.full_like(truth, 2.0)},
+            torch.tensor([0.5]),
+            residual_background=dropped_background,
+        )
+
+        torch.testing.assert_close(target, truth)
 
     def test_m2m_masks_are_zero_in_land_invalid_and_padding_regions(self):
         with tempfile.TemporaryDirectory() as tmp_dir:

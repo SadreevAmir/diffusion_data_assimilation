@@ -198,8 +198,8 @@ def make_multi_case_background_condition_assim_figure(
     analysis_columns = [("both", "assim")]
     optional_columns = [
         ("background only", "assim_background_only"),
-        ("obs only / bg base", "assim_observation_only"),
-        ("neither / bg base", "assim_neither"),
+        ("observation only", "assim_observation_only"),
+        ("neither", "assim_neither"),
     ]
     analysis_columns.extend(
         (title, key) for title, key in optional_columns if all(case.get(key) is not None for case in cases)
