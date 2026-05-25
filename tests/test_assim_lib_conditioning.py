@@ -260,12 +260,14 @@ class AssimLibConditioningTests(unittest.TestCase):
         self.assertEqual(float(sample["obs_mask"][:, 2, :].sum()), 0.0)
         self.assertEqual(float(sample["obs_mask"][:, :, 2:].sum()), 0.0)
 
-        # A NaN in truth invalidates only its field channel. The generated observation
-        # footprint is spatial and follows channel 0 validity for every observed channel.
-        self.assertEqual(float(sample["valid_mask"][0, 1, 1]), 0.0)
+        # valid_mask and the observation footprint carry only the global land/padding mask:
+        # per-case truth/background finite info is intentionally excluded to avoid leaking
+        # truth's coverage through the sampler's finalize overlay. A NaN in truth represents
+        # "no ice" (water) in this dataset and is treated as a valid observable value.
+        self.assertEqual(float(sample["valid_mask"][0, 1, 1]), 1.0)
         self.assertEqual(float(sample["valid_mask"][1, 1, 1]), 1.0)
-        self.assertEqual(float(sample["obs_mask"][0, 1, 1]), 0.0)
-        self.assertEqual(float(sample["obs_mask"][1, 1, 1]), 0.0)
+        self.assertEqual(float(sample["obs_mask"][0, 1, 1]), 1.0)
+        self.assertEqual(float(sample["obs_mask"][1, 1, 1]), 1.0)
 
     def test_sral_mix_can_force_synthetic_generated_tracks(self):
         with tempfile.TemporaryDirectory() as tmp_dir:

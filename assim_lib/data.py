@@ -571,7 +571,7 @@ class M2MForecastDataset(Dataset):
         back_record, background_offset_days = self._select_background_record(
             target_record.date, idx, day_idx
         )
-        background, background_finite = prepare_model_field(
+        background, _ = prepare_model_field(
             _field_at_hour(back_record.path, hour, self.indices),
             None,
             self.means,
@@ -579,7 +579,7 @@ class M2MForecastDataset(Dataset):
             self.padding_values,
             self.image_size,
         )
-        truth, truth_finite = prepare_model_field(
+        truth, _ = prepare_model_field(
             _field_at_hour(target_record.path, hour, self.indices),
             None,
             self.means,
@@ -587,7 +587,7 @@ class M2MForecastDataset(Dataset):
             self.padding_values,
             self.image_size,
         )
-        valid_mask = self.base_valid_mask * background_finite * truth_finite
+        valid_mask = self.base_valid_mask.clone()
 
         rng = np.random.default_rng(self.seed + idx)
         mask_config = self.config.get("observation_mask", {})

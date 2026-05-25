@@ -9,7 +9,7 @@
   "indices": [0, 1, 2, 8],
   "means": [0.5, 0.5, -3.0, 3.0],
   "stds": [0.5, 0.5, 0.5, 5.0],
-  "padding_values": [0.0, 0.0, -1.0, 0.0],
+  "padding_values": [0.0, 0.0, -3.0, 0.0],
   "image_size": [320, 256],
   "target_hour_index": 23,
   "hour_mode": "all",
