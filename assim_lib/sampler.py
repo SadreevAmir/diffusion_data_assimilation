@@ -50,6 +50,7 @@ class Sampler:
         obs_guidance_eps: float = 1e-8,
         initial_noise: torch.Tensor | None = None,
         sample_target: str = "state",
+        memory_efficient_euler: bool = False,
     ) -> torch.Tensor:
         device = device or get_device()
         background = background.to(device)
@@ -117,6 +118,12 @@ class Sampler:
             t_tensor = t.expand(batch_size) * 1000
             model_input = make_conditioned_model_input(x, grid, background, obs_values, obs_mask, water_mask)
             return _model_output(self.model(model_input, t_tensor))
+
+        if memory_efficient_euler and method == "euler":
+            state = x0
+            for index in range(timesteps.numel() - 1):
+                state = state + (timesteps[index + 1] - timesteps[index]) * f(timesteps[index], state)
+            return finalize(state)
 
         kwargs = {}
         if method in _FIXED_STEP_METHODS:

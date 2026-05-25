@@ -1,0 +1,23 @@
+{
+  "project_name": "m2m_concat_conditioning_evaluation",
+  "task_name": "evaluate_concat_conditioning_4f_1y_best",
+  "data_config": "../data/m2m_4f_1y.json",
+  "model_config": "../methods/concat_conditioning_4f.json",
+  "evaluation": {
+    "checkpoint_name": "ema_best_model.pth",
+    "split": "valid",
+    "stride_days": 15,
+    "ensemble_size": 15,
+    "sample_batch_size": 16,
+    "num_timesteps": 50,
+    "method": "euler",
+    "inference_precision": "auto",
+    "seed": 1234,
+    "save_ensembles": true
+  },
+  "clearml": {
+    "enabled": true,
+    "tags": ["m2m", "concat_conditioning", "4f", "evaluation", "physical_metrics"],
+    "upload_samples": false
+  }
+}
