@@ -577,6 +577,8 @@ def evaluate(args: argparse.Namespace) -> dict[str, Any]:
         "sample_target": sample_target,
         "sample_start_mode": training.sample_start_mode,
         "values_space": "physical",
+        "normalization_means": means,
+        "normalization_stds": stds,
         "concentration_channel": concentration_channel,
         "concentration_clipping": "[0, 1]" if concentration_channel is not None else None,
         "condition_note": condition_note,
