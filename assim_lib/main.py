@@ -17,6 +17,16 @@ def resolve_path(path: str | Path, base_dir: Path) -> Path:
     return base_dir / path
 
 
+def merge_config_overrides(config: dict, overrides: dict | None) -> dict:
+    merged = dict(config)
+    for key, value in (overrides or {}).items():
+        if isinstance(value, dict) and isinstance(merged.get(key), dict):
+            merged[key] = {**merged[key], **value}
+        else:
+            merged[key] = value
+    return merged
+
+
 def _debug(message: str) -> None:
     print(f"[assim_lib] {message}", flush=True)
 
@@ -43,7 +53,7 @@ def main(config: dict, config_dir: Path):
     data_config_path = resolve_path(config["data_config"], config_dir)
     model_config_path = resolve_path(config["model_config"], config_dir)
     _debug(f"loading data config: {data_config_path}")
-    data_config = load_json(data_config_path)
+    data_config = merge_config_overrides(load_json(data_config_path), config.get("data_overrides"))
     _debug(f"loading model config: {model_config_path}")
     model_config_raw = load_json(model_config_path)
 

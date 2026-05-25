@@ -20,7 +20,7 @@ from utils import get_device
 
 from .clearml_tracking import ClearMLTracker
 from .data import build_dataset
-from .main import load_json, resolve_path
+from .main import load_json, merge_config_overrides, resolve_path
 from .model_io import load_sampler
 from .trainer import TrainingConfig
 from .transforms import channel_denormalize
@@ -261,6 +261,8 @@ def _apply_evaluation_config(args: argparse.Namespace, experiment: dict) -> argp
         "max_cases": None,
         "num_timesteps": None,
         "method": "euler",
+        "rtol": None,
+        "atol": None,
         "device": "",
         "inference_precision": "auto",
         "seed": 1234,
@@ -313,6 +315,8 @@ def _start_clearml(
                 "max_cases": args.max_cases,
                 "num_timesteps": args.num_timesteps,
                 "method": args.method,
+                "rtol": args.rtol,
+                "atol": args.atol,
                 "device": args.device,
                 "inference_precision": args.inference_precision,
                 "seed": args.seed,
@@ -364,6 +368,8 @@ def generate_ensemble(
     seed: int,
     case_order: int,
     sample_target: str,
+    rtol: float = 1e-3,
+    atol: float = 1e-4,
     autocast_dtype: torch.dtype | None = None,
     progress=None,
 ) -> torch.Tensor:
@@ -394,6 +400,8 @@ def generate_ensemble(
                 num_timesteps=num_timesteps,
                 device=device,
                 method=method,
+                rtol=rtol,
+                atol=atol,
                 start_mode=config.sample_start_mode,
                 start_noise_level=config.sample_start_noise_level,
                 enforce_observations=config.sample_enforce_observations,
@@ -402,12 +410,38 @@ def generate_ensemble(
                 obs_guidance_eps=config.sample_obs_guidance_eps,
                 initial_noise=initial_noise,
                 sample_target=sample_target,
-                memory_efficient_euler=True,
+                memory_efficient_euler=method == "euler",
             )
         samples.append(sample.cpu())
         if progress is not None:
             progress.update(batch_size)
     return torch.cat(samples, dim=0)
+
+
+def apply_sampler_normalization(dataset, sampler, data_config: dict) -> tuple[list[float], list[float]]:
+    configured_means = list(getattr(dataset, "means", data_config.get("means", [])))
+    configured_stds = list(getattr(dataset, "stds", data_config.get("stds", [])))
+    metadata = getattr(sampler, "metadata", {}) or {}
+    means = metadata.get("normalization_means")
+    stds = metadata.get("normalization_stds")
+    if means is None or stds is None:
+        return configured_means, configured_stds
+    means = list(means)
+    stds = list(stds)
+    if configured_means != means or configured_stds != stds:
+        warnings.warn(
+            "Evaluation data_config normalization differs from checkpoint metadata; "
+            "using checkpoint normalization.",
+            stacklevel=2,
+        )
+    dataset.means = means
+    dataset.stds = stds
+    if hasattr(dataset, "config"):
+        dataset.config["means"] = means
+        dataset.config["stds"] = stds
+    data_config["means"] = means
+    data_config["stds"] = stds
+    return means, stds
 
 
 def evaluate(args: argparse.Namespace) -> dict[str, Any]:
@@ -427,7 +461,7 @@ def evaluate(args: argparse.Namespace) -> dict[str, Any]:
 
     data_config_path = resolve_path(experiment["data_config"], experiment_path.parent).resolve()
     model_config_path = resolve_path(experiment["model_config"], experiment_path.parent).resolve()
-    data_config = load_json(data_config_path)
+    data_config = merge_config_overrides(load_json(data_config_path), experiment.get("data_overrides"))
     raw_model_config = load_json(model_config_path)
     model_config = {**raw_model_config, **experiment.get("training", {})}
     training = TrainingConfig.from_dict(model_config)
@@ -446,10 +480,22 @@ def evaluate(args: argparse.Namespace) -> dict[str, Any]:
     if not checkpoint_path.exists():
         raise FileNotFoundError(f"Checkpoint does not exist: {checkpoint_path}")
     sampler = load_sampler(str(run_dir), args.checkpoint_name, model_config, device=device)
+    means, stds = apply_sampler_normalization(dataset, sampler, data_config)
+    sampler_metadata = getattr(sampler, "metadata", {}) or {}
+    normalization_source = (
+        "checkpoint_metadata"
+        if sampler_metadata.get("normalization_means") is not None
+        and sampler_metadata.get("normalization_stds") is not None
+        else "data_config"
+    )
 
     timesteps = args.num_timesteps
     if timesteps is None:
         timesteps = training.metric_num_timesteps or training.num_sample_timesteps
+    rtol = float(training.sample_rtol if args.rtol is None else args.rtol)
+    atol = float(training.sample_atol if args.atol is None else args.atol)
+    args.rtol = rtol
+    args.atol = atol
     output_dir = (
         Path(args.output_dir).resolve()
         if args.output_dir
@@ -462,8 +508,6 @@ def evaluate(args: argparse.Namespace) -> dict[str, Any]:
     clearml = _start_clearml(experiment, args, data_config, raw_model_config)
 
     fields = list(getattr(dataset, "config", data_config).get("fields", data_config.get("fields", [])))
-    means = list(getattr(dataset, "means", data_config.get("means", [0.0] * len(fields))))
-    stds = list(getattr(dataset, "stds", data_config.get("stds", [1.0] * len(fields))))
     concentration_channel = fields.index("siconc") if "siconc" in fields else None
     if training.sample_start_mode == "bridge" and args.ensemble_size > 1:
         warnings.warn(
@@ -503,6 +547,8 @@ def evaluate(args: argparse.Namespace) -> dict[str, Any]:
                 seed=args.seed,
                 case_order=case_order,
                 sample_target=sample_target,
+                rtol=rtol,
+                atol=atol,
                 autocast_dtype=autocast_dtype,
                 progress=progress,
             )
@@ -574,11 +620,14 @@ def evaluate(args: argparse.Namespace) -> dict[str, Any]:
         "memory_efficient_euler": args.method == "euler",
         "num_timesteps": timesteps,
         "sampling_method": args.method,
+        "sampling_rtol": rtol,
+        "sampling_atol": atol,
         "sample_target": sample_target,
         "sample_start_mode": training.sample_start_mode,
         "values_space": "physical",
         "normalization_means": means,
         "normalization_stds": stds,
+        "normalization_source": normalization_source,
         "concentration_channel": concentration_channel,
         "concentration_clipping": "[0, 1]" if concentration_channel is not None else None,
         "condition_note": condition_note,
@@ -618,6 +667,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-cases", type=int, default=None, help="Optional maximum number of selected cases.")
     parser.add_argument("--num-timesteps", type=int, default=None, help="Override sampling time steps.")
     parser.add_argument("--method", default=None, choices=("euler", "dopri5"), help="ODE solver method.")
+    parser.add_argument("--rtol", type=float, default=None, help="Relative tolerance for adaptive ODE solvers.")
+    parser.add_argument("--atol", type=float, default=None, help="Absolute tolerance for adaptive ODE solvers.")
     parser.add_argument("--device", default=None, help="Torch device; defaults to repository device selection.")
     parser.add_argument(
         "--inference-precision",

@@ -34,6 +34,8 @@ _DASHBOARD_CHANNELS = (0,)
 _DASHBOARD_DPI = 200
 _DASHBOARD_PANEL_WIDTH = 3.6
 _DASHBOARD_PANEL_HEIGHT = 2.5
+_DASHBOARD_LARGE_PANEL_WIDTH = 5.5
+_DASHBOARD_LARGE_PANEL_HEIGHT = 4.4
 
 
 def _debug(message: str) -> None:
@@ -64,8 +66,12 @@ class TrainingConfig:
     timestep_beta_params: tuple[float, float] = (2.0, 1.0)
     obs_loss_weight: float = 0.1
     background_dropout_probability: float = 0.0
+    conditioning_mode_probabilities: dict[str, float] | None = None
     sample_every_n_epochs: int = 1
     num_sample_timesteps: int = 200
+    sample_method: str = "euler"
+    sample_rtol: float = 1e-3
+    sample_atol: float = 1e-4
     sample_use_ema: bool = True
     sample_start_mode: str = "background"
     sample_start_noise_level: float = 0.5
@@ -163,6 +169,17 @@ class UNetTrainer:
             os.makedirs(self.output_dir, exist_ok=True)
             with open(os.path.join(self.output_dir, "config.json"), "w") as f:
                 json.dump(_jsonable(asdict(config)), f, indent=4)
+            run_metadata = {
+                "fields": self.fields,
+                "normalization_means": self.channel_means,
+                "normalization_stds": self.channel_stds,
+                "data_config": _jsonable(self.data_config),
+                "training_config": _jsonable(asdict(config)),
+                "experiment_config": _jsonable(experiment_config) if experiment_config is not None else None,
+                "model_config": _jsonable(model_config) if model_config is not None else None,
+            }
+            with open(os.path.join(self.output_dir, "metadata.json"), "w") as f:
+                json.dump(run_metadata, f, indent=4)
             _debug("initializing ClearML on main process")
             self.clearml = ClearMLTracker(
                 project_name=config.clearml_project_name,
@@ -178,6 +195,7 @@ class UNetTrainer:
                 self.clearml.connect("model_config", _jsonable(model_config))
             if data_config is not None:
                 self.clearml.connect("data_config", _jsonable(data_config))
+            self.clearml.connect("run_metadata", run_metadata)
         else:
             _debug("non-main process: ClearML init skipped")
 
@@ -217,8 +235,38 @@ class UNetTrainer:
             for key in ("truth", "background", "obs_values", "obs_mask", "valid_mask", "water_mask")
         }
 
-    def _conditioned_background(self, batch: dict[str, torch.Tensor]) -> torch.Tensor:
+    def _conditioned_inputs(
+        self, batch: dict[str, torch.Tensor]
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         background = batch["background"]
+        obs_values = batch["obs_values"]
+        obs_mask = batch["obs_mask"]
+        mode_probabilities = getattr(self.config, "conditioning_mode_probabilities", None)
+        if mode_probabilities is not None:
+            names = ("no_background", "no_track", "no_conditioning", "both")
+            unexpected = set(mode_probabilities) - set(names)
+            if unexpected:
+                raise ValueError(f"Unknown conditioning modes: {sorted(unexpected)}")
+            probabilities = [float(mode_probabilities.get(name, 0.0)) for name in names]
+            if any(probability < 0.0 for probability in probabilities):
+                raise ValueError("conditioning_mode_probabilities cannot contain negative values")
+            if not math.isclose(sum(probabilities), 1.0, rel_tol=0.0, abs_tol=1e-6):
+                raise ValueError("conditioning_mode_probabilities must sum to 1.0")
+            if self.model.training:
+                draw = torch.rand((background.shape[0], 1, 1, 1), device=background.device)
+                no_background = draw < probabilities[0]
+                no_track = (draw >= probabilities[0]) & (draw < probabilities[0] + probabilities[1])
+                no_conditioning = (
+                    (draw >= probabilities[0] + probabilities[1])
+                    & (draw < probabilities[0] + probabilities[1] + probabilities[2])
+                )
+                keep_background = (~(no_background | no_conditioning)).to(dtype=background.dtype)
+                keep_track = (~(no_track | no_conditioning)).to(dtype=obs_values.dtype)
+                background = background * keep_background
+                obs_values = obs_values * keep_track
+                obs_mask = obs_mask * keep_track.to(dtype=obs_mask.dtype)
+            return background, obs_values, obs_mask
+
         dropout_probability = float(getattr(self.config, "background_dropout_probability", 0.0))
         if not 0.0 <= dropout_probability <= 1.0:
             raise ValueError(
@@ -230,24 +278,32 @@ class UNetTrainer:
                 torch.rand((background.shape[0], 1, 1, 1), device=background.device) >= dropout_probability
             ).to(dtype=background.dtype)
             background = background * keep
-        return background
+        return background, obs_values, obs_mask
+
+    def _conditioned_background(self, batch: dict[str, torch.Tensor]) -> torch.Tensor:
+        return self._conditioned_inputs(batch)[0]
 
     def _make_model_input(
         self,
         noisy_truth: torch.Tensor,
         batch: dict[str, torch.Tensor],
         background: torch.Tensor | None = None,
+        obs_values: torch.Tensor | None = None,
+        obs_mask: torch.Tensor | None = None,
     ) -> torch.Tensor:
         batch_size = noisy_truth.shape[0]
         grid = self._grid.expand(batch_size, -1, -1, -1)
-        if background is None:
-            background = self._conditioned_background(batch)
+        if background is None or obs_values is None or obs_mask is None:
+            conditioned_background, conditioned_obs_values, conditioned_obs_mask = self._conditioned_inputs(batch)
+            background = conditioned_background if background is None else background
+            obs_values = conditioned_obs_values if obs_values is None else obs_values
+            obs_mask = conditioned_obs_mask if obs_mask is None else obs_mask
         return make_conditioned_model_input(
             noisy_truth,
             grid,
             background,
-            batch["obs_values"],
-            batch["obs_mask"],
+            obs_values,
+            obs_mask,
             batch["water_mask"],
         )
 
@@ -275,6 +331,15 @@ class UNetTrainer:
 
     def _sample_target(self) -> str:
         return "residual" if self.config.training_objective == "diffusion_residual" else "state"
+
+    def _sample_solver_kwargs(self) -> dict[str, object]:
+        method = str(getattr(self.config, "sample_method", "euler"))
+        return {
+            "method": method,
+            "rtol": float(getattr(self.config, "sample_rtol", 1e-3)),
+            "atol": float(getattr(self.config, "sample_atol", 1e-4)),
+            "memory_efficient_euler": method == "euler",
+        }
 
     @contextmanager
     def _sampling_model(self):
@@ -404,6 +469,7 @@ class UNetTrainer:
             return
         output_dir = os.path.abspath(self.output_dir)
         self.clearml.upload_artifact("training_config", os.path.join(output_dir, "config.json"))
+        self.clearml.upload_artifact("run_metadata", os.path.join(output_dir, "metadata.json"))
         self.clearml.upload_artifact("metrics", os.path.join(output_dir, "metrics.json"))
         if self.config.clearml_upload_checkpoints:
             for name in ("last_model.pth", "ema_last_model.pth", "best_model.pth", "ema_best_model.pth"):
@@ -422,12 +488,14 @@ class UNetTrainer:
                 truth = batch["truth"]
                 batch_size = truth.shape[0]
                 timesteps = self._sample_timesteps(batch_size)
-                background = self._conditioned_background(batch)
+                background, obs_values, obs_mask = self._conditioned_inputs(batch)
                 model_state, v_real = self._make_training_pair(
                     truth, batch, timesteps, residual_background=background
                 )
 
-                model_input = self._make_model_input(model_state, batch, background=background)
+                model_input = self._make_model_input(
+                    model_state, batch, background=background, obs_values=obs_values, obs_mask=obs_mask
+                )
                 v_pred = self.model(model_input, timesteps * 1000, return_dict=False)[0]
                 loss_full = self._masked_mse(v_pred, v_real, batch["valid_mask"])
                 loss_obs = self._masked_mse(v_pred, v_real, batch["obs_mask"])
@@ -600,6 +668,7 @@ class UNetTrainer:
                             obs_guidance_scale=self.config.sample_obs_guidance_scale,
                             obs_guidance_eps=self.config.sample_obs_guidance_eps,
                             sample_target=self._sample_target(),
+                            **self._sample_solver_kwargs(),
                         )
                     )
                 ensemble_tensor = torch.stack(ensemble, dim=1)
@@ -675,8 +744,8 @@ class UNetTrainer:
                 metrics[f"{key}_of_mean_{region}"] = mean_field_metrics[f"{key}_{region}"]
             skill_values = [member[f"analysis_rmse_skill_{region}"] for member in member_metrics]
             metrics[f"analysis_rmse_skill_mean_{region}"] = sum(skill_values) / len(skill_values)
-            metrics[f"analysis_rmse_skill_min_{region}"] = max(skill_values)
-            metrics[f"analysis_rmse_skill_max_{region}"] = min(skill_values)
+            metrics[f"analysis_rmse_skill_min_{region}"] = min(skill_values)
+            metrics[f"analysis_rmse_skill_max_{region}"] = max(skill_values)
             metrics[f"analysis_rmse_skill_of_mean_{region}"] = mean_field_metrics[f"analysis_rmse_skill_{region}"]
         if saved_batches:
             samples_dir = os.path.join(self.output_dir, "samples")
@@ -726,6 +795,7 @@ class UNetTrainer:
                 obs_guidance_scale=self.config.sample_obs_guidance_scale,
                 obs_guidance_eps=self.config.sample_obs_guidance_eps,
                 sample_target=self._sample_target(),
+                **self._sample_solver_kwargs(),
             )
         samples_dir = os.path.join(self.output_dir, "samples")
         os.makedirs(samples_dir, exist_ok=True)
@@ -844,9 +914,9 @@ class UNetTrainer:
         keys = ("truth", "background", "obs_values", "obs_mask", "valid_mask", "water_mask")
         return {key: torch.cat([case[key] for case in cases], dim=0) for key in keys}
 
-    def _remember_dashboard_epoch(self, epoch: int, pages: list[dict]) -> None:
+    def _remember_dashboard_epoch(self, epoch: int, pages: list[dict], large_path: str | None = None) -> None:
         max_history = max(_DASHBOARD_HISTORY_EPOCHS, 1)
-        self.dashboard_history.insert(0, {"epoch": int(epoch), "pages": pages})
+        self.dashboard_history.insert(0, {"epoch": int(epoch), "pages": pages, "large_path": large_path})
         del self.dashboard_history[max_history:]
 
     @staticmethod
@@ -860,13 +930,21 @@ class UNetTrainer:
             return
         for slot_idx, entry in enumerate(self.dashboard_history):
             slot = self._dashboard_slot_name(slot_idx)
+            epoch = int(entry["epoch"])
             for page in entry["pages"]:
                 page_idx = int(page["page_idx"])
                 self.clearml.report_image(
                     title=f"dashboard/{slot}_conditioning_ablation",
                     series=f"page_{page_idx:02d}",
                     path=page["path"],
-                    iteration=0,
+                    iteration=epoch,
+                )
+            if entry.get("large_path"):
+                self.clearml.report_image(
+                    title=f"dashboard/{slot}_large_conditioned_unconditioned",
+                    series="case_0000",
+                    path=entry["large_path"],
+                    iteration=epoch,
                 )
 
     @staticmethod
@@ -918,6 +996,7 @@ class UNetTrainer:
                     obs_guidance_eps=self.config.sample_obs_guidance_eps,
                     initial_noise=initial_noise,
                     sample_target=sample_target,
+                    **self._sample_solver_kwargs(),
                 )
 
             assim_batch = sample_variant(
@@ -994,7 +1073,27 @@ class UNetTrainer:
             plt.close(fig)
             current_pages.append({"page_idx": page_idx, "path": figure_path})
 
-        self._remember_dashboard_epoch(epoch, current_pages)
+        large_case = {
+            key: value for key, value in dashboard_cases[0].items()
+            if key not in ("assim_background_only", "assim_observation_only")
+        }
+        large_fig = make_multi_case_background_condition_assim_figure(
+            cases=[large_case],
+            fields=self.fields,
+            means=self.channel_means,
+            stds=self.channel_stds,
+            channels=range(len(self.fields)),
+            title=f"large fully conditioned vs fully unconditioned sample, epoch {epoch}",
+            panel_width=_DASHBOARD_LARGE_PANEL_WIDTH,
+            panel_height=_DASHBOARD_LARGE_PANEL_HEIGHT,
+        )
+        large_path = os.path.join(
+            samples_dir, f"epoch_{epoch:04d}_dashboard_large_conditioned_unconditioned.png"
+        )
+        large_fig.savefig(large_path, dpi=_DASHBOARD_DPI, bbox_inches="tight")
+        plt.close(large_fig)
+
+        self._remember_dashboard_epoch(epoch, current_pages, large_path=large_path)
         self._report_dashboard_history()
         _debug(f"dashboard sampling done epoch={epoch}")
 
@@ -1012,16 +1111,18 @@ class UNetTrainer:
                 truth = batch["truth"]
                 batch_size = truth.shape[0]
                 timesteps = self._sample_timesteps(batch_size)
-                background = self._conditioned_background(batch)
+                background, obs_values, obs_mask = self._conditioned_inputs(batch)
                 model_state, v_real = self._make_training_pair(
                     truth, batch, timesteps, residual_background=background
                 )
 
                 with self.accelerator.accumulate(self.model):
-                    model_input = self._make_model_input(model_state, batch, background=background)
+                    model_input = self._make_model_input(
+                        model_state, batch, background=background, obs_values=obs_values, obs_mask=obs_mask
+                    )
                     v_pred = self.model(model_input, timesteps * 1000, return_dict=False)[0]
                     loss_full = self._masked_mse(v_pred, v_real, batch["valid_mask"])
-                    loss_obs = self._masked_mse(v_pred, v_real, batch["obs_mask"])
+                    loss_obs = self._masked_mse(v_pred, v_real, obs_mask)
                     loss = loss_full + self.config.obs_loss_weight * loss_obs
 
                     self.accelerator.backward(loss)

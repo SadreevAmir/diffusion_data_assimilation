@@ -160,6 +160,31 @@ class AssimLibConditioningTests(unittest.TestCase):
         model_input = trainer._make_model_input(state, batch)
         torch.testing.assert_close(model_input[:, 4:6], batch["background"])
 
+    def test_conditioning_modes_drop_background_and_track_per_sample(self):
+        trainer = object.__new__(UNetTrainer)
+        trainer.config = SimpleNamespace(
+            conditioning_mode_probabilities={
+                "no_background": 0.25,
+                "no_track": 0.25,
+                "no_conditioning": 0.25,
+                "both": 0.25,
+            }
+        )
+        trainer.model = SimpleNamespace(training=True)
+        batch = {
+            "background": torch.ones((4, 1, 2, 2)),
+            "obs_values": torch.ones((4, 1, 2, 2)),
+            "obs_mask": torch.ones((4, 1, 2, 2)),
+        }
+        draws = torch.tensor([0.1, 0.3, 0.6, 0.9]).view(4, 1, 1, 1)
+
+        with patch("assim_lib.trainer.torch.rand", return_value=draws):
+            background, obs_values, obs_mask = trainer._conditioned_inputs(batch)
+
+        self.assertEqual(background[:, 0, 0, 0].tolist(), [0.0, 1.0, 0.0, 1.0])
+        self.assertEqual(obs_values[:, 0, 0, 0].tolist(), [1.0, 0.0, 0.0, 1.0])
+        self.assertEqual(obs_mask[:, 0, 0, 0].tolist(), [1.0, 0.0, 0.0, 1.0])
+
     def test_residual_diffusion_trains_on_truth_minus_background(self):
         trainer = object.__new__(UNetTrainer)
         trainer.config = SimpleNamespace(training_objective="diffusion_residual")
@@ -439,6 +464,9 @@ class AssimLibConditioningTests(unittest.TestCase):
                 metric_save_ensemble_samples=True,
                 metric_ensemble_save_dtype="float16",
                 training_objective="diffusion",
+                sample_method="dopri5",
+                sample_rtol=1e-5,
+                sample_atol=1e-6,
             )
             trainer.output_dir = tmp_dir
             trainer.accelerator = SimpleNamespace(device=torch.device("cpu"))
@@ -462,6 +490,11 @@ class AssimLibConditioningTests(unittest.TestCase):
                 ]
                 trainer.compute_sample_validation_metrics(epoch=3)
 
+            kwargs = sampler_cls.return_value.sample_conditioned.call_args_list[0].kwargs
+            self.assertEqual(kwargs["method"], "dopri5")
+            self.assertEqual(kwargs["rtol"], 1e-5)
+            self.assertEqual(kwargs["atol"], 1e-6)
+            self.assertFalse(kwargs["memory_efficient_euler"])
             artifact = torch.load(
                 Path(tmp_dir) / "samples" / "epoch_0003_metric_ensemble.pt",
                 map_location="cpu",

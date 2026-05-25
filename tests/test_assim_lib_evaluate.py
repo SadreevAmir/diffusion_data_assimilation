@@ -9,6 +9,7 @@ from assim_lib.evaluate import (
     PhysicalMetricAccumulator,
     _apply_evaluation_config,
     _publish_clearml_results,
+    apply_sampler_normalization,
     denormalize_and_clip,
     generate_ensemble,
     validation_case_indices,
@@ -129,6 +130,25 @@ class AssimLibEvaluationTests(unittest.TestCase):
 
         self.assertEqual(sampler.batch_sizes, [16, 1])
         torch.testing.assert_close(ensemble, torch.stack(expected))
+
+    def test_sampler_metadata_overrides_evaluation_normalization(self):
+        dataset = SimpleNamespace(
+            means=[0.5, 0.5],
+            stds=[0.5, 0.5],
+            config={"means": [0.5, 0.5], "stds": [0.5, 0.5]},
+        )
+        sampler = SimpleNamespace(
+            metadata={"normalization_means": [0.11, 1.2], "normalization_stds": [0.21, 0.7]}
+        )
+        data_config = {"means": [0.5, 0.5], "stds": [0.5, 0.5]}
+
+        with self.assertWarns(UserWarning):
+            means, stds = apply_sampler_normalization(dataset, sampler, data_config)
+
+        self.assertEqual(means, [0.11, 1.2])
+        self.assertEqual(stds, [0.21, 0.7])
+        self.assertEqual(dataset.means, means)
+        self.assertEqual(data_config["stds"], stds)
 
     def test_memory_efficient_euler_returns_final_state_without_trajectory_storage(self):
         condition = torch.zeros((1, 1, 2, 2))

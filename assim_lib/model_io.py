@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 
 import torch
@@ -23,6 +24,14 @@ def build_unet(config: TrainingConfig) -> UNet2DModel:
     )
 
 
+def load_run_metadata(run_dir: str) -> dict:
+    metadata_path = os.path.join(run_dir, "metadata.json")
+    if not os.path.exists(metadata_path):
+        return {}
+    with open(metadata_path, "r") as handle:
+        return json.load(handle)
+
+
 def load_sampler(run_dir: str, checkpoint_name: str, model_config: dict, device=None) -> Sampler:
     config = TrainingConfig.from_dict(model_config)
     model = build_unet(config)
@@ -40,4 +49,4 @@ def load_sampler(run_dir: str, checkpoint_name: str, model_config: dict, device=
     model.eval()
     if device is not None:
         model.to(device)
-    return Sampler(model)
+    return Sampler(model, metadata=load_run_metadata(run_dir))

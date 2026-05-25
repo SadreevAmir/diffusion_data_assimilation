@@ -19,8 +19,11 @@ def _model_output(output):
 
 
 class Sampler:
-    def __init__(self, model):
+    def __init__(self, model, metadata: dict | None = None):
         self.model = model
+        self.metadata = dict(metadata or {})
+        self.normalization_means = self.metadata.get("normalization_means")
+        self.normalization_stds = self.metadata.get("normalization_stds")
         self._grids = {}
 
     def _grid(self, height: int, width: int, device, dtype: torch.dtype) -> torch.Tensor:
