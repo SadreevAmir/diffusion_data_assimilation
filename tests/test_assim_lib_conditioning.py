@@ -471,6 +471,9 @@ class AssimLibConditioningTests(unittest.TestCase):
             trainer.output_dir = tmp_dir
             trainer.accelerator = SimpleNamespace(device=torch.device("cpu"))
             trainer.model = SimpleNamespace(eval=lambda: None)
+            trainer.fields = ["siconc"]
+            trainer.channel_means = [0.5]
+            trainer.channel_stds = [0.5]
             trainer._sampling_model = lambda: nullcontext(object())
             trainer._metric_case_indices = lambda max_cases, stride_days: [7, 11]
             batch = {
@@ -488,13 +491,15 @@ class AssimLibConditioningTests(unittest.TestCase):
                     torch.full((2, 1, 2, 2), 2.0),
                     torch.full((2, 1, 2, 2), 4.0),
                 ]
-                trainer.compute_sample_validation_metrics(epoch=3)
+                metrics = trainer.compute_sample_validation_metrics(epoch=3)
 
             kwargs = sampler_cls.return_value.sample_conditioned.call_args_list[0].kwargs
             self.assertEqual(kwargs["method"], "dopri5")
             self.assertEqual(kwargs["rtol"], 1e-5)
             self.assertEqual(kwargs["atol"], 1e-6)
             self.assertFalse(kwargs["memory_efficient_euler"])
+            self.assertEqual(metrics["background_rmse_siconc_full"], 0.5)
+            self.assertEqual(metrics["analysis_rmse_mean_siconc_full"], 0.5)
             artifact = torch.load(
                 Path(tmp_dir) / "samples" / "epoch_0003_metric_ensemble.pt",
                 map_location="cpu",
@@ -505,6 +510,8 @@ class AssimLibConditioningTests(unittest.TestCase):
             self.assertTrue(torch.equal(artifact["case_indices"], torch.tensor([7, 11])))
             self.assertEqual(float(artifact["samples"][0, 0, 0, 0, 0]), 2.0)
             self.assertEqual(float(artifact["samples"][0, 1, 0, 0, 0]), 4.0)
+            self.assertEqual(artifact["values_space"], "normalized")
+            self.assertEqual(artifact["metrics_values_space"], "physical")
 
 
 if __name__ == "__main__":

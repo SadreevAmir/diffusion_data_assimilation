@@ -20,7 +20,7 @@ from utils import make_normalized_xy_grid
 from .clearml_tracking import ClearMLTracker
 from .dashboard import make_multi_case_background_condition_assim_figure
 from .sampler import Sampler
-from .transforms import make_conditioned_model_input
+from .transforms import channel_denormalize, make_conditioned_model_input
 
 
 logger = get_logger(__name__)
@@ -173,6 +173,8 @@ class UNetTrainer:
                 "fields": self.fields,
                 "normalization_means": self.channel_means,
                 "normalization_stds": self.channel_stds,
+                "sample_metrics_values_space": "physical",
+                "concentration_clipping": "[0, 1]" if "siconc" in self.fields else None,
                 "data_config": _jsonable(self.data_config),
                 "training_config": _jsonable(asdict(config)),
                 "experiment_config": _jsonable(experiment_config) if experiment_config is not None else None,
@@ -341,6 +343,13 @@ class UNetTrainer:
             "memory_efficient_euler": method == "euler",
         }
 
+    def _physical_metric_tensor(self, tensor: torch.Tensor) -> torch.Tensor:
+        physical = channel_denormalize(tensor.to(dtype=torch.float32), self.channel_means, self.channel_stds)
+        if "siconc" in self.fields:
+            concentration_channel = self.fields.index("siconc")
+            physical[:, concentration_channel].clamp_(0.0, 1.0)
+        return physical
+
     @contextmanager
     def _sampling_model(self):
         unwrapped = self.accelerator.unwrap_model(self.model)
@@ -394,16 +403,16 @@ class UNetTrainer:
     def _report_train_metrics(self, loss, loss_full, loss_obs, step: int):
         if self.clearml is None:
             return
-        self.clearml.report_scalar("loss/total", "train", loss.item(), step)
-        self.clearml.report_scalar("loss/full", "train", loss_full.item(), step)
-        self.clearml.report_scalar("loss/observed", "train", loss_obs.item(), step)
+        self.clearml.report_scalar("loss_normalized/total", "train", loss.item(), step)
+        self.clearml.report_scalar("loss_normalized/full", "train", loss_full.item(), step)
+        self.clearml.report_scalar("loss_normalized/observed", "train", loss_obs.item(), step)
 
     def _report_val_metrics(self, loss_full: float, loss_obs: float, loss: float, step: int):
         if self.clearml is None:
             return
-        self.clearml.report_scalar("loss/total", "validation", loss, step)
-        self.clearml.report_scalar("loss/full", "validation", loss_full, step)
-        self.clearml.report_scalar("loss/observed", "validation", loss_obs, step)
+        self.clearml.report_scalar("loss_normalized/total", "validation", loss, step)
+        self.clearml.report_scalar("loss_normalized/full", "validation", loss_full, step)
+        self.clearml.report_scalar("loss_normalized/observed", "validation", loss_obs, step)
 
     def _report_sample_validation_metrics(self, metrics: dict[str, float], step: int):
         if self.clearml is None or not metrics:
@@ -418,23 +427,33 @@ class UNetTrainer:
                 self.clearml.report_scalar(title, series, value, step)
 
         for kind in ("mae", "rmse"):
+            for field_name in self.fields:
+                for region in ("full", "obs"):
+                    suffix = f"{field_name}_{region}"
+                    for aggregate in ("mean", "min", "max", "of_mean"):
+                        _report(
+                            f"metric_physical/analysis_{kind}",
+                            f"{field_name}/{aggregate}_{region}",
+                            f"analysis_{kind}_{aggregate}_{suffix}",
+                        )
+                    _report(
+                        f"metric_physical/analysis_{kind}",
+                        f"{field_name}/background_{region}",
+                        f"background_{kind}_{suffix}",
+                    )
+                    _report(
+                        f"metric_physical/background_{kind}", f"{field_name}/{region}", f"background_{kind}_{suffix}"
+                    )
+        for field_name in self.fields:
             for region in ("full", "obs"):
+                suffix = f"{field_name}_{region}"
                 for aggregate in ("mean", "min", "max", "of_mean"):
                     _report(
-                        f"metric/analysis_{kind}",
-                        f"{aggregate}_{region}",
-                        f"analysis_{kind}_{aggregate}_{region}",
+                        "metric_physical/analysis_rmse_skill",
+                        f"{field_name}/{aggregate}_{region}",
+                        f"analysis_rmse_skill_{aggregate}_{suffix}",
                     )
-                _report(f"metric/analysis_{kind}", f"background_{region}", f"background_{kind}_{region}")
-                _report(f"metric/background_{kind}", region, f"background_{kind}_{region}")
-        for region in ("full", "obs"):
-            for aggregate in ("mean", "min", "max", "of_mean"):
-                _report(
-                    "metric/analysis_rmse_skill",
-                    f"{aggregate}_{region}",
-                    f"analysis_rmse_skill_{aggregate}_{region}",
-                )
-            _report("metric/count", region, f"metric_count_{region}")
+                _report("metric_physical/count", f"{field_name}/{region}", f"metric_count_{suffix}")
 
     @staticmethod
     def _meta_mean(value):
@@ -622,12 +641,15 @@ class UNetTrainer:
             f"ensemble={num_ensemble} timesteps={metric_timesteps} stride_days={stride_days}"
         )
         totals = {
-            region: {
-                "background": self._empty_metric_totals(),
-                "members": [self._empty_metric_totals() for _ in range(num_ensemble)],
-                "of_mean": self._empty_metric_totals(),
+            field_name: {
+                region: {
+                    "background": self._empty_metric_totals(),
+                    "members": [self._empty_metric_totals() for _ in range(num_ensemble)],
+                    "of_mean": self._empty_metric_totals(),
+                }
+                for region in ("full", "obs")
             }
-            for region in ("full", "obs")
+            for field_name in self.fields
         }
         total_processed = 0
         save_ensemble = bool(getattr(self.config, "metric_save_ensemble_samples", False)) and epoch is not None
@@ -672,7 +694,6 @@ class UNetTrainer:
                         )
                     )
                 ensemble_tensor = torch.stack(ensemble, dim=1)
-                ensemble_mean = ensemble_tensor.mean(dim=1)
                 if save_ensemble:
                     saved_batches.append({
                         "samples": ensemble_tensor.detach().to(device="cpu", dtype=save_dtype),
@@ -683,27 +704,41 @@ class UNetTrainer:
                         "valid_mask": batch["valid_mask"].detach().to(device="cpu", dtype=save_dtype),
                         "water_mask": batch["water_mask"].detach().to(device="cpu", dtype=save_dtype),
                     })
-                for region, mask in (("full", batch["valid_mask"]), ("obs", batch["obs_mask"])):
-                    background_abs, background_sq, background_count = self._masked_error_sums(
-                        batch["background"], batch["truth"], mask
-                    )
-                    background_totals = totals[region]["background"]
-                    background_totals["background_abs"] += background_abs
-                    background_totals["background_sq"] += background_sq
-                    background_totals["count"] += background_count
+                n_cases, n_members, n_channels, height, width = ensemble_tensor.shape
+                ensemble_physical = self._physical_metric_tensor(
+                    ensemble_tensor.reshape(n_cases * n_members, n_channels, height, width)
+                ).reshape(n_cases, n_members, n_channels, height, width)
+                ensemble_mean = ensemble_physical.mean(dim=1)
+                truth_physical = self._physical_metric_tensor(batch["truth"])
+                background_physical = self._physical_metric_tensor(batch["background"])
+                for channel, field_name in enumerate(self.fields):
+                    for region, mask in (("full", batch["valid_mask"]), ("obs", batch["obs_mask"])):
+                        channel_mask = mask[:, channel:channel + 1]
+                        truth_channel = truth_physical[:, channel:channel + 1]
+                        background_abs, background_sq, background_count = self._masked_error_sums(
+                            background_physical[:, channel:channel + 1], truth_channel, channel_mask
+                        )
+                        background_totals = totals[field_name][region]["background"]
+                        background_totals["background_abs"] += background_abs
+                        background_totals["background_sq"] += background_sq
+                        background_totals["count"] += background_count
 
-                    for member_index, analysis in enumerate(ensemble):
-                        analysis_abs, analysis_sq, count = self._masked_error_sums(analysis, batch["truth"], mask)
-                        member_totals = totals[region]["members"][member_index]
-                        member_totals["analysis_abs"] += analysis_abs
-                        member_totals["analysis_sq"] += analysis_sq
-                        member_totals["count"] += min(count, background_count)
+                        for member_index, analysis in enumerate(ensemble_physical.unbind(dim=1)):
+                            analysis_abs, analysis_sq, count = self._masked_error_sums(
+                                analysis[:, channel:channel + 1], truth_channel, channel_mask
+                            )
+                            member_totals = totals[field_name][region]["members"][member_index]
+                            member_totals["analysis_abs"] += analysis_abs
+                            member_totals["analysis_sq"] += analysis_sq
+                            member_totals["count"] += min(count, background_count)
 
-                    analysis_abs, analysis_sq, count = self._masked_error_sums(ensemble_mean, batch["truth"], mask)
-                    mean_totals = totals[region]["of_mean"]
-                    mean_totals["analysis_abs"] += analysis_abs
-                    mean_totals["analysis_sq"] += analysis_sq
-                    mean_totals["count"] += min(count, background_count)
+                        analysis_abs, analysis_sq, count = self._masked_error_sums(
+                            ensemble_mean[:, channel:channel + 1], truth_channel, channel_mask
+                        )
+                        mean_totals = totals[field_name][region]["of_mean"]
+                        mean_totals["analysis_abs"] += analysis_abs
+                        mean_totals["analysis_sq"] += analysis_sq
+                        mean_totals["count"] += min(count, background_count)
                 total_processed += int(batch["truth"].shape[0])
 
         if total_processed == 0:
@@ -715,38 +750,43 @@ class UNetTrainer:
             "metric_num_ensemble": float(num_ensemble),
             "metric_stride_days": float(stride_days),
         }
-        for region in ("full", "obs"):
-            background_totals = totals[region]["background"]
+        for field_name in self.fields:
+            for region in ("full", "obs"):
+                suffix = f"{field_name}_{region}"
+                background_totals = totals[field_name][region]["background"]
 
-            def with_background(analysis_totals: dict[str, float]) -> dict[str, float]:
-                return {
-                    "analysis_abs": analysis_totals["analysis_abs"],
-                    "analysis_sq": analysis_totals["analysis_sq"],
-                    "background_abs": background_totals["background_abs"],
-                    "background_sq": background_totals["background_sq"],
-                    "count": background_totals["count"],
-                }
+                def with_background(analysis_totals: dict[str, float]) -> dict[str, float]:
+                    return {
+                        "analysis_abs": analysis_totals["analysis_abs"],
+                        "analysis_sq": analysis_totals["analysis_sq"],
+                        "background_abs": background_totals["background_abs"],
+                        "background_sq": background_totals["background_sq"],
+                        "count": background_totals["count"],
+                    }
 
-            # Preserve the legacy pixel-pooled metric for each member; aggregate only the finalized scalars.
-            member_metrics = [
-                self._finalize_metric_totals(region, with_background(member_totals))
-                for member_totals in totals[region]["members"]
-            ]
-            mean_field_metrics = self._finalize_metric_totals(region, with_background(totals[region]["of_mean"]))
-            metrics[f"background_mae_{region}"] = mean_field_metrics[f"background_mae_{region}"]
-            metrics[f"background_rmse_{region}"] = mean_field_metrics[f"background_rmse_{region}"]
-            metrics[f"metric_count_{region}"] = mean_field_metrics[f"metric_count_{region}"]
-            for key in ("analysis_mae", "analysis_rmse"):
-                values = [member[f"{key}_{region}"] for member in member_metrics]
-                metrics[f"{key}_mean_{region}"] = sum(values) / len(values)
-                metrics[f"{key}_min_{region}"] = min(values)
-                metrics[f"{key}_max_{region}"] = max(values)
-                metrics[f"{key}_of_mean_{region}"] = mean_field_metrics[f"{key}_{region}"]
-            skill_values = [member[f"analysis_rmse_skill_{region}"] for member in member_metrics]
-            metrics[f"analysis_rmse_skill_mean_{region}"] = sum(skill_values) / len(skill_values)
-            metrics[f"analysis_rmse_skill_min_{region}"] = min(skill_values)
-            metrics[f"analysis_rmse_skill_max_{region}"] = max(skill_values)
-            metrics[f"analysis_rmse_skill_of_mean_{region}"] = mean_field_metrics[f"analysis_rmse_skill_{region}"]
+                member_metrics = [
+                    self._finalize_metric_totals(suffix, with_background(member_totals))
+                    for member_totals in totals[field_name][region]["members"]
+                ]
+                mean_field_metrics = self._finalize_metric_totals(
+                    suffix, with_background(totals[field_name][region]["of_mean"])
+                )
+                metrics[f"background_mae_{suffix}"] = mean_field_metrics[f"background_mae_{suffix}"]
+                metrics[f"background_rmse_{suffix}"] = mean_field_metrics[f"background_rmse_{suffix}"]
+                metrics[f"metric_count_{suffix}"] = mean_field_metrics[f"metric_count_{suffix}"]
+                for key in ("analysis_mae", "analysis_rmse"):
+                    values = [member[f"{key}_{suffix}"] for member in member_metrics]
+                    metrics[f"{key}_mean_{suffix}"] = sum(values) / len(values)
+                    metrics[f"{key}_min_{suffix}"] = min(values)
+                    metrics[f"{key}_max_{suffix}"] = max(values)
+                    metrics[f"{key}_of_mean_{suffix}"] = mean_field_metrics[f"{key}_{suffix}"]
+                skill_values = [member[f"analysis_rmse_skill_{suffix}"] for member in member_metrics]
+                metrics[f"analysis_rmse_skill_mean_{suffix}"] = sum(skill_values) / len(skill_values)
+                metrics[f"analysis_rmse_skill_min_{suffix}"] = min(skill_values)
+                metrics[f"analysis_rmse_skill_max_{suffix}"] = max(skill_values)
+                metrics[f"analysis_rmse_skill_of_mean_{suffix}"] = mean_field_metrics[
+                    f"analysis_rmse_skill_{suffix}"
+                ]
         if saved_batches:
             samples_dir = os.path.join(self.output_dir, "samples")
             os.makedirs(samples_dir, exist_ok=True)
@@ -761,15 +801,22 @@ class UNetTrainer:
                 "num_ensemble": int(num_ensemble),
                 "stride_days": int(stride_days),
                 "save_dtype": save_dtype_name,
+                "values_space": "normalized",
+                "metrics_values_space": "physical",
+                "concentration_clipping": "[0, 1]" if "siconc" in self.fields else None,
             })
             artifact_path = os.path.join(samples_dir, f"epoch_{epoch:04d}_metric_ensemble.pt")
             torch.save(artifact, artifact_path)
             _debug(f"saved sample validation ensemble: {artifact_path}")
+        primary_suffix = f"{self.fields[0]}_full"
+        analysis_mean = metrics[f"analysis_rmse_mean_{primary_suffix}"]
+        analysis_of_mean = metrics[f"analysis_rmse_of_mean_{primary_suffix}"]
+        background_rmse = metrics[f"background_rmse_{primary_suffix}"]
         _debug(
             "sample validation metrics done "
-            f"analysis_rmse_mean_full={metrics['analysis_rmse_mean_full']:.6f} "
-            f"analysis_rmse_of_mean_full={metrics['analysis_rmse_of_mean_full']:.6f} "
-            f"background_rmse_full={metrics['background_rmse_full']:.6f}"
+            f"analysis_rmse_mean_{primary_suffix}={analysis_mean:.6f} "
+            f"analysis_rmse_of_mean_{primary_suffix}={analysis_of_mean:.6f} "
+            f"background_rmse_{primary_suffix}={background_rmse:.6f}"
         )
         return metrics
 
@@ -1012,25 +1059,30 @@ class UNetTrainer:
 
             for case_idx, one in enumerate(cases):
                 assim = assim_batch[case_idx]
+                assim_physical = self._physical_metric_tensor(assim.unsqueeze(0))[0]
+                truth_physical = self._physical_metric_tensor(one["truth"])[0]
+                background_physical = self._physical_metric_tensor(one["background"])[0]
 
-                analysis_mae, analysis_rmse = self._masked_error_metrics(
-                    assim,
-                    one["truth"][0],
-                    one["valid_mask"][0],
-                )
-                background_mae, background_rmse = self._masked_error_metrics(
-                    one["background"][0],
-                    one["truth"][0],
-                    one["valid_mask"][0],
-                )
-                skill = 0.0 if background_rmse <= 0.0 else 1.0 - analysis_rmse / background_rmse
                 if self.clearml is not None:
-                    series = f"case_{case_idx:04d}"
-                    self.clearml.report_scalar("sample/rmse_analysis", series, analysis_rmse, epoch)
-                    self.clearml.report_scalar("sample/rmse_background", series, background_rmse, epoch)
-                    self.clearml.report_scalar("sample/mae_analysis", series, analysis_mae, epoch)
-                    self.clearml.report_scalar("sample/mae_background", series, background_mae, epoch)
-                    self.clearml.report_scalar("sample/rmse_skill", series, skill, epoch)
+                    for channel, field_name in enumerate(self.fields):
+                        valid_mask = one["valid_mask"][0, channel:channel + 1]
+                        analysis_mae, analysis_rmse = self._masked_error_metrics(
+                            assim_physical[channel:channel + 1],
+                            truth_physical[channel:channel + 1],
+                            valid_mask,
+                        )
+                        background_mae, background_rmse = self._masked_error_metrics(
+                            background_physical[channel:channel + 1],
+                            truth_physical[channel:channel + 1],
+                            valid_mask,
+                        )
+                        skill = 0.0 if background_rmse <= 0.0 else 1.0 - analysis_rmse / background_rmse
+                        series = f"{field_name}/case_{case_idx:04d}"
+                        self.clearml.report_scalar("sample_physical/rmse_analysis", series, analysis_rmse, epoch)
+                        self.clearml.report_scalar("sample_physical/rmse_background", series, background_rmse, epoch)
+                        self.clearml.report_scalar("sample_physical/mae_analysis", series, analysis_mae, epoch)
+                        self.clearml.report_scalar("sample_physical/mae_background", series, background_mae, epoch)
+                        self.clearml.report_scalar("sample_physical/rmse_skill", series, skill, epoch)
 
                 dashboard_cases.append({
                     "case_idx": case_idx,
