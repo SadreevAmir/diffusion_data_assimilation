@@ -15,7 +15,7 @@
     "stride_days": 15,
     "ensemble_size": 15,
     "sample_batch_size": 16,
-    "num_timesteps": 2,
+    "num_timesteps": 25,
     "method": "dopri5",
     "rtol": 0.00001,
     "atol": 0.000001,

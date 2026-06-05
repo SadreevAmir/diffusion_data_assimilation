@@ -65,6 +65,7 @@ class TrainingConfig:
     timestep_sampler: str = "uniform"
     timestep_beta_params: tuple[float, float] = (2.0, 1.0)
     obs_loss_weight: float = 0.1
+    smoothness_loss_weight: float = 0.0
     background_dropout_probability: float = 0.0
     conditioning_mode_probabilities: dict[str, float] | None = None
     sample_every_n_epochs: int = 1
@@ -98,6 +99,7 @@ class TrainingConfig:
 
     block_out_channels: tuple[int, ...] = (64, 128, 256, 512, 512)
     layers_per_block: int = 2
+    dropout: float = 0.0
     down_block_types: tuple[str, ...] = (
         "DownBlock2D",
         "DownBlock2D",
@@ -371,6 +373,16 @@ class UNetTrainer:
         return (F.mse_loss(pred, target, reduction="none") * mask).sum() / denom
 
     @staticmethod
+    def _masked_smoothness_loss(pred: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
+        mask = mask.expand_as(pred)
+        dy_mask = mask[..., 1:, :] * mask[..., :-1, :]
+        dx_mask = mask[..., :, 1:] * mask[..., :, :-1]
+        dy = (pred[..., 1:, :] - pred[..., :-1, :]).square() * dy_mask
+        dx = (pred[..., :, 1:] - pred[..., :, :-1]).square() * dx_mask
+        denom = (dy_mask.sum() + dx_mask.sum()).clamp(min=1.0)
+        return (dy.sum() + dx.sum()) / denom
+
+    @staticmethod
     def _masked_error_metrics(pred: torch.Tensor, target: torch.Tensor, mask: torch.Tensor) -> tuple[float, float]:
         mask = mask.expand_as(pred)
         denom = mask.sum().clamp(min=1.0)
@@ -400,12 +412,13 @@ class UNetTrainer:
         torch.save(unwrapped.state_dict(), os.path.join(self.output_dir, name))
         torch.save(self.ema_model.state_dict(), os.path.join(self.output_dir, f"ema_{name}"))
 
-    def _report_train_metrics(self, loss, loss_full, loss_obs, step: int):
+    def _report_train_metrics(self, loss, loss_full, loss_obs, loss_smooth, step: int):
         if self.clearml is None:
             return
         self.clearml.report_scalar("loss_normalized/total", "train", loss.item(), step)
         self.clearml.report_scalar("loss_normalized/full", "train", loss_full.item(), step)
         self.clearml.report_scalar("loss_normalized/observed", "train", loss_obs.item(), step)
+        self.clearml.report_scalar("loss_normalized/smoothness", "train", loss_smooth.item(), step)
 
     def _report_val_metrics(self, loss_full: float, loss_obs: float, loss: float, step: int):
         if self.clearml is None:
@@ -1175,7 +1188,12 @@ class UNetTrainer:
                     v_pred = self.model(model_input, timesteps * 1000, return_dict=False)[0]
                     loss_full = self._masked_mse(v_pred, v_real, batch["valid_mask"])
                     loss_obs = self._masked_mse(v_pred, v_real, obs_mask)
-                    loss = loss_full + self.config.obs_loss_weight * loss_obs
+                    loss_smooth = self._masked_smoothness_loss(v_pred, batch["valid_mask"])
+                    loss = (
+                        loss_full
+                        + self.config.obs_loss_weight * loss_obs
+                        + self.config.smoothness_loss_weight * loss_smooth
+                    )
 
                     self.accelerator.backward(loss)
                     if self.accelerator.sync_gradients:
@@ -1188,15 +1206,17 @@ class UNetTrainer:
                 if batch_index == 0:
                     _debug(
                         f"epoch {epoch} first batch "
-                        f"loss={loss.item():.6f} full={loss_full.item():.6f} obs={loss_obs.item():.6f}"
+                        f"loss={loss.item():.6f} full={loss_full.item():.6f} "
+                        f"obs={loss_obs.item():.6f} smooth={loss_smooth.item():.6f}"
                     )
                     self._report_condition_diagnostics(raw_batch, global_step, "train")
-                self._report_train_metrics(loss, loss_full, loss_obs, global_step)
+                self._report_train_metrics(loss, loss_full, loss_obs, loss_smooth, global_step)
                 if self.config.tracker:
                     self.accelerator.log({
                         "train_loss": loss.item(),
                         "train_loss_full": loss_full.item(),
                         "train_loss_obs": loss_obs.item(),
+                        "train_loss_smoothness": loss_smooth.item(),
                     }, step=global_step)
                 global_step += 1
                 progress_bar.update(1)

@@ -20,6 +20,7 @@ def build_unet(config: TrainingConfig) -> UNet2DModel:
         block_out_channels=config.block_out_channels,
         down_block_types=config.down_block_types,
         up_block_types=config.up_block_types,
+        dropout=config.dropout,
         norm_num_groups=config.norm_num_groups,
     )
 

@@ -34,9 +34,10 @@
   "metric_num_timesteps": 200,
   "metric_num_ensemble": 10,
   "metric_stride_days": 15,
-  "block_out_channels": [64, 128, 256, 512, 512],
-  "layers_per_block": 2,
-  "down_block_types": ["DownBlock2D", "DownBlock2D", "DownBlock2D", "AttnDownBlock2D", "DownBlock2D"],
-  "up_block_types": ["UpBlock2D", "AttnUpBlock2D", "UpBlock2D", "UpBlock2D", "UpBlock2D"],
+  "block_out_channels": [64, 128, 256, 256],
+  "layers_per_block": 1,
+  "dropout": 0.1,
+  "down_block_types": ["DownBlock2D", "DownBlock2D", "AttnDownBlock2D", "DownBlock2D"],
+  "up_block_types": ["UpBlock2D", "AttnUpBlock2D", "UpBlock2D", "UpBlock2D"],
   "norm_num_groups": 32
 }
