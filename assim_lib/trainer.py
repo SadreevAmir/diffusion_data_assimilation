@@ -382,6 +382,19 @@ class UNetTrainer:
         denom = (dy_mask.sum() + dx_mask.sum()).clamp(min=1.0)
         return (dy.sum() + dx.sum()) / denom
 
+    def _sea_ice_concentration_smoothness_loss(
+        self,
+        pred: torch.Tensor,
+        mask: torch.Tensor,
+    ) -> torch.Tensor:
+        if self.config.smoothness_loss_weight <= 0.0 or "siconc" not in self.fields:
+            return pred.new_tensor(0.0)
+        channel = self.fields.index("siconc")
+        return self._masked_smoothness_loss(
+            pred[:, channel:channel + 1],
+            mask[:, channel:channel + 1],
+        )
+
     @staticmethod
     def _masked_error_metrics(pred: torch.Tensor, target: torch.Tensor, mask: torch.Tensor) -> tuple[float, float]:
         mask = mask.expand_as(pred)
@@ -1188,7 +1201,7 @@ class UNetTrainer:
                     v_pred = self.model(model_input, timesteps * 1000, return_dict=False)[0]
                     loss_full = self._masked_mse(v_pred, v_real, batch["valid_mask"])
                     loss_obs = self._masked_mse(v_pred, v_real, obs_mask)
-                    loss_smooth = self._masked_smoothness_loss(v_pred, batch["valid_mask"])
+                    loss_smooth = self._sea_ice_concentration_smoothness_loss(v_pred, batch["valid_mask"])
                     loss = (
                         loss_full
                         + self.config.obs_loss_weight * loss_obs
