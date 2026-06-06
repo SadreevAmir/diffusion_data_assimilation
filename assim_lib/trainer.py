@@ -49,7 +49,7 @@ def _default_mixed_precision() -> str:
 @dataclass
 class TrainingConfig:
     image_size: tuple[int, int] = (320, 256)
-    in_channels: int = 18
+    in_channels: int = 23
     out_channels: int = 4
     train_batch_size: int = 8
     eval_batch_size: int = 4
@@ -241,8 +241,9 @@ class UNetTrainer:
 
     def _conditioned_inputs(
         self, batch: dict[str, torch.Tensor]
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         background = batch["background"]
+        background_mask = torch.ones_like(background)
         obs_values = batch["obs_values"]
         obs_mask = batch["obs_mask"]
         mode_probabilities = getattr(self.config, "conditioning_mode_probabilities", None)
@@ -267,9 +268,10 @@ class UNetTrainer:
                 keep_background = (~(no_background | no_conditioning)).to(dtype=background.dtype)
                 keep_track = (~(no_track | no_conditioning)).to(dtype=obs_values.dtype)
                 background = background * keep_background
+                background_mask = background_mask * keep_background
                 obs_values = obs_values * keep_track
                 obs_mask = obs_mask * keep_track.to(dtype=obs_mask.dtype)
-            return background, obs_values, obs_mask
+            return background, background_mask, obs_values, obs_mask
 
         dropout_probability = float(getattr(self.config, "background_dropout_probability", 0.0))
         if not 0.0 <= dropout_probability <= 1.0:
@@ -282,7 +284,8 @@ class UNetTrainer:
                 torch.rand((background.shape[0], 1, 1, 1), device=background.device) >= dropout_probability
             ).to(dtype=background.dtype)
             background = background * keep
-        return background, obs_values, obs_mask
+            background_mask = background_mask * keep
+        return background, background_mask, obs_values, obs_mask
 
     def _conditioned_background(self, batch: dict[str, torch.Tensor]) -> torch.Tensor:
         return self._conditioned_inputs(batch)[0]
@@ -292,20 +295,28 @@ class UNetTrainer:
         noisy_truth: torch.Tensor,
         batch: dict[str, torch.Tensor],
         background: torch.Tensor | None = None,
+        background_mask: torch.Tensor | None = None,
         obs_values: torch.Tensor | None = None,
         obs_mask: torch.Tensor | None = None,
     ) -> torch.Tensor:
         batch_size = noisy_truth.shape[0]
         grid = self._grid.expand(batch_size, -1, -1, -1)
-        if background is None or obs_values is None or obs_mask is None:
-            conditioned_background, conditioned_obs_values, conditioned_obs_mask = self._conditioned_inputs(batch)
+        if background is None or background_mask is None or obs_values is None or obs_mask is None:
+            (
+                conditioned_background,
+                conditioned_background_mask,
+                conditioned_obs_values,
+                conditioned_obs_mask,
+            ) = self._conditioned_inputs(batch)
             background = conditioned_background if background is None else background
+            background_mask = conditioned_background_mask if background_mask is None else background_mask
             obs_values = conditioned_obs_values if obs_values is None else obs_values
             obs_mask = conditioned_obs_mask if obs_mask is None else obs_mask
         return make_conditioned_model_input(
             noisy_truth,
             grid,
             background,
+            background_mask,
             obs_values,
             obs_mask,
             batch["water_mask"],
@@ -533,13 +544,18 @@ class UNetTrainer:
                 truth = batch["truth"]
                 batch_size = truth.shape[0]
                 timesteps = self._sample_timesteps(batch_size)
-                background, obs_values, obs_mask = self._conditioned_inputs(batch)
+                background, background_mask, obs_values, obs_mask = self._conditioned_inputs(batch)
                 model_state, v_real = self._make_training_pair(
                     truth, batch, timesteps, residual_background=background
                 )
 
                 model_input = self._make_model_input(
-                    model_state, batch, background=background, obs_values=obs_values, obs_mask=obs_mask
+                    model_state,
+                    batch,
+                    background=background,
+                    background_mask=background_mask,
+                    obs_values=obs_values,
+                    obs_mask=obs_mask,
                 )
                 v_pred = self.model(model_input, timesteps * 1000, return_dict=False)[0]
                 loss_full = self._masked_mse(v_pred, v_real, batch["valid_mask"])
@@ -703,6 +719,7 @@ class UNetTrainer:
                     ensemble.append(
                         sampler.sample_conditioned(
                             background=batch["background"],
+                            background_mask=torch.ones_like(batch["background"]),
                             obs_values=batch["obs_values"],
                             obs_mask=batch["obs_mask"],
                             water_mask=batch["water_mask"],
@@ -855,6 +872,7 @@ class UNetTrainer:
             sampler = Sampler(sample_model)
             sample = sampler.sample_conditioned(
                 background=one["background"],
+                background_mask=torch.ones_like(one["background"]),
                 obs_values=one["obs_values"],
                 obs_mask=one["obs_mask"],
                 water_mask=one["water_mask"],
@@ -1052,9 +1070,10 @@ class UNetTrainer:
             zero_obs_mask = torch.zeros_like(dashboard_batch["obs_mask"])
             sample_target = self._sample_target()
 
-            def sample_variant(background, obs_values, obs_mask):
+            def sample_variant(background, background_mask, obs_values, obs_mask):
                 return sampler.sample_conditioned(
                     background=background,
+                    background_mask=background_mask,
                     obs_values=obs_values,
                     obs_mask=obs_mask,
                     water_mask=dashboard_batch["water_mask"],
@@ -1073,15 +1092,29 @@ class UNetTrainer:
                 )
 
             assim_batch = sample_variant(
-                dashboard_batch["background"], dashboard_batch["obs_values"], dashboard_batch["obs_mask"]
+                dashboard_batch["background"],
+                torch.ones_like(dashboard_batch["background"]),
+                dashboard_batch["obs_values"],
+                dashboard_batch["obs_mask"],
             )
             assim_background_only_batch = sample_variant(
-                dashboard_batch["background"], zero_obs_values, zero_obs_mask
+                dashboard_batch["background"],
+                torch.ones_like(dashboard_batch["background"]),
+                zero_obs_values,
+                zero_obs_mask,
             )
             assim_observation_only_batch = sample_variant(
-                zero_background, dashboard_batch["obs_values"], dashboard_batch["obs_mask"]
+                zero_background,
+                torch.zeros_like(dashboard_batch["background"]),
+                dashboard_batch["obs_values"],
+                dashboard_batch["obs_mask"],
             )
-            assim_neither_batch = sample_variant(zero_background, zero_obs_values, zero_obs_mask)
+            assim_neither_batch = sample_variant(
+                zero_background,
+                torch.zeros_like(dashboard_batch["background"]),
+                zero_obs_values,
+                zero_obs_mask,
+            )
 
             for case_idx, one in enumerate(cases):
                 assim = assim_batch[case_idx]
@@ -1189,14 +1222,19 @@ class UNetTrainer:
                 truth = batch["truth"]
                 batch_size = truth.shape[0]
                 timesteps = self._sample_timesteps(batch_size)
-                background, obs_values, obs_mask = self._conditioned_inputs(batch)
+                background, background_mask, obs_values, obs_mask = self._conditioned_inputs(batch)
                 model_state, v_real = self._make_training_pair(
                     truth, batch, timesteps, residual_background=background
                 )
 
                 with self.accelerator.accumulate(self.model):
                     model_input = self._make_model_input(
-                        model_state, batch, background=background, obs_values=obs_values, obs_mask=obs_mask
+                        model_state,
+                        batch,
+                        background=background,
+                        background_mask=background_mask,
+                        obs_values=obs_values,
+                        obs_mask=obs_mask,
                     )
                     v_pred = self.model(model_input, timesteps * 1000, return_dict=False)[0]
                     loss_full = self._masked_mse(v_pred, v_real, batch["valid_mask"])

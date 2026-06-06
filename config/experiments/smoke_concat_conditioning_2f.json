@@ -9,7 +9,7 @@
   },
   "training": {
     "image_size": [16, 16],
-    "in_channels": 11,
+    "in_channels": 13,
     "out_channels": 2,
     "train_batch_size": 2,
     "eval_batch_size": 2,

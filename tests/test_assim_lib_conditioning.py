@@ -68,12 +68,13 @@ class AssimLibConditioningTests(unittest.TestCase):
             state,
             grid,
             background,
+            torch.ones_like(background),
             obs_values,
             obs_mask,
             water_mask,
         )
 
-        self.assertEqual(tuple(model_input.shape), (1, 19, 3, 2))
+        self.assertEqual(tuple(model_input.shape), (1, 23, 3, 2))
         torch.testing.assert_close(model_input[:, -1:], water_mask[:, :1])
 
     def test_sampler_uses_provided_initial_noise(self):
@@ -154,11 +155,13 @@ class AssimLibConditioningTests(unittest.TestCase):
 
         model_input = trainer._make_model_input(state, batch)
         torch.testing.assert_close(model_input[:, 4:6], torch.zeros_like(batch["background"]))
+        torch.testing.assert_close(model_input[:, 6:8], torch.zeros_like(batch["background"]))
         torch.testing.assert_close(batch["background"], torch.ones_like(batch["background"]))
 
         trainer.model.training = False
         model_input = trainer._make_model_input(state, batch)
         torch.testing.assert_close(model_input[:, 4:6], batch["background"])
+        torch.testing.assert_close(model_input[:, 6:8], torch.ones_like(batch["background"]))
 
     def test_conditioning_modes_drop_background_and_track_per_sample(self):
         trainer = object.__new__(UNetTrainer)
@@ -179,9 +182,10 @@ class AssimLibConditioningTests(unittest.TestCase):
         draws = torch.tensor([0.1, 0.3, 0.6, 0.9]).view(4, 1, 1, 1)
 
         with patch("assim_lib.trainer.torch.rand", return_value=draws):
-            background, obs_values, obs_mask = trainer._conditioned_inputs(batch)
+            background, background_mask, obs_values, obs_mask = trainer._conditioned_inputs(batch)
 
         self.assertEqual(background[:, 0, 0, 0].tolist(), [0.0, 1.0, 0.0, 1.0])
+        self.assertEqual(background_mask[:, 0, 0, 0].tolist(), [0.0, 1.0, 0.0, 1.0])
         self.assertEqual(obs_values[:, 0, 0, 0].tolist(), [1.0, 0.0, 0.0, 1.0])
         self.assertEqual(obs_mask[:, 0, 0, 0].tolist(), [1.0, 0.0, 0.0, 1.0])
 

@@ -41,6 +41,7 @@ class Sampler:
         water_mask: torch.Tensor,
         size: tuple[int, int],
         num_timesteps: int,
+        background_mask: torch.Tensor | None = None,
         device=None,
         method: str = "euler",
         rtol: float = 1e-3,
@@ -57,6 +58,10 @@ class Sampler:
     ) -> torch.Tensor:
         device = device or get_device()
         background = background.to(device)
+        if background_mask is None:
+            background_mask = torch.ones_like(background)
+        else:
+            background_mask = background_mask.to(device)
         obs_values = obs_values.to(device)
         obs_mask = obs_mask.to(device)
         water_mask = water_mask.to(device)
@@ -108,6 +113,7 @@ class Sampler:
                 timesteps=timesteps,
                 grid=grid,
                 background=background,
+                background_mask=background_mask,
                 obs_values=obs_values,
                 obs_mask=obs_mask,
                 water_mask=water_mask,
@@ -119,7 +125,15 @@ class Sampler:
 
         def f(t, x):
             t_tensor = t.expand(batch_size) * 1000
-            model_input = make_conditioned_model_input(x, grid, background, obs_values, obs_mask, water_mask)
+            model_input = make_conditioned_model_input(
+                x,
+                grid,
+                background,
+                background_mask,
+                obs_values,
+                obs_mask,
+                water_mask,
+            )
             return _model_output(self.model(model_input, t_tensor))
 
         if memory_efficient_euler and method == "euler":
@@ -145,6 +159,7 @@ class Sampler:
         timesteps: torch.Tensor,
         grid: torch.Tensor,
         background: torch.Tensor,
+        background_mask: torch.Tensor,
         obs_values: torch.Tensor,
         obs_mask: torch.Tensor,
         water_mask: torch.Tensor,
@@ -167,6 +182,7 @@ class Sampler:
                     x_t,
                     grid,
                     background,
+                    background_mask,
                     obs_values,
                     obs_mask,
                     water_mask,

@@ -49,12 +49,24 @@ def make_conditioned_model_input(
     state: torch.Tensor,
     grid: torch.Tensor,
     background: torch.Tensor,
+    background_mask: torch.Tensor | None,
     obs_values: torch.Tensor,
     obs_mask: torch.Tensor,
     water_mask: torch.Tensor,
 ) -> torch.Tensor:
+    if background_mask is None:
+        background_mask = torch.ones_like(background)
+    if background_mask.shape != background.shape:
+        raise ValueError(
+            f"Expected background_mask shape {tuple(background.shape)}, "
+            f"got {tuple(background_mask.shape)}"
+        )
+    background_mask = background_mask.to(device=state.device, dtype=state.dtype)
     water_condition = first_mask_channel(water_mask, state, "water_mask")
-    return torch.cat([state, grid, background, obs_values, obs_mask, water_condition], dim=1)
+    return torch.cat(
+        [state, grid, background, background_mask, obs_values, obs_mask, water_condition],
+        dim=1,
+    )
 
 
 def pad_to_size(field: torch.Tensor, image_size: tuple[int, int], fill_value=0.0) -> torch.Tensor:
