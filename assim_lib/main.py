@@ -102,6 +102,8 @@ def main(config: dict, config_dir: Path):
 
     _debug("building UNet")
     model = build_unet(train_config)
+    num_parameters = sum(parameter.numel() for parameter in model.parameters())
+    _debug(f"model parameters={num_parameters:,} ({num_parameters / 1_000_000:.2f}M)")
     _debug("building optimizer and scheduler")
     optimizer = torch.optim.AdamW(model.parameters(), lr=train_config.learning_rate)
     lr_scheduler = get_cosine_schedule_with_warmup(

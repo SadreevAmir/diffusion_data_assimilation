@@ -1,6 +1,6 @@
 {
   "project_name": "m2m_concat_conditioning",
-  "task_name": "concat_conditioning_diffusion_balanced_2f_1y",
+  "task_name": "concat_conditioning_diffusion_balanced_50m_2f_1y",
   "data_config": "../data/m2m_2f_1y.json",
   "data_overrides": {
     "observation_mask": {
