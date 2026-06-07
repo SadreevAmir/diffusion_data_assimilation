@@ -30,6 +30,7 @@
   "sample_rtol": 0.00001,
   "sample_atol": 0.000001,
   "sample_use_ema": true,
+  "ema_decay": 0.999,
   "sample_start_mode": "noise",
   "sample_start_noise_level": 1.0,
   "sample_enforce_observations": false,

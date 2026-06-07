@@ -74,6 +74,7 @@ class TrainingConfig:
     sample_rtol: float = 1e-3
     sample_atol: float = 1e-4
     sample_use_ema: bool = True
+    ema_decay: float = 0.999
     sample_start_mode: str = "background"
     sample_start_noise_level: float = 0.5
     sample_enforce_observations: bool = True
@@ -220,7 +221,7 @@ class UNetTrainer:
         _debug(f"accelerator ready device={self.accelerator.device}")
 
         self.unwrapped_model = self.accelerator.unwrap_model(self.model)
-        self.ema_model = EMAModel(self.unwrapped_model.parameters(), decay=0.999)
+        self.ema_model = EMAModel(self.unwrapped_model.parameters(), decay=float(config.ema_decay))
         self.ema_model.to(self.accelerator.device)
 
         height, width = config.image_size
@@ -376,6 +377,11 @@ class UNetTrainer:
             yield unwrapped
         finally:
             self.ema_model.restore(unwrapped.parameters())
+
+    def _sampling_weight_label(self) -> str:
+        if self.config.sample_use_ema:
+            return f"EMA weights, decay={float(self.config.ema_decay):.6g}"
+        return "raw training weights"
 
     @staticmethod
     def _masked_mse(pred: torch.Tensor, target: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
@@ -1002,9 +1008,23 @@ class UNetTrainer:
         keys = ("truth", "background", "obs_values", "obs_mask", "valid_mask", "water_mask")
         return {key: torch.cat([case[key] for case in cases], dim=0) for key in keys}
 
-    def _remember_dashboard_epoch(self, epoch: int, pages: list[dict], large_path: str | None = None) -> None:
+    def _remember_dashboard_epoch(
+        self,
+        epoch: int,
+        pages: list[dict],
+        large_path: str | None = None,
+        weights_label: str | None = None,
+    ) -> None:
         max_history = max(_DASHBOARD_HISTORY_EPOCHS, 1)
-        self.dashboard_history.insert(0, {"epoch": int(epoch), "pages": pages, "large_path": large_path})
+        self.dashboard_history.insert(
+            0,
+            {
+                "epoch": int(epoch),
+                "pages": pages,
+                "large_path": large_path,
+                "weights_label": weights_label or self._sampling_weight_label(),
+            },
+        )
         del self.dashboard_history[max_history:]
 
     @staticmethod
@@ -1019,17 +1039,18 @@ class UNetTrainer:
         for slot_idx, entry in enumerate(self.dashboard_history):
             slot = self._dashboard_slot_name(slot_idx)
             epoch = int(entry["epoch"])
+            weights_label = str(entry.get("weights_label", self._sampling_weight_label()))
             for page in entry["pages"]:
                 page_idx = int(page["page_idx"])
                 self.clearml.report_image(
-                    title=f"dashboard/{slot}_conditioning_ablation",
+                    title=f"dashboard/{slot}_conditioning_ablation/{weights_label}",
                     series=f"page_{page_idx:02d}",
                     path=page["path"],
                     iteration=epoch,
                 )
             if entry.get("large_path"):
                 self.clearml.report_image(
-                    title=f"dashboard/{slot}_large_conditioned_unconditioned",
+                    title=f"dashboard/{slot}_large_conditioned_unconditioned/{weights_label}",
                     series="case_0000",
                     path=entry["large_path"],
                     iteration=epoch,
@@ -1048,7 +1069,11 @@ class UNetTrainer:
         if epoch % _DASHBOARD_EVERY_N_EPOCHS != 0:
             return
 
-        _debug(f"dashboard sampling start epoch={epoch}")
+        weights_label = self._sampling_weight_label()
+        _debug(f"dashboard sampling start epoch={epoch} weights={weights_label}")
+        if self.clearml is not None:
+            self.clearml.report_single_value("sampling_use_ema", float(bool(self.config.sample_use_ema)))
+            self.clearml.report_single_value("ema_decay", float(self.config.ema_decay))
         self.model.eval()
         cases = self._dashboard_cases()
         if not cases:
@@ -1161,7 +1186,7 @@ class UNetTrainer:
         for page_idx, page_cases in self._chunks(dashboard_cases, cases_per_page):
             title = (
                 f"conditioning ablation, shared initial noise, epoch {epoch}, "
-                f"page {page_idx}, cases {len(page_cases)}"
+                f"page {page_idx}, cases {len(page_cases)}, {weights_label}"
             )
             fig = make_multi_case_background_condition_assim_figure(
                 cases=page_cases,
@@ -1191,7 +1216,10 @@ class UNetTrainer:
             means=self.channel_means,
             stds=self.channel_stds,
             channels=range(len(self.fields)),
-            title=f"large fully conditioned vs fully unconditioned sample, epoch {epoch}",
+            title=(
+                f"large fully conditioned vs fully unconditioned sample, "
+                f"epoch {epoch}, {weights_label}"
+            ),
             panel_width=_DASHBOARD_LARGE_PANEL_WIDTH,
             panel_height=_DASHBOARD_LARGE_PANEL_HEIGHT,
         )
@@ -1201,7 +1229,12 @@ class UNetTrainer:
         large_fig.savefig(large_path, dpi=_DASHBOARD_DPI, bbox_inches="tight")
         plt.close(large_fig)
 
-        self._remember_dashboard_epoch(epoch, current_pages, large_path=large_path)
+        self._remember_dashboard_epoch(
+            epoch,
+            current_pages,
+            large_path=large_path,
+            weights_label=weights_label,
+        )
         self._report_dashboard_history()
         _debug(f"dashboard sampling done epoch={epoch}")
 
