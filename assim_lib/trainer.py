@@ -26,7 +26,8 @@ from .transforms import channel_denormalize, make_conditioned_model_input
 logger = get_logger(__name__)
 
 
-_DASHBOARD_EVERY_N_EPOCHS = 1
+_DASHBOARD_EVERY_N_EPOCHS = 5
+_UNCONDITIONAL_DASHBOARD_EVERY_N_EPOCHS = 1
 _DASHBOARD_NUM_CASES = 12
 _DASHBOARD_HISTORY_EPOCHS = 1
 _DASHBOARD_CASES_PER_PAGE = 12
@@ -36,6 +37,8 @@ _DASHBOARD_PANEL_WIDTH = 3.6
 _DASHBOARD_PANEL_HEIGHT = 2.5
 _DASHBOARD_LARGE_PANEL_WIDTH = 5.5
 _DASHBOARD_LARGE_PANEL_HEIGHT = 4.4
+_UNCONDITIONAL_PANEL_WIDTH = 7.0
+_UNCONDITIONAL_PANEL_HEIGHT = 5.6
 
 
 def _debug(message: str) -> None:
@@ -1063,6 +1066,120 @@ class UNetTrainer:
             yield start // size, values[start:start + size]
 
     @torch.no_grad()
+    def report_unconditional_dashboard_sample(self, epoch: int):
+        if _UNCONDITIONAL_DASHBOARD_EVERY_N_EPOCHS <= 0:
+            return
+        if epoch % _UNCONDITIONAL_DASHBOARD_EVERY_N_EPOCHS != 0:
+            return
+
+        weights_label = self._sampling_weight_label()
+        _debug(f"unconditional dashboard sampling start epoch={epoch} weights={weights_label}")
+        self.model.eval()
+        cases = self._dashboard_cases()
+        if not cases:
+            _debug(f"unconditional dashboard skipped epoch={epoch}: no validation cases")
+            return
+
+        samples_dir = os.path.join(self.output_dir, "samples")
+        os.makedirs(samples_dir, exist_ok=True)
+        dashboard_batch = self._dashboard_batch(cases[:1])
+        zero_background = torch.zeros_like(dashboard_batch["background"])
+        zero_obs_values = torch.zeros_like(dashboard_batch["obs_values"])
+        zero_obs_mask = torch.zeros_like(dashboard_batch["obs_mask"])
+        initial_noise = torch.randn_like(dashboard_batch["background"])
+
+        with self._sampling_model() as sample_model:
+            sampler = Sampler(sample_model)
+            unconditional = sampler.sample_conditioned(
+                background=zero_background,
+                background_mask=torch.zeros_like(dashboard_batch["background"]),
+                obs_values=zero_obs_values,
+                obs_mask=zero_obs_mask,
+                water_mask=dashboard_batch["water_mask"],
+                size=self.config.image_size,
+                num_timesteps=self.config.num_sample_timesteps,
+                device=self.accelerator.device,
+                start_mode=self.config.sample_start_mode,
+                start_noise_level=self.config.sample_start_noise_level,
+                enforce_observations=self.config.sample_enforce_observations,
+                valid_mask=dashboard_batch["valid_mask"],
+                obs_guidance_scale=self.config.sample_obs_guidance_scale,
+                obs_guidance_eps=self.config.sample_obs_guidance_eps,
+                initial_noise=initial_noise,
+                sample_target=self._sample_target(),
+                **self._sample_solver_kwargs(),
+            )
+
+        unconditional_physical = self._physical_metric_tensor(unconditional)[0].detach().cpu()
+        water_mask = dashboard_batch["water_mask"][0].detach().cpu()
+        valid_mask = dashboard_batch["valid_mask"][0].detach().cpu()
+        display_mask = water_mask if water_mask.shape[0] == 1 else valid_mask
+
+        import matplotlib.pyplot as plt
+        import numpy as np
+
+        n_channels = int(unconditional_physical.shape[0])
+        fig, axes = plt.subplots(
+            1,
+            n_channels,
+            figsize=(max(n_channels, 1) * _UNCONDITIONAL_PANEL_WIDTH, _UNCONDITIONAL_PANEL_HEIGHT),
+            squeeze=False,
+            constrained_layout=True,
+        )
+        fig.suptitle(
+            f"fully unconditional sample, epoch {epoch}, {weights_label}",
+            fontsize=16,
+        )
+
+        for channel in range(n_channels):
+            field_name = self.fields[channel] if channel < len(self.fields) else f"ch{channel}"
+            values = unconditional_physical[channel].numpy()
+            if display_mask.ndim == 3:
+                if display_mask.shape[0] == 1:
+                    channel_mask = display_mask[0].numpy() > 0
+                else:
+                    channel_mask = display_mask[channel].numpy() > 0
+                values = np.where(channel_mask, values, np.nan)
+
+            if channel == 0:
+                cmap, vmin, vmax = "Blues_r", 0.0, 1.0
+            else:
+                cmap = "viridis"
+                finite = values[np.isfinite(values)]
+                if finite.size:
+                    vmin = float(np.nanpercentile(finite, 1.0))
+                    vmax = float(np.nanpercentile(finite, 99.0))
+                    if vmin == vmax:
+                        vmin, vmax = None, None
+                else:
+                    vmin, vmax = None, None
+
+            ax = axes[0, channel]
+            image = ax.imshow(
+                np.ma.masked_invalid(values),
+                cmap=cmap,
+                vmin=vmin,
+                vmax=vmax,
+                interpolation="nearest",
+            )
+            ax.set_title(field_name, fontsize=14)
+            ax.axis("off")
+            fig.colorbar(image, ax=ax, fraction=0.035, pad=0.015)
+
+        path = os.path.join(samples_dir, f"epoch_{epoch:04d}_dashboard_unconditional_large.png")
+        fig.savefig(path, dpi=_DASHBOARD_DPI, bbox_inches="tight")
+        plt.close(fig)
+
+        if self.clearml is not None:
+            self.clearml.report_image(
+                title=f"dashboard/unconditional_large/{weights_label}",
+                series="case_0000",
+                path=path,
+                iteration=epoch,
+            )
+        _debug(f"unconditional dashboard saved: {path}")
+
+    @torch.no_grad()
     def report_dashboard_samples(self, epoch: int):
         if _DASHBOARD_EVERY_N_EPOCHS <= 0:
             return
@@ -1338,9 +1455,7 @@ class UNetTrainer:
                 _debug("saved metrics.json")
                 self.save_model_custom("last_model.pth")
                 _debug("saved last checkpoint")
-                if self.config.sample_every_n_epochs > 0 and epoch % self.config.sample_every_n_epochs == 0:
-                    self.save_samples(epoch)
-                    _debug("saved sample artifact")
+                self.report_unconditional_dashboard_sample(epoch)
                 self.report_dashboard_samples(epoch)
                 if val_loss < self.best_val_loss:
                     self.best_val_loss = val_loss
