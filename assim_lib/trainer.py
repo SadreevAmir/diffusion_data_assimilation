@@ -534,7 +534,6 @@ class UNetTrainer:
     def compute_val_loss(self) -> tuple[float, float, float]:
         self.model.eval()
         total_full = 0.0
-        total_obs = 0.0
         n = len(self.val_dataloader)
         _debug(f"validation start batches={n}")
 
@@ -558,16 +557,14 @@ class UNetTrainer:
                     obs_mask=obs_mask,
                 )
                 v_pred = self.model(model_input, timesteps * 1000, return_dict=False)[0]
-                loss_full = self._masked_mse(v_pred, v_real, batch["valid_mask"])
-                loss_obs = self._masked_mse(v_pred, v_real, batch["obs_mask"])
+                loss_full = F.mse_loss(v_pred, v_real)
 
                 total_full += self.accelerator.gather_for_metrics(loss_full).mean().item()
-                total_obs += self.accelerator.gather_for_metrics(loss_obs).mean().item()
 
         loss_full = total_full / max(n, 1)
-        loss_obs = total_obs / max(n, 1)
+        loss_obs = 0.0
         _debug(f"validation done loss_full={loss_full:.6f} loss_obs={loss_obs:.6f}")
-        return loss_full, loss_obs, loss_full + self.config.obs_loss_weight * loss_obs
+        return loss_full, loss_obs, loss_full
 
     @staticmethod
     def _empty_metric_totals() -> dict[str, float]:
@@ -1237,14 +1234,10 @@ class UNetTrainer:
                         obs_mask=obs_mask,
                     )
                     v_pred = self.model(model_input, timesteps * 1000, return_dict=False)[0]
-                    loss_full = self._masked_mse(v_pred, v_real, batch["valid_mask"])
-                    loss_obs = self._masked_mse(v_pred, v_real, obs_mask)
-                    loss_smooth = self._sea_ice_concentration_smoothness_loss(v_pred, batch["valid_mask"])
-                    loss = (
-                        loss_full
-                        + self.config.obs_loss_weight * loss_obs
-                        + self.config.smoothness_loss_weight * loss_smooth
-                    )
+                    loss_full = F.mse_loss(v_pred, v_real)
+                    loss_obs = torch.zeros_like(loss_full)
+                    loss_smooth = torch.zeros_like(loss_full)
+                    loss = loss_full
 
                     self.accelerator.backward(loss)
                     if self.accelerator.sync_gradients:

@@ -15,8 +15,8 @@
   "training_objective": "diffusion",
   "timestep_sampler": "uniform",
   "timestep_beta_params": [2.0, 1.0],
-  "obs_loss_weight": 0.1,
-  "smoothness_loss_weight": 0.0001,
+  "obs_loss_weight": 0.0,
+  "smoothness_loss_weight": 0.0,
   "background_dropout_probability": 0.0,
   "conditioning_mode_probabilities": {
     "no_background": 0.1666666667,
