@@ -37,9 +37,11 @@ class _DatasetWithoutStridedCases:
 class _NoiseReturningSampler:
     def __init__(self):
         self.batch_sizes = []
+        self.kwargs = []
 
     def sample_conditioned(self, **kwargs):
         self.batch_sizes.append(kwargs["background"].shape[0])
+        self.kwargs.append(kwargs)
         return kwargs["initial_noise"]
 
 
@@ -129,6 +131,9 @@ class AssimLibEvaluationTests(unittest.TestCase):
             expected.append(torch.randn_like(condition)[0])
 
         self.assertEqual(sampler.batch_sizes, [16, 1])
+        self.assertEqual(sampler.kwargs[0]["cfg_mode"], "none")
+        self.assertEqual(sampler.kwargs[0]["cfg_background_scale"], 1.0)
+        self.assertEqual(sampler.kwargs[0]["cfg_observation_scale"], 1.0)
         torch.testing.assert_close(ensemble, torch.stack(expected))
 
     def test_sampler_metadata_overrides_evaluation_normalization(self):

@@ -267,6 +267,9 @@ def _apply_evaluation_config(args: argparse.Namespace, experiment: dict) -> argp
         "inference_precision": "auto",
         "seed": 1234,
         "save_ensembles": False,
+        "cfg_mode": None,
+        "cfg_background_scale": None,
+        "cfg_observation_scale": None,
     }
     for name, default in defaults.items():
         if getattr(args, name, None) is None:
@@ -320,6 +323,9 @@ def _start_clearml(
                 "device": args.device,
                 "inference_precision": args.inference_precision,
                 "seed": args.seed,
+                "cfg_mode": args.cfg_mode,
+                "cfg_background_scale": args.cfg_background_scale,
+                "cfg_observation_scale": args.cfg_observation_scale,
                 "save_ensembles": args.save_ensembles,
                 "clearml_enabled": enabled,
             }
@@ -411,6 +417,9 @@ def generate_ensemble(
                 initial_noise=initial_noise,
                 sample_target=sample_target,
                 memory_efficient_euler=method == "euler",
+                cfg_mode=config.sample_cfg_mode,
+                cfg_background_scale=config.sample_cfg_background_scale,
+                cfg_observation_scale=config.sample_cfg_observation_scale,
             )
         samples.append(sample.cpu())
         if progress is not None:
@@ -465,6 +474,17 @@ def evaluate(args: argparse.Namespace) -> dict[str, Any]:
     raw_model_config = load_json(model_config_path)
     model_config = {**raw_model_config, **experiment.get("training", {})}
     training = TrainingConfig.from_dict(model_config)
+    scale_override_requested = (
+        args.cfg_background_scale is not None or args.cfg_observation_scale is not None
+    )
+    if args.cfg_mode is not None:
+        training.sample_cfg_mode = str(args.cfg_mode)
+    elif scale_override_requested and training.sample_cfg_mode == "none":
+        training.sample_cfg_mode = "background_delta"
+    if args.cfg_background_scale is not None:
+        training.sample_cfg_background_scale = float(args.cfg_background_scale)
+    if args.cfg_observation_scale is not None:
+        training.sample_cfg_observation_scale = float(args.cfg_observation_scale)
     device = torch.device(args.device or get_device())
     autocast_dtype, inference_precision = _inference_autocast_dtype(
         args.inference_precision, training, device
@@ -624,6 +644,9 @@ def evaluate(args: argparse.Namespace) -> dict[str, Any]:
         "sampling_atol": atol,
         "sample_target": sample_target,
         "sample_start_mode": training.sample_start_mode,
+        "sample_cfg_mode": training.sample_cfg_mode,
+        "sample_cfg_background_scale": training.sample_cfg_background_scale,
+        "sample_cfg_observation_scale": training.sample_cfg_observation_scale,
         "values_space": "physical",
         "normalization_means": means,
         "normalization_stds": stds,
@@ -677,6 +700,28 @@ def parse_args() -> argparse.Namespace:
         help="CUDA autocast precision; auto follows mixed_precision from the training config.",
     )
     parser.add_argument("--seed", type=int, default=None, help="Seed used to generate ensemble members.")
+    parser.add_argument(
+        "--cfg-mode",
+        default=None,
+        choices=("none", "independent", "background_delta"),
+        help=(
+            "CFG-like conditioning control. 'independent' combines none/background-only/"
+            "observation-only predictions; 'background_delta' adds an observation correction "
+            "to the background-conditioned prediction."
+        ),
+    )
+    parser.add_argument(
+        "--cfg-background-scale",
+        type=float,
+        default=None,
+        help="Scale for background CFG influence. 1.0 keeps the learned baseline.",
+    )
+    parser.add_argument(
+        "--cfg-observation-scale",
+        type=float,
+        default=None,
+        help="Scale for observation CFG influence. 1.0 keeps the learned baseline.",
+    )
     parser.add_argument(
         "--save-ensembles",
         action=argparse.BooleanOptionalAction,

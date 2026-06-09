@@ -8,6 +8,7 @@ from .transforms import make_conditioned_model_input
 
 
 _FIXED_STEP_METHODS = {"euler", "midpoint", "rk4", "heun3"}
+_CFG_MODES = {"none", "independent", "background_delta"}
 
 
 def _model_output(output):
@@ -16,6 +17,14 @@ def _model_output(output):
     if isinstance(output, (tuple, list)):
         return output[0]
     return output
+
+
+def _cfg_enabled(mode: str, background_scale: float, observation_scale: float) -> bool:
+    return mode != "none" and (
+        abs(float(background_scale) - 1.0) > 1e-12
+        or abs(float(observation_scale) - 1.0) > 1e-12
+        or mode == "independent"
+    )
 
 
 class Sampler:
@@ -55,6 +64,9 @@ class Sampler:
         initial_noise: torch.Tensor | None = None,
         sample_target: str = "state",
         memory_efficient_euler: bool = False,
+        cfg_mode: str = "none",
+        cfg_background_scale: float = 1.0,
+        cfg_observation_scale: float = 1.0,
     ) -> torch.Tensor:
         device = device or get_device()
         background = background.to(device)
@@ -72,6 +84,12 @@ class Sampler:
         num_timesteps = max(int(num_timesteps), 2)
         if sample_target not in ("state", "residual"):
             raise ValueError(f"Unknown sample_target={sample_target!r}; expected 'state' or 'residual'")
+        cfg_mode = str(cfg_mode)
+        if cfg_mode not in _CFG_MODES:
+            raise ValueError(f"Unknown cfg_mode={cfg_mode!r}; expected one of {sorted(_CFG_MODES)}")
+        cfg_background_scale = float(cfg_background_scale)
+        cfg_observation_scale = float(cfg_observation_scale)
+        use_cfg = _cfg_enabled(cfg_mode, cfg_background_scale, cfg_observation_scale)
         grid = self._grid(height, width, device, background.dtype).expand(batch_size, -1, -1, -1)
         if initial_noise is not None:
             expected_shape = (batch_size, channels, height, width)
@@ -108,6 +126,8 @@ class Sampler:
             return analysis
 
         if obs_guidance_scale > 0:
+            if use_cfg:
+                raise ValueError("obs_guidance_scale and CFG sampling cannot be enabled at the same time")
             state_sample = self._sample_guided_euler(
                 x0=x0,
                 timesteps=timesteps,
@@ -123,18 +143,85 @@ class Sampler:
             )
             return finalize(state_sample)
 
-        def f(t, x):
-            t_tensor = t.expand(batch_size) * 1000
+        def model_velocity(
+            state: torch.Tensor,
+            model_grid: torch.Tensor,
+            model_background: torch.Tensor,
+            model_background_mask: torch.Tensor,
+            model_obs_values: torch.Tensor,
+            model_obs_mask: torch.Tensor,
+            model_water_mask: torch.Tensor,
+            t_tensor: torch.Tensor,
+        ) -> torch.Tensor:
             model_input = make_conditioned_model_input(
-                x,
-                grid,
-                background,
-                background_mask,
-                obs_values,
-                obs_mask,
-                water_mask,
+                state,
+                model_grid,
+                model_background,
+                model_background_mask,
+                model_obs_values,
+                model_obs_mask,
+                model_water_mask,
             )
             return _model_output(self.model(model_input, t_tensor))
+
+        def f(t, x):
+            t_tensor = t.expand(batch_size) * 1000
+            if not use_cfg:
+                return model_velocity(
+                    x,
+                    grid,
+                    background,
+                    background_mask,
+                    obs_values,
+                    obs_mask,
+                    water_mask,
+                    t_tensor,
+                )
+
+            zeros_background = torch.zeros_like(background)
+            zeros_obs_values = torch.zeros_like(obs_values)
+            zeros_obs_mask = torch.zeros_like(obs_mask)
+            zeros_background_mask = torch.zeros_like(background_mask)
+
+            if cfg_mode == "independent":
+                variant_background = torch.cat([zeros_background, background, zeros_background], dim=0)
+                variant_background_mask = torch.cat(
+                    [zeros_background_mask, background_mask, zeros_background_mask],
+                    dim=0,
+                )
+                variant_obs_values = torch.cat([zeros_obs_values, zeros_obs_values, obs_values], dim=0)
+                variant_obs_mask = torch.cat([zeros_obs_mask, zeros_obs_mask, obs_mask], dim=0)
+            else:
+                variant_background = torch.cat([zeros_background, background, background], dim=0)
+                variant_background_mask = torch.cat(
+                    [zeros_background_mask, background_mask, background_mask],
+                    dim=0,
+                )
+                variant_obs_values = torch.cat([zeros_obs_values, zeros_obs_values, obs_values], dim=0)
+                variant_obs_mask = torch.cat([zeros_obs_mask, zeros_obs_mask, obs_mask], dim=0)
+
+            velocity = model_velocity(
+                x.repeat(3, 1, 1, 1),
+                grid.repeat(3, 1, 1, 1),
+                variant_background,
+                variant_background_mask,
+                variant_obs_values,
+                variant_obs_mask,
+                water_mask.repeat(3, 1, 1, 1),
+                t_tensor.repeat(3),
+            )
+            v_none, v_background, v_observation_or_both = velocity.chunk(3, dim=0)
+            if cfg_mode == "independent":
+                return (
+                    v_none
+                    + cfg_background_scale * (v_background - v_none)
+                    + cfg_observation_scale * (v_observation_or_both - v_none)
+                )
+            return (
+                v_none
+                + cfg_background_scale * (v_background - v_none)
+                + cfg_observation_scale * (v_observation_or_both - v_background)
+            )
 
         if memory_efficient_euler and method == "euler":
             state = x0

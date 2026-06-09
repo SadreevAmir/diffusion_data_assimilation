@@ -140,6 +140,84 @@ class AssimLibConditioningTests(unittest.TestCase):
 
         torch.testing.assert_close(analysis, correction)
 
+    def test_sampler_background_delta_cfg_scales_conditioning_predictions(self):
+        class ConditioningVelocityModel:
+            def __call__(self, model_input, timestep):
+                background_mask = model_input[:, 4:5]
+                obs_mask = model_input[:, 6:7]
+                has_background = background_mask.reshape(background_mask.shape[0], -1).sum(dim=1) > 0
+                has_obs = obs_mask.reshape(obs_mask.shape[0], -1).sum(dim=1) > 0
+                values = torch.ones((model_input.shape[0], 1, 1, 1), dtype=model_input.dtype)
+                values = torch.where(has_background.view(-1, 1, 1, 1), torch.full_like(values, 3.0), values)
+                values = torch.where(has_obs.view(-1, 1, 1, 1), torch.full_like(values, 7.0), values)
+                values = torch.where(
+                    (has_background & has_obs).view(-1, 1, 1, 1),
+                    torch.full_like(values, 10.0),
+                    values,
+                )
+                return values.expand(-1, 1, model_input.shape[-2], model_input.shape[-1])
+
+        condition = torch.zeros((1, 1, 2, 2))
+        sample = Sampler(ConditioningVelocityModel()).sample_conditioned(
+            background=torch.ones_like(condition),
+            background_mask=torch.ones_like(condition),
+            obs_values=torch.ones_like(condition),
+            obs_mask=torch.ones_like(condition),
+            water_mask=torch.ones_like(condition),
+            size=(2, 2),
+            num_timesteps=2,
+            device=torch.device("cpu"),
+            start_mode="noise",
+            initial_noise=condition,
+            memory_efficient_euler=True,
+            cfg_mode="background_delta",
+            cfg_background_scale=0.5,
+            cfg_observation_scale=2.0,
+        )
+
+        # v_none + 0.5 * (v_bg - v_none) + 2.0 * (v_both - v_bg)
+        expected_velocity = 1.0 + 0.5 * (3.0 - 1.0) + 2.0 * (10.0 - 3.0)
+        torch.testing.assert_close(sample, torch.full_like(condition, -0.999 * expected_velocity))
+
+    def test_sampler_independent_cfg_uses_observation_only_branch(self):
+        class ConditioningVelocityModel:
+            def __call__(self, model_input, timestep):
+                background_mask = model_input[:, 4:5]
+                obs_mask = model_input[:, 6:7]
+                has_background = background_mask.reshape(background_mask.shape[0], -1).sum(dim=1) > 0
+                has_obs = obs_mask.reshape(obs_mask.shape[0], -1).sum(dim=1) > 0
+                values = torch.ones((model_input.shape[0], 1, 1, 1), dtype=model_input.dtype)
+                values = torch.where(has_background.view(-1, 1, 1, 1), torch.full_like(values, 3.0), values)
+                values = torch.where(has_obs.view(-1, 1, 1, 1), torch.full_like(values, 7.0), values)
+                values = torch.where(
+                    (has_background & has_obs).view(-1, 1, 1, 1),
+                    torch.full_like(values, 10.0),
+                    values,
+                )
+                return values.expand(-1, 1, model_input.shape[-2], model_input.shape[-1])
+
+        condition = torch.zeros((1, 1, 2, 2))
+        sample = Sampler(ConditioningVelocityModel()).sample_conditioned(
+            background=torch.ones_like(condition),
+            background_mask=torch.ones_like(condition),
+            obs_values=torch.ones_like(condition),
+            obs_mask=torch.ones_like(condition),
+            water_mask=torch.ones_like(condition),
+            size=(2, 2),
+            num_timesteps=2,
+            device=torch.device("cpu"),
+            start_mode="noise",
+            initial_noise=condition,
+            memory_efficient_euler=True,
+            cfg_mode="independent",
+            cfg_background_scale=0.5,
+            cfg_observation_scale=2.0,
+        )
+
+        # v_none + 0.5 * (v_bg - v_none) + 2.0 * (v_obs - v_none)
+        expected_velocity = 1.0 + 0.5 * (3.0 - 1.0) + 2.0 * (7.0 - 1.0)
+        torch.testing.assert_close(sample, torch.full_like(condition, -0.999 * expected_velocity))
+
     def test_background_dropout_only_zeroes_train_conditioning_input(self):
         trainer = object.__new__(UNetTrainer)
         trainer.config = SimpleNamespace(background_dropout_probability=1.0)

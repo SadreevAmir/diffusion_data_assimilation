@@ -83,6 +83,9 @@ class TrainingConfig:
     sample_enforce_observations: bool = True
     sample_obs_guidance_scale: float = 0.0
     sample_obs_guidance_eps: float = 1e-8
+    sample_cfg_mode: str = "none"
+    sample_cfg_background_scale: float = 1.0
+    sample_cfg_observation_scale: float = 1.0
     base_output_dir: str = "checkpoints/concat_conditioning"
     run_name: str = ""
     tracker: str | None = None
@@ -358,6 +361,13 @@ class UNetTrainer:
             "rtol": float(getattr(self.config, "sample_rtol", 1e-3)),
             "atol": float(getattr(self.config, "sample_atol", 1e-4)),
             "memory_efficient_euler": method == "euler",
+        }
+
+    def _cfg_sampler_kwargs(self) -> dict[str, object]:
+        return {
+            "cfg_mode": str(getattr(self.config, "sample_cfg_mode", "none")),
+            "cfg_background_scale": float(getattr(self.config, "sample_cfg_background_scale", 1.0)),
+            "cfg_observation_scale": float(getattr(self.config, "sample_cfg_observation_scale", 1.0)),
         }
 
     def _physical_metric_tensor(self, tensor: torch.Tensor) -> torch.Tensor:
@@ -739,6 +749,7 @@ class UNetTrainer:
                             obs_guidance_scale=self.config.sample_obs_guidance_scale,
                             obs_guidance_eps=self.config.sample_obs_guidance_eps,
                             sample_target=self._sample_target(),
+                            **self._cfg_sampler_kwargs(),
                             **self._sample_solver_kwargs(),
                         )
                     )
@@ -892,6 +903,7 @@ class UNetTrainer:
                 obs_guidance_scale=self.config.sample_obs_guidance_scale,
                 obs_guidance_eps=self.config.sample_obs_guidance_eps,
                 sample_target=self._sample_target(),
+                **self._cfg_sampler_kwargs(),
                 **self._sample_solver_kwargs(),
             )
         samples_dir = os.path.join(self.output_dir, "samples")
@@ -1107,6 +1119,7 @@ class UNetTrainer:
                 obs_guidance_eps=self.config.sample_obs_guidance_eps,
                 initial_noise=initial_noise,
                 sample_target=self._sample_target(),
+                **self._cfg_sampler_kwargs(),
                 **self._sample_solver_kwargs(),
             )
 
@@ -1227,6 +1240,7 @@ class UNetTrainer:
                     obs_guidance_eps=self.config.sample_obs_guidance_eps,
                     initial_noise=initial_noise,
                     sample_target=sample_target,
+                    **self._cfg_sampler_kwargs(),
                     **self._sample_solver_kwargs(),
                 )
 
