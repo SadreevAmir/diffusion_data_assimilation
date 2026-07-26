@@ -38,8 +38,18 @@ def _channel_mask(mask, channel: int):
     raise ValueError(f"Expected valid_mask [H,W] or [C,H,W], got shape {mask.shape}")
 
 
-def _display_panels(background, obs_values, obs_mask, assim, channel: int, means, stds,
-                    valid_mask=None, water_mask=None, truth=None):
+def _display_panels(
+    background,
+    obs_values,
+    obs_mask,
+    assim,
+    channel: int,
+    means,
+    stds,
+    valid_mask=None,
+    water_mask=None,
+    truth=None,
+):
     bg = _clip_display(_denormalize_channel(background[channel], channel, means, stds), channel)
     an = _clip_display(_denormalize_channel(assim[channel], channel, means, stds), channel)
     cond = _clip_display(_denormalize_channel(obs_values[channel], channel, means, stds), channel)

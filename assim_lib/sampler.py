@@ -3,9 +3,8 @@ from __future__ import annotations
 import torch
 from torchdiffeq import odeint
 
-from utils import get_device, make_normalized_xy_grid
+from .runtime import get_device, make_normalized_xy_grid
 from .transforms import make_conditioned_model_input
-
 
 _FIXED_STEP_METHODS = {"euler", "midpoint", "rk4", "heun3"}
 _CFG_MODES = {"none", "independent", "background_delta"}
@@ -113,7 +112,9 @@ class Sampler:
             start_t = 1.0
             x0 = background
         else:
-            raise ValueError(f"Unknown start_mode={start_mode!r}; expected 'noise', 'background', or 'bridge'")
+            raise ValueError(
+                f"Unknown start_mode={start_mode!r}; expected 'noise', 'background', or 'bridge'"
+            )
 
         timesteps = torch.linspace(start_t, 0.001, num_timesteps, device=device)
 

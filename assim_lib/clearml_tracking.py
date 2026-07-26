@@ -6,7 +6,6 @@ from typing import Any
 
 from dotenv import load_dotenv
 
-
 REQUIRED_ENV = (
     "CLEARML_API_ACCESS_KEY",
     "CLEARML_API_SECRET_KEY",
@@ -56,7 +55,9 @@ class ClearMLTracker:
         try:
             from clearml import Task
         except ImportError as exc:
-            raise ImportError("ClearML support requires the clearml package. Install requirements.txt.") from exc
+            raise ImportError(
+                "ClearML support requires the clearml package. Install requirements.txt."
+            ) from exc
 
         task = Task.current_task()
         if task is None:

@@ -58,8 +58,7 @@ def make_conditioned_model_input(
         background_mask = torch.ones_like(background)
     if background_mask.shape != background.shape:
         raise ValueError(
-            f"Expected background_mask shape {tuple(background.shape)}, "
-            f"got {tuple(background_mask.shape)}"
+            f"Expected background_mask shape {tuple(background.shape)}, got {tuple(background_mask.shape)}"
         )
     background_mask = background_mask.to(device=state.device, dtype=state.dtype)
     water_condition = first_mask_channel(water_mask, state, "water_mask")
@@ -102,7 +101,9 @@ def load_valid_mask(mask, channels: int, image_size: tuple[int, int]) -> torch.T
     return pad_to_size(mask, image_size, fill_value=0.0)
 
 
-def prepare_model_field(field, indices, means, stds, padding_values, image_size) -> tuple[torch.Tensor, torch.Tensor]:
+def prepare_model_field(
+    field, indices, means, stds, padding_values, image_size
+) -> tuple[torch.Tensor, torch.Tensor]:
     selected = select_channels(field, None if indices is None else list(indices))
     finite = torch.isfinite(selected).to(torch.float32)
     padding = torch.as_tensor(padding_values, dtype=selected.dtype).view(-1, 1, 1)

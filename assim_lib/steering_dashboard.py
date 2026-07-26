@@ -6,18 +6,16 @@ from typing import Any
 
 import torch
 
-from utils import get_device
-
+from .config import TrainingConfig, load_json, merge_config_overrides, resolve_path
 from .dashboard import make_multi_case_background_condition_assim_figure
 from .data import build_dataset
 from .evaluate import apply_sampler_normalization
-from .main import load_json, merge_config_overrides, resolve_path
 from .model_io import load_sampler
-from .trainer import TrainingConfig
+from .runtime import get_device
 
 
 def _sample_target(config: TrainingConfig) -> str:
-    return "residual" if config.training_objective == "diffusion_residual" else "state"
+    return "residual" if config.training_objective == "residual_flow" else "state"
 
 
 def _default_setting() -> dict[str, Any]:
@@ -116,17 +114,19 @@ def make_steering_dashboard(
                 cfg_background_scale=float(setting["cfg_background_scale"]),
                 cfg_observation_scale=float(setting["cfg_observation_scale"]),
             )
-            dashboard_cases.append({
-                "case_idx": int(case_index),
-                "case_label": str(setting["label"]),
-                "background": batch["background"][0].detach().cpu(),
-                "obs_values": batch["obs_values"][0].detach().cpu(),
-                "obs_mask": batch["obs_mask"][0].detach().cpu(),
-                "assim": sample[0].detach().cpu(),
-                "truth": batch["truth"][0].detach().cpu(),
-                "valid_mask": batch["valid_mask"][0].detach().cpu(),
-                "water_mask": batch["water_mask"][0].detach().cpu(),
-            })
+            dashboard_cases.append(
+                {
+                    "case_idx": int(case_index),
+                    "case_label": str(setting["label"]),
+                    "background": batch["background"][0].detach().cpu(),
+                    "obs_values": batch["obs_values"][0].detach().cpu(),
+                    "obs_mask": batch["obs_mask"][0].detach().cpu(),
+                    "assim": sample[0].detach().cpu(),
+                    "truth": batch["truth"][0].detach().cpu(),
+                    "valid_mask": batch["valid_mask"][0].detach().cpu(),
+                    "water_mask": batch["water_mask"][0].detach().cpu(),
+                }
+            )
 
     title = (
         f"conditioning steering, split={split}, case={case_id}, steps={num_timesteps}, "

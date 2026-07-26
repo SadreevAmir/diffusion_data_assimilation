@@ -1,10 +1,11 @@
-from types import SimpleNamespace
-from pathlib import Path
 import unittest
+from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 import torch
 
+from assim_lib.config import TrainingConfig
 from assim_lib.evaluate import (
     PhysicalMetricAccumulator,
     _apply_evaluation_config,
@@ -15,7 +16,6 @@ from assim_lib.evaluate import (
     validation_case_indices,
 )
 from assim_lib.sampler import Sampler
-from assim_lib.trainer import TrainingConfig
 
 
 class _AllHourDataset:

@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
 
-echo 'testing'
-python -m  concat_conditioning.main --config /home/config/experiments/smoke_concat_conditioning_4f.json
+set -euo pipefail
+
+exec python -m assim_lib.main \
+  --config /home/config/experiments/smoke_concat_conditioning_2f.json

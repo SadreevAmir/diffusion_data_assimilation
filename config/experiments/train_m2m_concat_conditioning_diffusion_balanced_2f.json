@@ -10,7 +10,7 @@
   },
   "model_config": "../methods/concat_conditioning_diffusion_balanced_2f.json",
   "clearml": {
-    "tags": ["m2m", "concat_conditioning", "diffusion", "2f", "balanced_conditioning", "dopri5"],
+    "tags": ["m2m", "concat_conditioning", "flow_matching", "2f", "balanced_conditioning", "dopri5"],
     "upload_checkpoints": false
   }
 }

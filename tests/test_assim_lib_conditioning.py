@@ -267,9 +267,9 @@ class AssimLibConditioningTests(unittest.TestCase):
         self.assertEqual(obs_values[:, 0, 0, 0].tolist(), [1.0, 0.0, 0.0, 1.0])
         self.assertEqual(obs_mask[:, 0, 0, 0].tolist(), [1.0, 0.0, 0.0, 1.0])
 
-    def test_residual_diffusion_trains_on_truth_minus_background(self):
+    def test_residual_flow_trains_on_truth_minus_background(self):
         trainer = object.__new__(UNetTrainer)
-        trainer.config = SimpleNamespace(training_objective="diffusion_residual")
+        trainer.config = SimpleNamespace(training_objective="residual_flow")
         trainer.add_noise = lambda target, timesteps: (target, target)
         truth = torch.full((1, 1, 2, 2), 5.0)
         background = torch.full_like(truth, 2.0)
@@ -283,9 +283,9 @@ class AssimLibConditioningTests(unittest.TestCase):
         torch.testing.assert_close(model_state, torch.full_like(truth, 3.0))
         torch.testing.assert_close(target, torch.full_like(truth, 3.0))
 
-    def test_residual_diffusion_uses_dropped_background_for_target(self):
+    def test_residual_flow_uses_dropped_background_for_target(self):
         trainer = object.__new__(UNetTrainer)
-        trainer.config = SimpleNamespace(training_objective="diffusion_residual")
+        trainer.config = SimpleNamespace(training_objective="residual_flow")
         trainer.add_noise = lambda target, timesteps: (target, target)
         truth = torch.full((1, 1, 2, 2), 5.0)
         dropped_background = torch.zeros_like(truth)
@@ -494,7 +494,7 @@ class AssimLibConditioningTests(unittest.TestCase):
 
         self.assertEqual(dataset.strided_case_indices(stride_days=30), [0, 2, 3])
 
-    def test_sample_metrics_select_strided_days_at_legacy_hour_for_all_hours_data(self):
+    def test_sample_metrics_select_strided_days_at_configured_hour_for_all_hours_data(self):
         class DailyDataset:
             hours_per_day = 24
             hour_index = 23
@@ -507,9 +507,11 @@ class AssimLibConditioningTests(unittest.TestCase):
         trainer = object.__new__(UNetTrainer)
         trainer.val_dataloader = SimpleNamespace(dataset=DailyDataset())
 
-        self.assertEqual(trainer._metric_case_indices(3, stride_days=15), [23, (30 * 24) + 23, (60 * 24) + 23])
+        self.assertEqual(
+            trainer._metric_case_indices(3, stride_days=15), [23, (30 * 24) + 23, (60 * 24) + 23]
+        )
 
-    def test_legacy_metric_aggregation_is_pixel_weighted(self):
+    def test_metric_aggregation_is_pixel_weighted(self):
         metrics = UNetTrainer._finalize_metric_totals(
             "obs",
             {
@@ -545,7 +547,7 @@ class AssimLibConditioningTests(unittest.TestCase):
                 sample_obs_guidance_eps=1e-8,
                 metric_save_ensemble_samples=True,
                 metric_ensemble_save_dtype="float16",
-                training_objective="diffusion",
+                training_objective="flow",
                 sample_method="dopri5",
                 sample_rtol=1e-5,
                 sample_atol=1e-6,

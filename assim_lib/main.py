@@ -4,48 +4,12 @@ import argparse
 import json
 from pathlib import Path
 
-
-def load_json(path: str | Path) -> dict:
-    with open(path, "r") as f:
-        return json.load(f)
-
-
-def resolve_path(path: str | Path, base_dir: Path) -> Path:
-    path = Path(path)
-    if path.is_absolute() or path.exists():
-        return path
-    return base_dir / path
-
-
-def merge_config_overrides(config: dict, overrides: dict | None) -> dict:
-    merged = dict(config)
-    for key, value in (overrides or {}).items():
-        if isinstance(value, dict) and isinstance(merged.get(key), dict):
-            merged[key] = {**merged[key], **value}
-        else:
-            merged[key] = value
-    return merged
+from .config import TrainingConfig, load_json, merge_config_overrides, resolve_path
+from .runtime import add_noise, build_dataloader, seed_everything
 
 
 def _debug(message: str) -> None:
     print(f"[assim_lib] {message}", flush=True)
-
-
-def _loader(dataset, batch_size: int, num_workers: int, shuffle: bool):
-    import torch
-    from torch.utils.data import DataLoader
-
-    kwargs = dict(
-        batch_size=batch_size,
-        shuffle=shuffle,
-        num_workers=num_workers,
-        pin_memory=torch.cuda.is_available(),
-        persistent_workers=num_workers > 0,
-        drop_last=shuffle,
-    )
-    if num_workers > 0:
-        kwargs["prefetch_factor"] = 4
-    return DataLoader(dataset, **kwargs)
 
 
 def main(config: dict, config_dir: Path):
@@ -58,25 +22,25 @@ def main(config: dict, config_dir: Path):
     model_config_raw = load_json(model_config_path)
 
     _debug("importing torch/diffusers and assim_lib modules")
-    import numpy as np
     import torch
     from diffusers.optimization import get_cosine_schedule_with_warmup
 
-    from utils import add_noise
-
     from .data import build_dataset
     from .model_io import build_unet
-    from .trainer import TrainingConfig, UNetTrainer
+    from .trainer import UNetTrainer
 
     _debug("imports complete")
     model_config = {**model_config_raw, **config.get("training", {})}
     clearml_config = config.get("clearml", {})
     model_config["clearml_project_name"] = config["project_name"]
     model_config["clearml_task_name"] = config["task_name"]
+    model_config.setdefault("clearml_enabled", bool(clearml_config.get("enabled", True)))
     model_config.setdefault("clearml_tags", clearml_config.get("tags", []))
     model_config.setdefault("clearml_output_uri", clearml_config.get("output_uri"))
     model_config.setdefault("clearml_env_path", clearml_config.get("env_path"))
-    model_config.setdefault("clearml_upload_checkpoints", bool(clearml_config.get("upload_checkpoints", False)))
+    model_config.setdefault(
+        "clearml_upload_checkpoints", bool(clearml_config.get("upload_checkpoints", False))
+    )
     train_config = TrainingConfig.from_dict(model_config)
     _debug(
         "training config "
@@ -86,18 +50,25 @@ def main(config: dict, config_dir: Path):
     )
 
     _debug(f"setting random seed: {train_config.seed}")
-    torch.manual_seed(train_config.seed)
-    np.random.seed(train_config.seed)
-    if torch.cuda.is_available():
-        torch.cuda.manual_seed_all(train_config.seed)
+    seed_everything(train_config.seed)
 
     _debug(f"building train dataset: {data_config.get('dataset_name')}")
     train_dataset = build_dataset(data_config, split="train")
     _debug(f"building valid dataset: {data_config.get('dataset_name')}")
     valid_dataset = build_dataset(data_config, split="valid")
     _debug(f"dataset sizes train={len(train_dataset)} valid={len(valid_dataset)}")
-    train_loader = _loader(train_dataset, train_config.train_batch_size, train_config.num_workers_train, shuffle=True)
-    valid_loader = _loader(valid_dataset, train_config.eval_batch_size, train_config.num_workers_val, shuffle=False)
+    train_loader = build_dataloader(
+        train_dataset,
+        train_config.train_batch_size,
+        train_config.num_workers_train,
+        shuffle=True,
+    )
+    valid_loader = build_dataloader(
+        valid_dataset,
+        train_config.eval_batch_size,
+        train_config.num_workers_val,
+        shuffle=False,
+    )
     _debug(f"dataloader batches train={len(train_loader)} valid={len(valid_loader)}")
 
     _debug("building UNet")
@@ -127,13 +98,18 @@ def main(config: dict, config_dir: Path):
     )
     _debug("starting training loop")
     output_dir = trainer.train_loop()
-    result = {"output_dir": str(Path(output_dir).resolve()), "metrics_path": str((Path(output_dir) / "metrics.json").resolve())}
+    result = {
+        "output_dir": str(Path(output_dir).resolve()),
+        "metrics_path": str((Path(output_dir) / "metrics.json").resolve()),
+    }
     print(json.dumps(result, indent=2))
     return result
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Train concat-conditioned background+observation diffusion model.")
+    parser = argparse.ArgumentParser(
+        description="Train a flow-matching model conditioned on background and observations."
+    )
     parser.add_argument("--config", required=True, help="Path to experiment JSON config")
     return parser.parse_args()
 

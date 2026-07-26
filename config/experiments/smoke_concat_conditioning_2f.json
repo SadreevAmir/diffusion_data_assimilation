@@ -1,10 +1,11 @@
 {
   "project_name": "smoke_concat_conditioning",
-  "task_name": "smoke_concat_conditioning_residual_2f",
+  "task_name": "smoke_concat_conditioning_flow_2f",
   "data_config": "../data/smoke_m2m_2f.json",
-  "model_config": "../methods/concat_conditioning_2f.json",
+  "model_config": "../methods/concat_conditioning_diffusion_balanced_2f.json",
   "clearml": {
-    "tags": ["smoke", "concat_conditioning", "residual", "2f", "m2m"],
+    "enabled": false,
+    "tags": ["smoke", "concat_conditioning", "flow_matching", "2f", "m2m"],
     "upload_checkpoints": true
   },
   "training": {
@@ -23,13 +24,14 @@
     "obs_loss_weight": 0.1,
     "sample_every_n_epochs": 0,
     "num_sample_timesteps": 2,
+    "sample_method": "euler",
     "metric_every_n_epochs": 1,
     "metric_num_cases": 1,
     "metric_num_timesteps": 2,
     "metric_num_ensemble": 2,
     "metric_stride_days": 1,
     "metric_save_ensemble_samples": false,
-    "base_output_dir": "outputs/concat_conditioning_residual_2f_smoke",
+    "base_output_dir": "outputs/concat_conditioning_flow_2f_smoke",
     "run_name": "smoke",
     "tracker": null,
     "block_out_channels": [16, 32],

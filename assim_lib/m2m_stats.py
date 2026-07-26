@@ -3,21 +3,17 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import re
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
+from datetime import timedelta
 from functools import partial
 from pathlib import Path
 
 import numpy as np
 from tqdm.auto import tqdm
 
-
-@dataclass(frozen=True)
-class ForecastRecord:
-    date: date
-    path: Path
+from .config import load_json
+from .forecast import ForecastRecord, as_date, forecast_records, records_in_range
 
 
 @dataclass
@@ -27,16 +23,18 @@ class ChannelStats:
     m2: np.ndarray
 
     @classmethod
-    def empty(cls, channels: int) -> "ChannelStats":
+    def empty(cls, channels: int) -> ChannelStats:
         return cls(
             counts=np.zeros(channels, dtype=np.int64),
             means=np.zeros(channels, dtype=np.float64),
             m2=np.zeros(channels, dtype=np.float64),
         )
 
-    def merge(self, other: "ChannelStats") -> None:
+    def merge(self, other: ChannelStats) -> None:
         if self.counts.shape != other.counts.shape:
-            raise ValueError(f"Cannot merge channel stats with shapes {self.counts.shape} and {other.counts.shape}")
+            raise ValueError(
+                f"Cannot merge channel stats with shapes {self.counts.shape} and {other.counts.shape}"
+            )
         if np.any(other.counts < 0) or np.any(self.counts > np.iinfo(np.int64).max - other.counts):
             raise OverflowError("Channel value counts exceed int64 capacity")
 
@@ -69,62 +67,6 @@ class ChannelStats:
         )
 
 
-def load_json(path: str | Path) -> dict:
-    with open(path, "r") as handle:
-        return json.load(handle)
-
-
-def _parse_date(value: str) -> date | None:
-    dashed = re.search(r"\d{4}-\d{2}-\d{2}", value)
-    if dashed is not None:
-        return datetime.strptime(dashed.group(0), "%Y-%m-%d").date()
-
-    compact = re.search(r"\d{8}", value)
-    if compact is not None:
-        return datetime.strptime(compact.group(0), "%Y%m%d").date()
-    return None
-
-
-def _date(value: str | date) -> date:
-    if isinstance(value, date):
-        return value
-    return datetime.fromisoformat(value).date()
-
-
-def _records_in_range(records: list[ForecastRecord], start: date, end: date) -> list[ForecastRecord]:
-    return [record for record in records if start <= record.date <= end]
-
-
-def _forecast_records(preds_dir: Path, lead_time_hours: int | None) -> list[ForecastRecord]:
-    if not preds_dir.is_dir():
-        raise FileNotFoundError(preds_dir)
-
-    files = sorted(preds_dir.glob("*.npy"))
-    if lead_time_hours is not None:
-        prefix = f"ocean+atmosphere_{lead_time_hours}"
-        files = [path for path in files if path.name.startswith(prefix)]
-
-    records = []
-    for path in files:
-        parsed = _parse_date(path.name)
-        if parsed is not None:
-            records.append(ForecastRecord(parsed, path))
-    if not records:
-        raise FileNotFoundError(f"No dated .npy forecast files found in {preds_dir}")
-    return records
-
-
-def _field_at_hour(path: Path, hour_index: int) -> np.ndarray:
-    field = np.load(path, mmap_mode="r")
-    if field.ndim == 4:
-        if not -field.shape[1] <= hour_index < field.shape[1]:
-            raise IndexError(f"hour_index={hour_index} is outside the {field.shape[1]} time slices in {path}")
-        return field[:, hour_index]
-    if field.ndim == 3:
-        return field
-    raise ValueError(f"Expected forecast array [V,T,H,W] or [V,H,W], got {field.shape} in {path}")
-
-
 def _merged_split_config(config: dict, split: str) -> dict:
     split_config = config.get(split)
     if not isinstance(split_config, dict):
@@ -136,15 +78,19 @@ def _paired_records(config: dict, split: str):
     merged = _merged_split_config(config, split)
     preds_dir = Path(merged["dataset_dir"]) / "preds"
     lead_time = merged.get("lead_time_hours")
-    records = _forecast_records(preds_dir, None if lead_time is None else int(lead_time))
-    background = _records_in_range(records, _date(merged["back_start_day"]), _date(merged["back_end_day"]))
+    records = forecast_records(preds_dir, None if lead_time is None else int(lead_time))
+    background = records_in_range(
+        records,
+        as_date(merged["back_start_day"]),
+        as_date(merged["back_end_day"]),
+    )
 
     assimilation_range = int(merged.get("assimilation_range", 1))
     obs_shift = max(0, assimilation_range - 1)
-    target_pool = _records_in_range(
+    target_pool = records_in_range(
         records,
-        _date(merged["obs_start_day"]) - timedelta(days=obs_shift),
-        _date(merged["obs_end_day"]) + timedelta(days=1),
+        as_date(merged["obs_start_day"]) - timedelta(days=obs_shift),
+        as_date(merged["obs_end_day"]) + timedelta(days=1),
     )
     if len(target_pool) < len(background) + obs_shift:
         raise ValueError("Observation/target date range is too short for background records")
@@ -190,7 +136,9 @@ def _stats_from_block(
     if water_mask is not None:
         height, width = block.shape[-2:]
         if height > water_mask.shape[-2] or width > water_mask.shape[-1]:
-            raise ValueError(f"Field shape {(height, width)} is larger than mask shape {water_mask.shape[-2:]}")
+            raise ValueError(
+                f"Field shape {(height, width)} is larger than mask shape {water_mask.shape[-2:]}"
+            )
         cropped = water_mask[:, :height, :width]
         broadcast = cropped[:, None, :, :] if block.ndim == 4 else cropped
         valid &= broadcast
@@ -224,7 +172,9 @@ def _partial_stats_for_record(
 ) -> ChannelStats:
     field = np.load(record.path, mmap_mode="r")
     if np.any(indices < 0) or int(indices.max()) >= field.shape[0]:
-        raise IndexError(f"Configured indices {indices.tolist()} exceed {field.shape[0]} channels in {record.path}")
+        raise IndexError(
+            f"Configured indices {indices.tolist()} exceed {field.shape[0]} channels in {record.path}"
+        )
 
     if field.ndim == 4:
         n_hours = field.shape[1]
@@ -345,7 +295,9 @@ def update_data_config(path: str | Path, payload: dict) -> None:
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Compute M2M normalization statistics for configured channels.")
+    parser = argparse.ArgumentParser(
+        description="Compute M2M normalization statistics for configured channels."
+    )
     parser.add_argument("--config", required=True, help="Path to an M2M data JSON config")
     parser.add_argument("--output", help="Optional JSON path for full statistics and provenance")
     parser.add_argument("--split", default="train", help="Split config used to select record dates")
@@ -369,7 +321,10 @@ def parse_args():
         "--hour-mode",
         choices=("fixed", "all", "auto"),
         default="auto",
-        help="'fixed' uses target_hour_index, 'all' iterates 24 hours per file, 'auto' reads hour_mode from the config",
+        help=(
+            "'fixed' uses target_hour_index, 'all' iterates 24 hours per file, "
+            "'auto' reads hour_mode from the config"
+        ),
     )
     return parser.parse_args()
 

@@ -7,8 +7,8 @@ import torch
 from diffusers.models.unets.unet_2d import UNet2DModel
 from diffusers.training_utils import EMAModel
 
+from .config import TrainingConfig
 from .sampler import Sampler
-from .trainer import TrainingConfig
 
 
 def build_unet(config: TrainingConfig) -> UNet2DModel:
@@ -29,7 +29,7 @@ def load_run_metadata(run_dir: str) -> dict:
     metadata_path = os.path.join(run_dir, "metadata.json")
     if not os.path.exists(metadata_path):
         return {}
-    with open(metadata_path, "r") as handle:
+    with open(metadata_path) as handle:
         return json.load(handle)
 
 

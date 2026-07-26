@@ -16,7 +16,6 @@ services:
     volumes:
       - "/mnt:/mnt"
       - "./:/home/"
-    cpuset: 241-255
     shm_size: '48gb'
     deploy: 
       resources:
@@ -25,6 +24,3 @@ services:
           - driver: nvidia
             device_ids: ['1']
             capabilities: [gpu]
-        limits:
-          cpus: '6.0'
-          memory: 64G

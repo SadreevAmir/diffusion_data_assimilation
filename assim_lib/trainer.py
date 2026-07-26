@@ -4,7 +4,7 @@ import json
 import math
 import os
 from contextlib import contextmanager
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict
 from datetime import datetime
 
 import torch
@@ -15,13 +15,12 @@ from accelerate.utils import ProjectConfiguration
 from diffusers.training_utils import EMAModel
 from tqdm.auto import tqdm
 
-from utils import make_normalized_xy_grid
-
 from .clearml_tracking import ClearMLTracker
+from .config import TrainingConfig, jsonable
 from .dashboard import make_multi_case_background_condition_assim_figure
+from .runtime import make_normalized_xy_grid
 from .sampler import Sampler
 from .transforms import channel_denormalize, make_conditioned_model_input
-
 
 logger = get_logger(__name__)
 
@@ -45,107 +44,21 @@ def _debug(message: str) -> None:
     print(f"[assim_lib][trainer] {message}", flush=True)
 
 
-def _default_mixed_precision() -> str:
-    return "bf16" if torch.cuda.is_available() else "no"
-
-
-@dataclass
-class TrainingConfig:
-    image_size: tuple[int, int] = (320, 256)
-    in_channels: int = 23
-    out_channels: int = 4
-    train_batch_size: int = 8
-    eval_batch_size: int = 4
-    num_workers_train: int = 4
-    num_workers_val: int = 2
-    num_epochs: int = 20
-    gradient_accumulation_steps: int = 1
-    learning_rate: float = 1e-4
-    lr_warmup_steps: int = 500
-    mixed_precision: str = field(default_factory=_default_mixed_precision)
-    seed: int = 0
-    training_objective: str = "diffusion"
-    timestep_sampler: str = "uniform"
-    timestep_beta_params: tuple[float, float] = (2.0, 1.0)
-    obs_loss_weight: float = 0.1
-    smoothness_loss_weight: float = 0.0
-    background_dropout_probability: float = 0.0
-    conditioning_mode_probabilities: dict[str, float] | None = None
-    sample_every_n_epochs: int = 1
-    num_sample_timesteps: int = 200
-    sample_method: str = "euler"
-    sample_rtol: float = 1e-3
-    sample_atol: float = 1e-4
-    sample_use_ema: bool = True
-    ema_decay: float = 0.999
-    sample_start_mode: str = "background"
-    sample_start_noise_level: float = 0.5
-    sample_enforce_observations: bool = True
-    sample_obs_guidance_scale: float = 0.0
-    sample_obs_guidance_eps: float = 1e-8
-    sample_cfg_mode: str = "none"
-    sample_cfg_background_scale: float = 1.0
-    sample_cfg_observation_scale: float = 1.0
-    base_output_dir: str = "checkpoints/concat_conditioning"
-    run_name: str = ""
-    tracker: str | None = None
-    resume_from_checkpoint: str = ""
-    clearml_project_name: str = "concat_conditioning"
-    clearml_task_name: str = ""
-    clearml_tags: tuple[str, ...] = ()
-    clearml_output_uri: str | None = None
-    clearml_env_path: str | None = None
-    clearml_upload_checkpoints: bool = False
-    metric_every_n_epochs: int = 1
-    metric_num_cases: int = 24
-    metric_num_timesteps: int = 200
-    metric_num_ensemble: int = 10
-    metric_stride_days: int = 15
-    metric_save_ensemble_samples: bool = False
-    metric_ensemble_save_dtype: str = "float16"
-
-    block_out_channels: tuple[int, ...] = (64, 128, 256, 512, 512)
-    layers_per_block: int = 2
-    dropout: float = 0.0
-    down_block_types: tuple[str, ...] = (
-        "DownBlock2D",
-        "DownBlock2D",
-        "DownBlock2D",
-        "AttnDownBlock2D",
-        "DownBlock2D",
-    )
-    up_block_types: tuple[str, ...] = (
-        "UpBlock2D",
-        "AttnUpBlock2D",
-        "UpBlock2D",
-        "UpBlock2D",
-        "UpBlock2D",
-    )
-    norm_num_groups: int = 32
-
-    @classmethod
-    def from_dict(cls, config: dict) -> "TrainingConfig":
-        known = {field.name for field in cls.__dataclass_fields__.values()}
-        values = {key: value for key, value in config.items() if key in known}
-        tuple_keys = {
-            "image_size",
-            "timestep_beta_params",
-            "block_out_channels",
-            "down_block_types",
-            "up_block_types",
-            "clearml_tags",
-        }
-        for key in tuple_keys:
-            if key in values:
-                values[key] = tuple(values[key])
-        return cls(**values)
-
-
 class UNetTrainer:
-    def __init__(self, config: TrainingConfig, model, optimizer, data_loader_train,
-                 data_loader_val, lr_scheduler, add_noise_func,
-                 experiment_config=None, model_config=None, data_config=None,
-                 dashboard_dataset=None):
+    def __init__(
+        self,
+        config: TrainingConfig,
+        model,
+        optimizer,
+        data_loader_train,
+        data_loader_val,
+        lr_scheduler,
+        add_noise_func,
+        experiment_config=None,
+        model_config=None,
+        data_config=None,
+        dashboard_dataset=None,
+    ):
         self.config = config
         self.run_name = config.run_name or datetime.now().strftime("run_%Y%m%d_%H%M%S")
         self.output_dir = os.path.join(config.base_output_dir, self.run_name)
@@ -177,52 +90,52 @@ class UNetTrainer:
         if self.accelerator.is_main_process:
             os.makedirs(self.output_dir, exist_ok=True)
             with open(os.path.join(self.output_dir, "config.json"), "w") as f:
-                json.dump(_jsonable(asdict(config)), f, indent=4)
+                json.dump(jsonable(asdict(config)), f, indent=4)
             run_metadata = {
                 "fields": self.fields,
                 "normalization_means": self.channel_means,
                 "normalization_stds": self.channel_stds,
                 "sample_metrics_values_space": "physical",
                 "concentration_clipping": "[0, 1]" if "siconc" in self.fields else None,
-                "data_config": _jsonable(self.data_config),
-                "training_config": _jsonable(asdict(config)),
-                "experiment_config": _jsonable(experiment_config) if experiment_config is not None else None,
-                "model_config": _jsonable(model_config) if model_config is not None else None,
+                "data_config": jsonable(self.data_config),
+                "training_config": jsonable(asdict(config)),
+                "experiment_config": jsonable(experiment_config) if experiment_config is not None else None,
+                "model_config": jsonable(model_config) if model_config is not None else None,
             }
             with open(os.path.join(self.output_dir, "metadata.json"), "w") as f:
                 json.dump(run_metadata, f, indent=4)
-            _debug("initializing ClearML on main process")
-            self.clearml = ClearMLTracker(
-                project_name=config.clearml_project_name,
-                task_name=config.clearml_task_name or self.run_name,
-                tags=config.clearml_tags,
-                output_uri=config.clearml_output_uri,
-                env_path=config.clearml_env_path,
-            )
-            self.clearml.connect("training_config", _jsonable(asdict(config)))
-            if experiment_config is not None:
-                self.clearml.connect("experiment_config", _jsonable(experiment_config))
-            if model_config is not None:
-                self.clearml.connect("model_config", _jsonable(model_config))
-            if data_config is not None:
-                self.clearml.connect("data_config", _jsonable(data_config))
-            self.clearml.connect("run_metadata", run_metadata)
+            if config.clearml_enabled:
+                _debug("initializing ClearML on main process")
+                self.clearml = ClearMLTracker(
+                    project_name=config.clearml_project_name,
+                    task_name=config.clearml_task_name or self.run_name,
+                    tags=config.clearml_tags,
+                    output_uri=config.clearml_output_uri,
+                    env_path=config.clearml_env_path,
+                )
+                self.clearml.connect("training_config", jsonable(asdict(config)))
+                if experiment_config is not None:
+                    self.clearml.connect("experiment_config", jsonable(experiment_config))
+                if model_config is not None:
+                    self.clearml.connect("model_config", jsonable(model_config))
+                if data_config is not None:
+                    self.clearml.connect("data_config", jsonable(data_config))
+                self.clearml.connect("run_metadata", run_metadata)
+            else:
+                _debug("ClearML disabled by experiment config")
         else:
             _debug("non-main process: ClearML init skipped")
 
         if config.tracker:
-            self.accelerator.init_trackers("concat_conditioning_training", config=_jsonable(asdict(config)))
+            self.accelerator.init_trackers("concat_conditioning_training", config=jsonable(asdict(config)))
 
-        if (self.accelerator.device.type == "cuda"
-                and hasattr(model, "enable_xformers_memory_efficient_attention")):
+        if self.accelerator.device.type == "cuda" and hasattr(
+            model, "enable_xformers_memory_efficient_attention"
+        ):
             model.enable_xformers_memory_efficient_attention()
 
-        (self.model,
-         self.optimizer,
-         self.train_dataloader,
-         self.val_dataloader,
-         self.lr_scheduler) = self.accelerator.prepare(
-            model, optimizer, data_loader_train, data_loader_val, lr_scheduler
+        (self.model, self.optimizer, self.train_dataloader, self.val_dataloader, self.lr_scheduler) = (
+            self.accelerator.prepare(model, optimizer, data_loader_train, data_loader_val, lr_scheduler)
         )
         _debug(f"accelerator ready device={self.accelerator.device}")
 
@@ -268,9 +181,8 @@ class UNetTrainer:
                 draw = torch.rand((background.shape[0], 1, 1, 1), device=background.device)
                 no_background = draw < probabilities[0]
                 no_track = (draw >= probabilities[0]) & (draw < probabilities[0] + probabilities[1])
-                no_conditioning = (
-                    (draw >= probabilities[0] + probabilities[1])
-                    & (draw < probabilities[0] + probabilities[1] + probabilities[2])
+                no_conditioning = (draw >= probabilities[0] + probabilities[1]) & (
+                    draw < probabilities[0] + probabilities[1] + probabilities[2]
                 )
                 keep_background = (~(no_background | no_conditioning)).to(dtype=background.dtype)
                 keep_track = (~(no_track | no_conditioning)).to(dtype=obs_values.dtype)
@@ -283,8 +195,7 @@ class UNetTrainer:
         dropout_probability = float(getattr(self.config, "background_dropout_probability", 0.0))
         if not 0.0 <= dropout_probability <= 1.0:
             raise ValueError(
-                "background_dropout_probability must be within [0, 1], "
-                f"got {dropout_probability}"
+                f"background_dropout_probability must be within [0, 1], got {dropout_probability}"
             )
         if self.model.training and dropout_probability > 0.0:
             keep = (
@@ -336,9 +247,9 @@ class UNetTrainer:
         timesteps: torch.Tensor,
         residual_background: torch.Tensor | None = None,
     ) -> tuple[torch.Tensor, torch.Tensor]:
-        if self.config.training_objective == "diffusion":
+        if self.config.training_objective == "flow":
             return self.add_noise(truth, timesteps)
-        if self.config.training_objective == "diffusion_residual":
+        if self.config.training_objective == "residual_flow":
             background = batch["background"] if residual_background is None else residual_background
             return self.add_noise(truth - background, timesteps)
         if self.config.training_objective == "bridge":
@@ -348,11 +259,11 @@ class UNetTrainer:
             return state, target_velocity
         raise ValueError(
             f"Unknown training_objective={self.config.training_objective!r}; "
-            "expected 'diffusion', 'diffusion_residual', or 'bridge'"
+            "expected 'flow', 'residual_flow', or 'bridge'"
         )
 
     def _sample_target(self) -> str:
-        return "residual" if self.config.training_objective == "diffusion_residual" else "state"
+        return "residual" if self.config.training_objective == "residual_flow" else "state"
 
     def _sample_solver_kwargs(self) -> dict[str, object]:
         method = str(getattr(self.config, "sample_method", "euler"))
@@ -421,12 +332,14 @@ class UNetTrainer:
             return pred.new_tensor(0.0)
         channel = self.fields.index("siconc")
         return self._masked_smoothness_loss(
-            pred[:, channel:channel + 1],
-            mask[:, channel:channel + 1],
+            pred[:, channel : channel + 1],
+            mask[:, channel : channel + 1],
         )
 
     @staticmethod
-    def _masked_error_metrics(pred: torch.Tensor, target: torch.Tensor, mask: torch.Tensor) -> tuple[float, float]:
+    def _masked_error_metrics(
+        pred: torch.Tensor, target: torch.Tensor, mask: torch.Tensor
+    ) -> tuple[float, float]:
         mask = mask.expand_as(pred)
         denom = mask.sum().clamp(min=1.0)
         diff = (pred - target) * mask
@@ -498,7 +411,9 @@ class UNetTrainer:
                         f"background_{kind}_{suffix}",
                     )
                     _report(
-                        f"metric_physical/background_{kind}", f"{field_name}/{region}", f"background_{kind}_{suffix}"
+                        f"metric_physical/background_{kind}",
+                        f"{field_name}/{region}",
+                        f"background_{kind}_{suffix}",
                     )
         for field_name in self.fields:
             for region in ("full", "obs"):
@@ -631,7 +546,7 @@ class UNetTrainer:
             batch = self._batch_to_device(raw_batch)
             batch_size = batch["truth"].shape[0]
             for batch_idx in range(batch_size):
-                cases.append({key: value[batch_idx:batch_idx + 1] for key, value in batch.items()})
+                cases.append({key: value[batch_idx : batch_idx + 1] for key, value in batch.items()})
                 if len(cases) >= max_cases:
                     return cases
         return cases
@@ -673,7 +588,7 @@ class UNetTrainer:
 
         batch_size = max(int(batch_size), 1)
         for start in range(0, len(indices), batch_size):
-            chunk = indices[start:start + batch_size]
+            chunk = indices[start : start + batch_size]
             samples = [val_dataset[idx] for idx in chunk]
             raw_batch = default_collate(samples)
             yield self._batch_to_device(raw_batch)
@@ -710,7 +625,9 @@ class UNetTrainer:
             for field_name in self.fields
         }
         total_processed = 0
-        save_ensemble = bool(getattr(self.config, "metric_save_ensemble_samples", False)) and epoch is not None
+        save_ensemble = (
+            bool(getattr(self.config, "metric_save_ensemble_samples", False)) and epoch is not None
+        )
         saved_batches = []
         if save_ensemble:
             save_dtype_name = str(getattr(self.config, "metric_ensemble_save_dtype", "float16")).lower()
@@ -755,15 +672,17 @@ class UNetTrainer:
                     )
                 ensemble_tensor = torch.stack(ensemble, dim=1)
                 if save_ensemble:
-                    saved_batches.append({
-                        "samples": ensemble_tensor.detach().to(device="cpu", dtype=save_dtype),
-                        "truth": batch["truth"].detach().to(device="cpu", dtype=save_dtype),
-                        "background": batch["background"].detach().to(device="cpu", dtype=save_dtype),
-                        "obs_values": batch["obs_values"].detach().to(device="cpu", dtype=save_dtype),
-                        "obs_mask": batch["obs_mask"].detach().to(device="cpu", dtype=save_dtype),
-                        "valid_mask": batch["valid_mask"].detach().to(device="cpu", dtype=save_dtype),
-                        "water_mask": batch["water_mask"].detach().to(device="cpu", dtype=save_dtype),
-                    })
+                    saved_batches.append(
+                        {
+                            "samples": ensemble_tensor.detach().to(device="cpu", dtype=save_dtype),
+                            "truth": batch["truth"].detach().to(device="cpu", dtype=save_dtype),
+                            "background": batch["background"].detach().to(device="cpu", dtype=save_dtype),
+                            "obs_values": batch["obs_values"].detach().to(device="cpu", dtype=save_dtype),
+                            "obs_mask": batch["obs_mask"].detach().to(device="cpu", dtype=save_dtype),
+                            "valid_mask": batch["valid_mask"].detach().to(device="cpu", dtype=save_dtype),
+                            "water_mask": batch["water_mask"].detach().to(device="cpu", dtype=save_dtype),
+                        }
+                    )
                 n_cases, n_members, n_channels, height, width = ensemble_tensor.shape
                 ensemble_physical = self._physical_metric_tensor(
                     ensemble_tensor.reshape(n_cases * n_members, n_channels, height, width)
@@ -773,10 +692,10 @@ class UNetTrainer:
                 background_physical = self._physical_metric_tensor(batch["background"])
                 for channel, field_name in enumerate(self.fields):
                     for region, mask in (("full", batch["valid_mask"]), ("obs", batch["obs_mask"])):
-                        channel_mask = mask[:, channel:channel + 1]
-                        truth_channel = truth_physical[:, channel:channel + 1]
+                        channel_mask = mask[:, channel : channel + 1]
+                        truth_channel = truth_physical[:, channel : channel + 1]
                         background_abs, background_sq, background_count = self._masked_error_sums(
-                            background_physical[:, channel:channel + 1], truth_channel, channel_mask
+                            background_physical[:, channel : channel + 1], truth_channel, channel_mask
                         )
                         background_totals = totals[field_name][region]["background"]
                         background_totals["background_abs"] += background_abs
@@ -785,7 +704,7 @@ class UNetTrainer:
 
                         for member_index, analysis in enumerate(ensemble_physical.unbind(dim=1)):
                             analysis_abs, analysis_sq, count = self._masked_error_sums(
-                                analysis[:, channel:channel + 1], truth_channel, channel_mask
+                                analysis[:, channel : channel + 1], truth_channel, channel_mask
                             )
                             member_totals = totals[field_name][region]["members"][member_index]
                             member_totals["analysis_abs"] += analysis_abs
@@ -793,7 +712,7 @@ class UNetTrainer:
                             member_totals["count"] += min(count, background_count)
 
                         analysis_abs, analysis_sq, count = self._masked_error_sums(
-                            ensemble_mean[:, channel:channel + 1], truth_channel, channel_mask
+                            ensemble_mean[:, channel : channel + 1], truth_channel, channel_mask
                         )
                         mean_totals = totals[field_name][region]["of_mean"]
                         mean_totals["analysis_abs"] += analysis_abs
@@ -852,19 +771,29 @@ class UNetTrainer:
             os.makedirs(samples_dir, exist_ok=True)
             artifact = {
                 key: torch.cat([batch[key] for batch in saved_batches], dim=0)
-                for key in ("samples", "truth", "background", "obs_values", "obs_mask", "valid_mask", "water_mask")
+                for key in (
+                    "samples",
+                    "truth",
+                    "background",
+                    "obs_values",
+                    "obs_mask",
+                    "valid_mask",
+                    "water_mask",
+                )
             }
-            artifact.update({
-                "case_indices": torch.as_tensor(indices[:total_processed], dtype=torch.long),
-                "epoch": int(epoch),
-                "num_timesteps": int(metric_timesteps),
-                "num_ensemble": int(num_ensemble),
-                "stride_days": int(stride_days),
-                "save_dtype": save_dtype_name,
-                "values_space": "normalized",
-                "metrics_values_space": "physical",
-                "concentration_clipping": "[0, 1]" if "siconc" in self.fields else None,
-            })
+            artifact.update(
+                {
+                    "case_indices": torch.as_tensor(indices[:total_processed], dtype=torch.long),
+                    "epoch": int(epoch),
+                    "num_timesteps": int(metric_timesteps),
+                    "num_ensemble": int(num_ensemble),
+                    "stride_days": int(stride_days),
+                    "save_dtype": save_dtype_name,
+                    "values_space": "normalized",
+                    "metrics_values_space": "physical",
+                    "concentration_clipping": "[0, 1]" if "siconc" in self.fields else None,
+                }
+            )
             artifact_path = os.path.join(samples_dir, f"epoch_{epoch:04d}_metric_ensemble.pt")
             torch.save(artifact, artifact_path)
             _debug(f"saved sample validation ensemble: {artifact_path}")
@@ -1012,7 +941,7 @@ class UNetTrainer:
         labels = list(labels or [])
         cases = []
         for batch_idx in range(batch["truth"].shape[0]):
-            case = {key: value[batch_idx:batch_idx + 1] for key, value in batch.items()}
+            case = {key: value[batch_idx : batch_idx + 1] for key, value in batch.items()}
             if batch_idx < len(labels) and labels[batch_idx]:
                 case["case_label"] = str(labels[batch_idx])
             cases.append(case)
@@ -1075,7 +1004,7 @@ class UNetTrainer:
     def _chunks(values: list, size: int):
         size = max(int(size), 1)
         for start in range(0, len(values), size):
-            yield start // size, values[start:start + size]
+            yield start // size, values[start : start + size]
 
     @torch.no_grad()
     def report_unconditional_dashboard_sample(self, epoch: int):
@@ -1277,41 +1206,52 @@ class UNetTrainer:
 
                 if self.clearml is not None:
                     for channel, field_name in enumerate(self.fields):
-                        valid_mask = one["valid_mask"][0, channel:channel + 1]
+                        valid_mask = one["valid_mask"][0, channel : channel + 1]
                         analysis_mae, analysis_rmse = self._masked_error_metrics(
-                            assim_physical[channel:channel + 1],
-                            truth_physical[channel:channel + 1],
+                            assim_physical[channel : channel + 1],
+                            truth_physical[channel : channel + 1],
                             valid_mask,
                         )
                         background_mae, background_rmse = self._masked_error_metrics(
-                            background_physical[channel:channel + 1],
-                            truth_physical[channel:channel + 1],
+                            background_physical[channel : channel + 1],
+                            truth_physical[channel : channel + 1],
                             valid_mask,
                         )
                         skill = 0.0 if background_rmse <= 0.0 else 1.0 - analysis_rmse / background_rmse
                         series = f"{field_name}/case_{case_idx:04d}"
-                        self.clearml.report_scalar("sample_physical/rmse_analysis", series, analysis_rmse, epoch)
-                        self.clearml.report_scalar("sample_physical/rmse_background", series, background_rmse, epoch)
-                        self.clearml.report_scalar("sample_physical/mae_analysis", series, analysis_mae, epoch)
-                        self.clearml.report_scalar("sample_physical/mae_background", series, background_mae, epoch)
+                        self.clearml.report_scalar(
+                            "sample_physical/rmse_analysis", series, analysis_rmse, epoch
+                        )
+                        self.clearml.report_scalar(
+                            "sample_physical/rmse_background", series, background_rmse, epoch
+                        )
+                        self.clearml.report_scalar(
+                            "sample_physical/mae_analysis", series, analysis_mae, epoch
+                        )
+                        self.clearml.report_scalar(
+                            "sample_physical/mae_background", series, background_mae, epoch
+                        )
                         self.clearml.report_scalar("sample_physical/rmse_skill", series, skill, epoch)
 
-                dashboard_cases.append({
-                    "case_idx": case_idx,
-                    "case_label": one.get("case_label"),
-                    "background": one["background"][0],
-                    "obs_values": one["obs_values"][0],
-                    "obs_mask": one["obs_mask"][0],
-                    "assim": assim,
-                    "assim_background_only": assim_background_only_batch[case_idx],
-                    "assim_observation_only": assim_observation_only_batch[case_idx],
-                    "assim_neither": assim_neither_batch[case_idx],
-                    "truth": one["truth"][0],
-                    "valid_mask": one["valid_mask"][0],
-                    "water_mask": one["water_mask"][0],
-                })
+                dashboard_cases.append(
+                    {
+                        "case_idx": case_idx,
+                        "case_label": one.get("case_label"),
+                        "background": one["background"][0],
+                        "obs_values": one["obs_values"][0],
+                        "obs_mask": one["obs_mask"][0],
+                        "assim": assim,
+                        "assim_background_only": assim_background_only_batch[case_idx],
+                        "assim_observation_only": assim_observation_only_batch[case_idx],
+                        "assim_neither": assim_neither_batch[case_idx],
+                        "truth": one["truth"][0],
+                        "valid_mask": one["valid_mask"][0],
+                        "water_mask": one["water_mask"][0],
+                    }
+                )
 
         import matplotlib.pyplot as plt
+
         current_pages = []
         cases_per_page = max(_DASHBOARD_CASES_PER_PAGE, 1)
         for page_idx, page_cases in self._chunks(dashboard_cases, cases_per_page):
@@ -1338,7 +1278,8 @@ class UNetTrainer:
             current_pages.append({"page_idx": page_idx, "path": figure_path})
 
         large_case = {
-            key: value for key, value in dashboard_cases[0].items()
+            key: value
+            for key, value in dashboard_cases[0].items()
             if key not in ("assim_background_only", "assim_observation_only")
         }
         large_fig = make_multi_case_background_condition_assim_figure(
@@ -1347,10 +1288,7 @@ class UNetTrainer:
             means=self.channel_means,
             stds=self.channel_stds,
             channels=range(len(self.fields)),
-            title=(
-                f"large fully conditioned vs fully unconditioned sample, "
-                f"epoch {epoch}, {weights_label}"
-            ),
+            title=(f"large fully conditioned vs fully unconditioned sample, epoch {epoch}, {weights_label}"),
             panel_width=_DASHBOARD_LARGE_PANEL_WIDTH,
             panel_height=_DASHBOARD_LARGE_PANEL_HEIGHT,
         )
@@ -1375,7 +1313,9 @@ class UNetTrainer:
         for epoch in range(self.config.num_epochs):
             self.model.train()
             _debug(f"epoch {epoch} start")
-            progress_bar = tqdm(total=len(self.train_dataloader), disable=not self.accelerator.is_local_main_process)
+            progress_bar = tqdm(
+                total=len(self.train_dataloader), disable=not self.accelerator.is_local_main_process
+            )
             progress_bar.set_description(f"Epoch {epoch}")
 
             for batch_index, raw_batch in enumerate(self.train_dataloader):
@@ -1420,12 +1360,15 @@ class UNetTrainer:
                     self._report_condition_diagnostics(raw_batch, global_step, "train")
                 self._report_train_metrics(loss, loss_full, loss_obs, loss_smooth, global_step)
                 if self.config.tracker:
-                    self.accelerator.log({
-                        "train_loss": loss.item(),
-                        "train_loss_full": loss_full.item(),
-                        "train_loss_obs": loss_obs.item(),
-                        "train_loss_smoothness": loss_smooth.item(),
-                    }, step=global_step)
+                    self.accelerator.log(
+                        {
+                            "train_loss": loss.item(),
+                            "train_loss_full": loss_full.item(),
+                            "train_loss_obs": loss_obs.item(),
+                            "train_loss_smoothness": loss_smooth.item(),
+                        },
+                        step=global_step,
+                    )
                 global_step += 1
                 progress_bar.update(1)
                 progress_bar.set_postfix(loss=loss.item(), obs=loss_obs.item())
@@ -1433,9 +1376,11 @@ class UNetTrainer:
             progress_bar.close()
             val_loss_full, val_loss_obs, val_loss = self.compute_val_loss()
             sample_metrics = {}
-            if (self.accelerator.is_main_process
-                    and self.config.metric_every_n_epochs > 0
-                    and epoch % self.config.metric_every_n_epochs == 0):
+            if (
+                self.accelerator.is_main_process
+                and self.config.metric_every_n_epochs > 0
+                and epoch % self.config.metric_every_n_epochs == 0
+            ):
                 sample_metrics = self.compute_sample_validation_metrics(epoch=epoch)
 
             history_entry = {
@@ -1449,11 +1394,14 @@ class UNetTrainer:
             history_entry.update(sample_metrics)
             self.val_history.append(history_entry)
             if self.config.tracker:
-                self.accelerator.log({
-                    "val_loss": val_loss,
-                    "val_loss_full": val_loss_full,
-                    "val_loss_obs": val_loss_obs,
-                }, step=global_step)
+                self.accelerator.log(
+                    {
+                        "val_loss": val_loss,
+                        "val_loss_full": val_loss_full,
+                        "val_loss_obs": val_loss_obs,
+                    },
+                    step=global_step,
+                )
             self._report_val_metrics(val_loss_full, val_loss_obs, val_loss, global_step)
             self._report_sample_validation_metrics(sample_metrics, global_step)
             try:
@@ -1461,7 +1409,9 @@ class UNetTrainer:
             except StopIteration:
                 pass
             _debug(f"epoch {epoch} validation total={val_loss:.6f}")
-            logger.info("Epoch %d val_loss %.6f full %.6f obs %.6f", epoch, val_loss, val_loss_full, val_loss_obs)
+            logger.info(
+                "Epoch %d val_loss %.6f full %.6f obs %.6f", epoch, val_loss, val_loss_full, val_loss_obs
+            )
 
             if self.accelerator.is_main_process:
                 with open(os.path.join(self.output_dir, "metrics.json"), "w") as f:
@@ -1486,13 +1436,3 @@ class UNetTrainer:
         _debug("training finished")
         self.accelerator.end_training()
         return self.output_dir
-
-
-def _jsonable(value):
-    if isinstance(value, tuple):
-        return [_jsonable(v) for v in value]
-    if isinstance(value, list):
-        return [_jsonable(v) for v in value]
-    if isinstance(value, dict):
-        return {key: _jsonable(val) for key, val in value.items()}
-    return value

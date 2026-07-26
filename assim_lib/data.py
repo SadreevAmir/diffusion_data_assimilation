@@ -1,79 +1,20 @@
 from __future__ import annotations
 
-import re
-from dataclasses import dataclass
-from datetime import date, datetime, timedelta
-from functools import lru_cache
+from datetime import date, timedelta
 from pathlib import Path
 
 import numpy as np
 import torch
 from torch.utils.data import Dataset
 
+from .forecast import (
+    as_date,
+    field_at_hour,
+    forecast_records,
+    parse_date,
+    records_in_range,
+)
 from .transforms import load_valid_mask, make_observation_tensors, pad_to_size, prepare_model_field
-
-
-@lru_cache(maxsize=128)
-def _open_npy_mmap(path_str: str) -> np.ndarray:
-    return np.load(path_str, mmap_mode="r")
-
-
-@dataclass(frozen=True)
-class ForecastRecord:
-    date: date
-    path: Path
-
-
-def _parse_date(value: str) -> date | None:
-    dashed = re.search(r"\d{4}-\d{2}-\d{2}", value)
-    if dashed is not None:
-        return datetime.strptime(dashed.group(0), "%Y-%m-%d").date()
-
-    compact = re.search(r"\d{8}", value)
-    if compact is not None:
-        return datetime.strptime(compact.group(0), "%Y%m%d").date()
-
-    return None
-
-
-def _date(value: str | date) -> date:
-    if isinstance(value, date):
-        return value
-    return datetime.fromisoformat(value).date()
-
-
-def _records_in_range(records: list[ForecastRecord], start: date, end: date) -> list[ForecastRecord]:
-    return [record for record in records if start <= record.date <= end]
-
-
-def _forecast_records(preds_dir: Path, lead_time_hours: int | None) -> list[ForecastRecord]:
-    if not preds_dir.is_dir():
-        raise FileNotFoundError(preds_dir)
-
-    files = sorted(preds_dir.glob("*.npy"))
-    if lead_time_hours is not None:
-        prefix = f"ocean+atmosphere_{lead_time_hours}"
-        files = [path for path in files if path.name.startswith(prefix)]
-
-    records = []
-    for path in files:
-        parsed = _parse_date(path.name)
-        if parsed is not None:
-            records.append(ForecastRecord(parsed, path))
-    if not records:
-        raise FileNotFoundError(f"No dated .npy forecast files found in {preds_dir}")
-    return records
-
-
-def _field_at_hour(path: Path, hour_index: int, indices: list[int] | None = None):
-    field = _open_npy_mmap(str(path))
-    if field.ndim == 4:
-        selected = field[:, hour_index] if indices is None else field[indices, hour_index]
-        return np.array(selected, copy=True)
-    if field.ndim == 3:
-        selected = field if indices is None else field[indices]
-        return np.array(selected, copy=True)
-    raise ValueError(f"Expected forecast array [V,T,H,W] or [V,H,W], got {field.shape} in {path}")
 
 
 def _sral_transform(arr: np.ndarray, index: int) -> np.ndarray:
@@ -143,7 +84,9 @@ def _combine_sral_files(paths: list[Path]) -> np.ndarray | None:
     return combined
 
 
-def _generate_track_mask(image_size: tuple[int, int], valid_mask: torch.Tensor, n_tracks_range, rng) -> torch.Tensor:
+def _generate_track_mask(
+    image_size: tuple[int, int], valid_mask: torch.Tensor, n_tracks_range, rng
+) -> torch.Tensor:
     height, width = image_size
     n_min, n_max = int(n_tracks_range[0]), int(n_tracks_range[1])
     n_tracks = int(rng.integers(n_min, n_max + 1)) if n_max >= n_min else n_min
@@ -166,13 +109,17 @@ def _generate_track_mask(image_size: tuple[int, int], valid_mask: torch.Tensor, 
             ok = (rows >= 0) & (rows < height)
             mask[rows[ok], cols[ok]] = 1.0
 
-    valid_2d = valid_mask[0].detach().cpu().numpy() if valid_mask.ndim == 3 else valid_mask.detach().cpu().numpy()
+    valid_2d = (
+        valid_mask[0].detach().cpu().numpy() if valid_mask.ndim == 3 else valid_mask.detach().cpu().numpy()
+    )
     return torch.from_numpy(mask * (valid_2d > 0)).to(dtype=torch.float32)
 
 
 def _random_mask(image_size: tuple[int, int], valid_mask: torch.Tensor, density: float, rng) -> torch.Tensor:
     mask = (rng.random(image_size) < float(density)).astype(np.float32)
-    valid_2d = valid_mask[0].detach().cpu().numpy() if valid_mask.ndim == 3 else valid_mask.detach().cpu().numpy()
+    valid_2d = (
+        valid_mask[0].detach().cpu().numpy() if valid_mask.ndim == 3 else valid_mask.detach().cpu().numpy()
+    )
     return torch.from_numpy(mask * (valid_2d > 0)).to(dtype=torch.float32)
 
 
@@ -184,7 +131,11 @@ def _make_mask(image_size, valid_mask, config, rng, mask_config=None) -> torch.T
     if kind == "random":
         return _random_mask(image_size, valid_mask, float(mask_config.get("density", 0.05)), rng)
     if kind == "uniform_points":
-        valid_2d = valid_mask[0].detach().cpu().numpy() > 0 if valid_mask.ndim == 3 else valid_mask.detach().cpu().numpy() > 0
+        valid_2d = (
+            valid_mask[0].detach().cpu().numpy() > 0
+            if valid_mask.ndim == 3
+            else valid_mask.detach().cpu().numpy() > 0
+        )
         coords = np.argwhere(valid_2d)
         mask = np.zeros(image_size, dtype=np.float32)
         if coords.size == 0:
@@ -209,7 +160,9 @@ class SmokeM2MDataset(Dataset):
         self.split = split
         split_config = config.get(split, {})
         self.n_cases = int(split_config.get("n_cases", config.get("n_cases", 8)))
-        self.channels = int(config.get("channels", len(config.get("fields", ["var0", "var1", "var2", "var3"]))))
+        self.channels = int(
+            config.get("channels", len(config.get("fields", ["var0", "var1", "var2", "var3"])))
+        )
         self.image_size = tuple(int(v) for v in config.get("image_size", [32, 32]))
         self.background_noise_std = float(config.get("background_noise_std", 0.25))
         self.seed = int(config.get("seed", 42)) + (10000 if split == "valid" else 0)
@@ -275,23 +228,30 @@ class M2MForecastDataset(Dataset):
         self.background_strategy = str(self.config.get("background_strategy", "indexed"))
         if self.background_strategy not in ("indexed", "year_ago_jitter"):
             raise ValueError(
-                f"Unknown background_strategy={self.background_strategy!r}; expected 'indexed' or 'year_ago_jitter'"
+                f"Unknown background_strategy={self.background_strategy!r}; "
+                "expected 'indexed' or 'year_ago_jitter'"
             )
         self.background_year_offset_days = int(self.config.get("background_year_offset_days", 365))
         self.background_jitter_days = int(self.config.get("background_jitter_days", 7))
 
         preds_dir = Path(self.config["dataset_dir"]) / "preds"
         lead = self.config.get("lead_time_hours", None)
-        records = _forecast_records(preds_dir, None if lead is None else int(lead))
-        self.back_data = _records_in_range(records, _date(self.config["back_start_day"]), _date(self.config["back_end_day"]))
+        records = forecast_records(preds_dir, None if lead is None else int(lead))
+        self.back_data = records_in_range(
+            records,
+            as_date(self.config["back_start_day"]),
+            as_date(self.config["back_end_day"]),
+        )
 
-        obs_start = _date(self.config["obs_start_day"]) - timedelta(days=self.obs_shift)
-        obs_end = _date(self.config["obs_end_day"]) + timedelta(days=1)
-        self.obs_data = _records_in_range(records, obs_start, obs_end)
+        obs_start = as_date(self.config["obs_start_day"]) - timedelta(days=self.obs_shift)
+        obs_end = as_date(self.config["obs_end_day"]) + timedelta(days=1)
+        self.obs_data = records_in_range(records, obs_start, obs_end)
         if len(self.back_data) == 0 or len(self.obs_data) == 0:
             raise ValueError("No forecast records selected for M2M date ranges")
         if len(self.obs_data) < len(self.back_data) + self.obs_shift:
-            raise ValueError("Observation/target date range is too short for background range and assimilation_range")
+            raise ValueError(
+                "Observation/target date range is too short for background range and assimilation_range"
+            )
 
         self.sral_records = self._load_sral_records()
         self.records_by_date = {record.date: record for record in records}
@@ -318,7 +278,9 @@ class M2MForecastDataset(Dataset):
         synthetic_config = mask_config.get("synthetic", {})
         if synthetic_probability > 0.0 and not isinstance(synthetic_config, dict):
             raise ValueError("observation_mask.synthetic must be an object when synthetic_probability > 0")
-        synthetic_kind = synthetic_config.get("kind", "generated_track") if isinstance(synthetic_config, dict) else None
+        synthetic_kind = (
+            synthetic_config.get("kind", "generated_track") if isinstance(synthetic_config, dict) else None
+        )
         if synthetic_kind == "sral_tracks":
             raise ValueError("observation_mask.synthetic.kind cannot be 'sral_tracks'")
 
@@ -342,7 +304,7 @@ class M2MForecastDataset(Dataset):
             return {}
         out: dict[date, list[Path]] = {}
         for path in sorted(sral_path.glob("*.npy")):
-            parsed = _parse_date(path.name)
+            parsed = parse_date(path.name)
             if parsed is not None:
                 out.setdefault(parsed, []).append(path)
         return out
@@ -404,11 +366,15 @@ class M2MForecastDataset(Dataset):
     ) -> tuple[torch.Tensor, torch.Tensor, dict]:
         obs_values = torch.zeros((len(self.indices), *self.image_size), dtype=torch.float32)
         obs_mask = torch.zeros_like(obs_values)
-        return obs_values, obs_mask, self._observation_diagnostics(
-            mask_kind,
+        return (
+            obs_values,
             obs_mask,
-            valid_mask,
-            empty_obs_days=empty_obs_days,
+            self._observation_diagnostics(
+                mask_kind,
+                obs_mask,
+                valid_mask,
+                empty_obs_days=empty_obs_days,
+            ),
         )
 
     def _sral_track_observations(
@@ -429,7 +395,9 @@ class M2MForecastDataset(Dataset):
             )
 
         mask_config = self.config.get("observation_mask", {})
-        transform_index = int(mask_config.get("sral_transform_index", self.config.get("sral_transform_index", 11)))
+        transform_index = int(
+            mask_config.get("sral_transform_index", self.config.get("sral_transform_index", 11))
+        )
         observed_source_indices = [self.indices[channel] for channel in self.observed_channels]
         observed_means = [self.means[channel] for channel in self.observed_channels]
         observed_stds = [self.stds[channel] for channel in self.observed_channels]
@@ -455,7 +423,7 @@ class M2MForecastDataset(Dataset):
                 continue
 
             track_field, track_finite = prepare_model_field(
-                _field_at_hour(model_record.path, hour, observed_source_indices),
+                field_at_hour(model_record.path, hour, observed_source_indices),
                 None,
                 observed_means,
                 observed_stds,
@@ -468,12 +436,16 @@ class M2MForecastDataset(Dataset):
                 obs_values[channel][fill_mask] = track_field[observed_idx][fill_mask]
                 obs_mask[channel][fill_mask] = 1.0
 
-        return obs_values, obs_mask, self._observation_diagnostics(
-            "sral_tracks",
+        return (
+            obs_values,
             obs_mask,
-            valid_mask,
-            sral_files_used=sral_files_used,
-            empty_obs_days=empty_obs_days,
+            self._observation_diagnostics(
+                "sral_tracks",
+                obs_mask,
+                valid_mask,
+                sral_files_used=sral_files_used,
+                empty_obs_days=empty_obs_days,
+            ),
         )
 
     def _selected_sral_conditioning(self, mask_config: dict, rng) -> str:
@@ -500,10 +472,14 @@ class M2MForecastDataset(Dataset):
         spatial_mask = _make_mask(self.image_size, valid_mask, self.config, rng, mask_config=synthetic_config)
         spatial_mask = spatial_mask * valid_mask[0]
         obs_values, obs_mask = make_observation_tensors(truth, spatial_mask, self.observed_channels)
-        return obs_values, obs_mask, self._observation_diagnostics(
-            f"synthetic_{synthetic_kind}",
+        return (
+            obs_values,
             obs_mask,
-            valid_mask,
+            self._observation_diagnostics(
+                f"synthetic_{synthetic_kind}",
+                obs_mask,
+                valid_mask,
+            ),
         )
 
     def _sral_spatial_mask(self, target_date: date) -> torch.Tensor | None:
@@ -518,7 +494,11 @@ class M2MForecastDataset(Dataset):
                 continue
             transformed_sral = _sral_transform(
                 combined_sral,
-                int(self.config.get("observation_mask", {}).get("sral_transform_index", self.config.get("sral_transform_index", 11))),
+                int(
+                    self.config.get("observation_mask", {}).get(
+                        "sral_transform_index", self.config.get("sral_transform_index", 11)
+                    )
+                ),
             )
             finite = torch.as_tensor(np.isfinite(transformed_sral).astype(np.float32))
             finite = pad_to_size(finite, self.image_size, fill_value=0.0)[0]
@@ -568,11 +548,9 @@ class M2MForecastDataset(Dataset):
     def __getitem__(self, idx):
         day_idx, hour = self._resolve_index(idx)
         target_record = self.obs_data[day_idx + self.obs_shift]
-        back_record, background_offset_days = self._select_background_record(
-            target_record.date, idx, day_idx
-        )
+        back_record, background_offset_days = self._select_background_record(target_record.date, idx, day_idx)
         background, _ = prepare_model_field(
-            _field_at_hour(back_record.path, hour, self.indices),
+            field_at_hour(back_record.path, hour, self.indices),
             None,
             self.means,
             self.stds,
@@ -580,7 +558,7 @@ class M2MForecastDataset(Dataset):
             self.image_size,
         )
         truth, _ = prepare_model_field(
-            _field_at_hour(target_record.path, hour, self.indices),
+            field_at_hour(target_record.path, hour, self.indices),
             None,
             self.means,
             self.stds,

@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "flow-matching-data-assimilation"
+version = "0.1.0"
+description = "Conditional flow matching for sparse sea-ice data assimilation"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "accelerate>=1.1.1",
+  "clearml>=1.16.5",
+  "diffusers>=0.36.0",
+  "matplotlib>=3.9.2",
+  "numpy>=2.1.3",
+  "python-dotenv>=1.0.1",
+  "torchdiffeq>=0.2.3",
+  "tqdm>=4.67.1",
+]
+
+[project.optional-dependencies]
+dev = ["ruff>=0.12"]
+
+[tool.setuptools.packages.find]
+include = ["assim_lib*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]

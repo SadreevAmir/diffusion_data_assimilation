@@ -15,16 +15,13 @@ import numpy as np
 import torch
 from tqdm.auto import tqdm
 
-from synthetic_eval.metrics import ensemble_crps, interval_coverage
-from utils import get_device
-
 from .clearml_tracking import ClearMLTracker
+from .config import TrainingConfig, load_json, merge_config_overrides, resolve_path
 from .data import build_dataset
-from .main import load_json, merge_config_overrides, resolve_path
+from .metrics import ensemble_crps, interval_coverage
 from .model_io import load_sampler
-from .trainer import TrainingConfig
+from .runtime import get_device
 from .transforms import channel_denormalize
-
 
 INTERVAL_LEVELS = (0.5, 0.8, 0.9, 0.95)
 
@@ -222,7 +219,7 @@ def _write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
 
 
 def _sample_target(config: TrainingConfig) -> str:
-    return "residual" if config.training_objective == "diffusion_residual" else "state"
+    return "residual" if config.training_objective == "residual_flow" else "state"
 
 
 def _seed_member(seed: int) -> None:
@@ -474,9 +471,7 @@ def evaluate(args: argparse.Namespace) -> dict[str, Any]:
     raw_model_config = load_json(model_config_path)
     model_config = {**raw_model_config, **experiment.get("training", {})}
     training = TrainingConfig.from_dict(model_config)
-    scale_override_requested = (
-        args.cfg_background_scale is not None or args.cfg_observation_scale is not None
-    )
+    scale_override_requested = args.cfg_background_scale is not None or args.cfg_observation_scale is not None
     if args.cfg_mode is not None:
         training.sample_cfg_mode = str(args.cfg_mode)
     elif scale_override_requested and training.sample_cfg_mode == "none":
@@ -679,20 +674,34 @@ def evaluate(args: argparse.Namespace) -> dict[str, Any]:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Evaluate a conditioned model checkpoint in physical units.")
-    parser.add_argument("--config", required=True, help="Path to an evaluation or training experiment JSON config.")
+    parser.add_argument(
+        "--config", required=True, help="Path to an evaluation or training experiment JSON config."
+    )
     parser.add_argument("--run-dir", default=None, help="Directory containing the trained checkpoint.")
     parser.add_argument("--checkpoint-name", default=None, help="Checkpoint filename.")
     parser.add_argument("--output-dir", default=None, help="Directory for evaluation outputs.")
     parser.add_argument("--split", default=None, choices=("train", "valid"), help="Dataset split.")
-    parser.add_argument("--stride-days", type=int, default=None, help="Spacing between evaluated target days.")
+    parser.add_argument(
+        "--stride-days", type=int, default=None, help="Spacing between evaluated target days."
+    )
     parser.add_argument("--ensemble-size", type=int, default=None, help="Samples generated for each case.")
-    parser.add_argument("--sample-batch-size", type=int, default=None, help="Maximum members sampled per model batch.")
-    parser.add_argument("--max-cases", type=int, default=None, help="Optional maximum number of selected cases.")
+    parser.add_argument(
+        "--sample-batch-size", type=int, default=None, help="Maximum members sampled per model batch."
+    )
+    parser.add_argument(
+        "--max-cases", type=int, default=None, help="Optional maximum number of selected cases."
+    )
     parser.add_argument("--num-timesteps", type=int, default=None, help="Override sampling time steps.")
     parser.add_argument("--method", default=None, choices=("euler", "dopri5"), help="ODE solver method.")
-    parser.add_argument("--rtol", type=float, default=None, help="Relative tolerance for adaptive ODE solvers.")
-    parser.add_argument("--atol", type=float, default=None, help="Absolute tolerance for adaptive ODE solvers.")
-    parser.add_argument("--device", default=None, help="Torch device; defaults to repository device selection.")
+    parser.add_argument(
+        "--rtol", type=float, default=None, help="Relative tolerance for adaptive ODE solvers."
+    )
+    parser.add_argument(
+        "--atol", type=float, default=None, help="Absolute tolerance for adaptive ODE solvers."
+    )
+    parser.add_argument(
+        "--device", default=None, help="Torch device; defaults to repository device selection."
+    )
     parser.add_argument(
         "--inference-precision",
         default=None,
