@@ -530,10 +530,7 @@ def _base_metadata(
         "seed": args.seed,
         "normalization_means": context.means,
         "normalization_stds": context.stds,
-        "formula": (
-            "v = background_weight * v_background_only "
-            "+ track_weight * v_track_only + 0 * v_both"
-        ),
+        "formula": ("v = background_weight * v_background_only + track_weight * v_track_only + 0 * v_both"),
         "cfg_implementation": (
             "independent CFG with background_weight + track_weight = 1; "
             "the unconditional coefficient cancels exactly"
@@ -661,9 +658,7 @@ def run_december(args: argparse.Namespace) -> dict[str, Any]:
         **_base_metadata(context, args, settings, case_indices),
         "experiment": "december_visual_balance",
         "track_source": args.track_source,
-        "synthetic_track_count": (
-            args.synthetic_track_count if args.track_source == "synthetic" else None
-        ),
+        "synthetic_track_count": (args.synthetic_track_count if args.track_source == "synthetic" else None),
         "cases": case_metadata,
     }
     (output_dir / "metadata.json").write_text(
@@ -876,9 +871,7 @@ def run_track_sweep(args: argparse.Namespace) -> dict[str, Any]:
     samples_dir = output_dir / "samples"
     if args.save_samples:
         samples_dir.mkdir()
-    total_samples = (
-        len(track_counts) * len(settings) * len(case_indices) * int(args.ensemble_size)
-    )
+    total_samples = len(track_counts) * len(settings) * len(case_indices) * int(args.ensemble_size)
     monitor = RunMonitor(output_dir, total_samples, "December synthetic-track CFG quality sweep")
     progress = tqdm(total=total_samples, desc="December track/CFG sweep", unit="sample")
 
@@ -890,9 +883,7 @@ def run_track_sweep(args: argparse.Namespace) -> dict[str, Any]:
             track_masks.append((track_count, first_mask))
             for setting in settings:
                 accumulator = PhysicalMetricAccumulator()
-                for case_order, (dataset_index, item) in enumerate(
-                    zip(case_indices, items, strict=True)
-                ):
+                for case_order, (dataset_index, item) in enumerate(zip(case_indices, items, strict=True)):
                     metadata = _case_metadata(item, dataset_index, case_order)
                     physical = _physical_item(item, context.means, context.stds, concentration_channel)
                     progress.set_postfix(
@@ -969,9 +960,7 @@ def run_track_sweep(args: argparse.Namespace) -> dict[str, Any]:
                             "track_weight": setting.track_weight,
                             "both_weight": 0.0,
                             "mean_observed_fraction": (
-                                float(np.mean(observed_fractions))
-                                if observed_fractions
-                                else float("nan")
+                                float(np.mean(observed_fractions)) if observed_fractions else float("nan")
                             ),
                             **row,
                         }
@@ -1025,9 +1014,9 @@ def run_track_sweep(args: argparse.Namespace) -> dict[str, Any]:
 def _add_common_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--config", required=True, help="Evaluation experiment JSON.")
     parser.add_argument("--run-dir", required=True, help="Trained run containing the checkpoint.")
-    parser.add_argument("--checkpoint-name", default="ema_best_model.pth")
+    parser.add_argument("--checkpoint-name", default="auto")
     parser.add_argument("--output-dir", required=True)
-    parser.add_argument("--split", choices=("train", "valid"), default="valid")
+    parser.add_argument("--split", choices=("train", "valid", "test"), default="valid")
     parser.add_argument("--year", type=int, default=None, help="Defaults to the latest matching year.")
     parser.add_argument(
         "--month",

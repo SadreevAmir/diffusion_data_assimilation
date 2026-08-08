@@ -10,7 +10,7 @@
   },
   "model_config": "../methods/concat_conditioning_diffusion_balanced_2f.json",
   "evaluation": {
-    "checkpoint_name": "ema_best_model.pth",
+    "checkpoint_name": "auto",
     "split": "valid",
     "stride_days": 15,
     "ensemble_size": 15,

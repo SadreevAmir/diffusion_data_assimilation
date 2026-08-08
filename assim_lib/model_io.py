@@ -33,7 +33,19 @@ def load_run_metadata(run_dir: str) -> dict:
         return json.load(handle)
 
 
+def resolve_checkpoint_name(run_dir: str, checkpoint_name: str) -> str:
+    """Choose a validation-safe checkpoint for new and recognized legacy runs."""
+    if checkpoint_name != "auto":
+        return checkpoint_name
+    metadata = load_run_metadata(run_dir)
+    data_config = metadata.get("data_config", {})
+    if data_config.get("split_protocol") == "3dvar_main_200d":
+        return "ema_best_model.pth"
+    return "ema_last_model.pth"
+
+
 def load_sampler(run_dir: str, checkpoint_name: str, model_config: dict, device=None) -> Sampler:
+    checkpoint_name = resolve_checkpoint_name(run_dir, checkpoint_name)
     config = TrainingConfig.from_dict(model_config)
     model = build_unet(config)
     checkpoint_path = os.path.join(run_dir, checkpoint_name)
@@ -50,4 +62,6 @@ def load_sampler(run_dir: str, checkpoint_name: str, model_config: dict, device=
     model.eval()
     if device is not None:
         model.to(device)
-    return Sampler(model, metadata=load_run_metadata(run_dir))
+    metadata = load_run_metadata(run_dir)
+    metadata["resolved_checkpoint_name"] = checkpoint_name
+    return Sampler(model, metadata=metadata)

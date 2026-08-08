@@ -1,0 +1,139 @@
+{
+  "project_name": "flow_matching_experiments",
+  "task_name": "m2m_flow_mode_experiment",
+  "data_config": "../data/m2m_2f_1y.json",
+  "data_overrides": {
+    "observed_channels": [0],
+    "assimilation_range": 3,
+    "target_hour_index": 23,
+    "hour_mode": "all",
+    "background_strategy": "indexed",
+    "observation_mask": {
+      "kind": "sral_tracks",
+      "sral_transform_index": 1,
+      "synthetic_probability": 0.0,
+      "empty_probability": 0.0,
+      "require_finite_model_values": false
+    }
+  },
+  "model_config": "../methods/concat_conditioning_diffusion_balanced_2f.json",
+  "default_mode": "smoke_strict_full",
+  "comparison": {
+    "checkpoint_name": "auto",
+    "target_hour": 23,
+    "field_protocol": "siconc-only",
+    "conditioning_mode": "full",
+    "track_weight": 0.5,
+    "ensemble_size": 15,
+    "sample_batch_size": 5,
+    "num_timesteps": 25,
+    "method": "dopri5",
+    "rtol": 0.00001,
+    "atol": 0.000001,
+    "inference_precision": "float32",
+    "seed": 1234,
+    "save_ensembles": false
+  },
+  "modes": {
+    "smoke_strict_full": {
+      "comparison": {
+        "dataset_split": "test",
+        "start_date": "2023-01-01",
+        "end_date": "2023-01-01",
+        "expected_num_cases": 1,
+        "ensemble_size": 3,
+        "sample_batch_size": 3,
+        "num_timesteps": 8,
+        "method": "euler",
+        "conditioning_mode": "full",
+        "field_protocol": "siconc-only"
+      }
+    },
+    "validation_strict_full": {
+      "comparison": {
+        "dataset_split": "valid",
+        "start_date": "2022-01-01",
+        "end_date": "2022-02-09",
+        "expected_num_cases": 40,
+        "conditioning_mode": "full",
+        "field_protocol": "siconc-only"
+      }
+    },
+    "validation_background_only": {
+      "comparison": {
+        "dataset_split": "valid",
+        "start_date": "2022-01-01",
+        "end_date": "2022-02-09",
+        "expected_num_cases": 40,
+        "conditioning_mode": "independent-balance",
+        "track_weight": 0.0,
+        "field_protocol": "siconc-only"
+      }
+    },
+    "validation_balanced": {
+      "comparison": {
+        "dataset_split": "valid",
+        "start_date": "2022-01-01",
+        "end_date": "2022-02-09",
+        "expected_num_cases": 40,
+        "conditioning_mode": "independent-balance",
+        "track_weight": 0.5,
+        "field_protocol": "siconc-only"
+      }
+    },
+    "validation_balance_selection": {
+      "comparison": {
+        "dataset_split": "valid",
+        "start_date": "2022-01-01",
+        "end_date": "2022-07-15",
+        "expected_num_cases": 40,
+        "case_stride_days": 5,
+        "conditioning_mode": "independent-balance",
+        "track_weight": 0.5,
+        "field_protocol": "siconc-only"
+      }
+    },
+    "validation_track_only": {
+      "comparison": {
+        "dataset_split": "valid",
+        "start_date": "2022-01-01",
+        "end_date": "2022-02-09",
+        "expected_num_cases": 40,
+        "conditioning_mode": "independent-balance",
+        "track_weight": 1.0,
+        "field_protocol": "siconc-only"
+      }
+    },
+    "test_strict_full": {
+      "comparison": {
+        "dataset_split": "test",
+        "start_date": "2023-01-01",
+        "end_date": "2023-07-19",
+        "expected_num_cases": 200,
+        "conditioning_mode": "full",
+        "field_protocol": "siconc-only"
+      }
+    },
+    "test_strict_cfg": {
+      "comparison": {
+        "dataset_split": "test",
+        "start_date": "2023-01-01",
+        "end_date": "2023-07-19",
+        "expected_num_cases": 200,
+        "conditioning_mode": "independent-balance",
+        "track_weight": 0.5,
+        "field_protocol": "siconc-only"
+      }
+    },
+    "test_native_two_field_full": {
+      "comparison": {
+        "dataset_split": "test",
+        "start_date": "2023-01-01",
+        "end_date": "2023-07-19",
+        "expected_num_cases": 200,
+        "conditioning_mode": "full",
+        "field_protocol": "native-two-field"
+      }
+    }
+  }
+}

@@ -5,8 +5,8 @@ REPO_DIR="${REPO_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
 RUN_DIR="${1:-${RUN_DIR:-}}"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
 CUDA_DEVICE="${CUDA_DEVICE:-0}"
-YEAR="${YEAR:-2023}"
-CHECKPOINT_NAME="${CHECKPOINT_NAME:-ema_best_model.pth}"
+YEAR="${YEAR:-2022}"
+CHECKPOINT_NAME="${CHECKPOINT_NAME:-auto}"
 CONFIG="${CONFIG:-config/experiments/evaluate_m2m_concat_conditioning_diffusion_balanced_2f.json}"
 RUN_STAMP="$(date +%Y%m%d_%H%M%S)"
 OUTPUT_ROOT="${OUTPUT_ROOT:-${RUN_DIR}/evaluation/cfg_december_${RUN_STAMP}}"
@@ -23,7 +23,7 @@ if [[ ! -f "$CONFIG" ]]; then
   echo "[cfg-december] missing experiment config: $CONFIG"
   exit 2
 fi
-if [[ ! -f "$RUN_DIR/$CHECKPOINT_NAME" ]]; then
+if [[ "$CHECKPOINT_NAME" != "auto" && ! -f "$RUN_DIR/$CHECKPOINT_NAME" ]]; then
   echo "[cfg-december] missing checkpoint: $RUN_DIR/$CHECKPOINT_NAME"
   exit 2
 fi
@@ -45,6 +45,7 @@ echo "[cfg-december] starting short visual experiment"
   --config "$CONFIG" \
   --run-dir "$RUN_DIR" \
   --checkpoint-name "$CHECKPOINT_NAME" \
+  --split valid \
   --year "$YEAR" \
   --month 12 \
   --num-cases 2 \
@@ -62,6 +63,7 @@ echo "[cfg-december] starting L40-calibrated synthetic-track sweep"
   --config "$CONFIG" \
   --run-dir "$RUN_DIR" \
   --checkpoint-name "$CHECKPOINT_NAME" \
+  --split valid \
   --year "$YEAR" \
   --month 12 \
   --ensemble-size 5 \

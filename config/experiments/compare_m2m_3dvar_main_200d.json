@@ -1,0 +1,46 @@
+{
+  "project_name": "flow_matching_3dvar_comparison",
+  "task_name": "flow_matching_m2m_main_200d",
+  "data_config": "../data/m2m_2f_1y.json",
+  "data_overrides": {
+    "observed_channels": [0],
+    "assimilation_range": 3,
+    "target_hour_index": 23,
+    "hour_mode": "all",
+    "background_strategy": "indexed",
+    "observation_mask": {
+      "kind": "sral_tracks",
+      "sral_transform_index": 1,
+      "synthetic_probability": 0.0,
+      "empty_probability": 0.0,
+      "require_finite_model_values": false
+    },
+    "test": {
+      "back_start_day": "2022-01-01",
+      "back_end_day": "2022-07-19",
+      "obs_start_day": "2023-01-01",
+      "obs_end_day": "2023-07-19"
+    }
+  },
+  "model_config": "../methods/concat_conditioning_diffusion_balanced_2f.json",
+  "comparison": {
+    "checkpoint_name": "auto",
+    "dataset_split": "test",
+    "start_date": "2023-01-01",
+    "end_date": "2023-07-19",
+    "target_hour": 23,
+    "expected_num_cases": 200,
+    "field_protocol": "siconc-only",
+    "conditioning_mode": "full",
+    "track_weight": 0.5,
+    "ensemble_size": 15,
+    "sample_batch_size": 5,
+    "num_timesteps": 25,
+    "method": "dopri5",
+    "rtol": 0.00001,
+    "atol": 0.000001,
+    "inference_precision": "float32",
+    "seed": 1234,
+    "save_ensembles": false
+  }
+}

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterable, Mapping
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -15,6 +16,48 @@ from .forecast import (
     records_in_range,
 )
 from .transforms import load_valid_mask, make_observation_tensors, pad_to_size, prepare_model_field
+
+THREEDVAR_MAIN_200D_SPLITS = {
+    "train": {
+        "back_start_day": "2015-01-01",
+        "back_end_day": "2020-12-31",
+        "obs_start_day": "2016-01-01",
+        "obs_end_day": "2021-12-31",
+    },
+    "valid": {
+        "back_start_day": "2021-01-01",
+        "back_end_day": "2021-12-31",
+        "obs_start_day": "2022-01-01",
+        "obs_end_day": "2022-12-31",
+    },
+    "test": {
+        "back_start_day": "2022-01-01",
+        "back_end_day": "2022-07-19",
+        "obs_start_day": "2023-01-01",
+        "obs_end_day": "2023-07-19",
+    },
+}
+
+
+def validate_temporal_split_protocol(config: Mapping) -> None:
+    """Enforce the temporal split used by the 3D-Var model-to-model suite."""
+    protocol = config.get("split_protocol")
+    if protocol is None:
+        return
+    if protocol != "3dvar_main_200d":
+        raise ValueError(f"Unknown split_protocol={protocol!r}")
+
+    mismatches = {}
+    for split, expected in THREEDVAR_MAIN_200D_SPLITS.items():
+        actual = config.get(split)
+        if not isinstance(actual, Mapping):
+            mismatches[split] = (actual, expected)
+            continue
+        for key, expected_value in expected.items():
+            if actual.get(key) != expected_value:
+                mismatches[f"{split}.{key}"] = (actual.get(key), expected_value)
+    if mismatches:
+        raise ValueError(f"Data split does not match the 3D-Var train/validation/test protocol: {mismatches}")
 
 
 def _sral_transform(arr: np.ndarray, index: int) -> np.ndarray:
@@ -156,6 +199,9 @@ class M2MForecastDataset(Dataset):
     name = "M2MForecastDataset"
 
     def __init__(self, config, split: str = "train"):
+        validate_temporal_split_protocol(config)
+        if split not in config or not isinstance(config[split], Mapping):
+            raise KeyError(f"Missing dataset split configuration: {split!r}")
         self.config = {**config, **config.get(split, {})}
         self.split = split
         self.indices = [int(v) for v in self.config["indices"]]
@@ -171,7 +217,8 @@ class M2MForecastDataset(Dataset):
         self.observed_channels = [int(v) for v in self.config.get("observed_channels", [0])]
         self.assimilation_range = int(self.config.get("assimilation_range", 1))
         self.obs_shift = max(0, self.assimilation_range - 1)
-        self.seed = int(self.config.get("seed", 1234)) + (10000 if split == "valid" else 0)
+        split_seed_offset = {"train": 0, "valid": 10000, "test": 20000}.get(split, 30000)
+        self.seed = int(self.config.get("seed", 1234)) + split_seed_offset
         self.background_strategy = str(self.config.get("background_strategy", "indexed"))
         if self.background_strategy not in ("indexed", "year_ago_jitter"):
             raise ValueError(
@@ -295,8 +342,12 @@ class M2MForecastDataset(Dataset):
         sral_files_used: int = 0,
         empty_obs_days: int = 0,
     ) -> dict:
-        valid_count = float(valid_mask[0].sum().item())
-        obs_count = int(obs_mask[self.observed_channels].sum().item()) if self.observed_channels else 0
+        if self.observed_channels:
+            valid_count = float(valid_mask[self.observed_channels].sum().item())
+            obs_count = int(obs_mask[self.observed_channels].sum().item())
+        else:
+            valid_count = 0.0
+            obs_count = 0
         return {
             "mask_kind": mask_kind,
             "sral_files_used": int(sral_files_used),
@@ -342,6 +393,7 @@ class M2MForecastDataset(Dataset):
             )
 
         mask_config = self.config.get("observation_mask", {})
+        require_finite_model_values = bool(mask_config.get("require_finite_model_values", True))
         transform_index = int(
             mask_config.get("sral_transform_index", self.config.get("sral_transform_index", 11))
         )
@@ -379,7 +431,9 @@ class M2MForecastDataset(Dataset):
             )
             sral_files_used += len(sral_paths)
             for observed_idx, channel in enumerate(self.observed_channels):
-                fill_mask = (obs_mask[channel] == 0) & (spatial_mask > 0) & (track_finite[observed_idx] > 0)
+                fill_mask = (obs_mask[channel] == 0) & (spatial_mask > 0)
+                if require_finite_model_values:
+                    fill_mask = fill_mask & (track_finite[observed_idx] > 0)
                 obs_values[channel][fill_mask] = track_field[observed_idx][fill_mask]
                 obs_mask[channel][fill_mask] = 1.0
 
@@ -429,28 +483,49 @@ class M2MForecastDataset(Dataset):
             ),
         )
 
-    def _sral_spatial_mask(self, target_date: date) -> torch.Tensor | None:
+    def sral_spatial_mask(
+        self,
+        target_date: date,
+        *,
+        day_offsets: Iterable[int] = (0,),
+        transform_index: int | None = None,
+    ) -> torch.Tensor | None:
+        """Return the union of SRAL footprints for explicit relative days.
+
+        ``day_offsets=(0,)`` is the footprint on ``target_date``. Positive
+        offsets address previous days, matching the observation merge order.
+        Values from SRAL are deliberately ignored; only finite pixels define
+        the footprint.
+        """
         if not self.sral_records:
             return None
         mask = torch.zeros(self.image_size, dtype=torch.float32)
-        for offset in range(self.assimilation_range):
+        if transform_index is None:
+            transform_index = int(
+                self.config.get("observation_mask", {}).get(
+                    "sral_transform_index", self.config.get("sral_transform_index", 11)
+                )
+            )
+        for raw_offset in day_offsets:
+            offset = int(raw_offset)
+            if offset < 0:
+                raise ValueError(f"SRAL day offsets must be non-negative, got {offset}")
             current_date = target_date - timedelta(days=offset)
             sral_paths = self.sral_records.get(current_date, [])
             combined_sral = _combine_sral_files(sral_paths)
             if combined_sral is None:
                 continue
-            transformed_sral = _sral_transform(
-                combined_sral,
-                int(
-                    self.config.get("observation_mask", {}).get(
-                        "sral_transform_index", self.config.get("sral_transform_index", 11)
-                    )
-                ),
-            )
+            transformed_sral = _sral_transform(combined_sral, int(transform_index))
             finite = torch.as_tensor(np.isfinite(transformed_sral).astype(np.float32))
             finite = pad_to_size(finite, self.image_size, fill_value=0.0)[0]
-            mask = torch.maximum(mask, finite)
+            mask = torch.maximum(mask, finite * self.base_valid_mask[0])
         return mask if torch.any(mask > 0) else None
+
+    def _sral_spatial_mask(self, target_date: date) -> torch.Tensor | None:
+        return self.sral_spatial_mask(
+            target_date,
+            day_offsets=range(self.assimilation_range),
+        )
 
     def _nearest_record(self, target: date):
         if not self._sorted_record_dates:

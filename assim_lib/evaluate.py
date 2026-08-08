@@ -249,7 +249,7 @@ def _inference_autocast_dtype(
 def _apply_evaluation_config(args: argparse.Namespace, experiment: dict) -> argparse.Namespace:
     config = experiment.get("evaluation", {})
     defaults = {
-        "checkpoint_name": "ema_best_model.pth",
+        "checkpoint_name": "auto",
         "output_dir": "",
         "split": "valid",
         "stride_days": 15,
@@ -375,6 +375,7 @@ def generate_ensemble(
     atol: float = 1e-4,
     autocast_dtype: torch.dtype | None = None,
     progress=None,
+    background_mask: torch.Tensor | None = None,
 ) -> torch.Tensor:
     """Generate one conditional ensemble in GPU-friendly member batches."""
     samples: list[torch.Tensor] = []
@@ -396,6 +397,9 @@ def generate_ensemble(
         with autocast_context:
             sample = sampler.sample_conditioned(
                 background=background.expand(batch_size, -1, -1, -1),
+                background_mask=(
+                    background_mask.expand(batch_size, -1, -1, -1) if background_mask is not None else None
+                ),
                 obs_values=obs_values.expand(batch_size, -1, -1, -1),
                 obs_mask=obs_mask.expand(batch_size, -1, -1, -1),
                 water_mask=water_mask.expand(batch_size, -1, -1, -1),
@@ -680,7 +684,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--run-dir", default=None, help="Directory containing the trained checkpoint.")
     parser.add_argument("--checkpoint-name", default=None, help="Checkpoint filename.")
     parser.add_argument("--output-dir", default=None, help="Directory for evaluation outputs.")
-    parser.add_argument("--split", default=None, choices=("train", "valid"), help="Dataset split.")
+    parser.add_argument(
+        "--split",
+        default=None,
+        choices=("train", "valid", "test"),
+        help="Dataset split.",
+    )
     parser.add_argument(
         "--stride-days", type=int, default=None, help="Spacing between evaluated target days."
     )
