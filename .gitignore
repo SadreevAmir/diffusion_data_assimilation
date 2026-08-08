@@ -8,6 +8,7 @@ __pycache__/
 *.py[cod]
 *$py.class
 .ruff_cache/
+.pytest_cache/
 *.egg-info/
 
 # Jupyter
@@ -15,19 +16,14 @@ __pycache__/
 
 # Checkpoints & model weights
 checkpoints*/
+outputs/
+logs/
 *.pth
 *.pt
 *.bin
 
 # Logs
 *.log
-
-# LaTeX build artifacts
-latex/*.aux
-latex/*.fdb_latexmk
-latex/*.fls
-latex/*.out
-latex/*.synctex.gz
 
 # Envs
 venv/
@@ -37,4 +33,3 @@ venv/
 .DS_Store
 .Trash-0/
 .dockercompose.un~
-pictures/

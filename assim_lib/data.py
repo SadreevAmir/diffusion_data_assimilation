@@ -152,59 +152,6 @@ def _make_mask(image_size, valid_mask, config, rng, mask_config=None) -> torch.T
     raise ValueError(f"Unknown observation_mask kind: {kind}")
 
 
-class SmokeM2MDataset(Dataset):
-    name = "SmokeM2MDataset"
-
-    def __init__(self, config, split: str = "train"):
-        self.config = config
-        self.split = split
-        split_config = config.get(split, {})
-        self.n_cases = int(split_config.get("n_cases", config.get("n_cases", 8)))
-        self.channels = int(
-            config.get("channels", len(config.get("fields", ["var0", "var1", "var2", "var3"])))
-        )
-        self.image_size = tuple(int(v) for v in config.get("image_size", [32, 32]))
-        self.background_noise_std = float(config.get("background_noise_std", 0.25))
-        self.seed = int(config.get("seed", 42)) + (10000 if split == "valid" else 0)
-        self.observed_channels = [int(v) for v in config.get("observed_channels", [0])]
-
-        valid_mask = torch.ones((self.channels, *self.image_size), dtype=torch.float32)
-        self.valid_mask = valid_mask
-
-    def __len__(self):
-        return self.n_cases
-
-    def __getitem__(self, idx):
-        rng = np.random.default_rng(self.seed + idx)
-        height, width = self.image_size
-        yy, xx = np.meshgrid(
-            np.linspace(0.0, 1.0, height, dtype=np.float32),
-            np.linspace(0.0, 1.0, width, dtype=np.float32),
-            indexing="ij",
-        )
-        fields = []
-        for channel in range(self.channels):
-            freq = channel + 1
-            base = np.sin(freq * np.pi * xx) + np.cos(freq * np.pi * yy)
-            fields.append(base.astype(np.float32))
-        truth = torch.from_numpy(np.stack(fields, axis=0))
-        truth = truth + torch.from_numpy(rng.normal(0.0, 0.03, size=truth.shape).astype(np.float32))
-        background = truth + torch.from_numpy(
-            rng.normal(0.0, self.background_noise_std, size=truth.shape).astype(np.float32)
-        )
-        spatial_mask = _make_mask(self.image_size, self.valid_mask, self.config, rng)
-        obs_values, obs_mask = make_observation_tensors(truth, spatial_mask, self.observed_channels)
-        return {
-            "truth": truth,
-            "background": background,
-            "obs_values": obs_values,
-            "obs_mask": obs_mask,
-            "valid_mask": self.valid_mask,
-            "water_mask": self.valid_mask[:1],
-            "meta": {"case_id": f"{self.split}_{idx:04d}", "split": self.split},
-        }
-
-
 class M2MForecastDataset(Dataset):
     name = "M2MForecastDataset"
 
@@ -618,7 +565,6 @@ class M2MForecastDataset(Dataset):
 
 
 DATASETS = {
-    SmokeM2MDataset.name: SmokeM2MDataset,
     M2MForecastDataset.name: M2MForecastDataset,
 }
 

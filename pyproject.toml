@@ -25,9 +25,6 @@ dev = ["ruff>=0.12"]
 [tool.setuptools.packages.find]
 include = ["assim_lib*"]
 
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-
 [tool.ruff]
 line-length = 110
 target-version = "py310"

@@ -1,10 +1,7 @@
 services:
-  diffusion_data_assimilation:
+  flow_matching:
     build: .
-    image: ${USER}/diffusion_data_assimilation
-    container_name: ${USER}_diffusion_data_assimilation
-    env_file:
-      - .env
+    image: flow-matching-data-assimilation:latest
     environment:
       - HF_TOKEN=${HF_TOKEN:-}
       - CLEARML_API_ACCESS_KEY=${CLEARML_API_ACCESS_KEY:-}
@@ -12,15 +9,15 @@ services:
       - CLEARML_API_HOST=${CLEARML_API_HOST:-}
       - CLEARML_WEB_HOST=${CLEARML_WEB_HOST:-}
       - CLEARML_FILES_HOST=${CLEARML_FILES_HOST:-}
-      - WANDB_SILENT=true 
+      - WANDB_SILENT=true
     volumes:
-      - "/mnt:/mnt"
-      - "./:/home/"
+      - "${DATA_ROOT:-/mnt}:/mnt:ro"
+      - "./:/home"
     shm_size: '48gb'
-    deploy: 
+    deploy:
       resources:
         reservations:
           devices:
           - driver: nvidia
-            device_ids: ['1']
+            device_ids: ['${GPU_DEVICE_ID:-0}']
             capabilities: [gpu]

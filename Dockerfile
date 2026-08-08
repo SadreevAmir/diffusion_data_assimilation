@@ -11,17 +11,6 @@ RUN wget --quiet https://repo.anaconda.com/miniconda/Miniconda3-py310_24.4.0-0-L
     && /bin/bash ~/anaconda.sh -b -p /opt/conda \
     && rm ~/anaconda.sh
 
-RUN conda config --set ssl_verify yes && \
-    conda config --add channels conda-forge && \
-    conda config --set channel_priority strict
-
-RUN conda install -y \
-    jupyterlab \
-    nb_conda_kernels \
-    ipykernel \
-    python-lsp-server \
-    && conda clean -afy
-
 RUN pip install --no-cache-dir \
     torch==2.5.1 torchvision==0.20.1 \
     --index-url https://download.pytorch.org/whl/cu121
@@ -34,7 +23,9 @@ COPY ./requirements.txt /tmp/requirements.txt
 RUN pip install --no-cache-dir -r /tmp/requirements.txt
 
 WORKDIR /home/
-EXPOSE 8888
+
+COPY . /home/
+RUN pip install --no-cache-dir -e /home
 
 COPY ./entrypoint.sh /sh/
 RUN ["chmod", "755", "/sh/entrypoint.sh"]

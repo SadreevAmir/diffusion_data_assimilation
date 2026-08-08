@@ -1,0 +1,14 @@
+.git
+.env
+.venv
+__pycache__
+*.py[cod]
+.ruff_cache
+.pytest_cache
+checkpoints
+outputs
+logs
+*.pth
+*.pt
+*.bin
+.DS_Store
