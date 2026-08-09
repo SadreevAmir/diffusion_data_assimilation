@@ -595,10 +595,19 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                 if int(item["meta"]["hour"]) != int(args.target_hour):
                     raise AssertionError(f"Wrong target hour in {item['meta']}")
                 background_date = date.fromisoformat(str(item["meta"]["background_date"]))
-                if (target_date - background_date).days != 365:
+                day_index, _ = dataset._resolve_index(dataset_index)
+                expected_background = dataset.back_data[day_index].date
+                if background_date != expected_background:
                     raise AssertionError(
-                        f"Expected a 365-day background offset, got background={background_date}, "
-                        f"target={target_date}"
+                        f"Indexed background mismatch: background={background_date}, "
+                        f"expected={expected_background}, target={target_date}"
+                    )
+                expected_offset = (target_date - expected_background).days
+                if int(item["meta"]["background_offset_days"]) != expected_offset:
+                    raise AssertionError(
+                        "Background offset metadata does not match the indexed records: "
+                        f"metadata={item['meta']['background_offset_days']}, "
+                        f"expected={expected_offset}"
                     )
                 if item["meta"].get("mask_kind") != "sral_tracks":
                     raise AssertionError(
