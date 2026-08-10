@@ -93,6 +93,18 @@
         "field_protocol": "siconc-only"
       }
     },
+    "validation_track_weight_0625": {
+      "comparison": {
+        "dataset_split": "valid",
+        "start_date": "2022-01-01",
+        "end_date": "2022-07-15",
+        "expected_num_cases": 40,
+        "case_stride_days": 5,
+        "conditioning_mode": "independent-balance",
+        "track_weight": 0.625,
+        "field_protocol": "siconc-only"
+      }
+    },
     "validation_track_only": {
       "comparison": {
         "dataset_split": "valid",
