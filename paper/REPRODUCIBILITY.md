@@ -1,8 +1,8 @@
 # Reproducibility handoff for the frozen mechanism result
 
-This handoff covers only the 40-case development-period mechanism analysis in
-the paper. It consumes the compact per-case table from the completed trusted
-cross-fitted spread run; it does not require or permit raw ensembles.
+This handoff covers the 40-case development-period mechanism analysis and the
+completed fixed-contract joint calibration audit. Neither requires raw
+ensembles in the publication worktree.
 
 ## Frozen inputs and procedure
 
@@ -17,6 +17,18 @@ cross-fitted spread run; it does not require or permit raw ensembles.
 - Selected fold scales: `2.6, 2.7, 2.8, 2.8, 2.6`.
 - Paired uncertainty: not reported because the audited compact contract lacks
   raw case-level fields; aggregate means are not used to synthesize pairs.
+
+## Joint-gate audit trail
+
+The completed audit evaluates 40 cases with ten members and fixed folds,
+candidate grid and tie randomization. The global-spread candidate passes the
+aggregate proper-score thresholds but fails the predeclared no-compensation
+gate. Reconciliation anchors are: established-ice Brier score `0.0569726083`
+raw and `0.0581998581` corrected; exact-one member mass `0.0090418817` raw and
+`0.1648320723` corrected; mean IIEE `0.0796004071` raw and `0.0839797890`
+corrected; edge disagreement `0.0351291198` raw and `0.0366783519` corrected;
+absolute ice-extent error `0.0461536485` raw and `0.0507920924` corrected.
+These values support rejection, not reconstruction of paired case differences.
 
 ## Compact-artifact contract
 

@@ -6,7 +6,7 @@ Can a finite ensemble from a conditional diffusion/flow data-assimilation model
 be calibrated for bounded, zero-inflated spatial fields while preserving useful
 joint scenarios and sparse-observation skill?
 
-## Provisional mechanism result; calibration decision remains open
+## Frozen mechanism result; broad calibration claim rejected
 
 The current reference method is five-fold, deterministic date-stratified cross-fitted global
 spread calibration of the learned-joint ensemble. Within each fold, choose one
@@ -14,15 +14,25 @@ scale from `1.0:0.1:4.0` on the other 32 cases by minimum case-mean fair CRPS an
 apply it to eight held-out cases. The member transform is
 `mean + scale * (member - mean)`; clip only for bounded scoring. Selected scales
 are `2.6, 2.7, 2.8, 2.8, 2.6`. Its transform, folds and grid are frozen as a
-reference baseline, but it is not yet accepted as the paper's calibrated
-ensemble method.
+reference baseline. The completed joint audit rejects it as the paper's
+well-calibrated ensemble method: proper scores improve, but mandatory boundary
+and spatial/physical preservation criteria fail.
 
 The earlier narrow score/coverage gate was met: fair CRPS improves by at least 3% (observed 4.79%),
 ordinary CRPS is at most 0.061526 (observed 0.061101), 90% coverage is within
 0.85–0.94 (observed 0.878775), all selected scales are interior, and pre-clipping
 mean-invariance error is below `1e-10` (observed `4.16e-16`). That gate diagnoses
 global underdispersion but is insufficient for bounded, zero-inflated SIC, so
-method selection is reopened under the joint gate below.
+the joint gate below was applied as predeclared and failed.
+
+The failure is mechanistically informative. Established-ice Brier score worsens
+by 2.15% (`0.0569726` to `0.0581999`) against a 1% tolerance; exact-one member
+mass moves from `0.0090419` to `0.1648321` while truth exact-one mass is zero;
+mean IIEE worsens by 5.50%, edge disagreement by 4.41%, and absolute ice-extent
+error by 10.05%. Global anomaly inflation therefore repairs a marginal
+underdispersion signal while introducing clipping-related boundary atoms and
+degrading physical/spatial diagnostics. No family averaging is used to excuse
+these failures.
 
 ## Predeclared calibration stop/go gate
 

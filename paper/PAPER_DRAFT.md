@@ -24,8 +24,13 @@ scales are 2.6, 2.7, 2.8, 2.8 and 2.6. Cross-fitted fair CRPS decreases from
 and spread-skill ratio changes from 0.7241 to 1.0615. The nominal 90% interval
 diagnostic rises from 0.5051 to 0.8788. The transform preserves the ensemble
 center before bounded-score clipping to numerical precision. These validation
-results support a narrow diagnosis of predominantly global underdispersion, not
-an independent generalization claim or superiority to a deterministic method.
+results support a narrow diagnosis of predominantly global underdispersion. A
+predeclared joint audit nevertheless rejects the correction as a well-calibrated
+ensemble: clipping creates a large spurious exact-one atom, established-ice
+Brier score worsens by 2.15%, and IIEE and edge disagreement worsen beyond their
+2% tolerances. The result exposes a marginal-score/physical-structure tradeoff,
+not an independent generalization claim or superiority to a deterministic
+method.
 
 ## 1. Introduction
 
@@ -200,6 +205,18 @@ but clipping can cause this difference and it is not attributed to center-skill
 improvement. The 95% diagnostic remains below its nominal level, so the result
 does not establish complete tail calibration.
 
+The subsequent fixed-contract joint audit applies the predeclared
+no-compensation gate to all 40 cases. Although the proper-score family passes,
+the boundary and spatial/physical families do not. Established-ice Brier score
+increases from `0.0569726` to `0.0581999` (2.15%, versus a 1% tolerance).
+Exact-one member mass increases from `0.0090419` to `0.1648321` despite zero
+truth mass, consistent with clipping inflated anomalies at the upper bound.
+Mean IIEE increases from `0.0796004` to `0.0839798` (5.50%), edge disagreement
+from `0.0351291` to `0.0366784` (4.41%), and absolute ice-extent error from
+`0.0461536` to `0.0507921` (10.05%). Global spread correction is therefore a
+negative mechanism baseline: it repairs marginal underdispersion by proper
+scores but is not a structure-preserving calibration method.
+
 Figure 1 summarizes this aggregate mechanism result. The dashed references are
 descriptive finite-ensemble targets, not confidence bounds; paired date/block
 intervals remain unavailable from the present compact contract.
@@ -242,11 +259,11 @@ ensemble sizes, regions or observation systems remains unverified.
 The trusted compact-table contract contains 40 corrected case rows but does not
 contain the corresponding raw case-level fields. Consequently, paired
 case-level uncertainty is neither reconstructed from aggregate means nor
-reported. Conditional, spatial and independent-period studies are not presented
-as contributions of this draft. In particular, the calibrated ensemble has not
-been checked for preservation of IIEE, ice area/extent, edge geometry,
-variograms or spatial spectra; this prevents a submission-readiness claim even
-though the aggregate marginal mechanism result is valid.
+reported. Conditional and independent-period studies are not presented as
+contributions of this draft. The completed joint audit checks IIEE, ice
+area/extent, edge geometry and variograms; its failed mandatory preservation
+criteria prevent a submission-readiness claim even though the aggregate
+marginal mechanism result is valid.
 
 ## Data and code availability
 
