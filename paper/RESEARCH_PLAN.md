@@ -34,6 +34,18 @@ underdispersion signal while introducing clipping-related boundary atoms and
 degrading physical/spatial diagnostics. No family averaging is used to excuse
 these failures.
 
+A fixed boundary-aware comparator has also been completed under the same joint
+gate. Five contiguous eight-date holdouts with a three-case purge fit a hurdle
+isotonic bounded distribution and reconstruct ten members with ECC-Q from the
+raw rank template. It substantially improves exact-zero and exact-one mass
+errors and randomized-rank discrepancy, but fair CRPS worsens by `0.0270909`
+and mean IIEE by `0.103785`, with paired date intervals excluding zero; edge
+disagreement worsens by `0.270714`. This rejects the specific hypothesis that
+the fixed marginal hurdle fit plus ECC-Q can preserve useful conditional
+spatial structure. It counts as a strong negative mechanism baseline, not as an
+eligible calibrated ensemble and not as exhaustive coverage of the required
+baseline families.
+
 ## Predeclared calibration stop/go gate
 
 All candidates must be evaluated out of fold on the same 40 date-level cases
@@ -90,10 +102,13 @@ failure isolates a scientifically useful tradeoff.
 
 ## Deferred alternatives, not current method development
 
-Boundary-aware conditional, case-adaptive, hybrid-sampling and affine
-mean-and-spread methods remain future work. With 40 cases they add estimation
-flexibility, confound the clean mechanism attribution, or require new sampling
-without repairing a failed criterion.
+Additional boundary-aware conditional, case-adaptive, hybrid-sampling and
+affine mean-and-spread methods are not selected by the current evidence. With
+40 cases they add estimation flexibility, confound the clean mechanism
+attribution, or require new sampling without repairing a failed criterion. The
+completed fixed purged hurdle-isotonic/ECC-Q construction is retained below as
+an evaluated negative instance of items 1, 2 and 4, not as evidence that every
+method in those families fails.
 
 1. Calibrate occurrence probabilities for exact open water and ice threshold
    events using regularized isotonic/Beta or hurdle components.
@@ -114,10 +129,13 @@ without repairing a failed criterion.
 - raw ensemble;
 - physical-space bias/spread scaling;
 - naive affine-logit scaling as a documented failure mode;
-- zero/one-inflated Beta or EMOS-like SIC postprocessing;
-- isotonic/quantile mapping;
+- zero/one-inflated Beta or EMOS-like SIC postprocessing (still missing; the
+  completed hurdle-isotonic method is a distinct negative baseline);
+- isotonic/quantile mapping (one fixed hurdle-isotonic construction completed
+  and rejected by the joint gate);
 - conformal intervals;
-- ECC-Q/ECC-T or rank-preserving reconstruction;
+- ECC-Q/ECC-T or rank-preserving reconstruction (ECC-Q completed within the
+  rejected hurdle-isotonic construction; broader coverage remains missing);
 - deterministic background and 3D-Var;
 - probabilistic DA baseline such as EnKF/LETKF when a fair implementation is
   available.

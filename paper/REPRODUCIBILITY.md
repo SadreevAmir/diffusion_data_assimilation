@@ -34,6 +34,22 @@ corrected; edge disagreement `0.0351291198` raw and `0.0366783519` corrected;
 absolute ice-extent error `0.0461536485` raw and `0.0507920924` corrected.
 These values support rejection, not reconstruction of paired case differences.
 
+The subsequent fixed purged hurdle-isotonic/ECC-Q audit reuses the same raw
+ensemble through a reviewed server-side compact contract. It uses five
+contiguous eight-date holdouts with a three-case purge, a fixed-grid hurdle
+isotonic bounded distribution fitted only outside each purged holdout, and
+ten-member ECC-Q reconstruction from the raw rank template. There are no
+runtime tuning parameters. All 40 cases are finite and the reported ECC
+rank-order violation count is zero. Reconciliation anchors for the candidate
+are fair CRPS `0.0855814526`, ordinary CRPS `0.0977137292`, ensemble-mean RMSE
+`0.2684209181`, exact-zero mass absolute error `0.0134507165`, exact-one mass
+absolute error `0`, randomized-rank discrepancy per point-case `0.0053082831`,
+mean IIEE `0.1833850772`, edge disagreement `0.3058432880`, and energy-score RMS
+`0.1979851836`. The authoritative compact summary reports paired date and
+non-overlapping four-case-block intervals; the latter remains a post-hoc
+temporal sensitivity. These anchors document a rejected method and must not be
+used to reconstruct case-level pairs.
+
 ## Compact-artifact contract
 
 Two distinct compact contracts must not be conflated. The trusted 40-row

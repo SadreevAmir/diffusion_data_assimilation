@@ -162,12 +162,14 @@ individual pixels. We report a paired date-bootstrap interval and a post-hoc
 circular contiguous four-date-block temporal sensitivity from the trusted
 compact analysis.
 
-The reported baselines are the raw ensemble and the score-optimized affine-logit
-negative baseline. Other distributional and rank-preserving postprocessors were
-not evaluated and are not implied by this paper's evidence. This baseline set is
-insufficient for the minimum strong domain/SciML tier; a boundary-aware
-distributional comparator and a rank-preserving or conformal comparator remain
-scientific blockers rather than editorial tasks.
+The reported baselines are the raw ensemble, the score-optimized affine-logit
+negative baseline, cross-fitted global anomaly scaling, and a fixed purged
+hurdle-isotonic bounded distribution reconstructed with ECC-Q. The latter is a
+boundary-aware and rank-preserving negative mechanism baseline: it repairs the
+boundary-mass and randomized-rank diagnostics but fails the proper-score and
+spatial/physical families decisively. This single failed construction does not
+exhaust strong SIC distributional, conformal or probabilistic-DA baselines, so
+the minimum strong domain/SciML baseline tier remains incomplete.
 
 ## 6. Preliminary validation results
 
@@ -232,6 +234,23 @@ intervals are above zero (date `[0.00206475, 0.00671611]`; block
 `[0.00114932, 0.00784928]`). Thus paired uncertainty sharpens rather than
 reverses the joint-gate decision.
 
+The fixed purged hurdle-isotonic/ECC-Q comparator gives a complementary
+negative result. Five contiguous eight-date holdouts, separated from fitting
+data by a three-case purge, produce finite outputs for all 40 cases and no ECC
+rank-order violations. Relative to raw, exact-zero mass absolute error falls
+from `0.396859` to `0.013451`, exact-one mass absolute error from `0.009042` to
+`0`, and randomized-rank discrepancy per point-case from `0.079014` to
+`0.005308`. These improvements do not translate into a useful predictive
+ensemble. Fair CRPS rises from `0.058491` to `0.085581` (paired delta
+`0.027091`, date-bootstrap 95% CI `[0.021732, 0.032111]`; post-hoc four-case
+block CI `[0.017398, 0.035924]`), and ordinary CRPS rises from `0.062108` to
+`0.097714`. Ensemble-mean RMSE rises to `0.268421`, mean IIEE to `0.183385`,
+edge disagreement to `0.305843`, and energy-score RMS to `0.197985`. The result
+falsifies the hypothesis that this fixed marginal hurdle fit plus raw-rank
+ECC-Q can jointly repair reliability and preserve spatial skill. It remains a
+high-value negative ablation because it separates successful boundary/rank
+repair from severe loss of conditional interior and spatial fidelity.
+
 Figure 1 summarizes the aggregate mechanism result. The dashed references are
 descriptive finite-ensemble targets, not confidence bounds.
 
@@ -276,6 +295,17 @@ ensemble sizes, regions or observation systems remains unverified.
 | Absolute ice-extent error | 0.04615 | 0.05079 | 10.05% worse; fails the preservation gate |
 | Lag-1 analysis-mean variogram error | 0.000936 | 0.000896 | Improves, but cannot compensate for failed mandatory families |
 | Lag-2 analysis-mean variogram error | 0.002168 | 0.002066 | Improves, but cannot compensate for failed mandatory families |
+
+| Purged hurdle-IDR/ECC-Q diagnostic | Raw ensemble | Candidate | Interpretation |
+|---|---:|---:|---|
+| Fair CRPS | 0.058491 | 0.085581 | 46.3% worse; proper-score family fails |
+| Ordinary CRPS | 0.062108 | 0.097714 | 57.3% worse |
+| Exact-zero mass absolute error | 0.396859 | 0.013451 | Boundary atom is substantially repaired |
+| Exact-one mass absolute error | 0.009042 | 0 | Upper-boundary mass error is removed |
+| Randomized-rank discrepancy per point-case | 0.079014 | 0.005308 | Large reliability improvement |
+| Mean IIEE | 0.079600 | 0.183385 | 130% worse; spatial/physical family fails |
+| Edge disagreement | 0.035129 | 0.305843 | 771% worse |
+| Energy-score RMS | 0.145718 | 0.197985 | 35.9% worse |
 
 | Paired diagnostic | Mean delta (corrected - raw) | Date-bootstrap 95% CI | Four-date-block 95% CI |
 |---|---:|---:|---:|

@@ -37,7 +37,7 @@ mass, mean IIEE worsens by 5.50%, and edge disagreement worsens by 4.41%.
 | Clean checkpoint and frozen independent evaluation | One legacy checkpoint and reused development dates | Blocking; method may be frozen, but the generalization claim is not tested |
 | Exact deterministic comparison | Background and learned-joint aggregate RMSE/IIEE are available; no independent frozen comparison is claimed | Blocking for the main comparison table |
 | Correct finite-ensemble diagnostics | Fair and ordinary CRPS, spread-skill, four coverage diagnostics and center invariance are reported | Satisfied for the narrow mechanism claim |
-| Strong SIC calibration baselines | Only raw ensemble and a failed affine-logit transform are evaluated | Blocking; at least one boundary-aware distributional baseline and one rank-preserving or conformal baseline are required |
+| Strong SIC calibration baselines | Raw, affine-logit, global spread, and a fixed purged hurdle-isotonic/ECC-Q comparator are evaluated; all postprocessors fail at least one mandatory family | Partially resolved: a boundary-aware rank-preserving comparator now exists as a strong negative ablation, but one failed fixed construction does not complete the minimum baseline tier |
 | Case/block uncertainty | Trusted 40-date paired analysis reports fair-CRPS delta `-0.00280091`, date CI `[-0.00413219, -0.00135419]`, and circular four-date-block CI `[-0.00502644, -0.000290285]`; ordinary-CRPS intervals cross zero | Satisfied for the narrow mechanism claim; the block interval is a post-hoc temporal sensitivity, not a predeclared pass/fail gate |
 | Spatial/physical preservation | The joint audit reports calibrated IIEE, edge, area/extent and variogram diagnostics; the candidate exceeds the IIEE and edge tolerances | Blocking for selection of global scaling, but resolved as an auditable negative mechanism result |
 | Publication figures | A reproducible aggregate mechanism figure and manuscript uncertainty table are cited; spatial/physical diagnostics are tabulated | Partial; a claim-led spatial/physical figure is still desirable but no longer blocks truthful reporting of the compact evidence |
@@ -47,12 +47,14 @@ mass, mean IIEE worsens by 5.50%, and edge disagreement worsens by 4.41%.
 
 The completed joint audit rejects global anomaly scaling under the frozen gate,
 and the trusted CPU result closes paired uncertainty without new sampling. The
-remaining minimum-tier scientific evidence is not another tuning point: it is a
-predeclared strong SIC postprocessing comparison containing at least one
-boundary-aware distributional baseline and one rank-preserving or conformal
-baseline. No currently implemented trusted mode provides that baseline family,
-so proposing an invented mode would be invalid. Repeating either spread-only
-analysis or the joint audit would not change the decision.
+fixed purged hurdle-isotonic bounded distribution with ECC-Q now supplies the
+previously missing boundary-aware/rank-preserving mechanism comparison. It
+repairs boundary masses and randomized ranks but fails proper-score and
+spatial/physical families by large margins. The remaining minimum-tier gap is
+therefore broader independent baseline coverage and a candidate that can
+satisfy the no-compensation gate, not another tuning point. No additional
+implemented mode supplies a mechanistically distinct eligible family.
+Repeating completed analyses would not change the decision.
 
 ## Safe autonomous work completed or still possible
 
@@ -74,6 +76,9 @@ analysis or the joint audit would not change the decision.
   incomplete method pairs and provenance mismatches fail closed.
 - The claim ledger, manuscript and readiness audit now record the failed joint
   gate and its boundary/spatial mechanism without accessing raw ensembles.
+- The fixed purged hurdle-isotonic/ECC-Q result is recorded as a negative
+  mechanism ablation: boundary-mass and rank diagnostics improve, while paired
+  proper-score, IIEE, edge and energy diagnostics reject method selection.
 - The manuscript evidence table reports the boundary and spatial failures next
   to the proper-score gains, including the improving lag-1/lag-2 variogram
   errors that are explicitly barred from compensating for failed mandatory
@@ -87,11 +92,13 @@ analysis or the joint audit would not change the decision.
 
 The joint gate decision is complete: global spread scaling is rejected as the
 paper's calibrated-ensemble method. The immediate external scientific boundary
-is implementation and review of a trusted strong-baseline analysis contract.
+is specification and review of a mechanistically distinct strong-baseline
+contract or authorization of the already frozen independent evaluation; the
+available fixed boundary/rank comparator has been completed and rejected.
 The paired date/block CPU analysis of the existing compact audit is complete;
 its compact result has been reconciled into the evidence chain, while local
-reconstruction remains intentionally excluded. The currently implemented modes cannot supply
-boundary-aware distributional and rank-preserving/conformal comparators. The
-frozen independent evaluation
+reconstruction remains intentionally excluded. The currently implemented modes
+cannot supply another independent strong baseline family beyond the completed
+negative comparators. The frozen independent evaluation
 also remains locked until explicit authorization after the pre-test evidence
 package and clean checkpoint are complete.
