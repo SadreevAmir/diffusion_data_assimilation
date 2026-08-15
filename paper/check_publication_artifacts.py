@@ -20,6 +20,7 @@ REQUIRED_FILES = (
 )
 FIGURE_PATTERN = re.compile(r"!\[[^]]*\]\(([^)]+)\)")
 REFERENCE_PATTERN = re.compile(r"^(\d+)\. ", re.MULTILINE)
+CLAIM_PATTERN = re.compile(r"^\| C(\d+) \|", re.MULTILINE)
 FINAL_DIAGNOSTIC_ANCHORS = {
     "PAPER_DRAFT.md": (
         "0.055738",
@@ -72,6 +73,18 @@ NEXT_BASELINE_ANCHORS = {
         "specification and review of a mechanistically distinct strong-baseline",
     ),
 }
+MANUSCRIPT_EVIDENCE_ANCHORS = (
+    "| Diagnostic | Raw ensemble | Cross-fitted correction | Interpretation |",
+    "| Established-ice Brier score | 0.056973 | 0.058200 |",
+    "| Purged hurdle-IDR/ECC-Q diagnostic | Raw ensemble | Candidate | Interpretation |",
+    "| Fair CRPS | 0.058491 | 0.085581 | 46.3% worse; proper-score family fails |",
+    "| Mean-preserving projected-spread diagnostic | Raw ensemble | Candidate | Interpretation |",
+    "| Upper-cap mass | 0 | 0.167438 | Active-cap boundary failure remains |",
+    "| Mean-preserving open-logit diagnostic | Raw ensemble | Candidate | Interpretation |",
+    "| Established-ice Brier score | 0.056973 | 0.059107 | Worse beyond 1% tolerance; boundary family fails |",
+    "| Paired diagnostic | Mean delta (corrected - raw) | Date-bootstrap 95% CI | Four-date-block 95% CI |",
+    "| Mean IIEE | 0.004379 | [0.002065, 0.006716] | [0.001149, 0.007849] |",
+)
 
 
 def require(condition: bool, message: str) -> None:
@@ -84,7 +97,24 @@ def main() -> int:
     require(not missing, f"missing required publication files: {', '.join(missing)}")
 
     manuscript = (PAPER_DIR / "PAPER_DRAFT.md").read_text(encoding="utf-8")
+    claim_ledger = (PAPER_DIR / "CLAIM_LEDGER.md").read_text(encoding="utf-8")
     readiness = (PAPER_DIR / "PUBLICATION_READINESS.md").read_text(encoding="utf-8")
+
+    claim_ids = [int(value) for value in CLAIM_PATTERN.findall(claim_ledger)]
+    require(claim_ids, "claim ledger contains no claim rows")
+    require(
+        claim_ids == list(range(1, claim_ids[-1] + 1)),
+        "claim IDs must be unique and contiguous from C1",
+    )
+
+    missing_table_anchors = [
+        anchor for anchor in MANUSCRIPT_EVIDENCE_ANCHORS if anchor not in manuscript
+    ]
+    require(
+        not missing_table_anchors,
+        "manuscript is missing evidence-table anchors: "
+        + ", ".join(missing_table_anchors),
+    )
 
     for name, anchors in FINAL_DIAGNOSTIC_ANCHORS.items():
         document = (PAPER_DIR / name).read_text(encoding="utf-8")
@@ -145,7 +175,8 @@ def main() -> int:
 
     print(
         f"publication artifact audit passed: {len(REQUIRED_FILES)} files, "
-        f"{len(figures)} figures, {len(references)} references, status={status}"
+        f"{len(figures)} figures, {len(references)} references, "
+        f"{len(claim_ids)} claims, status={status}"
     )
     return 0
 
