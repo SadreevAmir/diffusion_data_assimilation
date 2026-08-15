@@ -148,6 +148,20 @@ diagnostics. It fails closed on a missing key, changed case count or non-finite
 value. Figure 1 is descriptive: it neither manufactures paired intervals nor
 adds unavailable spatial/physical evidence.
 
+The claim-led joint-gate Figure 2 is generated from the completed projected-
+spread aggregate without raw ensembles:
+
+```bash
+python3 paper/make_joint_gate_figure.py \
+  aggregate_case_mean_metrics.json paper/figures/joint_gate_summary.svg
+```
+
+The generator requires the exact reviewed candidate identifier, both full-
+region method rows, 40 finite cases per method and `overall_eligible=false`.
+It reports candidate/raw ratios and fixed per-metric limits; it does not form a
+composite score or recompute the gate. The checked-in SVG is a compact rendering
+of the trusted summary and can be regenerated only after these checks pass.
+
 The compact CSV and aggregate JSON retain their trusted manifests outside the
 paper narrative. Venue metadata, author statements and data-release decisions
 remain external inputs.

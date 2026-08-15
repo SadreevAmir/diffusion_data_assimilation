@@ -291,6 +291,19 @@ CRPS rows. Coverage and spread-skill references show only the direction of the
 reliability change; they do not establish continuous, casewise or fieldwise
 coverage for a ten-member ensemble.
 
+Figure 2 places the retained proper-score gain beside the mandatory diagnostics
+that determine the joint decision. Ratios are relative to raw, so the figure
+does not mix quantities with different units or allow improvement in one family
+to compensate for failure in another.
+
+![Joint-gate ratios for exact mean-preserving projected spread.](figures/joint_gate_summary.svg)
+
+**Figure 2.** Exact mean-preserving projected spread relative to the raw
+ensemble. Red lines mark the fixed metric-specific gate limits. Mean-field IIEE
+and edge disagreement are exact invariants, but the established-ice Brier limit
+is exceeded; member-spatial safety also fails in the full lag audit. The panel
+is a decision summary, not a composite score.
+
 ## 7. Limitations
 
 The completed evidence uses one legacy checkpoint, one sampling seed, ten

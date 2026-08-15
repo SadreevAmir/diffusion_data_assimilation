@@ -49,7 +49,7 @@ ensemble.
 | Strong SIC calibration baselines | Raw, affine-logit, global spread, fixed purged hurdle-isotonic/ECC-Q, and exact mean-preserving projected spread are evaluated; all postprocessors fail at least one mandatory family | Partially resolved: boundary/rank and exact-mean-preservation ablations are now strong negative controls, but they do not complete the zero/one-inflated parametric, conformal or probabilistic-DA baseline tier |
 | Case/block uncertainty | Trusted 40-date paired analysis reports fair-CRPS delta `-0.00280091`, date CI `[-0.00413219, -0.00135419]`, and circular four-date-block CI `[-0.00502644, -0.000290285]`; ordinary-CRPS intervals cross zero | Satisfied for the narrow mechanism claim; the block interval is a post-hoc temporal sensitivity, not a predeclared pass/fail gate |
 | Spatial/physical preservation | The joint audit reports calibrated IIEE, edge, area/extent and variogram diagnostics; the candidate exceeds the IIEE and edge tolerances | Blocking for selection of global scaling, but resolved as an auditable negative mechanism result |
-| Publication figures | A reproducible aggregate mechanism figure and manuscript uncertainty table are cited; spatial/physical diagnostics are tabulated | Partial; a claim-led spatial/physical figure is still desirable but no longer blocks truthful reporting of the compact evidence |
+| Publication figures | Reproducible aggregate reliability and joint-gate figures plus manuscript uncertainty and mechanism tables are cited | Satisfied for the present mechanism claims; broader baseline and independent-evaluation figures depend on the blocking evidence |
 | References and reproducibility | Core scoring, ECC and IIEE references plus a guarded reconciliation contract are present | Partial; method-specific references must accompany any still-missing baseline experiments |
 
 ## Fastest defensible next evidence
@@ -104,6 +104,9 @@ Repeating completed analyses would not change the decision.
 - A fail-closed generator for the aggregate CRPS, spread-skill and coverage
   figure is present and documented; it uses only the trusted one-row summary
   and does not imply paired uncertainty or spatial preservation.
+- A second fail-closed generator and checked-in figure expose the central joint-
+  gate decision as candidate/raw ratios. They place the fair-CRPS gain beside
+  boundary and spatial diagnostics without averaging across mandatory families.
 - The manuscript now cites the primary ECC and IIEE references at first use;
   any future baseline family must add its own method-specific citation rather
   than inheriting authority from these references.
