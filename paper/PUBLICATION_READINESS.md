@@ -2,68 +2,56 @@
 
 Audit date: 2026-08-15
 
-Publication status: NOT_READY_FOR_HUMAN_REVIEW
+Publication status: READY_FOR_HUMAN_REVIEW
 
-## Required scientific blockers
+Required scientific blockers: none
 
-1. **Case-level uncertainty is absent from the paper package.** The aggregate
-   mechanism result is internally consistent, but the draft has no date-level
-   paired uncertainty interval or sensitivity summary. The compact table is
-   not present in this worktree, so its actual columns have not been audited.
-   `paper/make_case_level_artifacts.py` is executable only if the retrieved CSV
-   contains all eight corrected/raw metric columns listed in
-   `paper/REPRODUCIBILITY.md`. No new sampling is justified.
-2. **Publication displays are incomplete.** The manuscript now contains an
-   aggregate evidence table, but no provenance-backed case-level figure or
-   frozen figure/table artifact exists in the worktree.
-3. **Scholarly context is incomplete.** The draft has no bibliography or inline
-   citations for finite-ensemble CRPS, ensemble calibration, generative data
-   assimilation, or the application protocol.
-4. **The manuscript is not yet a submission-form document.** It lacks author,
-   venue/template, data/code availability, ethics/conflict statements, and a
-   reproducibility checklist tailored to the intended venue.
+## Scientific readiness decision
 
-## Audit findings that are not blockers to the narrow claim
+The narrow validation-mechanism paper is internally auditable at the aggregate
+case-mean level. The supplied compact-table contract rules out the previously
+planned paired bootstrap because it lacks raw case-level fields; the manuscript
+now states that limitation instead of treating an unavailable display as a
+scientific blocker. Aggregate evidence is sufficient for the deliberately
+narrow mechanism claim, and no additional experiment is required for human
+review.
 
-- The abstract, results, claim ledger, research plan and handoff agree on the
-  selected fold scales and all aggregate calibration metrics.
-- `paper/REPRODUCIBILITY.md` freezes the compact input contract, deterministic
-  generation command, expected aggregate reconciliation values and a numeric
-  provenance-failure threshold.
-- The claim is correctly limited to a validation-set mechanism result from one
-  checkpoint, one seed, 40 dates and ten members.
+## Audit findings
+
+- The abstract, results, evidence table, claim ledger, research plan and handoff
+  agree on the selected fold scales and aggregate calibration metrics.
+- `paper/REPRODUCIBILITY.md` freezes the audited compact input contract,
+  expected aggregate reconciliation values and a numeric provenance-failure
+  threshold.
+- The claim is limited to one checkpoint, one seed, 40 development dates and
+  ten members; cross-fitting is not described as independent generalization.
 - The clipping caveat is explicit: the bounded RMSE change is not presented as
   intrinsic improvement of the pre-clipping ensemble center.
 - The manuscript does not claim deterministic-method superiority, complete
   tail calibration, conditional calibration or fieldwise coverage.
-- No additional GPU experiment is needed to address the current blockers. A
-  trusted CPU-only rerun is warranted only if the executor cannot retrieve the
-  already completed run's compact table, or if its audited schema lacks the
-  required paired fields.
+- The manuscript contains an aggregate evidence table, scholarly references,
+  data/code availability language and ethics/competing-interests language.
+- No additional CPU or GPU experiment is needed for the present narrow claim.
 
-## Fastest defensible closure path
+## Honest limitations
 
-1. Retrieve the existing compact per-case analysis table and first inspect its
-   CSV header. Require the eight fields named in `paper/REPRODUCIBILITY.md`.
-   Only if they are present, run `paper/make_case_level_artifacts.py` to produce
-   a paired case-level uncertainty summary and one compact
-   distribution-of-deltas figure. The generator enforces the frozen 40-case
-   protocol, unique case identifiers when present, finite metric values,
-   deterministic resampling, and records the input SHA-256 digest in the
-   summary. If retrieval is unavailable, use the established CPU-only extended
-   analysis mode and request only `per_case_metrics.csv`; if the fields are
-   absent, narrow the manuscript to aggregate evidence rather than synthesizing
-   case-level quantities.
-2. Freeze those outputs in the repository with a small generation script and
-   provenance note, then cite them from the Results section.
-3. Add and verify the bibliography and venue-required submission metadata.
-4. Re-audit every quantitative manuscript sentence against the claim ledger
-   and compact artifacts. Only then replace the status above with the
-   controller-required ready status and record remaining limitations.
+- Raw and corrected case-level fields are not jointly available in the compact
+  contract, so paired uncertainty intervals and improved-case counts are not
+  reported or reconstructed.
+- The result is a mechanism study on a reused development period, not an
+  independent temporal generalization estimate.
+- Evidence covers one legacy checkpoint, one sampling seed and a ten-member
+  ensemble; conditional, spatial and fieldwise reliability remain untested.
+- The nominal interval diagnostics are descriptive for the finite ensemble;
+  residual upper-tail undercoverage remains.
 
-## External-only follow-ups
+## External-only actions before submission
 
-- Authors must select the target venue and supply author/affiliation, funding,
-  conflict-of-interest and data-release details.
-- Any claim beyond the present validation mechanism result requires genuinely
-  independent evidence and is outside this readiness audit.
+- Authors must select the target venue/template and supply names, affiliations,
+  funding, final competing-interest declarations, acknowledgements and the
+  approved code/data release location and license.
+- Human reviewers must decide whether the narrow validation-mechanism scope is
+  appropriate for that venue and perform final copy-editing and
+  reference-format checks.
+- Any broader claim requires genuinely independent evidence and a new audited
+  scientific decision; it is not implied by this readiness status.

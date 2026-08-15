@@ -15,36 +15,21 @@ cross-fitted spread run; it does not require or permit raw ensembles.
 - Selection objective: case-mean fair CRPS.
 - Scale grid: `1.0, 1.1, ..., 4.0`.
 - Selected fold scales: `2.6, 2.7, 2.8, 2.8, 2.6`.
-- Paired uncertainty: deterministic percentile bootstrap over the 40 cases,
-  with 20,000 replicates and seed `20220815`.
+- Paired uncertainty: not reported because the audited compact contract lacks
+  raw case-level fields; aggregate means are not used to synthesize pairs.
 
-## Compact-artifact generation
+## Compact-artifact contract
 
-The compact table is not currently present in this worktree, and the aggregate
-summary does not establish its row-level schema. Before running the generator,
-inspect the retrieved CSV header and require these exact paired fields:
+The trusted 40-row corrected-case table has an audited contract containing
+`analysis_fair_crps`, `analysis_crps`, `analysis_spread_skill_ratio`, and
+`analysis_coverage_90`, but no corresponding `raw_*` fields. The aggregate
+summary separately reports corrected and raw means. Those means are sufficient
+for aggregate reconciliation but cannot identify paired case differences.
 
-- `analysis_fair_crps`, `raw_analysis_fair_crps`;
-- `analysis_crps`, `raw_analysis_crps`;
-- `analysis_spread_skill_ratio`, `raw_analysis_spread_skill_ratio`;
-- `analysis_coverage_90`, `raw_analysis_coverage_90`.
-
-Do not claim that local generation is executable until this header check passes.
-If it passes, place the trusted compact table at
-`paper/artifacts/per_case_metrics.csv`, then run:
-
-```bash
-python3 paper/make_case_level_artifacts.py \
-  paper/artifacts/per_case_metrics.csv \
-  --summary paper/artifacts/case_level_summary.json \
-  --figure paper/figures/fair_crps_case_deltas.svg
-```
-
-The generator itself repeats the column check and rejects an unexpected case
-count, duplicate case identifiers when that column is present, non-finite
-metrics, and an undersized bootstrap.
-It creates output directories as needed and records the input SHA-256 digest in
-the JSON summary.
+Accordingly, `paper/make_case_level_artifacts.py` is retained as a guarded
+generator for a richer future compact contract, but it is not executable from
+the currently available table and none of its outputs are cited. Do not join
+tables by row order or synthesize raw case values from aggregate means.
 
 ## Required reconciliation checks
 
@@ -58,15 +43,13 @@ trusted aggregate summary to ordinary floating-point tolerance:
 | Spread-skill ratio | 0.7240662110 | 1.0614835127 |
 | 90% interval diagnostic | 0.5050835783 | 0.8787749039 |
 
-Then record the paired interval and improved-case count in the manuscript and
-claim ledger. Treat a mismatch larger than `1e-10` in any listed case mean as a
-provenance or schema failure: do not publish the artifact and do not repair it
-by rounding or manual editing.
+Treat a mismatch larger than `1e-10` in any listed case mean as a provenance or
+schema failure: do not publish the artifact and do not repair it by rounding or
+manual editing. No paired interval or improved-case count is part of the present
+evidence package.
 
 ## Scope and audit trail
 
-The JSON summary and SVG are derived publication artifacts. The compact CSV is
-the evidence input and must retain its trusted retrieval manifest outside the
-paper narrative. The paper must not describe the paired case bootstrap as an
-independent-period uncertainty estimate. Venue metadata, author statements and
-data-release decisions remain external inputs.
+The compact CSV and aggregate JSON retain their trusted manifests outside the
+paper narrative. Venue metadata, author statements and data-release decisions
+remain external inputs.

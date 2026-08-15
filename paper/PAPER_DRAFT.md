@@ -30,7 +30,8 @@ an independent generalization claim or superiority to a deterministic method.
 
 Diffusion models, flow matching and stochastic interpolants have made it
 possible to sample high-dimensional conditional distributions at useful
-spatial resolutions. In data assimilation, this offers a compelling alternative
+spatial resolutions [1,2]. In data assimilation, this offers a compelling
+alternative
 to a single optimized analysis: the output can be an ensemble that represents
 multiple states compatible with a physical background and sparse observations.
 
@@ -104,7 +105,7 @@ not used in conditioning, provides a sparse track-imitation diagnostic.
 
 For `M` generated members, the empirical ensemble CRPS and the fair score for
 an underlying sampling distribution use different pairwise normalizations. The
-latter removes the self-pair finite-sample bias and is required when ensemble
+latter removes the self-pair finite-sample bias [3] and is required when ensemble
 sizes differ or when dispersion is interpreted as a property of the underlying
 generator.
 
@@ -118,7 +119,8 @@ construction. Randomized ranks provide a more direct exchangeability check.
 We report ordinary ensemble CRPS alongside fair CRPS, using the latter as the
 scale-selection objective. Coverage remains a descriptive interval diagnostic
 for the ten-member ensemble rather than a literal continuous-distribution
-guarantee.
+guarantee. CRPS is interpreted as a proper scoring rule for a predictive
+distribution [4].
 
 ## 4. Cross-fitted global spread calibration
 
@@ -219,9 +221,35 @@ ensemble sizes, regions or observation systems remains unverified.
 | 95% interval diagnostic | 0.5250 | 0.8915 | Improved but residual upper-tail undercoverage remains |
 | Pre-clipping center error | 0 | 4.16e-16 | Mean preservation holds to numerical precision |
 
-The submission package still requires a compact provenance-backed display of
-case-level score changes and uncertainty across dates. The frozen generator
-resamples cases as paired units and records the compact input table's SHA-256
-digest; its outputs are not reported until they are generated from the trusted
-table and checked against the aggregate means. Conditional, spatial and
-independent-period studies are not presented as contributions of this draft.
+The trusted compact-table contract contains 40 corrected case rows but does not
+contain the corresponding raw case-level fields. Consequently, paired
+case-level uncertainty is neither reconstructed from aggregate means nor
+reported. Conditional, spatial and independent-period studies are not presented
+as contributions of this draft.
+
+## Data and code availability
+
+The manuscript reports only compact validation summaries. Raw ensembles remain
+outside the publication worktree. The frozen transform, scale grid, fold sizes,
+selected scales, scoring conventions and reconciliation values are documented
+in `REPRODUCIBILITY.md`; release location and licensing require author approval.
+
+## Ethics and competing interests
+
+The study uses model fields and satellite-footprint geometry and involves no
+human participants or personal data. Authors must supply the final funding and
+competing-interest declarations before submission.
+
+## References
+
+1. Ho, J., Jain, A. & Abbeel, P. Denoising Diffusion Probabilistic Models.
+   *Advances in Neural Information Processing Systems* **33** (2020).
+2. Lipman, Y., Chen, R. T. Q., Ben-Hamu, H., Nickel, M. & Le, M. Flow Matching
+   for Generative Modeling. *International Conference on Learning
+   Representations* (2023), arXiv:2210.02747.
+3. Ferro, C. A. T. Fair scores for ensemble forecasts. *Quarterly Journal of
+   the Royal Meteorological Society* **140**, 1917–1923 (2014).
+   doi:10.1002/qj.2270.
+4. Gneiting, T. & Raftery, A. E. Strictly Proper Scoring Rules, Prediction, and
+   Estimation. *Journal of the American Statistical Association* **102**,
+   359–378 (2007). doi:10.1198/016214506000001437.

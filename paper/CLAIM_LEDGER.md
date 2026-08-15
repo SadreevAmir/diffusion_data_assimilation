@@ -23,6 +23,7 @@ Last audited: 2026-08-15.
 | C12 | The frozen spread correction preserves the ensemble center before clipping. | Verified numerically and algebraically | `x_bar + s(x_k-x_bar)`; maximum reported pre-clipping invariance error 4.16e-16 | Bounded scoring clips members; bounded RMSE 0.1903366 → 0.1876254 must not be called an intrinsic center-skill gain. |
 | C13 | The frozen correction improves the reported pointwise coverage diagnostics. | Verified validation evidence | 50%: 0.208196 → 0.596277; 80%: 0.471026 → 0.856292; 90%: 0.505084 → 0.878775; 95%: 0.525005 → 0.891464 | These are small-ensemble pointwise diagnostics, not guaranteed continuous, casewise or fieldwise coverage; residual upper-tail undercoverage remains. |
 | C14 | The frozen correction improves ordinary ensemble CRPS. | Verified validation evidence | 0.0621082810 → 0.0611013421 | Ordinary CRPS improves less than fair CRPS and was not the selection objective; report both. |
+| C15 | The available compact corrected-case table supports paired uncertainty against the raw ensemble. | Rejected by artifact contract | The 40-row contract lists corrected metrics but no `raw_*` fields | Aggregate raw and corrected means cannot identify paired case differences; no paired interval or improved-case count is reported. |
 
 ## Mandatory language discipline
 
