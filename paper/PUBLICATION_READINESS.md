@@ -4,9 +4,8 @@ Audit date: 2026-08-16
 
 Publication status: NOT_READY
 
-Required scientific blockers: strong SIC calibration baselines,
-spatial/physical preservation, clean checkpoint and frozen independent
-evaluation
+Required scientific blockers: an eligible spatially preserving calibration,
+clean checkpoint and frozen independent evaluation
 
 ## Scientific readiness decision
 
@@ -48,6 +47,16 @@ is `0.0719362` versus `0.0108617`, and member-spatial safety fails. Boundary
 and spatial damage therefore persist without a hard cap; the fixed diagnostic
 is closed and no post-hoc tuning is admissible.
 
+The frozen ZOIB-EMOS/ECC-Q baseline is now also complete and rejected. It
+finishes all 40 cases with converged folds and zero ECC rank-order violations,
+and sharply improves exact-boundary mass errors and randomized ranks. However,
+fair CRPS is `0.0585570` versus `0.0584906` raw, ordinary CRPS worsens to
+`0.0649912`, inner-order attainable error worsens to `0.253947`, established-
+ice Brier worsens to `0.0642805`, and every spatial/physical criterion fails.
+Only operational validity passes at family level. This closes the frozen
+parametric boundary-aware route without post-hoc tuning; it does not supply an
+eligible calibrated ensemble.
+
 ## Minimum-tier gap audit
 
 | Required element | Current evidence | Readiness consequence |
@@ -55,7 +64,7 @@ is closed and no post-hoc tuning is admissible.
 | Clean checkpoint and frozen independent evaluation | One legacy checkpoint and reused development dates | Blocking; method may be frozen, but the generalization claim is not tested |
 | Exact deterministic comparison | Background and learned-joint aggregate RMSE/IIEE are available; no independent frozen comparison is claimed | Blocking for the main comparison table |
 | Correct finite-ensemble diagnostics | Fair and ordinary CRPS, spread-skill, four coverage diagnostics and center invariance are reported | Satisfied for the narrow mechanism claim |
-| Strong SIC calibration baselines | Raw, affine-logit, global spread, fixed purged hurdle-isotonic/ECC-Q, exact mean-preserving projected spread and fixed mean-preserving open-logit desaturation are evaluated; all postprocessors fail at least one mandatory family | Partially resolved: boundary/rank, exact-mean-preservation and hard-cap-removal ablations are strong negative controls, but they do not complete the zero/one-inflated parametric, conformal or probabilistic-DA baseline tier |
+| Strong SIC calibration baselines | Raw, affine-logit, global spread, purged hurdle-isotonic/ECC-Q, exact mean-preserving projected spread, open-logit desaturation and frozen ZOIB-EMOS/ECC-Q are evaluated; all postprocessors fail at least one mandatory family | The predeclared zero/one-inflated parametric gap is resolved as a strong negative control; no candidate satisfies the common gate, and conformal or probabilistic-DA comparisons remain absent |
 | Case/block uncertainty | Trusted 40-date paired analysis reports fair-CRPS delta `-0.00280091`, date CI `[-0.00413219, -0.00135419]`, and circular four-date-block CI `[-0.00502644, -0.000290285]`; ordinary-CRPS intervals cross zero | Satisfied for the narrow mechanism claim; the block interval is a post-hoc temporal sensitivity, not a predeclared pass/fail gate |
 | Spatial/physical preservation | The joint audit reports calibrated IIEE, edge, area/extent and variogram diagnostics; the candidate exceeds the IIEE and edge tolerances | Blocking for selection of global scaling, but resolved as an auditable negative mechanism result |
 | Publication figures | Reproducible aggregate reliability and joint-gate figures plus manuscript uncertainty and mechanism tables are cited | Satisfied for the present mechanism claims; broader baseline and independent-evaluation figures depend on the blocking evidence |
@@ -70,8 +79,11 @@ previously missing boundary-aware/rank-preserving mechanism comparison. It
 repairs boundary masses and randomized ranks but fails proper-score and
 spatial/physical families by large margins. The remaining minimum-tier gap is
 therefore broader independent baseline coverage and a candidate that can
-satisfy the no-compensation gate, not another tuning point. No additional
-implemented mode supplies a mechanistically distinct eligible family.
+satisfy the no-compensation gate, not another tuning point. The completed
+ZOIB-EMOS/ECC-Q baseline closes the parametric boundary-aware route: boundary
+masses and ranks improve, but proper-score, inner-order, boundary and spatial
+families fail. No additional implemented mode supplies a mechanistically
+distinct eligible family.
 Repeating completed analyses would not change the decision.
 The final open-logit result additionally rules out hard upper-cap saturation as
 the sole cause of failure. It improves the capped candidate's proper score and
@@ -108,6 +120,9 @@ inner-order reliability but still fails boundary and member-spatial families.
   and reproducibility trail. It removes hard upper-cap saturation and passes
   finite-ensemble reliability, while its failed boundary and member-spatial
   families close calibration development without post-hoc parameter changes.
+- The frozen ZOIB-EMOS/ECC-Q result is recorded as a fifth negative mechanism:
+  operational validity and marginal boundary/rank repair do not compensate for
+  failed proper-score, inner-order, established-ice and spatial families.
 - The claim ledger no longer describes the baseline evidence as raw plus
   affine-logit only, and the manuscript contributions now expose both sides of
   the boundary/rank-versus-spatial tradeoff without treating one failed
@@ -137,12 +152,13 @@ inner-order reliability but still fails boundary and member-spatial families.
 ## External boundary
 
 The joint gate decisions are complete: global spread scaling, purged
-hurdle-isotonic/ECC-Q, exact mean-preserving projected spread and fixed
-open-logit desaturation are rejected as
+hurdle-isotonic/ECC-Q, exact mean-preserving projected spread, fixed open-logit
+desaturation and frozen ZOIB-EMOS/ECC-Q are rejected as
 the paper's calibrated-ensemble method. The immediate external scientific
-boundary is specification and review of a mechanistically distinct strong-baseline
-contract or authorization of the already frozen independent evaluation; the
-available fixed boundary/rank comparator has been completed and rejected.
+boundary is authorization of a clean checkpoint and the already frozen
+independent evaluation, or specification and review of a genuinely new
+mechanistically distinct calibration contract. All currently implemented
+boundary/rank comparators have been completed and rejected.
 The paired date/block CPU analysis of the existing compact audit is complete;
 its compact result has been reconciled into the evidence chain, while local
 reconstruction remains intentionally excluded. The currently implemented modes

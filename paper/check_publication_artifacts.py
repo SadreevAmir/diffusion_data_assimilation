@@ -53,7 +53,7 @@ NEXT_BASELINE_ANCHORS = {
     "NEXT_BASELINE_CONTRACT.md": (
         "exactly 13 fitted coefficients",
         "source_experiment=joint_full_condition_validation_2022",
-        "No currently reviewed trusted-executor mode implements this contract.",
+        "overall_eligible=false",
     ),
     "RESEARCH_PLAN.md": (
         "NEXT_BASELINE_CONTRACT.md",
@@ -61,16 +61,17 @@ NEXT_BASELINE_ANCHORS = {
     ),
     "CLAIM_LEDGER.md": (
         "| C28 |",
-        "No reviewed trusted-executor mode implements this contract.",
+        "| C29 |",
+        "0.0585570",
     ),
     "REPRODUCIBILITY.md": (
-        "## Frozen next-baseline handoff",
+        "## Frozen ZOIB-EMOS/ECC-Q handoff",
         "exactly 13 fitted coefficients",
-        "must not be scheduled under an",
+        "0.0642804809",
     ),
     "PUBLICATION_READINESS.md": (
-        "implemented mode supplies a mechanistically distinct eligible family.",
-        "specification and review of a mechanistically distinct strong-baseline",
+        "No additional implemented mode",
+        "0.0585570",
     ),
 }
 MANUSCRIPT_EVIDENCE_ANCHORS = (
@@ -82,6 +83,8 @@ MANUSCRIPT_EVIDENCE_ANCHORS = (
     "| Upper-cap mass | 0 | 0.167438 | Active-cap boundary failure remains |",
     "| Mean-preserving open-logit diagnostic | Raw ensemble | Candidate | Interpretation |",
     "| Established-ice Brier score | 0.056973 | 0.059107 | Worse beyond 1% tolerance; boundary family fails |",
+    "| ZOIB-EMOS/ECC-Q diagnostic | Raw ensemble | Candidate | Interpretation |",
+    "| Fair CRPS | 0.058491 | 0.058557 | No 3% improvement; proper-score family fails |",
     "| Paired diagnostic | Mean delta (corrected - raw) | Date-bootstrap 95% CI | Four-date-block 95% CI |",
     "| Mean IIEE | 0.004379 | [0.002065, 0.006716] | [0.001149, 0.007849] |",
 )

@@ -80,24 +80,29 @@ boundary and member-spatial families fail despite the other four families
 passing. This is the terminal fixed diagnostic; epsilon, transform bounds,
 zero mask and transferred scales must not be tuned after this result.
 
-## Frozen next-baseline handoff
+## Frozen ZOIB-EMOS/ECC-Q handoff
 
-The next mechanistically distinct baseline is design-frozen in
-`paper/NEXT_BASELINE_CONTRACT.md`: a date-balanced ZOIB-EMOS marginal model
-with exactly 13 fitted coefficients, five purged contiguous cross-fitting
-folds, and deterministic ECC-Q reconstruction. Its predictors, optimizer,
-initialization, seeds, uncertainty contract and no-compensation gate are fixed
-before execution. The sole intended runtime input is the server-side source
-experiment; no ensemble artifact is retrieved into this worktree.
+The design frozen in `paper/NEXT_BASELINE_CONTRACT.md` has now been executed by
+the reviewed server runner: a date-balanced ZOIB-EMOS marginal model with
+exactly 13 fitted coefficients, five purged contiguous cross-fitting folds and
+deterministic ECC-Q reconstruction. Its sole runtime parameter was
+`source_experiment=joint_full_condition_validation_2022`; no ensemble artifact
+was retrieved into this worktree. All 40 cases and folds completed, all
+reported metrics were finite and ECC-Q strict rank-order violations were zero.
 
-This is a specification, not completed evidence. No reviewed trusted-executor
-mode currently implements the contract, so it must not be scheduled under an
-existing mode identifier or described as a runnable proposal. Once a reviewed
-runner exists, its only runtime parameter must be
-`source_experiment=joint_full_condition_validation_2022`; runner provenance,
-fold convergence and all joint-gate families must be returned in the compact
-summary. Until then, claims C17 and C28 remain blocking and no result may be
-inferred from the design freeze itself.
+Reconciliation anchors are fair CRPS `0.0584905850` raw and `0.0585569940`
+candidate; ordinary CRPS `0.0621082810` and `0.0649912008`; ensemble-mean RMSE
+`0.1903366044` and `0.2007737230`; exact-zero mass absolute error `0.396858616`
+and `0.008275438`; exact-one mass absolute error `0.009041882` and
+`0.0000687234`; randomized-rank discrepancy per observation `0.0790135133`
+and `0.0098823033`; inner-order attainable error `0.1759533520` and
+`0.2539472381`; established-ice Brier `0.0569726083` and `0.0642804809`; mean
+IIEE `0.0796004071` and `0.0871897938`; edge disagreement `0.0351291198` and
+`0.0401654091`. Only operational validity passes at family level and
+`overall_eligible=false`. The fixed ridge, predictors, optimizer and links must
+not be tuned after this result. These compact anchors document a rejected
+parametric boundary-aware baseline and must not be used to reconstruct
+case-level pairs.
 
 ## Compact-artifact contract
 

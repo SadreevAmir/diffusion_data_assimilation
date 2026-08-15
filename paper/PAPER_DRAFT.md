@@ -80,7 +80,7 @@ The present validation study contributes:
 3. **An auditable sparse-observation protocol.** We record the conditioning
    channels, real footprint geometry, model-to-model observation values, frozen
    checkpoint and deterministic cross-fitting procedure.
-4. **Four complementary negative calibration mechanisms.** We show why
+4. **Five complementary negative calibration mechanisms.** We show why
    score improvement from an affine-logit transform is insufficient when it
    destroys exact boundary mass, and why a fixed purged hurdle-isotonic/ECC-Q
    construction can repair boundary masses and randomized ranks while severely
@@ -89,7 +89,9 @@ The present validation study contributes:
    showing that spread-only repair still fails boundary, inner-order and
    member-spatial criteria. A final fixed open-logit desaturation removes hard
    upper-cap saturation and repairs the inner-order criterion, but still fails
-   boundary and member-spatial safety.
+   boundary and member-spatial safety. Finally, a frozen zero/one-inflated
+   Beta EMOS marginal model with ECC-Q improves boundary masses and randomized
+   ranks, but fails proper-score, inner-order, boundary and spatial families.
 
 The methods and gates are frozen from validation evidence. Independent
 evaluation, multi-seed training and broader generalization remain outside the
@@ -296,6 +298,21 @@ boundary-safe, spatially reliable calibration. This was the final fixed
 diagnostic; no transform bounds, zero masks or transferred scales were tuned
 after its result.
 
+The frozen ZOIB-EMOS/ECC-Q comparator tests a distinct parametric route with
+explicit zero and one atoms. All 40 cases complete, every fold converges and
+ECC-Q produces no strict rank-order violations. Exact-zero mass error falls
+from `0.396859` to `0.008275`, exact-one mass error from `0.009042` to
+`0.0000687`, and rank discrepancy per observation from `0.079014` to
+`0.009882`. The joint gate still rejects the method. Fair CRPS is essentially
+unchanged (`0.058491` to `0.058557`), ordinary CRPS worsens (`0.062108` to
+`0.064991`), and inner-order attainable-coverage error rises from `0.175953`
+to `0.253947`. Established-ice Brier worsens to `0.064280`, mean IIEE to
+`0.087190`, and edge disagreement to `0.040165`; every spatial/physical
+criterion fails. Explicit boundary atoms plus ECC-Q are therefore insufficient
+to convert marginal boundary/rank repair into useful spatial calibration under
+the frozen model. No optimizer, predictor, link or regularization change
+follows this result.
+
 Figure 1 summarizes the aggregate mechanism result. The dashed references are
 descriptive finite-ensemble targets, not confidence bounds.
 
@@ -388,6 +405,19 @@ ensemble sizes, regions or observation systems remains unverified.
 | Mass above 0.999 | 0.010862 | 0.071936 | Residual near-boundary concentration exceeds raw |
 | Upper-cap mass | 0 | 0 | Hard-cap artifact removed |
 | Local variogram score, lag 1 | 0.009100 | 0.009346 | Exceeds the 2% safety tolerance |
+
+| ZOIB-EMOS/ECC-Q diagnostic | Raw ensemble | Candidate | Interpretation |
+|---|---:|---:|---|
+| Fair CRPS | 0.058491 | 0.058557 | No 3% improvement; proper-score family fails |
+| Ordinary CRPS | 0.062108 | 0.064991 | 4.64% worse |
+| Ensemble-mean RMSE | 0.190337 | 0.200774 | 5.48% worse |
+| Exact-zero mass absolute error | 0.396859 | 0.008275 | Boundary atom is substantially repaired |
+| Exact-one mass absolute error | 0.009042 | 0.0000687 | Upper-boundary mass error is substantially repaired |
+| Randomized-rank discrepancy per observation | 0.079014 | 0.009882 | Rank criterion passes |
+| Inner-order attainable-coverage error | 0.175953 | 0.253947 | Reliability family fails |
+| Established-ice Brier score | 0.056973 | 0.064280 | Boundary family fails |
+| Mean IIEE | 0.079600 | 0.087190 | Spatial/physical family fails |
+| Edge disagreement | 0.035129 | 0.040165 | Spatial/physical family fails |
 
 | Paired diagnostic | Mean delta (corrected - raw) | Date-bootstrap 95% CI | Four-date-block 95% CI |
 |---|---:|---:|---:|

@@ -131,10 +131,13 @@ interval is a temporal sensitivity, not an acceptance gate.
 - **Optimization failure:** the fixed low-dimensional baseline is operationally
   invalid. Do not silently substitute another optimizer or regularizer.
 
-## Executor boundary
+## Execution record
 
-No currently reviewed trusted-executor mode implements this contract. The next
-controller change, outside this worktree's allowed scope, must add and review a
-server-CPU runner with `source_experiment=joint_full_condition_validation_2022`
-as its only runtime parameter. Until that mode exists, this document is a design
-freeze and must not be represented as an executable experiment proposal.
+The reviewed server-CPU runner has executed this contract with
+`source_experiment=joint_full_condition_validation_2022` as its only runtime
+parameter. All 40 cases and folds completed, all reported metrics were finite
+and ECC-Q strict rank-order violations were zero. The fixed joint gate returned
+`overall_eligible=false`: only operational validity passed. The frozen ridge,
+predictors, optimizer and links remain unchanged after the result; the compact
+reconciliation anchors and interpretation are recorded in
+`REPRODUCIBILITY.md`, `CLAIM_LEDGER.md` and `PUBLICATION_READINESS.md`.
