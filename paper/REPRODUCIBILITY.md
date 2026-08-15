@@ -17,9 +17,11 @@ ensembles in the publication worktree.
 - Selected fold scales: `2.6, 2.7, 2.8, 2.8, 2.6`.
 - Paired uncertainty: not reported. The earlier spread-only compact contract
   lacks raw case-level fields, while the later joint-audit contract contains
-  long-form `target_date`/`method` rows for raw and corrected methods. No
-  server-generated paired interval summary has been retrieved, and aggregate
-  means are not used to synthesize pairs.
+  long-form `target_date`/`method` rows for raw and corrected methods. The
+  implemented trusted mode `validation_existing_calibration_paired_uncertainty`
+  has been proposed with source `joint_existing_ensemble_calibration_audit_valid`,
+  but no server-generated compact summary has been retrieved. Aggregate means
+  are not used to synthesize pairs.
 
 ## Joint-gate audit trail
 
@@ -45,10 +47,11 @@ for aggregate reconciliation but cannot identify paired case differences.
 The completed joint-audit table instead has 160 long-form rows, with
 `target_date`, `fold`, `method` and the full proper-score, rank, boundary and
 spatial diagnostic family. It includes raw and corrected methods, so a trusted
-server analysis can join them by `target_date` and compute paired date-level and
-predeclared contiguous-block uncertainty. This worktree does not contain that
-table or a resulting compact interval summary; therefore no such result is
-cited here.
+server analysis can join them by `target_date` and compute paired date-level
+uncertainty plus a circular contiguous four-date-block temporal sensitivity.
+The reviewed CPU mode compares raw with all three fixed candidates and never
+reads raw ensembles. This worktree does not contain the table or a resulting
+compact interval summary; therefore no such result is cited here.
 
 Accordingly, `paper/make_case_level_artifacts.py` is a guarded server-analysis
 generator with two explicit input layouts. Its `--long-form` layout consumes
