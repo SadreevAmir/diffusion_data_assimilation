@@ -139,20 +139,20 @@ unclipped center.
 
 ## 5. Experimental protocol
 
-Training targets cover 2016–2021, development targets use 2022, and the locked
-test consists of 200 consecutive target days in 2023. The present checkpoint is
-a legacy final-epoch checkpoint and is used only for preliminary development.
-Publication results require retraining with the corrected split and multiple
-seeds.
+The present mechanism study uses 40 dates from the development split. The
+checkpoint, case set, ensemble size, cross-fitting folds, scale grid and scoring
+rules are fixed for the analysis reported here. The checkpoint is a legacy
+final-epoch checkpoint, so the study is explicitly presented as a
+validation-mechanism result rather than an independent generalization result.
 
 The primary deterministic quantity is the generated ensemble mean, which is
 compared with the single 3D-Var analysis. Probabilistic scores apply only to the
 generative and probabilistic baselines. All uncertainty intervals resample
 dates or temporal blocks, never individual pixels.
 
-Baselines include raw ensembles, physical bias/spread scaling, naive logit
-postprocessing, zero/one-inflated distributional regression, isotonic or
-quantile mapping, conformal intervals and ECC-like reconstruction.
+The reported baselines are the raw ensemble and the score-optimized affine-logit
+negative baseline. Other distributional and rank-preserving postprocessors were
+not evaluated and are not implied by this paper's evidence.
 
 ## 6. Preliminary validation results
 

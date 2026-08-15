@@ -9,7 +9,8 @@ Publication status: NOT_READY_FOR_HUMAN_REVIEW
 1. **Case-level uncertainty is absent from the paper package.** The aggregate
    mechanism result is internally consistent, but the draft has no date-level
    paired uncertainty interval or sensitivity summary. This can be computed
-   from the existing compact per-case table; no new sampling is justified.
+   from the existing compact per-case table with
+   `paper/make_case_level_artifacts.py`; no new sampling is justified.
 2. **Publication displays are incomplete.** The manuscript now contains an
    aggregate evidence table, but no provenance-backed case-level figure or
    frozen figure/table artifact exists in the worktree.
@@ -34,7 +35,8 @@ Publication status: NOT_READY_FOR_HUMAN_REVIEW
 
 ## Fastest defensible closure path
 
-1. Use the existing per-case analysis table to produce a paired date-level
+1. Retrieve the existing compact per-case analysis table and run
+   `paper/make_case_level_artifacts.py` to produce a paired case-level
    uncertainty summary and one compact distribution-of-deltas figure.
 2. Freeze those outputs in the repository with a small generation script and
    provenance note, then cite them from the Results section.
