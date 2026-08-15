@@ -1,7 +1,8 @@
 # Reliable Generative Data Assimilation: Finite-Ensemble Calibration under Sparse Spatial Observations
 
-> Living preprint draft. Claims marked `[HYPOTHESIS]` or `[PLANNED]` are not
-> results. See `CLAIM_LEDGER.md` for provenance and limitations.
+> Validation-mechanism draft. See `CLAIM_LEDGER.md` for provenance and
+> limitations. This document does not report an independent generalization
+> result.
 
 ## Abstract
 
@@ -57,9 +58,9 @@ regularized affine-logit transformation further improves blocked-validation
 CRPS and RMSE, but removes exact zero mass and sharply worsens coverage. Thus
 score optimization alone does not solve the calibration problem.
 
-### Contributions
+### Contributions supported by the present evidence
 
-The intended contributions are:
+The present validation study contributes:
 
 1. **Finite-ensemble-aware evaluation.** We distinguish
    empirical-distribution scores from fair ensemble estimators and derive or
@@ -67,12 +68,12 @@ The intended contributions are:
 2. **A mean-preserving global spread correction.** We cross-fit a single
    multiplicative anomaly scale, preserving member ranks and the pre-clipping
    ensemble center, and report both ordinary and fair CRPS.
-3. **A locked sparse-observation protocol.** We enforce temporally separated
-   development and test years, exact conditioning-channel provenance, a frozen
-   model-to-model comparison with 3D-Var, and date-block uncertainty estimates.
-4. **A diagnostic study of generative assimilation.** We evaluate reliability
-   by season, ice regime, track geometry and distance to observation, as well as
-   spatial spectra, edge statistics and multivariate scores.
+3. **An auditable sparse-observation protocol.** We record the conditioning
+   channels, real footprint geometry, model-to-model observation values, frozen
+   checkpoint and deterministic cross-fitting procedure.
+4. **A documented negative baseline.** We show why score improvement from an
+   affine-logit transform is insufficient when it destroys exact boundary mass
+   and worsens interval diagnostics.
 
 The method is frozen from validation evidence. Independent evaluation,
 multi-seed training and broader generalization remain outside the present claim.
@@ -205,14 +206,19 @@ comparisons, and residual upper-tail undercoverage remains. No independent
 comparison with 3D-Var is claimed. Generalization across checkpoints, seeds,
 ensemble sizes, regions or observation systems remains unverified.
 
-## 8. Planned figures and tables
+## 8. Evidence table for the frozen mechanism claim
 
-- Figure 1: conditioning and independent-guidance pipeline.
-- Figure 2: finite-ensemble bias and attainable coverage versus ensemble size.
-- Figure 3: exact-zero failure of naive logit postprocessing.
-- Figure 4: raw and calibrated reliability conditional on ice regime and track distance.
-- Figure 5: fair-CRPS/reliability/spatial-distortion Pareto frontier.
-- Table 1: frozen background, 3D-Var and flow deterministic comparison.
-- Table 2: probabilistic postprocessing baselines.
-- Table 3: boundary, spatial and ensemble-size ablations.
-- Table 4: out-of-distribution and second-task generalization.
+| Diagnostic | Raw ensemble | Cross-fitted correction | Interpretation |
+|---|---:|---:|---|
+| Fair CRPS | 0.058491 | 0.055690 | 4.79% reduction; selection objective |
+| Ordinary CRPS | 0.062108 | 0.061101 | Secondary proper-score improvement |
+| Spread-skill ratio | 0.7241 | 1.0615 | Strong raw underdispersion is largely corrected |
+| 50% interval diagnostic | 0.2082 | 0.5963 | Improved, descriptive for ten members |
+| 80% interval diagnostic | 0.4710 | 0.8563 | Improved, descriptive for ten members |
+| 90% interval diagnostic | 0.5051 | 0.8788 | Meets the predeclared acceptance interval |
+| 95% interval diagnostic | 0.5250 | 0.8915 | Improved but residual upper-tail undercoverage remains |
+| Pre-clipping center error | 0 | 4.16e-16 | Mean preservation holds to numerical precision |
+
+The submission package still requires a compact provenance-backed display of
+case-level score changes and uncertainty across dates. Conditional, spatial and
+independent-period studies are not presented as contributions of this draft.
