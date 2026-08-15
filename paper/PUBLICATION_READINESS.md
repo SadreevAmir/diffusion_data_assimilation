@@ -37,7 +37,7 @@ mass, mean IIEE worsens by 5.50%, and edge disagreement worsens by 4.41%.
 | Exact deterministic comparison | Background and learned-joint aggregate RMSE/IIEE are available; no independent frozen comparison is claimed | Blocking for the main comparison table |
 | Correct finite-ensemble diagnostics | Fair and ordinary CRPS, spread-skill, four coverage diagnostics and center invariance are reported | Satisfied for the narrow mechanism claim |
 | Strong SIC calibration baselines | Only raw ensemble and a failed affine-logit transform are evaluated | Blocking; at least one boundary-aware distributional baseline and one rank-preserving or conformal baseline are required |
-| Case/block uncertainty | The corrected compact table lacks paired raw fields | Blocking; aggregate means cannot identify paired date-level uncertainty |
+| Case/block uncertainty | The earlier 40-row spread-only table lacks paired raw fields; the later 160-row joint-audit contract contains `target_date` and `method`, but no server-generated paired uncertainty summary has been retrieved | Blocking; the long-form joint table can support pairing by date and method, but aggregate means alone cannot and local analysis is outside the execution boundary |
 | Spatial/physical preservation | The joint audit reports calibrated IIEE, edge, area/extent and variogram diagnostics; the candidate exceeds the IIEE and edge tolerances | Blocking for selection of global scaling, but resolved as an auditable negative mechanism result |
 | Publication figures | A reproducible aggregate mechanism figure is cited; uncertainty and spatial/physical figures remain unavailable | Partial; paired uncertainty and spatial/physical comparisons must be visualized after admissible compact artifacts exist |
 | References and reproducibility | Core scoring and generative-model references plus a guarded reconciliation contract are present | Partial; baseline and sea-ice verification references must accompany the missing experiments |
@@ -58,6 +58,11 @@ either spread-only analysis or the joint audit would not change the decision.
 - The frozen method, aggregate reconciliation values, clipping caveat and
   negative affine-logit finding are recorded consistently.
 - Unsupported paired intervals and improved-case counts are not reconstructed.
+- The completed joint-audit schema is now distinguished from the earlier
+  spread-only schema: its 160 long-form rows contain `target_date` and `method`
+  for four methods. This makes a server-side paired analysis possible in
+  principle, but does not make an interval available in the publication
+  worktree.
 - A guarded artifact generator exists for separate compact raw and corrected
   tables. It requires the same explicit ISO-date keys in both inputs and a
   predeclared block length, then emits paired case-bootstrap and circular
@@ -74,8 +79,10 @@ either spread-only analysis or the joint audit would not change the decision.
 
 The joint gate decision is complete: global spread scaling is rejected as the
 paper's calibrated-ensemble method. The immediate external scientific boundary
-is implementation and review of a trusted strong-baseline analysis contract;
-the currently implemented modes cannot supply boundary-aware distributional
-and rank-preserving/conformal comparators. The frozen independent evaluation
+is implementation and review of a trusted strong-baseline analysis contract,
+plus trusted server-side paired date/block analysis of the existing long-form
+joint-audit table. The currently implemented modes cannot supply boundary-aware
+distributional and rank-preserving/conformal comparators or the missing compact
+uncertainty summary. The frozen independent evaluation
 also remains locked until explicit authorization after the pre-test evidence
 package and clean checkpoint are complete.

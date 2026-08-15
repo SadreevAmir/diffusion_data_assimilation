@@ -15,8 +15,11 @@ ensembles in the publication worktree.
 - Selection objective: case-mean fair CRPS.
 - Scale grid: `1.0, 1.1, ..., 4.0`.
 - Selected fold scales: `2.6, 2.7, 2.8, 2.8, 2.6`.
-- Paired uncertainty: not reported because the audited compact contract lacks
-  raw case-level fields; aggregate means are not used to synthesize pairs.
+- Paired uncertainty: not reported. The earlier spread-only compact contract
+  lacks raw case-level fields, while the later joint-audit contract contains
+  long-form `target_date`/`method` rows for raw and corrected methods. No
+  server-generated paired interval summary has been retrieved, and aggregate
+  means are not used to synthesize pairs.
 
 ## Joint-gate audit trail
 
@@ -32,11 +35,20 @@ These values support rejection, not reconstruction of paired case differences.
 
 ## Compact-artifact contract
 
-The trusted 40-row corrected-case table has an audited contract containing
+Two distinct compact contracts must not be conflated. The trusted 40-row
+spread-only corrected-case table has an audited contract containing
 `analysis_fair_crps`, `analysis_crps`, `analysis_spread_skill_ratio`, and
 `analysis_coverage_90`, but no corresponding `raw_*` fields. The aggregate
 summary separately reports corrected and raw means. Those means are sufficient
 for aggregate reconciliation but cannot identify paired case differences.
+
+The completed joint-audit table instead has 160 long-form rows, with
+`target_date`, `fold`, `method` and the full proper-score, rank, boundary and
+spatial diagnostic family. It includes raw and corrected methods, so a trusted
+server analysis can join them by `target_date` and compute paired date-level and
+predeclared contiguous-block uncertainty. This worktree does not contain that
+table or a resulting compact interval summary; therefore no such result is
+cited here.
 
 Accordingly, `paper/make_case_level_artifacts.py` is retained as a guarded
 generator for two richer future compact contracts: one raw case table and one

@@ -256,9 +256,12 @@ ensemble sizes, regions or observation systems remains unverified.
 | 95% interval diagnostic | 0.5250 | 0.8915 | Improved but residual upper-tail undercoverage remains |
 | Pre-clipping center error | 0 | 4.16e-16 | Mean preservation holds to numerical precision |
 
-The trusted compact-table contract contains 40 corrected case rows but does not
-contain the corresponding raw case-level fields. Consequently, paired
-case-level uncertainty is neither reconstructed from aggregate means nor
+The earlier spread-only compact-table contract contains 40 corrected case rows
+without corresponding raw case-level fields. The later joint-audit contract is
+long-form and contains `target_date` and `method` for 160 rows, including raw
+and corrected methods; it can support a trusted server-side paired analysis.
+No such paired uncertainty summary is currently present in the publication
+worktree, so intervals are neither reconstructed from aggregate means nor
 reported. Conditional and independent-period studies are not presented as
 contributions of this draft. The completed joint audit checks IIEE, ice
 area/extent, edge geometry and variograms; its failed mandatory preservation
