@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import datetime as dt
 import hashlib
 import json
 import math
@@ -48,7 +49,27 @@ def bootstrap_mean_ci(
     return percentile(means, 0.025), percentile(means, 0.975)
 
 
-def read_cases(path: Path) -> list[dict[str, float]]:
+def circular_block_bootstrap_mean_ci(
+    deltas: list[float], *, samples: int, seed: int, block_length: int
+) -> tuple[float, float]:
+    """Bootstrap the mean using circular contiguous blocks of ordered cases."""
+    if not 1 < block_length <= len(deltas):
+        raise ValueError("block_length must be between 2 and the number of cases")
+    rng = random.Random(seed)
+    size = len(deltas)
+    means = []
+    for _ in range(samples):
+        resample = []
+        while len(resample) < size:
+            start = rng.randrange(size)
+            resample.extend(
+                deltas[(start + offset) % size] for offset in range(block_length)
+            )
+        means.append(sum(resample[:size]) / size)
+    return percentile(means, 0.025), percentile(means, 0.975)
+
+
+def read_cases(path: Path, *, date_column: str) -> list[dict[str, float]]:
     with path.open(newline="", encoding="utf-8") as handle:
         rows = list(csv.DictReader(handle))
     if not rows:
@@ -58,6 +79,7 @@ def read_cases(path: Path) -> list[dict[str, float]]:
             f"expected {EXPECTED_CASES} cases from the frozen protocol, found {len(rows)}"
         )
     required = {name for metric in METRICS for name in (metric, f"raw_{metric}")}
+    required.add(date_column)
     missing = sorted(required - set(rows[0]))
     if missing:
         raise ValueError(f"input table is missing columns: {', '.join(missing)}")
@@ -65,7 +87,23 @@ def read_cases(path: Path) -> list[dict[str, float]]:
         case_ids = [row["case_index"] for row in rows]
         if len(set(case_ids)) != len(case_ids):
             raise ValueError("case_index values must be unique")
-    cases = [{name: float(row[name]) for name in required} for row in rows]
+    dated_rows = []
+    for index, row in enumerate(rows):
+        try:
+            date = dt.date.fromisoformat(row[date_column])
+        except ValueError as error:
+            raise ValueError(
+                f"case {index} has a non-ISO date in {date_column}: {row[date_column]!r}"
+            ) from error
+        dated_rows.append((date, row))
+    dates = [date for date, _ in dated_rows]
+    if len(set(dates)) != len(dates):
+        raise ValueError(f"{date_column} values must be unique")
+    dated_rows.sort(key=lambda item: item[0])
+    cases = [
+        {name: float(row[name]) for name in required if name != date_column}
+        for _, row in dated_rows
+    ]
     for index, case in enumerate(cases):
         nonfinite = sorted(name for name, value in case.items() if not math.isfinite(value))
         if nonfinite:
@@ -76,7 +114,13 @@ def read_cases(path: Path) -> list[dict[str, float]]:
 
 
 def summarize(
-    cases: list[dict[str, float]], *, samples: int, seed: int, input_sha256: str
+    cases: list[dict[str, float]],
+    *,
+    samples: int,
+    seed: int,
+    block_length: int,
+    date_column: str,
+    input_sha256: str,
 ) -> dict[str, object]:
     metrics: dict[str, object] = {}
     for offset, metric in enumerate(METRICS):
@@ -84,19 +128,34 @@ def summarize(
         corrected = [case[metric] for case in cases]
         deltas = [after - before for before, after in zip(raw, corrected)]
         low, high = bootstrap_mean_ci(deltas, samples=samples, seed=seed + offset)
+        block_low, block_high = circular_block_bootstrap_mean_ci(
+            deltas,
+            samples=samples,
+            seed=seed + len(METRICS) + offset,
+            block_length=block_length,
+        )
         metrics[metric] = {
             "raw_case_mean": sum(raw) / len(raw),
             "corrected_case_mean": sum(corrected) / len(corrected),
             "paired_mean_delta": sum(deltas) / len(deltas),
             "paired_mean_delta_percentile_bootstrap_95_ci": [low, high],
+            "paired_mean_delta_circular_block_bootstrap_95_ci": [
+                block_low,
+                block_high,
+            ],
             "cases_improved": sum(delta < 0 for delta in deltas),
             "cases_total": len(deltas),
         }
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "input_sha256": input_sha256,
         "analysis_unit": "case",
-        "interval_method": "paired nonparametric percentile bootstrap over cases",
+        "temporal_order_column": date_column,
+        "interval_methods": [
+            "paired nonparametric percentile bootstrap over cases",
+            "paired circular contiguous-block percentile bootstrap over date-ordered cases",
+        ],
+        "block_length_cases": block_length,
         "bootstrap_samples": samples,
         "bootstrap_seed": seed,
         "metrics": metrics,
@@ -136,17 +195,23 @@ def main() -> None:
     parser.add_argument("--figure", type=Path, required=True)
     parser.add_argument("--bootstrap-samples", type=int, default=20_000)
     parser.add_argument("--seed", type=int, default=20220815)
+    parser.add_argument("--date-column", required=True)
+    parser.add_argument("--block-length", type=int, required=True)
     args = parser.parse_args()
     if args.bootstrap_samples < 1_000:
         parser.error("--bootstrap-samples must be at least 1000")
     if args.summary.resolve() == args.figure.resolve():
         parser.error("--summary and --figure must be different paths")
-    cases = read_cases(args.input_csv)
+    if not 1 < args.block_length <= EXPECTED_CASES:
+        parser.error(f"--block-length must be between 2 and {EXPECTED_CASES}")
+    cases = read_cases(args.input_csv, date_column=args.date_column)
     input_sha256 = hashlib.sha256(args.input_csv.read_bytes()).hexdigest()
     summary = summarize(
         cases,
         samples=args.bootstrap_samples,
         seed=args.seed,
+        block_length=args.block_length,
+        date_column=args.date_column,
         input_sha256=input_sha256,
     )
     args.summary.parent.mkdir(parents=True, exist_ok=True)

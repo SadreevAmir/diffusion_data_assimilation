@@ -31,6 +31,13 @@ generator for a richer future compact contract, but it is not executable from
 the currently available table and none of its outputs are cited. Do not join
 tables by row order or synthesize raw case values from aggregate means.
 
+The generator requires an explicit ISO-date column through `--date-column`,
+sorts cases by that column, rejects duplicate or malformed dates, and reports
+both a paired case bootstrap and a paired circular contiguous-block bootstrap.
+The block length is mandatory through `--block-length`, recorded in the JSON
+output, and must be fixed scientifically before inspecting interval results. This
+prevents an arbitrary CSV row order from being treated as temporal adjacency.
+
 ## Required reconciliation checks
 
 Before citing the generated outputs, verify that their case means reproduce the

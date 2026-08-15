@@ -56,7 +56,9 @@ the trusted implementation must first extend an allowlisted analysis contract.
   negative affine-logit finding are recorded consistently.
 - Unsupported paired intervals and improved-case counts are not reconstructed.
 - A guarded artifact generator exists and fails closed when paired raw columns
-  are absent.
+  are absent. It now requires an explicit ISO-date column and predeclared block
+  length, then emits both paired case-bootstrap and circular contiguous-block
+  intervals; malformed or duplicate dates fail closed.
 - Once an admissible compact paired table is returned, the guarded generator,
   claim ledger, result figure and manuscript uncertainty paragraph can be
   updated without accessing raw ensembles.
