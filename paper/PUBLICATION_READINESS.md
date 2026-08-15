@@ -4,8 +4,8 @@ Audit date: 2026-08-15
 
 Publication status: NOT_READY
 
-Required scientific blockers: case/block uncertainty, strong SIC calibration
-baselines, spatial/physical preservation, clean checkpoint and frozen independent
+Required scientific blockers: strong SIC calibration baselines,
+spatial/physical preservation, clean checkpoint and frozen independent
 evaluation
 
 ## Scientific readiness decision
@@ -19,8 +19,9 @@ spread correction does not satisfy the minimum tier frozen in
 The evidence supports a useful mechanism diagnosis: the learned-joint
 ten-member ensemble is globally underdispersed and cross-fitted anomaly scaling
 improves fair CRPS without moving the pre-clipping center. The completed audit
-rejects spatial preservation; uncertainty of the score improvement, comparison
-with strong SIC postprocessors, and independent generalization remain absent.
+rejects spatial preservation. Paired date uncertainty now supports the fair-CRPS
+improvement, and the post-hoc four-date-block sensitivity agrees; comparison
+with strong SIC postprocessors and independent generalization remain absent.
 
 The global scaling is therefore frozen only as a reproducible reference
 and negative mechanism baseline, not as the selected calibrated-ensemble
@@ -37,18 +38,16 @@ mass, mean IIEE worsens by 5.50%, and edge disagreement worsens by 4.41%.
 | Exact deterministic comparison | Background and learned-joint aggregate RMSE/IIEE are available; no independent frozen comparison is claimed | Blocking for the main comparison table |
 | Correct finite-ensemble diagnostics | Fair and ordinary CRPS, spread-skill, four coverage diagnostics and center invariance are reported | Satisfied for the narrow mechanism claim |
 | Strong SIC calibration baselines | Only raw ensemble and a failed affine-logit transform are evaluated | Blocking; at least one boundary-aware distributional baseline and one rank-preserving or conformal baseline are required |
-| Case/block uncertainty | The earlier 40-row spread-only table lacks paired raw fields; the later 160-row joint-audit contract contains `target_date` and `method`. The implemented trusted paired-uncertainty mode has been proposed, but no compact summary has been retrieved | Blocking until the returned date-paired intervals are reconciled; the circular four-date-block interval is a temporal sensitivity, not a predeclared pass/fail gate |
+| Case/block uncertainty | Trusted 40-date paired analysis reports fair-CRPS delta `-0.00280091`, date CI `[-0.00413219, -0.00135419]`, and circular four-date-block CI `[-0.00502644, -0.000290285]`; ordinary-CRPS intervals cross zero | Satisfied for the narrow mechanism claim; the block interval is a post-hoc temporal sensitivity, not a predeclared pass/fail gate |
 | Spatial/physical preservation | The joint audit reports calibrated IIEE, edge, area/extent and variogram diagnostics; the candidate exceeds the IIEE and edge tolerances | Blocking for selection of global scaling, but resolved as an auditable negative mechanism result |
-| Publication figures | A reproducible aggregate mechanism figure is cited; uncertainty and spatial/physical figures remain unavailable | Partial; paired uncertainty and spatial/physical comparisons must be visualized after admissible compact artifacts exist |
+| Publication figures | A reproducible aggregate mechanism figure and manuscript uncertainty table are cited; spatial/physical diagnostics are tabulated | Partial; a claim-led spatial/physical figure is still desirable but no longer blocks truthful reporting of the compact evidence |
 | References and reproducibility | Core scoring and generative-model references plus a guarded reconciliation contract are present | Partial; baseline and sea-ice verification references must accompany the missing experiments |
 
 ## Fastest defensible next evidence
 
-The completed joint audit closes the previous diagnostic unknown and rejects
-global anomaly scaling under the frozen gate. The already proposed trusted CPU
-analysis is the fastest route to paired uncertainty for the four audited fixed
-methods; it requires no new sampling. After that summary, the remaining
-minimum-tier scientific evidence is not another tuning point: it is a
+The completed joint audit rejects global anomaly scaling under the frozen gate,
+and the trusted CPU result closes paired uncertainty without new sampling. The
+remaining minimum-tier scientific evidence is not another tuning point: it is a
 predeclared strong SIC postprocessing comparison containing at least one
 boundary-aware distributional baseline and one rank-preserving or conformal
 baseline. No currently implemented trusted mode provides that baseline family,
@@ -59,12 +58,13 @@ analysis or the joint audit would not change the decision.
 
 - The frozen method, aggregate reconciliation values, clipping caveat and
   negative affine-logit finding are recorded consistently.
-- Unsupported paired intervals and improved-case counts are not reconstructed.
+- Paired intervals and improved-case counts are cited only from the completed
+  trusted compact analysis, never reconstructed from aggregate means.
 - The completed joint-audit schema is now distinguished from the earlier
   spread-only schema: its 160 long-form rows contain `target_date` and `method`
-  for four methods. This makes a server-side paired analysis possible in
-  principle, but does not make an interval available in the publication
-  worktree.
+  for four methods. The completed trusted server analysis uses this contract;
+  its compact intervals are cited without copying the case table into the
+  publication worktree.
 - The guarded artifact generator now accepts the completed 160-row long-form
   contract directly. It pivots exactly named methods by unique ISO
   `target_date`, requires both methods on all 40 dates and the predeclared
@@ -88,9 +88,9 @@ analysis or the joint audit would not change the decision.
 The joint gate decision is complete: global spread scaling is rejected as the
 paper's calibrated-ensemble method. The immediate external scientific boundary
 is implementation and review of a trusted strong-baseline analysis contract.
-The paired date/block CPU analysis of the existing compact audit is implemented
-and already proposed, but its summary has not yet returned; local reconstruction
-is intentionally excluded. The currently implemented modes cannot supply
+The paired date/block CPU analysis of the existing compact audit is complete;
+its compact result has been reconciled into the evidence chain, while local
+reconstruction remains intentionally excluded. The currently implemented modes cannot supply
 boundary-aware distributional and rank-preserving/conformal comparators. The
 frozen independent evaluation
 also remains locked until explicit authorization after the pre-test evidence

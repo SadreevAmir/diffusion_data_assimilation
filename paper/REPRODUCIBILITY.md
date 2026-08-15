@@ -15,13 +15,12 @@ ensembles in the publication worktree.
 - Selection objective: case-mean fair CRPS.
 - Scale grid: `1.0, 1.1, ..., 4.0`.
 - Selected fold scales: `2.6, 2.7, 2.8, 2.8, 2.6`.
-- Paired uncertainty: not reported. The earlier spread-only compact contract
-  lacks raw case-level fields, while the later joint-audit contract contains
-  long-form `target_date`/`method` rows for raw and corrected methods. The
-  implemented trusted mode `validation_existing_calibration_paired_uncertainty`
-  has been proposed with source `joint_existing_ensemble_calibration_audit_valid`,
-  but no server-generated compact summary has been retrieved. Aggregate means
-  are not used to synthesize pairs.
+- Paired uncertainty: completed by trusted mode
+  `validation_existing_calibration_paired_uncertainty` with source
+  `joint_existing_ensemble_calibration_audit_valid`. It pairs all 40 dates and
+  compares raw with all three fixed candidates without reading raw ensembles.
+  The manuscript cites only fields present in its returned compact summary;
+  aggregate means are not used to synthesize pairs.
 
 ## Joint-gate audit trail
 
@@ -50,8 +49,9 @@ spatial diagnostic family. It includes raw and corrected methods, so a trusted
 server analysis can join them by `target_date` and compute paired date-level
 uncertainty plus a circular contiguous four-date-block temporal sensitivity.
 The reviewed CPU mode compares raw with all three fixed candidates and never
-reads raw ensembles. This worktree does not contain the table or a resulting
-compact interval summary; therefore no such result is cited here.
+reads raw ensembles. Its completed compact summary is the authoritative source
+for the paired intervals cited here; the worktree intentionally does not copy
+the per-case table or raw ensembles.
 
 Accordingly, `paper/make_case_level_artifacts.py` is a guarded server-analysis
 generator with two explicit input layouts. Its `--long-form` layout consumes
@@ -96,8 +96,9 @@ trusted aggregate summary to ordinary floating-point tolerance:
 Treat a mismatch larger than `1e-10` in any listed case mean as a provenance or
 schema failure: do not publish the artifact and do not repair it by rounding or
 manual editing. The guarded generator enforces this check before creating its
-output directories or writing JSON/SVG artifacts. No paired interval or
-improved-case count is part of the present evidence package.
+output directories or writing JSON/SVG artifacts. Paired intervals and
+improved-case counts belong to the separately completed trusted compact
+uncertainty package, not to this generator invocation or the aggregate anchors.
 
 ## Scope and audit trail
 

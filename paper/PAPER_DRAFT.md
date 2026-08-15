@@ -21,7 +21,9 @@ date-stratified folds, select one global multiplicative anomaly scale on the
 other 32 dates by fair CRPS, then apply it to the eight held-out dates. Selected
 scales are 2.6, 2.7, 2.8, 2.8 and 2.6. Cross-fitted fair CRPS decreases from
 0.058491 to 0.055690 (4.79%), ordinary CRPS decreases from 0.062108 to 0.061101,
-and spread-skill ratio changes from 0.7241 to 1.0615. The nominal 90% interval
+and spread-skill ratio changes from 0.7241 to 1.0615. The paired fair-CRPS
+change is -0.002801 (date-bootstrap 95% CI -0.004132 to -0.001354; post-hoc
+four-date-block sensitivity -0.005026 to -0.000290). The nominal 90% interval
 diagnostic rises from 0.5051 to 0.8788. The transform preserves the ensemble
 center before bounded-score clipping to numerical precision. These validation
 results support a narrow diagnosis of predominantly global underdispersion. A
@@ -155,9 +157,10 @@ validation-mechanism result rather than an independent generalization result.
 
 The primary deterministic quantity is the generated ensemble mean, which is
 compared with the single 3D-Var analysis. Probabilistic scores apply only to the
-generative and probabilistic baselines. Any future uncertainty interval must
-resample dates or contiguous temporal blocks, never individual pixels. No
-uncertainty interval is available from the current aggregate contract.
+generative and probabilistic baselines. Uncertainty resamples dates, never
+individual pixels. We report a paired date-bootstrap interval and a post-hoc
+circular contiguous four-date-block temporal sensitivity from the trusted
+compact analysis.
 
 The reported baselines are the raw ensemble and the score-optimized affine-logit
 negative baseline. Other distributional and rank-preserving postprocessors were
@@ -217,9 +220,20 @@ from `0.0351291` to `0.0366784` (4.41%), and absolute ice-extent error from
 negative mechanism baseline: it repairs marginal underdispersion by proper
 scores but is not a structure-preserving calibration method.
 
-Figure 1 summarizes this aggregate mechanism result. The dashed references are
-descriptive finite-ensemble targets, not confidence bounds; paired date/block
-intervals remain unavailable from the present compact contract.
+The paired 40-date analysis supports the fair-CRPS reduction: the mean delta is
+`-0.00280091`, with date-bootstrap 95% CI `[-0.00413219, -0.00135419]` and
+post-hoc circular four-date-block CI `[-0.00502644, -0.000290285]`; 33 of 40
+dates improve. The smaller ordinary-CRPS delta (`-0.00100694`) is uncertain:
+its date CI `[-0.00226205, 0.000370390]` and block CI
+`[-0.00304748, 0.00132497]` cross zero. Bounded ensemble-mean RMSE decreases by
+`-0.00271125`, with both intervals below zero, but remains a clipping-affected
+secondary diagnostic. Conversely, mean IIEE worsens by `0.00437938`, and both
+intervals are above zero (date `[0.00206475, 0.00671611]`; block
+`[0.00114932, 0.00784928]`). Thus paired uncertainty sharpens rather than
+reverses the joint-gate decision.
+
+Figure 1 summarizes the aggregate mechanism result. The dashed references are
+descriptive finite-ensemble targets, not confidence bounds.
 
 ![Aggregate proper-score and reliability diagnostics before and after the
 cross-fitted spread correction.](figures/calibration_summary.svg)
@@ -263,13 +277,22 @@ ensemble sizes, regions or observation systems remains unverified.
 | Lag-1 analysis-mean variogram error | 0.000936 | 0.000896 | Improves, but cannot compensate for failed mandatory families |
 | Lag-2 analysis-mean variogram error | 0.002168 | 0.002066 | Improves, but cannot compensate for failed mandatory families |
 
+| Paired diagnostic | Mean delta (corrected - raw) | Date-bootstrap 95% CI | Four-date-block 95% CI |
+|---|---:|---:|---:|
+| Fair CRPS | -0.002801 | [-0.004132, -0.001354] | [-0.005026, -0.000290] |
+| Ordinary CRPS | -0.001007 | [-0.002262, 0.000370] | [-0.003047, 0.001325] |
+| Bounded ensemble-mean RMSE | -0.002711 | [-0.004528, -0.000895] | [-0.005207, -0.000103] |
+| Mean IIEE | 0.004379 | [0.002065, 0.006716] | [0.001149, 0.007849] |
+
+The circular block intervals are an honest post-hoc temporal sensitivity, not
+a predeclared acceptance gate.
+
 The earlier spread-only compact-table contract contains 40 corrected case rows
 without corresponding raw case-level fields. The later joint-audit contract is
 long-form and contains `target_date` and `method` for 160 rows, including raw
-and corrected methods; it can support a trusted server-side paired analysis.
-No such paired uncertainty summary is currently present in the publication
-worktree, so intervals are neither reconstructed from aggregate means nor
-reported. Conditional and independent-period studies are not presented as
+and corrected methods; a trusted server-side paired analysis has now completed.
+The intervals above come from its compact summary and are not reconstructed
+from aggregate means. Conditional and independent-period studies are not presented as
 contributions of this draft. The completed joint audit checks IIEE, ice
 area/extent, edge geometry and variograms; its failed mandatory preservation
 criteria prevent a submission-readiness claim even though the aggregate
