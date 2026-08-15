@@ -7,6 +7,23 @@ Publication status: NOT_READY
 Required scientific blockers: an eligible spatially preserving calibration,
 clean checkpoint and frozen independent evaluation
 
+## Independent package re-audit
+
+The 2026-08-16 independent re-audit checked the manuscript, claim ledger,
+research plan, reproducibility handoff, readiness declaration, both linked SVG
+figures and the local fail-closed checker. It found and corrected two stale
+baseline-inventory statements: the claim ledger still described the evidence
+as if only the hurdle-isotonic/ECC-Q comparator had completed, and the research
+plan still marked zero/one-inflated Beta or EMOS-like postprocessing as missing.
+Both now record the completed, rejected ZOIB-EMOS/ECC-Q result while retaining
+the genuinely missing conformal, probabilistic-DA and independent deterministic
+comparisons. The checker now requires these corrected inventory anchors.
+
+The re-audit does not change the scientific decision. All available trusted
+calibration routes are negative controls, no method passes the common gate, and
+the minimum strong domain/SciML tier still lacks a clean checkpoint and frozen
+independent evaluation. Publication status therefore remains `NOT_READY`.
+
 ## Scientific readiness decision
 
 The validation-set mechanism result and completed joint calibration audit are

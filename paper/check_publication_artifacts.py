@@ -58,11 +58,13 @@ NEXT_BASELINE_ANCHORS = {
     "RESEARCH_PLAN.md": (
         "NEXT_BASELINE_CONTRACT.md",
         "date-balanced ZOIB-EMOS distribution",
+        "ZOIB-EMOS/ECC-Q construction is completed and rejected",
     ),
     "CLAIM_LEDGER.md": (
         "| C28 |",
         "| C29 |",
         "0.0585570",
+        "conformal and probabilistic-DA families",
     ),
     "REPRODUCIBILITY.md": (
         "## Frozen ZOIB-EMOS/ECC-Q handoff",

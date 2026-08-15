@@ -140,13 +140,14 @@ method in those families fails.
 - raw ensemble;
 - physical-space bias/spread scaling;
 - naive affine-logit scaling as a documented failure mode;
-- zero/one-inflated Beta or EMOS-like SIC postprocessing (still missing; the
-  completed hurdle-isotonic method is a distinct negative baseline);
+- zero/one-inflated Beta or EMOS-like SIC postprocessing (the frozen
+  ZOIB-EMOS/ECC-Q construction is completed and rejected by the joint gate);
 - isotonic/quantile mapping (one fixed hurdle-isotonic construction completed
   and rejected by the joint gate);
 - conformal intervals;
-- ECC-Q/ECC-T or rank-preserving reconstruction (ECC-Q completed within the
-  rejected hurdle-isotonic construction; broader coverage remains missing);
+- ECC-Q/ECC-T or rank-preserving reconstruction (ECC-Q completed within both
+  rejected hurdle-isotonic and ZOIB-EMOS constructions; broader dependence-
+  reconstruction coverage remains missing);
 - deterministic background and 3D-Var;
 - probabilistic DA baseline such as EnKF/LETKF when a fair implementation is
   available.
