@@ -80,14 +80,16 @@ The present validation study contributes:
 3. **An auditable sparse-observation protocol.** We record the conditioning
    channels, real footprint geometry, model-to-model observation values, frozen
    checkpoint and deterministic cross-fitting procedure.
-4. **Three complementary negative calibration mechanisms.** We show why
+4. **Four complementary negative calibration mechanisms.** We show why
    score improvement from an affine-logit transform is insufficient when it
    destroys exact boundary mass, and why a fixed purged hurdle-isotonic/ECC-Q
    construction can repair boundary masses and randomized ranks while severely
    degrading proper scores and spatial skill. An exact capped-simplex projection
    then preserves the raw mean and every audited mean-field diagnostic while
    showing that spread-only repair still fails boundary, inner-order and
-   member-spatial criteria.
+   member-spatial criteria. A final fixed open-logit desaturation removes hard
+   upper-cap saturation and repairs the inner-order criterion, but still fails
+   boundary and member-spatial safety.
 
 The methods and gates are frozen from validation evidence. Independent
 evaluation, multi-seed training and broader generalization remain outside the
@@ -279,6 +281,21 @@ absence of a literal exact-one atom is not sufficient evidence of boundary
 safety. This test falsifies the sufficiency of exact mean-preserving spread
 correction while retaining its proper-score and rank mechanism signal.
 
+The final fixed open-logit diagnostic isolates hard upper-cap saturation. It
+inherits the projected candidate's zero mask and frozen transferred scales,
+uses an open-logit member transform, and solves a per-pixel intercept to retain
+the raw ensemble mean. Fair CRPS falls further to `0.055738`; randomized-rank
+discrepancy per point-case falls to `0.011764`, and inner-order attainable-
+coverage error improves from `0.175953` raw and `0.185472` capped to `0.148343`.
+The upper-cap mass is zero and the maximum mean error is `4.57e-16`. This
+candidate nevertheless remains ineligible. Established-ice Brier is `0.059107`
+versus `0.056973` raw, mass above `0.999` is `0.071936` versus `0.010862`, and
+both local- and member-variogram safety families fail. Thus hard-cap removal
+explains the capped method's inner-order failure but is not sufficient for
+boundary-safe, spatially reliable calibration. This was the final fixed
+diagnostic; no transform bounds, zero masks or transferred scales were tuned
+after its result.
+
 Figure 1 summarizes the aggregate mechanism result. The dashed references are
 descriptive finite-ensemble targets, not confidence bounds.
 
@@ -359,6 +376,18 @@ ensemble sizes, regions or observation systems remains unverified.
 | Avoidable exact-one mass | 0.008821 | 0 | Literal exact-one artifact removed |
 | Upper-cap mass | 0 | 0.167438 | Active-cap boundary failure remains |
 | Local variogram score, lag 1 | 0.009100 | 0.009224 | Exceeds the 2% safety tolerance |
+
+| Mean-preserving open-logit diagnostic | Raw ensemble | Candidate | Interpretation |
+|---|---:|---:|---|
+| Fair CRPS | 0.058491 | 0.055738 | 4.71% better; proper-score family passes |
+| Ordinary CRPS | 0.062108 | 0.060424 | Better; proper-score family passes |
+| Ensemble-mean RMSE | 0.190337 | 0.190337 | Exact mean-field invariant |
+| Randomized-rank discrepancy per point-case | 0.079014 | 0.011764 | Reliability criterion passes |
+| Inner-order attainable-coverage error | 0.175953 | 0.148343 | Better than raw and capped projection |
+| Established-ice Brier score | 0.056973 | 0.059107 | Worse beyond 1% tolerance; boundary family fails |
+| Mass above 0.999 | 0.010862 | 0.071936 | Residual near-boundary concentration exceeds raw |
+| Upper-cap mass | 0 | 0 | Hard-cap artifact removed |
+| Local variogram score, lag 1 | 0.009100 | 0.009346 | Exceeds the 2% safety tolerance |
 
 | Paired diagnostic | Mean delta (corrected - raw) | Date-bootstrap 95% CI | Four-date-block 95% CI |
 |---|---:|---:|---:|

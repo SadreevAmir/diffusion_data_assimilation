@@ -39,6 +39,15 @@ exceeded. Thus mean shift is ruled out as the cause of the remaining tradeoff;
 exact mean preservation is not sufficient for a jointly reliable spatial
 ensemble.
 
+The final fixed open-logit diagnostic removes the capped projection's hard
+upper-cap mass and passes proper-score, finite-ensemble reliability,
+mean-field-invariant and operational families. It also improves fair CRPS to
+`0.0557378` and inner-order error to `0.148343`. It is still ineligible:
+established-ice Brier is `0.0591071` versus `0.0569726` raw, mass above `0.999`
+is `0.0719362` versus `0.0108617`, and member-spatial safety fails. Boundary
+and spatial damage therefore persist without a hard cap; the fixed diagnostic
+is closed and no post-hoc tuning is admissible.
+
 ## Minimum-tier gap audit
 
 | Required element | Current evidence | Readiness consequence |
@@ -46,7 +55,7 @@ ensemble.
 | Clean checkpoint and frozen independent evaluation | One legacy checkpoint and reused development dates | Blocking; method may be frozen, but the generalization claim is not tested |
 | Exact deterministic comparison | Background and learned-joint aggregate RMSE/IIEE are available; no independent frozen comparison is claimed | Blocking for the main comparison table |
 | Correct finite-ensemble diagnostics | Fair and ordinary CRPS, spread-skill, four coverage diagnostics and center invariance are reported | Satisfied for the narrow mechanism claim |
-| Strong SIC calibration baselines | Raw, affine-logit, global spread, fixed purged hurdle-isotonic/ECC-Q, and exact mean-preserving projected spread are evaluated; all postprocessors fail at least one mandatory family | Partially resolved: boundary/rank and exact-mean-preservation ablations are now strong negative controls, but they do not complete the zero/one-inflated parametric, conformal or probabilistic-DA baseline tier |
+| Strong SIC calibration baselines | Raw, affine-logit, global spread, fixed purged hurdle-isotonic/ECC-Q, exact mean-preserving projected spread and fixed mean-preserving open-logit desaturation are evaluated; all postprocessors fail at least one mandatory family | Partially resolved: boundary/rank, exact-mean-preservation and hard-cap-removal ablations are strong negative controls, but they do not complete the zero/one-inflated parametric, conformal or probabilistic-DA baseline tier |
 | Case/block uncertainty | Trusted 40-date paired analysis reports fair-CRPS delta `-0.00280091`, date CI `[-0.00413219, -0.00135419]`, and circular four-date-block CI `[-0.00502644, -0.000290285]`; ordinary-CRPS intervals cross zero | Satisfied for the narrow mechanism claim; the block interval is a post-hoc temporal sensitivity, not a predeclared pass/fail gate |
 | Spatial/physical preservation | The joint audit reports calibrated IIEE, edge, area/extent and variogram diagnostics; the candidate exceeds the IIEE and edge tolerances | Blocking for selection of global scaling, but resolved as an auditable negative mechanism result |
 | Publication figures | Reproducible aggregate reliability and joint-gate figures plus manuscript uncertainty and mechanism tables are cited | Satisfied for the present mechanism claims; broader baseline and independent-evaluation figures depend on the blocking evidence |
@@ -64,6 +73,9 @@ therefore broader independent baseline coverage and a candidate that can
 satisfy the no-compensation gate, not another tuning point. No additional
 implemented mode supplies a mechanistically distinct eligible family.
 Repeating completed analyses would not change the decision.
+The final open-logit result additionally rules out hard upper-cap saturation as
+the sole cause of failure. It improves the capped candidate's proper score and
+inner-order reliability but still fails boundary and member-spatial families.
 
 ## Safe autonomous work completed or still possible
 
@@ -92,6 +104,10 @@ Repeating completed analyses would not change the decision.
   manuscript, claim ledger and reproducibility trail. It isolates a robust
   fair-CRPS/rank gain from failed boundary, inner-order and member-spatial
   families without conflating the result with a shifted mean field.
+- The final fixed open-logit result is recorded across manuscript, claim ledger
+  and reproducibility trail. It removes hard upper-cap saturation and passes
+  finite-ensemble reliability, while its failed boundary and member-spatial
+  families close calibration development without post-hoc parameter changes.
 - The claim ledger no longer describes the baseline evidence as raw plus
   affine-logit only, and the manuscript contributions now expose both sides of
   the boundary/rank-versus-spatial tradeoff without treating one failed
@@ -114,7 +130,8 @@ Repeating completed analyses would not change the decision.
 ## External boundary
 
 The joint gate decisions are complete: global spread scaling, purged
-hurdle-isotonic/ECC-Q and exact mean-preserving projected spread are rejected as
+hurdle-isotonic/ECC-Q, exact mean-preserving projected spread and fixed
+open-logit desaturation are rejected as
 the paper's calibrated-ensemble method. The immediate external scientific
 boundary is specification and review of a mechanistically distinct strong-baseline
 contract or authorization of the already frozen independent evaluation; the

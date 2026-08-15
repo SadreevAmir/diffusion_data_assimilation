@@ -64,6 +64,22 @@ rejected sufficiency hypothesis: proper scores and mean-field invariants pass,
 but boundary, inner-order and member-spatial families fail. They must not be
 used to reconstruct case-level pairs.
 
+The final fixed mean-preserving open-logit audit inherits the projected
+candidate's exact zero mask and the frozen transferred modulo-five scales. It
+replaces hard capping by an open-logit member transform and solves a per-pixel
+intercept to preserve the raw ensemble mean; the transferred scales are not
+claimed as cross-fitted optima for this transform family. Reconciliation
+anchors are fair CRPS `0.0557378026`, ordinary CRPS `0.0604237707`,
+ensemble-mean RMSE `0.1903366044`, randomized-rank discrepancy per point-case
+`0.0117638969`, inner-order attainable-coverage error `0.1483434796`,
+established-ice Brier score `0.0591071355`, mass above `0.999`
+`0.0719361803`, upper-logit-clamp mass `5.14e-7`, upper-cap mass `0`, and
+maximum mean error `4.57e-16`. All 40 cases are finite with zero strict
+rank-order violations. The authoritative gate rejects the candidate because
+boundary and member-spatial families fail despite the other four families
+passing. This is the terminal fixed diagnostic; epsilon, transform bounds,
+zero mask and transferred scales must not be tuned after this result.
+
 ## Compact-artifact contract
 
 Two distinct compact contracts must not be conflated. The trusted 40-row
