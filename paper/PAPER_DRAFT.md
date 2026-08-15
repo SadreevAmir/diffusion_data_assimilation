@@ -200,6 +200,19 @@ but clipping can cause this difference and it is not attributed to center-skill
 improvement. The 95% diagnostic remains below its nominal level, so the result
 does not establish complete tail calibration.
 
+Figure 1 summarizes this aggregate mechanism result. The dashed references are
+descriptive finite-ensemble targets, not confidence bounds; paired date/block
+intervals remain unavailable from the present compact contract.
+
+![Aggregate proper-score and reliability diagnostics before and after the
+cross-fitted spread correction.](figures/calibration_summary.svg)
+
+**Figure 1.** Aggregate validation diagnostics for the raw learned-joint
+ensemble and cross-fitted global spread correction. Lower is better for both
+CRPS rows. Coverage and spread-skill references show only the direction of the
+reliability change; they do not establish continuous, casewise or fieldwise
+coverage for a ten-member ensemble.
+
 ## 7. Limitations
 
 The completed evidence uses one legacy checkpoint, one sampling seed, ten

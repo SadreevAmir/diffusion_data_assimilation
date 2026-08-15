@@ -36,7 +36,7 @@ finite-ensemble rank/coverage, boundary-mass and spatial/physical evidence.
 | Strong SIC calibration baselines | Only raw ensemble and a failed affine-logit transform are evaluated | Blocking; at least one boundary-aware distributional baseline and one rank-preserving or conformal baseline are required |
 | Case/block uncertainty | The corrected compact table lacks paired raw fields | Blocking; aggregate means cannot identify paired date-level uncertainty |
 | Spatial/physical preservation | Raw learned-joint IIEE is available, but calibrated IIEE, edge/area/extent or multivariate scores are absent | Blocking; a marginal score gain alone is insufficient |
-| Publication figures | No generated result figure is cited by the manuscript | Blocking; uncertainty and spatial/physical comparisons must be visualized after admissible compact artifacts exist |
+| Publication figures | A reproducible aggregate mechanism figure is cited; uncertainty and spatial/physical figures remain unavailable | Partial; paired uncertainty and spatial/physical comparisons must be visualized after admissible compact artifacts exist |
 | References and reproducibility | Core scoring and generative-model references plus a guarded reconciliation contract are present | Partial; baseline and sea-ice verification references must accompany the missing experiments |
 
 ## Fastest defensible next evidence
@@ -69,6 +69,9 @@ the trusted implementation must first extend an allowlisted analysis contract.
 - Once an admissible compact paired table is returned, the guarded generator,
   claim ledger, result figure and manuscript uncertainty paragraph can be
   updated without accessing raw ensembles.
+- A fail-closed generator for the aggregate CRPS, spread-skill and coverage
+  figure is present and documented; it uses only the trusted one-row summary
+  and does not imply paired uncertainty or spatial preservation.
 
 ## External boundary
 

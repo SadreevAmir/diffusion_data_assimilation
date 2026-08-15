@@ -62,6 +62,20 @@ improved-case count is part of the present evidence package.
 
 ## Scope and audit trail
 
+The aggregate Figure 1 is generated without raw ensembles:
+
+```bash
+python3 paper/make_calibration_summary_figure.py \
+  aggregate_case_mean_metrics.json \
+  paper/figures/calibration_summary.svg
+```
+
+The generator requires a one-row JSON list, `num_cases == 40`, and finite raw
+and corrected values for both CRPS variants, spread-skill and all four interval
+diagnostics. It fails closed on a missing key, changed case count or non-finite
+value. Figure 1 is descriptive: it neither manufactures paired intervals nor
+adds unavailable spatial/physical evidence.
+
 The compact CSV and aggregate JSON retain their trusted manifests outside the
 paper narrative. Venue metadata, author statements and data-release decisions
 remain external inputs.
