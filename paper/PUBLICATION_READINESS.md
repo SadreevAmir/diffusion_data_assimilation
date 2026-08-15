@@ -2,56 +2,69 @@
 
 Audit date: 2026-08-15
 
-Publication status: READY_FOR_HUMAN_REVIEW
+Publication status: NOT_READY
 
-Required scientific blockers: none
+Required scientific blockers: case/block uncertainty, strong SIC calibration
+baselines, spatial/physical preservation, clean checkpoint and frozen independent
+evaluation
 
 ## Scientific readiness decision
 
-The narrow validation-mechanism paper is internally auditable at the aggregate
-case-mean level. The supplied compact-table contract rules out the previously
-planned paired bootstrap because it lacks raw case-level fields; the manuscript
-now states that limitation instead of treating an unavailable display as a
-scientific blocker. Aggregate evidence is sufficient for the deliberately
-narrow mechanism claim, and no additional experiment is required for human
-review.
+The validation-set mechanism result is internally auditable, but it is not a
+submission-ready strong domain/SciML paper. Narrowing the claim to one global
+spread correction does not satisfy the minimum tier frozen in
+`paper/RESEARCH_PLAN.md`. The earlier readiness decision is withdrawn.
 
-## Audit findings
+The existing evidence supports a useful mechanism diagnosis: the learned-joint
+ten-member ensemble is globally underdispersed and cross-fitted anomaly scaling
+improves fair CRPS without moving the pre-clipping center. It does not yet
+support spatial preservation, uncertainty of the score improvement, comparison
+with strong SIC postprocessors, or independent generalization.
 
-- The abstract, results, evidence table, claim ledger, research plan and handoff
-  agree on the selected fold scales and aggregate calibration metrics.
-- `paper/REPRODUCIBILITY.md` freezes the audited compact input contract,
-  expected aggregate reconciliation values and a numeric provenance-failure
-  threshold.
-- The claim is limited to one checkpoint, one seed, 40 development dates and
-  ten members; cross-fitting is not described as independent generalization.
-- The clipping caveat is explicit: the bounded RMSE change is not presented as
-  intrinsic improvement of the pre-clipping ensemble center.
-- The manuscript does not claim deterministic-method superiority, complete
-  tail calibration, conditional calibration or fieldwise coverage.
-- The manuscript contains an aggregate evidence table, scholarly references,
-  data/code availability language and ethics/competing-interests language.
-- No additional CPU or GPU experiment is needed for the present narrow claim.
+## Minimum-tier gap audit
 
-## Honest limitations
+| Required element | Current evidence | Readiness consequence |
+|---|---|---|
+| Clean checkpoint and frozen independent evaluation | One legacy checkpoint and reused development dates | Blocking; method may be frozen, but the generalization claim is not tested |
+| Exact deterministic comparison | Background and learned-joint aggregate RMSE/IIEE are available; no independent frozen comparison is claimed | Blocking for the main comparison table |
+| Correct finite-ensemble diagnostics | Fair and ordinary CRPS, spread-skill, four coverage diagnostics and center invariance are reported | Satisfied for the narrow mechanism claim |
+| Strong SIC calibration baselines | Only raw ensemble and a failed affine-logit transform are evaluated | Blocking; at least one boundary-aware distributional baseline and one rank-preserving or conformal baseline are required |
+| Case/block uncertainty | The corrected compact table lacks paired raw fields | Blocking; aggregate means cannot identify paired date-level uncertainty |
+| Spatial/physical preservation | Raw learned-joint IIEE is available, but calibrated IIEE, edge/area/extent or multivariate scores are absent | Blocking; a marginal score gain alone is insufficient |
+| Publication figures | No generated result figure is cited by the manuscript | Blocking; uncertainty and spatial/physical comparisons must be visualized after admissible compact artifacts exist |
+| References and reproducibility | Core scoring and generative-model references plus a guarded reconciliation contract are present | Partial; baseline and sea-ice verification references must accompany the missing experiments |
 
-- Raw and corrected case-level fields are not jointly available in the compact
-  contract, so paired uncertainty intervals and improved-case counts are not
-  reported or reconstructed.
-- The result is a mechanism study on a reused development period, not an
-  independent temporal generalization estimate.
-- Evidence covers one legacy checkpoint, one sampling seed and a ten-member
-  ensemble; conditional, spatial and fieldwise reliability remain untested.
-- The nominal interval diagnostics are descriptive for the finite ensemble;
-  residual upper-tail undercoverage remains.
+## Fastest defensible next evidence
 
-## External-only actions before submission
+The next server analysis should reuse the existing learned-joint ensemble and
+emit a compact paired date-level table containing both raw and corrected values
+for fair CRPS and physical preservation metrics. Date and contiguous temporal
+block bootstrap intervals must be computed on the server; pixels must never be
+resampled as independent units. The same analysis should evaluate predeclared
+boundary-aware and rank-preserving/conformal baselines if an implemented trusted
+mode supports them.
 
-- Authors must select the target venue/template and supply names, affiliations,
-  funding, final competing-interest declarations, acknowledgements and the
-  approved code/data release location and license.
-- Human reviewers must decide whether the narrow validation-mechanism scope is
-  appropriate for that venue and perform final copy-editing and
-  reference-format checks.
-- Any broader claim requires genuinely independent evidence and a new audited
-  scientific decision; it is not implied by this readiness status.
+The currently implemented cross-fit spread modes do not, by their audited
+compact contract, provide those baselines or paired physical metrics. Repeating
+the same mode would reproduce an already known aggregate result and would not
+close the minimum-tier blockers. A new mode cannot be invented in a proposal;
+the trusted implementation must first extend an allowlisted analysis contract.
+
+## Safe autonomous work completed or still possible
+
+- The frozen method, aggregate reconciliation values, clipping caveat and
+  negative affine-logit finding are recorded consistently.
+- Unsupported paired intervals and improved-case counts are not reconstructed.
+- A guarded artifact generator exists and fails closed when paired raw columns
+  are absent.
+- Once an admissible compact paired table is returned, the guarded generator,
+  claim ledger, result figure and manuscript uncertainty paragraph can be
+  updated without accessing raw ensembles.
+
+## External boundary
+
+The immediate boundary is not editorial review. It is the absence of an
+allowlisted server-analysis contract that can return the required paired
+uncertainty, baseline and spatial/physical evidence from existing ensembles.
+The frozen independent evaluation remains locked until explicit authorization
+after the pre-test evidence package and clean checkpoint are complete.

@@ -24,6 +24,8 @@ Last audited: 2026-08-15.
 | C13 | The frozen correction improves the reported pointwise coverage diagnostics. | Verified validation evidence | 50%: 0.208196 → 0.596277; 80%: 0.471026 → 0.856292; 90%: 0.505084 → 0.878775; 95%: 0.525005 → 0.891464 | These are small-ensemble pointwise diagnostics, not guaranteed continuous, casewise or fieldwise coverage; residual upper-tail undercoverage remains. |
 | C14 | The frozen correction improves ordinary ensemble CRPS. | Verified validation evidence | 0.0621082810 → 0.0611013421 | Ordinary CRPS improves less than fair CRPS and was not the selection objective; report both. |
 | C15 | The available compact corrected-case table supports paired uncertainty against the raw ensemble. | Rejected by artifact contract | The 40-row contract lists corrected metrics but no `raw_*` fields | Aggregate raw and corrected means cannot identify paired case differences; no paired interval or improved-case count is reported. |
+| C16 | The frozen spread correction preserves spatial and physical sea-ice structure. | Unknown; required for minimum publication tier | Raw learned-joint IIEE is available, but the calibrated compact result reports no paired IIEE, edge, area/extent, variogram or spectrum metric | Obtain paired case/block uncertainty for predeclared physical metrics from an allowlisted server analysis; do not infer preservation from marginal CRPS. |
+| C17 | The current baseline set is sufficient for a strong domain/SciML paper. | Rejected by readiness audit | Only the raw ensemble and failed affine-logit postprocessor are evaluated | Add at least one boundary-aware distributional baseline and one rank-preserving or conformal baseline under the same blocked protocol. |
 
 ## Mandatory language discipline
 

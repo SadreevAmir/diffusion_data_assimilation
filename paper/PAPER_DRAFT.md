@@ -1,8 +1,9 @@
 # Reliable Generative Data Assimilation: Finite-Ensemble Calibration under Sparse Spatial Observations
 
-> Validation-mechanism draft. See `CLAIM_LEDGER.md` for provenance and
-> limitations. This document does not report an independent generalization
-> result.
+> Validation-mechanism draft, not a submission-ready paper. See
+> `CLAIM_LEDGER.md` and `PUBLICATION_READINESS.md` for provenance, minimum-tier
+> blockers and limitations. This document does not report an independent
+> generalization result.
 
 ## Abstract
 
@@ -149,12 +150,16 @@ validation-mechanism result rather than an independent generalization result.
 
 The primary deterministic quantity is the generated ensemble mean, which is
 compared with the single 3D-Var analysis. Probabilistic scores apply only to the
-generative and probabilistic baselines. All uncertainty intervals resample
-dates or temporal blocks, never individual pixels.
+generative and probabilistic baselines. Any future uncertainty interval must
+resample dates or contiguous temporal blocks, never individual pixels. No
+uncertainty interval is available from the current aggregate contract.
 
 The reported baselines are the raw ensemble and the score-optimized affine-logit
 negative baseline. Other distributional and rank-preserving postprocessors were
-not evaluated and are not implied by this paper's evidence.
+not evaluated and are not implied by this paper's evidence. This baseline set is
+insufficient for the minimum strong domain/SciML tier; a boundary-aware
+distributional comparator and a rank-preserving or conformal comparator remain
+scientific blockers rather than editorial tasks.
 
 ## 6. Preliminary validation results
 
@@ -225,7 +230,10 @@ The trusted compact-table contract contains 40 corrected case rows but does not
 contain the corresponding raw case-level fields. Consequently, paired
 case-level uncertainty is neither reconstructed from aggregate means nor
 reported. Conditional, spatial and independent-period studies are not presented
-as contributions of this draft.
+as contributions of this draft. In particular, the calibrated ensemble has not
+been checked for preservation of IIEE, ice area/extent, edge geometry,
+variograms or spatial spectra; this prevents a submission-readiness claim even
+though the aggregate marginal mechanism result is valid.
 
 ## Data and code availability
 
