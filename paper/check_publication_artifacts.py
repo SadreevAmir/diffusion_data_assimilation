@@ -65,16 +65,27 @@ NEXT_BASELINE_ANCHORS = {
         "| C28 |",
         "| C29 |",
         "0.0585570",
+        "overall_eligible=false",
+        "only operational validity passes at family level",
         "conformal and probabilistic-DA families",
+    ),
+    "PAPER_DRAFT.md": (
+        "| ZOIB-EMOS/ECC-Q diagnostic | Raw ensemble | Candidate | Interpretation |",
+        "| Ordinary CRPS | 0.062108 | 0.064991 | 4.64% worse |",
+        "| Inner-order attainable-coverage error | 0.175953 | 0.253947 | Reliability family fails |",
+        "| Mean IIEE | 0.079600 | 0.087190 | Spatial/physical family fails |",
     ),
     "REPRODUCIBILITY.md": (
         "## Frozen ZOIB-EMOS/ECC-Q handoff",
         "exactly 13 fitted coefficients",
         "0.0642804809",
+        "Only operational validity passes at family level",
+        "overall_eligible=false",
     ),
     "PUBLICATION_READINESS.md": (
         "No additional implemented mode",
         "0.0585570",
+        "Only operational validity passes at family level",
     ),
 }
 MANUSCRIPT_EVIDENCE_ANCHORS = (
