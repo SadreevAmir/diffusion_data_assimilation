@@ -41,7 +41,7 @@ mass, mean IIEE worsens by 5.50%, and edge disagreement worsens by 4.41%.
 | Case/block uncertainty | Trusted 40-date paired analysis reports fair-CRPS delta `-0.00280091`, date CI `[-0.00413219, -0.00135419]`, and circular four-date-block CI `[-0.00502644, -0.000290285]`; ordinary-CRPS intervals cross zero | Satisfied for the narrow mechanism claim; the block interval is a post-hoc temporal sensitivity, not a predeclared pass/fail gate |
 | Spatial/physical preservation | The joint audit reports calibrated IIEE, edge, area/extent and variogram diagnostics; the candidate exceeds the IIEE and edge tolerances | Blocking for selection of global scaling, but resolved as an auditable negative mechanism result |
 | Publication figures | A reproducible aggregate mechanism figure and manuscript uncertainty table are cited; spatial/physical diagnostics are tabulated | Partial; a claim-led spatial/physical figure is still desirable but no longer blocks truthful reporting of the compact evidence |
-| References and reproducibility | Core scoring and generative-model references plus a guarded reconciliation contract are present | Partial; baseline and sea-ice verification references must accompany the missing experiments |
+| References and reproducibility | Core scoring, ECC and IIEE references plus a guarded reconciliation contract are present | Partial; method-specific references must accompany any still-missing baseline experiments |
 
 ## Fastest defensible next evidence
 
@@ -91,6 +91,9 @@ Repeating completed analyses would not change the decision.
 - A fail-closed generator for the aggregate CRPS, spread-skill and coverage
   figure is present and documented; it uses only the trusted one-row summary
   and does not imply paired uncertainty or spatial preservation.
+- The manuscript now cites the primary ECC and IIEE references at first use;
+  any future baseline family must add its own method-specific citation rather
+  than inheriting authority from these references.
 
 ## External boundary
 

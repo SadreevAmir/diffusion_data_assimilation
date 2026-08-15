@@ -169,7 +169,7 @@ compact analysis.
 
 The reported baselines are the raw ensemble, the score-optimized affine-logit
 negative baseline, cross-fitted global anomaly scaling, and a fixed purged
-hurdle-isotonic bounded distribution reconstructed with ECC-Q. The latter is a
+hurdle-isotonic bounded distribution reconstructed with ECC-Q [5]. The latter is a
 boundary-aware and rank-preserving negative mechanism baseline: it repairs the
 boundary-mass and randomized-rank diagnostics but fails the proper-score and
 spatial/physical families decisively. This single failed construction does not
@@ -221,7 +221,7 @@ the boundary and spatial/physical families do not. Established-ice Brier score
 increases from `0.0569726` to `0.0581999` (2.15%, versus a 1% tolerance).
 Exact-one member mass increases from `0.0090419` to `0.1648321` despite zero
 truth mass, consistent with clipping inflated anomalies at the upper bound.
-Mean IIEE increases from `0.0796004` to `0.0839798` (5.50%), edge disagreement
+Mean IIEE [6] increases from `0.0796004` to `0.0839798` (5.50%), edge disagreement
 from `0.0351291` to `0.0366784` (4.41%), and absolute ice-extent error from
 `0.0461536` to `0.0507921` (10.05%). Global spread correction is therefore a
 negative mechanism baseline: it repairs marginal underdispersion by proper
@@ -359,3 +359,9 @@ competing-interest declarations before submission.
 4. Gneiting, T. & Raftery, A. E. Strictly Proper Scoring Rules, Prediction, and
    Estimation. *Journal of the American Statistical Association* **102**,
    359–378 (2007). doi:10.1198/016214506000001437.
+5. Schefzik, R., Thorarinsdottir, T. L. & Gneiting, T. Uncertainty
+   Quantification in Complex Simulation Models Using Ensemble Copula Coupling.
+   *Statistical Science* **28**, 616–640 (2013). doi:10.1214/13-STS443.
+6. Goessling, H. F., Tietsche, S., Day, J. J., Hawkins, E. & Jung, T.
+   Predictability of the Arctic sea ice edge. *Geophysical Research Letters*
+   **43**, 1642–1650 (2016). doi:10.1002/2015GL067232.
