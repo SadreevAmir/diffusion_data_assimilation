@@ -21,6 +21,11 @@ improves fair CRPS without moving the pre-clipping center. It does not yet
 support spatial preservation, uncertainty of the score improvement, comparison
 with strong SIC postprocessors, or independent generalization.
 
+The global scaling is therefore frozen only as a reproducible reference
+baseline, not as the selected calibrated-ensemble method. The joint stop/go gate
+in `paper/RESEARCH_PLAN.md` now requires simultaneous proper-score,
+finite-ensemble rank/coverage, boundary-mass and spatial/physical evidence.
+
 ## Minimum-tier gap audit
 
 | Required element | Current evidence | Readiness consequence |

@@ -6,20 +6,58 @@ Can a finite ensemble from a conditional diffusion/flow data-assimilation model
 be calibrated for bounded, zero-inflated spatial fields while preserving useful
 joint scenarios and sparse-observation skill?
 
-## Frozen method and completed decision
+## Provisional mechanism result; calibration decision remains open
 
-The paper method is five-fold, deterministic date-stratified cross-fitted global
+The current reference method is five-fold, deterministic date-stratified cross-fitted global
 spread calibration of the learned-joint ensemble. Within each fold, choose one
 scale from `1.0:0.1:4.0` on the other 32 cases by minimum case-mean fair CRPS and
 apply it to eight held-out cases. The member transform is
 `mean + scale * (member - mean)`; clip only for bounded scoring. Selected scales
-are `2.6, 2.7, 2.8, 2.8, 2.6`. This method is frozen.
+are `2.6, 2.7, 2.8, 2.8, 2.6`. Its transform, folds and grid are frozen as a
+reference baseline, but it is not yet accepted as the paper's calibrated
+ensemble method.
 
-Stop/go criteria were met: fair CRPS improves by at least 3% (observed 4.79%),
+The earlier narrow score/coverage gate was met: fair CRPS improves by at least 3% (observed 4.79%),
 ordinary CRPS is at most 0.061526 (observed 0.061101), 90% coverage is within
 0.85–0.94 (observed 0.878775), all selected scales are interior, and pre-clipping
-mean-invariance error is below `1e-10` (observed `4.16e-16`). No further method
-search is justified by the current paper claim.
+mean-invariance error is below `1e-10` (observed `4.16e-16`). That gate diagnoses
+global underdispersion but is insufficient for bounded, zero-inflated SIC, so
+method selection is reopened under the joint gate below.
+
+## Predeclared calibration stop/go gate
+
+All candidates must be evaluated out of fold on the same 40 date-level cases
+and compared pairwise with the raw ensemble and frozen global scaling. A method
+is eligible for the paper only if every mandatory family passes; no weighted
+average may compensate for a failed family.
+
+1. **Proper scores:** case-mean fair CRPS improves by at least 3% over raw and
+   ordinary CRPS is no worse than raw by more than 1%. Report paired date-level
+   and contiguous four-case block 95% intervals; the fair-CRPS interval must not
+   cross zero for a positive calibration claim.
+2. **Finite-ensemble reliability:** randomized-rank histogram with randomized
+   tie handling must reduce a predeclared discrepancy from discrete uniformity
+   by at least 20% versus raw. Report attainable order-statistic coverage and
+   width for `M=10`; each reported central coverage diagnostic must move closer
+   to its finite-ensemble target, with none worsening by more than 0.02.
+3. **Boundary behaviour:** report exact-zero and exact-one member mass and Brier
+   scores for `siconc > 0` and `siconc > 0.15`. Neither Brier score may worsen by
+   more than 1%, and the absolute error in each boundary mass may not increase
+   versus raw. A method that removes an observed boundary atom fails.
+4. **Spatial and physical preservation:** paired case-level IIEE plus ice area,
+   extent and an edge metric are mandatory. Mean IIEE and edge error may worsen
+   by at most 2%; absolute mean area and extent bias may worsen by at most 2% of
+   their raw absolute bias (or by at most 0.1 percentage point of domain area
+   when raw bias is near zero). At least one patchwise variogram or spectral
+   discrepancy must not worsen by more than 2%.
+5. **Operational validity:** all 40 cases must be finite, fold selection must use
+   only the other folds, member identities or raw ranks must be preserved for
+   rank-reconstruction methods, and all thresholds and tie randomization seeds
+   must be fixed before reading candidate summaries.
+
+Failure of any mandatory family rejects a broad "well-calibrated ensemble"
+claim. A method may remain a named mechanism or negative baseline when its
+failure isolates a scientifically useful tradeoff.
 
 ## Correctness status
 
