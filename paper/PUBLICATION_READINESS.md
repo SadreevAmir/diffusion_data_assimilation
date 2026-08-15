@@ -8,9 +8,11 @@ Publication status: NOT_READY_FOR_HUMAN_REVIEW
 
 1. **Case-level uncertainty is absent from the paper package.** The aggregate
    mechanism result is internally consistent, but the draft has no date-level
-   paired uncertainty interval or sensitivity summary. This can be computed
-   from the existing compact per-case table with
-   `paper/make_case_level_artifacts.py`; no new sampling is justified.
+   paired uncertainty interval or sensitivity summary. The compact table is
+   not present in this worktree, so its actual columns have not been audited.
+   `paper/make_case_level_artifacts.py` is executable only if the retrieved CSV
+   contains all eight corrected/raw metric columns listed in
+   `paper/REPRODUCIBILITY.md`. No new sampling is justified.
 2. **Publication displays are incomplete.** The manuscript now contains an
    aggregate evidence table, but no provenance-backed case-level figure or
    frozen figure/table artifact exists in the worktree.
@@ -34,16 +36,24 @@ Publication status: NOT_READY_FOR_HUMAN_REVIEW
   intrinsic improvement of the pre-clipping ensemble center.
 - The manuscript does not claim deterministic-method superiority, complete
   tail calibration, conditional calibration or fieldwise coverage.
-- No additional server experiment is needed to address the current blockers.
+- No additional GPU experiment is needed to address the current blockers. A
+  trusted CPU-only rerun is warranted only if the executor cannot retrieve the
+  already completed run's compact table, or if its audited schema lacks the
+  required paired fields.
 
 ## Fastest defensible closure path
 
-1. Retrieve the existing compact per-case analysis table and run
-   `paper/make_case_level_artifacts.py` to produce a paired case-level
-   uncertainty summary and one compact distribution-of-deltas figure. The
-   generator enforces the frozen 40-case protocol, unique case identifiers when
-   present, finite metric values, deterministic resampling, and records the
-   input SHA-256 digest in the summary.
+1. Retrieve the existing compact per-case analysis table and first inspect its
+   CSV header. Require the eight fields named in `paper/REPRODUCIBILITY.md`.
+   Only if they are present, run `paper/make_case_level_artifacts.py` to produce
+   a paired case-level uncertainty summary and one compact
+   distribution-of-deltas figure. The generator enforces the frozen 40-case
+   protocol, unique case identifiers when present, finite metric values,
+   deterministic resampling, and records the input SHA-256 digest in the
+   summary. If retrieval is unavailable, use the established CPU-only extended
+   analysis mode and request only `per_case_metrics.csv`; if the fields are
+   absent, narrow the manuscript to aggregate evidence rather than synthesizing
+   case-level quantities.
 2. Freeze those outputs in the repository with a small generation script and
    provenance note, then cite them from the Results section.
 3. Add and verify the bibliography and venue-required submission metadata.

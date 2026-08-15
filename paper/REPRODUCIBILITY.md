@@ -20,8 +20,18 @@ cross-fitted spread run; it does not require or permit raw ensembles.
 
 ## Compact-artifact generation
 
-Place the trusted compact table at `paper/artifacts/per_case_metrics.csv`, then
-run:
+The compact table is not currently present in this worktree, and the aggregate
+summary does not establish its row-level schema. Before running the generator,
+inspect the retrieved CSV header and require these exact paired fields:
+
+- `analysis_fair_crps`, `raw_analysis_fair_crps`;
+- `analysis_crps`, `raw_analysis_crps`;
+- `analysis_spread_skill_ratio`, `raw_analysis_spread_skill_ratio`;
+- `analysis_coverage_90`, `raw_analysis_coverage_90`.
+
+Do not claim that local generation is executable until this header check passes.
+If it passes, place the trusted compact table at
+`paper/artifacts/per_case_metrics.csv`, then run:
 
 ```bash
 python3 paper/make_case_level_artifacts.py \
@@ -30,8 +40,9 @@ python3 paper/make_case_level_artifacts.py \
   --figure paper/figures/fair_crps_case_deltas.svg
 ```
 
-The generator rejects an unexpected case count, duplicate case identifiers
-when that column is present, non-finite metrics, and an undersized bootstrap.
+The generator itself repeats the column check and rejects an unexpected case
+count, duplicate case identifiers when that column is present, non-finite
+metrics, and an undersized bootstrap.
 It creates output directories as needed and records the input SHA-256 digest in
 the JSON summary.
 
