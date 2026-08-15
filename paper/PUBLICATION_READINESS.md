@@ -25,6 +25,9 @@ Publication status: NOT_READY_FOR_HUMAN_REVIEW
 
 - The abstract, results, claim ledger, research plan and handoff agree on the
   selected fold scales and all aggregate calibration metrics.
+- `paper/REPRODUCIBILITY.md` freezes the compact input contract, deterministic
+  generation command, expected aggregate reconciliation values and a numeric
+  provenance-failure threshold.
 - The claim is correctly limited to a validation-set mechanism result from one
   checkpoint, one seed, 40 dates and ten members.
 - The clipping caveat is explicit: the bounded RMSE change is not presented as
@@ -37,7 +40,10 @@ Publication status: NOT_READY_FOR_HUMAN_REVIEW
 
 1. Retrieve the existing compact per-case analysis table and run
    `paper/make_case_level_artifacts.py` to produce a paired case-level
-   uncertainty summary and one compact distribution-of-deltas figure.
+   uncertainty summary and one compact distribution-of-deltas figure. The
+   generator enforces the frozen 40-case protocol, unique case identifiers when
+   present, finite metric values, deterministic resampling, and records the
+   input SHA-256 digest in the summary.
 2. Freeze those outputs in the repository with a small generation script and
    provenance note, then cite them from the Results section.
 3. Add and verify the bibliography and venue-required submission metadata.

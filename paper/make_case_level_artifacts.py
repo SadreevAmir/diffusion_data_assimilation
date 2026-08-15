@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
 import math
 import random
@@ -21,6 +22,7 @@ METRICS = (
     "analysis_spread_skill_ratio",
     "analysis_coverage_90",
 )
+EXPECTED_CASES = 40
 
 
 def percentile(values: list[float], probability: float) -> float:
@@ -51,15 +53,30 @@ def read_cases(path: Path) -> list[dict[str, float]]:
         rows = list(csv.DictReader(handle))
     if not rows:
         raise ValueError("input table has no cases")
+    if len(rows) != EXPECTED_CASES:
+        raise ValueError(
+            f"expected {EXPECTED_CASES} cases from the frozen protocol, found {len(rows)}"
+        )
     required = {name for metric in METRICS for name in (metric, f"raw_{metric}")}
     missing = sorted(required - set(rows[0]))
     if missing:
         raise ValueError(f"input table is missing columns: {', '.join(missing)}")
-    return [{name: float(row[name]) for name in required} for row in rows]
+    if "case_index" in rows[0]:
+        case_ids = [row["case_index"] for row in rows]
+        if len(set(case_ids)) != len(case_ids):
+            raise ValueError("case_index values must be unique")
+    cases = [{name: float(row[name]) for name in required} for row in rows]
+    for index, case in enumerate(cases):
+        nonfinite = sorted(name for name, value in case.items() if not math.isfinite(value))
+        if nonfinite:
+            raise ValueError(
+                f"case {index} has non-finite values in: {', '.join(nonfinite)}"
+            )
+    return cases
 
 
 def summarize(
-    cases: list[dict[str, float]], *, samples: int, seed: int
+    cases: list[dict[str, float]], *, samples: int, seed: int, input_sha256: str
 ) -> dict[str, object]:
     metrics: dict[str, object] = {}
     for offset, metric in enumerate(METRICS):
@@ -76,6 +93,8 @@ def summarize(
             "cases_total": len(deltas),
         }
     return {
+        "schema_version": 1,
+        "input_sha256": input_sha256,
         "analysis_unit": "case",
         "interval_method": "paired nonparametric percentile bootstrap over cases",
         "bootstrap_samples": samples,
@@ -120,8 +139,18 @@ def main() -> None:
     args = parser.parse_args()
     if args.bootstrap_samples < 1_000:
         parser.error("--bootstrap-samples must be at least 1000")
+    if args.summary.resolve() == args.figure.resolve():
+        parser.error("--summary and --figure must be different paths")
     cases = read_cases(args.input_csv)
-    summary = summarize(cases, samples=args.bootstrap_samples, seed=args.seed)
+    input_sha256 = hashlib.sha256(args.input_csv.read_bytes()).hexdigest()
+    summary = summarize(
+        cases,
+        samples=args.bootstrap_samples,
+        seed=args.seed,
+        input_sha256=input_sha256,
+    )
+    args.summary.parent.mkdir(parents=True, exist_ok=True)
+    args.figure.parent.mkdir(parents=True, exist_ok=True)
     args.summary.write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
     fair_deltas = [
         case["analysis_fair_crps"] - case["raw_analysis_fair_crps"]

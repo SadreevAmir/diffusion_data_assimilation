@@ -220,5 +220,8 @@ ensemble sizes, regions or observation systems remains unverified.
 | Pre-clipping center error | 0 | 4.16e-16 | Mean preservation holds to numerical precision |
 
 The submission package still requires a compact provenance-backed display of
-case-level score changes and uncertainty across dates. Conditional, spatial and
+case-level score changes and uncertainty across dates. The frozen generator
+resamples cases as paired units and records the compact input table's SHA-256
+digest; its outputs are not reported until they are generated from the trusted
+table and checked against the aggregate means. Conditional, spatial and
 independent-period studies are not presented as contributions of this draft.
