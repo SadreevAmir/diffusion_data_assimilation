@@ -213,7 +213,10 @@ python3 paper/check_publication_artifacts.py
 ```
 
 It requires the manuscript, claim ledger, research plan, reproducibility handoff
-and readiness audit; resolves every manuscript figure within `paper/`; parses
+and readiness audit. It also requires `FROZEN_EVALUATION_HANDOFF.md`, which
+fixes the external preflight inputs, no-retuning rule, no-compensation decision
+contract and compact return package without authorizing the locked run. The
+audit resolves every manuscript figure within `paper/`; parses
 linked SVG files as XML; checks contiguous numbered references; and rejects a
 ready status with nonempty scientific blockers or a not-ready status without
 explicit blockers. It also requires the final fixed diagnostic's fair-CRPS,

@@ -168,6 +168,14 @@ inner-order reliability but still fails boundary and member-spatial families.
 
 ## External boundary
 
+The preflight for this boundary is now explicit in
+`paper/FROZEN_EVALUATION_HANDOFF.md`. It requires controller-attested immutable
+checkpoint, dataset, code and environment identities; an implemented reviewed
+runner; aligned deterministic-comparator cases; frozen seeds; and a single-pass
+evaluation. It also fixes the summary-only return schema and forbids retuning
+after confirmatory evidence. This closes an autonomous reproducibility gap but
+does not constitute authorization or change `NOT_READY`.
+
 The joint gate decisions are complete: global spread scaling, purged
 hurdle-isotonic/ECC-Q, exact mean-preserving projected spread, fixed open-logit
 desaturation and frozen ZOIB-EMOS/ECC-Q are rejected as

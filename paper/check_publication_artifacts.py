@@ -17,6 +17,7 @@ REQUIRED_FILES = (
     "RESEARCH_PLAN.md",
     "PUBLICATION_READINESS.md",
     "NEXT_BASELINE_CONTRACT.md",
+    "FROZEN_EVALUATION_HANDOFF.md",
 )
 FIGURE_PATTERN = re.compile(r"!\[[^]]*\]\(([^)]+)\)")
 REFERENCE_PATTERN = re.compile(r"^(\d+)\. ", re.MULTILINE)
@@ -90,6 +91,15 @@ MANUSCRIPT_EVIDENCE_ANCHORS = (
     "| Paired diagnostic | Mean delta (corrected - raw) | Date-bootstrap 95% CI | Four-date-block 95% CI |",
     "| Mean IIEE | 0.004379 | [0.002065, 0.006716] | [0.001149, 0.007849] |",
 )
+FROZEN_EVALUATION_ANCHORS = (
+    "Status: BLOCKED_PENDING_EXTERNAL_AUTHORIZATION",
+    "immutable checkpoint identity, dataset-manifest digest, code revision",
+    "No calibration family, coefficient, threshold,",
+    "no-compensation families remain those in `RESEARCH_PLAN.md`",
+    "Retrieval defaults to `summary_only`",
+    "`overall_eligible=true`",
+    "every recorded mandatory family is true",
+)
 
 
 def require(condition: bool, message: str) -> None:
@@ -104,6 +114,18 @@ def main() -> int:
     manuscript = (PAPER_DIR / "PAPER_DRAFT.md").read_text(encoding="utf-8")
     claim_ledger = (PAPER_DIR / "CLAIM_LEDGER.md").read_text(encoding="utf-8")
     readiness = (PAPER_DIR / "PUBLICATION_READINESS.md").read_text(encoding="utf-8")
+    frozen_handoff = (PAPER_DIR / "FROZEN_EVALUATION_HANDOFF.md").read_text(
+        encoding="utf-8"
+    )
+
+    missing_handoff_anchors = [
+        anchor for anchor in FROZEN_EVALUATION_ANCHORS if anchor not in frozen_handoff
+    ]
+    require(
+        not missing_handoff_anchors,
+        "frozen evaluation handoff is missing anchors: "
+        + ", ".join(missing_handoff_anchors),
+    )
 
     claim_ids = [int(value) for value in CLAIM_PATTERN.findall(claim_ledger)]
     require(claim_ids, "claim ledger contains no claim rows")
