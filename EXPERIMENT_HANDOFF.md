@@ -1,9 +1,51 @@
 # Experiment handoff: flow matching vs 3D-Var
 
-Last updated: 2026-08-08. This document is the operational source of truth for
+Last updated: 2026-08-15. This document is the operational source of truth for
 continuing the experiment in a new Codex chat. Read it before running anything.
 
-## Current status
+## Superseding publication status
+
+The method-selection stage is complete. The frozen paper method is five-fold
+date-stratified cross-fitted global spread calibration of the existing
+learned-joint ten-member ensemble. Do not resume the older monthly-CFG or
+boundary-aware development plans below unless a manuscript audit identifies a
+specific missing criterion or scoring inconsistency.
+
+Reproducibility protocol:
+
+- input artifact: completed 40-case learned-joint validation ensemble from
+  `joint_full_condition_validation_2022` (`validation_strict_full`);
+- analysis record: `joint_crossfit_spread_calibration_extended_valid` using
+  `validation_existing_ensemble_crossfit_spread_only_extended`;
+- folds: five deterministic date-stratified folds, eight holdout cases each;
+- selection: on the other 32 cases, minimize case-mean fair CRPS over
+  `1.0, 1.1, ..., 4.0`;
+- transform: `mean + scale * (member - mean)`; clip only for bounded scoring;
+- selected fold scales: `2.6, 2.7, 2.8, 2.8, 2.6`;
+- aggregate each metric as the arithmetic mean of per-case metrics over all 40
+  out-of-fold predictions;
+- retain metadata, aggregate metrics and the per-case metrics table; raw
+  ensembles remain server-side.
+
+Exact aggregate result: fair CRPS `0.05849058504420133 →
+0.055689673560032536`; ordinary CRPS `0.06210828098743627 →
+0.06110134210979743`; spread-skill ratio `0.7240662109968337 →
+1.061483512716757`; coverage 50% `0.20819643481300246 →
+0.5962770113288237`, 80% `0.47102565947735264 → 0.8562915064662706`,
+90% `0.5050835783457039 → 0.8787749038797623`, and 95%
+`0.5250046261076958 → 0.8914643172893065`. Pre-clipping mean-invariance error
+is `4.1598668953923836e-16`. Bounded ensemble-mean RMSE changes from
+`0.1903366044319444` to `0.18762535704090777`; because clipping can move the
+bounded mean, this is not an intrinsic mean-skill claim.
+
+The defensible scope is a validation-set mechanism result: global
+underdispersion explains much of this learned-joint ensemble's proper-score
+deficit. It is not an independent generalization estimate, does not prove
+conditional or fieldwise calibration, and does not establish superiority to
+3D-Var. Evidence is limited to one checkpoint, one seed, 40 cases and ten
+members; the 95% diagnostic remains below nominal.
+
+## Historical implementation status
 
 The implementation of the comparison protocol is ready, but the real numerical
 experiment described here has not yet been completed. A synthetic end-to-end
@@ -430,10 +472,10 @@ model-to-model `main_200d` experiment, config
 `config/data/model/var_200d.yaml`, and task
 `3d_var_baseline_var_100_main_200d`.
 
-## Ensemble calibration: designed but not implemented
+## Historical calibration plan (superseded)
 
-The repository currently diagnoses calibration but does not transform the
-ensemble. Do not describe the current results as calibrated.
+This older affine-logit plan is not the frozen paper method. It is retained only
+for provenance and must not be restarted by default.
 
 The proposed future calibration is performed only after monthly CFG weights
 are frozen. On validation-2022, fit bounded logit-space affine mean correction

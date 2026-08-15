@@ -12,20 +12,18 @@ important in practice, where only a small number of members is generated and
 the assimilated field can be bounded and zero-inflated. We study conditional
 flow-based data assimilation for Arctic sea-ice concentration using a dense
 model background and sparse observations under real satellite-track geometry.
-On 40 validation dates, increasing observation-track guidance from 0.5 to
-0.625 reduces ensemble-mean RMSE by 4.34% and empirical ensemble CRPS by 6.52%.
-However, standard affine-logit postprocessing improves cross-validated,
-adaptively reused development CRPS while severely degrading boundary
-reliability because it removes exact
-open-water mass. This exposes two frequently conflated effects: finite-ensemble
-bias in common diagnostics and calibration failure in structured bounded
-outputs. `[HYPOTHESIS]` We develop a boundary-aware, finite-ensemble-aware and
-rank-preserving calibrator that separately treats occurrence, positive
-intensity and spatial dependence. `[PLANNED]` A frozen out-of-year evaluation
-will compare the calibrated generative ensemble with classical postprocessing
-and 3D-Var under an identical model-to-model protocol. The broader goal is to
-turn generative analysis samples into statistically reliable spatial scenarios
-without sacrificing sharpness or physical structure.
+On 40 validation dates, a learned joint-conditioning ensemble improves the
+background ensemble-mean RMSE but is strongly underdispersed. We therefore
+freeze a deliberately simple postprocessing rule: in each of five deterministic
+date-stratified folds, select one global multiplicative anomaly scale on the
+other 32 dates by fair CRPS, then apply it to the eight held-out dates. Selected
+scales are 2.6, 2.7, 2.8, 2.8 and 2.6. Cross-fitted fair CRPS decreases from
+0.058491 to 0.055690 (4.79%), ordinary CRPS decreases from 0.062108 to 0.061101,
+and spread-skill ratio changes from 0.7241 to 1.0615. The nominal 90% interval
+diagnostic rises from 0.5051 to 0.8788. The transform preserves the ensemble
+center before bounded-score clipping to numerical precision. These validation
+results support a narrow diagnosis of predominantly global underdispersion, not
+an independent generalization claim or superiority to a deterministic method.
 
 ## 1. Introduction
 
@@ -63,13 +61,12 @@ score optimization alone does not solve the calibration problem.
 
 The intended contributions are:
 
-1. **Finite-ensemble-aware evaluation.** `[IN PROGRESS]` We distinguish
+1. **Finite-ensemble-aware evaluation.** We distinguish
    empirical-distribution scores from fair ensemble estimators and derive or
    document attainable reliability targets for small ensembles.
-2. **Boundary-aware structured calibration.** `[HYPOTHESIS]` We separately
-   calibrate occurrence and positive intensity, then preserve/reconstruct the
-   raw ensemble's rank dependence instead of applying an unconstrained field
-   correction.
+2. **A mean-preserving global spread correction.** We cross-fit a single
+   multiplicative anomaly scale, preserving member ranks and the pre-clipping
+   ensemble center, and report both ordinary and fair CRPS.
 3. **A locked sparse-observation protocol.** We enforce temporally separated
    development and test years, exact conditioning-channel provenance, a frozen
    model-to-model comparison with 3D-Var, and date-block uncertainty estimates.
@@ -77,8 +74,8 @@ The intended contributions are:
    by season, ice regime, track geometry and distance to observation, as well as
    spatial spectra, edge statistics and multivariate scores.
 
-Only the protocol and preliminary validation evidence are complete at the time
-of this draft. The method and locked test contributions remain hypotheses.
+The method is frozen from validation evidence. Independent evaluation,
+multi-seed training and broader generalization remain outside the present claim.
 
 ## 2. Conditional generative assimilation
 
@@ -117,29 +114,27 @@ sample quantiles therefore must not be interpreted as a literal 90% predictive
 interval without a continuous predictive model or an explicit finite-ensemble
 construction. Randomized ranks provide a more direct exchangeability check.
 
-`[PLANNED]` We formalize the estimands used throughout the paper and report both
-finite-ensemble diagnostics and distribution-level scores where identifiable.
+We report ordinary ensemble CRPS alongside fair CRPS, using the latter as the
+scale-selection objective. Coverage remains a descriptive interval diagnostic
+for the ten-member ensemble rather than a literal continuous-distribution
+guarantee.
 
-## 4. Boundary-aware rank-preserving calibration
+## 4. Cross-fitted global spread calibration
 
-`[HYPOTHESIS]` A useful calibrator for sea-ice concentration should represent:
+For members `x_k` and their pointwise ensemble mean `x_bar`, the frozen method
+forms `x'_k = x_bar + s(x_k - x_bar)`. Values are clipped to `[0,1]` only when
+bounded scores are computed. Five folds are assigned deterministically by date
+strata. For each holdout fold, `s` minimizes daily case-mean fair CRPS on the
+other four folds over the predeclared grid 1.0, 1.1, ..., 4.0. Each fold has 32
+selection dates and eight held-out dates; every reported calibrated case is
+therefore scored out of fold.
 
-1. probability mass at exact open water and, where supported, exact compact ice;
-2. a conditional distribution for values in the interior of the physical range;
-3. dependence across pixels and ensemble members.
-
-The proposed pipeline first learns a regularized occurrence calibrator for
-events such as `x>0` and `x>0.15`. It then learns a monotone conditional map for
-positive concentration. Parameters use hierarchical shrinkage across month,
-distance to observations, track density and ice regime. Calibrated marginal
-quantiles are assigned according to raw member ranks, retaining an empirical
-copula in the spirit of ensemble copula coupling. A temporal-block conformal
-layer is considered only for explicitly stated coverage targets.
-
-The method is selected under a predeclared constrained objective: fair CRPS is
-the primary score; calibration error and boundary mass are constraints;
-variogram distortion, spatial spectra and physical edge statistics are
-guardrails. A method that improves CRPS while violating reliability is rejected.
+The selected scales (2.6, 2.7, 2.8, 2.8 and 2.6) are interior and stable across
+folds. This supports the mechanism interpretation that the learned-joint
+ensemble's proper-score deficit is largely a global spread error. Because
+clipping can move the bounded ensemble mean, any post-clipping RMSE change is a
+secondary numerical consequence, not evidence that the method improves the
+unclipped center.
 
 ## 5. Experimental protocol
 
@@ -185,13 +180,30 @@ targets for these interval statistics require correction, the transformation's
 boundary failure is unambiguous. Repeated refinement on the same 40 dates also
 makes the final blocked estimate meta-adaptive rather than locked.
 
+For the learned-joint ensemble, five-fold cross-fitted global spread calibration
+selects scales `2.6, 2.7, 2.8, 2.8, 2.6`. Fair CRPS changes from `0.0584905850`
+to `0.0556896736`, a `4.79%` reduction, while ordinary CRPS changes from
+`0.0621082810` to `0.0611013421`. Spread-skill ratio changes from `0.724066` to
+`1.061484`. Coverage diagnostics change from `0.208196` to `0.596277` (50%),
+`0.471026` to `0.856292` (80%), `0.505084` to `0.878775` (90%), and `0.525005`
+to `0.891464` (95%). The maximum pre-clipping mean-invariance error is
+`4.16e-16`. Bounded ensemble-mean RMSE changes from `0.1903366` to `0.1876254`,
+but clipping can cause this difference and it is not attributed to center-skill
+improvement. The 95% diagnostic remains below its nominal level, so the result
+does not establish complete tail calibration.
+
 ## 7. Limitations
 
 The completed evidence uses one legacy checkpoint, one sampling seed, ten
-members and 40 development dates. The observation values are M2M truth sampled
-under real satellite geometry, not direct satellite SIC retrievals. No locked
-test or exact numerical comparison with 3D-Var is reported yet. The proposed
-calibrator and generalization beyond Arctic sea ice remain unverified.
+members and 40 development dates. Scale selection and evaluation are separated
+case-wise by cross-fitting, but both reuse the same limited development period;
+the result is therefore not an independent temporal generalization estimate.
+The observation values are M2M truth sampled under real satellite geometry, not
+direct satellite SIC retrievals. Coverage is aggregated pointwise and does not
+establish casewise or fieldwise coverage. Clipping complicates bounded mean
+comparisons, and residual upper-tail undercoverage remains. No independent
+comparison with 3D-Var is claimed. Generalization across checkpoints, seeds,
+ensemble sizes, regions or observation systems remains unverified.
 
 ## 8. Planned figures and tables
 

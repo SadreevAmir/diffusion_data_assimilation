@@ -3,7 +3,7 @@
 This ledger separates immutable evidence from hypotheses and planned results.
 Every manuscript claim must point to a row here before it is strengthened.
 
-Last audited: 2026-08-13.
+Last audited: 2026-08-15.
 
 ## Evidence status
 
@@ -16,9 +16,13 @@ Last audited: 2026-08-13.
 | C5 | The raw finite ensemble exhibits nonuniform randomized ranks and insufficient dispersion. | Supported preliminary evidence | M=10 saved ensembles; extreme ranks and spread diagnostics | Naive nominal coverage and raw spread-skill targets are finite-ensemble biased and must not be compared directly with 0.9 and 1.0. |
 | C6 | Blocked affine-logit postprocessing improves held-out empirical CRPS and ensemble-mean RMSE. | Verified for the searched validation protocol | CRPS 0.06609 → 0.06092; RMSE 0.20366 → 0.19428 | Repeated grid adaptation used the same 40 dates; final performance is meta-adapted. It is not a locked estimate. |
 | C7 | The affine-logit result is a calibrated ensemble. | Rejected | Out-of-fold transforms change the nominal 90% interval diagnostic from 0.646 to 0.367 and member-range coverage from 0.722 to 0.396; truth is exactly zero on 53.6% of evaluated pixels, raw members on 24.6%, and calibrated members on 0% | Finite-M targets still require correction, but the direction and zero-mass failure are unambiguous. Call this score-optimized postprocessing or a negative baseline. |
-| C8 | Finite-ensemble-aware, boundary-aware calibration can improve reliability without destroying spatial dependence. | Central hypothesis, unverified | Motivated by current failure mode and classical ensemble postprocessing | Requires a new method, frozen nested protocol, strong baselines and spatial diagnostics. |
-| C9 | The proposed method outperforms 3D-Var on test-2023. | Unknown and locked | No admissible final artifact | Freeze the complete method first; open the 200-day test once after explicit approval. |
+| C8 | Finite-ensemble-aware, boundary-aware calibration can improve reliability without destroying spatial dependence. | Future-work hypothesis, unverified | Motivated by the affine-logit failure mode and classical ensemble postprocessing | Not part of the frozen method or current claim; would require a new nested protocol, strong baselines and spatial diagnostics. |
+| C9 | The frozen global-spread method outperforms 3D-Var on the independent evaluation period. | Unknown and outside current scope | No admissible final artifact | Do not infer deterministic-method superiority from the present validation calibration result. |
 | C10 | The method generalizes beyond sea ice and one flow checkpoint. | Unknown | No evidence | Add clean retraining seeds, another generative backbone and at least one public structured benchmark. |
+| C11 | The learned-joint ten-member ensemble is globally underdispersed on the 40-date validation set, and a mean-preserving global anomaly scale removes most of its proper-score deficit. | Supported validation mechanism claim | Five-fold date-stratified cross-fit; scales 2.6, 2.7, 2.8, 2.8, 2.6; fair CRPS 0.0584905850 → 0.0556896736 (4.79%); spread-skill 0.724066 → 1.061484 | One checkpoint, one seed and one 40-date development period. “Principally global” is supported; universal or conditional calibration is not. |
+| C12 | The frozen spread correction preserves the ensemble center before clipping. | Verified numerically and algebraically | `x_bar + s(x_k-x_bar)`; maximum reported pre-clipping invariance error 4.16e-16 | Bounded scoring clips members; bounded RMSE 0.1903366 → 0.1876254 must not be called an intrinsic center-skill gain. |
+| C13 | The frozen correction improves the reported pointwise coverage diagnostics. | Verified validation evidence | 50%: 0.208196 → 0.596277; 80%: 0.471026 → 0.856292; 90%: 0.505084 → 0.878775; 95%: 0.525005 → 0.891464 | These are small-ensemble pointwise diagnostics, not guaranteed continuous, casewise or fieldwise coverage; residual upper-tail undercoverage remains. |
+| C14 | The frozen correction improves ordinary ensemble CRPS. | Verified validation evidence | 0.0621082810 → 0.0611013421 | Ordinary CRPS improves less than fair CRPS and was not the selection objective; report both. |
 
 ## Mandatory language discipline
 
@@ -26,4 +30,6 @@ Last audited: 2026-08-13.
 - Say **empirical ensemble CRPS** until fair finite-ensemble CRPS is reported.
 - Say **nominal quantile interval diagnostic** for the current M=10 coverage values.
 - Say **score-optimized affine postprocessing**, not calibration, for the current logit result.
+- Say **cross-fitted global spread calibration on the validation set**, not independently validated calibration.
+- Attribute the fair-CRPS and coverage gains to dispersion correction; do not attribute the bounded RMSE change to an unclipped mean shift.
 - Never state superiority to 3D-Var or test-year performance before the locked run.
