@@ -3,7 +3,7 @@
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Bash|shell_command|exec_command|apply_patch|Edit|Write|Agent|spawn_agent",
+        "matcher": "Bash|shell_command|exec_command|apply_patch|Edit|Write|Read|read_file|Agent|spawn_agent",
         "hooks": [
           {
             "type": "command",
