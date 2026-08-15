@@ -126,6 +126,10 @@ inner-order reliability but still fails boundary and member-spatial families.
 - The manuscript now cites the primary ECC and IIEE references at first use;
   any future baseline family must add its own method-specific citation rather
   than inheriting authority from these references.
+- A local fail-closed publication audit now checks required paper files,
+  manuscript figure links, SVG parseability, contiguous numbered references and
+  consistency between publication status and the blocker declaration. This is
+  an integrity check and does not relax any scientific blocker.
 
 ## External boundary
 

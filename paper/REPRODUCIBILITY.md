@@ -181,3 +181,15 @@ of the trusted summary and can be regenerated only after these checks pass.
 The compact CSV and aggregate JSON retain their trusted manifests outside the
 paper narrative. Venue metadata, author statements and data-release decisions
 remain external inputs.
+
+The publication package itself has a local fail-closed integrity audit:
+
+```bash
+python3 paper/check_publication_artifacts.py
+```
+
+It requires the manuscript, claim ledger, research plan, reproducibility handoff
+and readiness audit; resolves every manuscript figure within `paper/`; parses
+linked SVG files as XML; checks contiguous numbered references; and rejects a
+ready status with nonempty scientific blockers or a not-ready status without
+explicit blockers. It validates package integrity, not scientific eligibility.
