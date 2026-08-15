@@ -151,6 +151,12 @@ method in those families fails.
 - probabilistic DA baseline such as EnKF/LETKF when a fair implementation is
   available.
 
+The next baseline is now design-frozen in `NEXT_BASELINE_CONTRACT.md`: a pooled,
+date-balanced ZOIB-EMOS distribution with purged contiguous cross-fitting and
+ECC-Q reconstruction. Its optimizer, predictors, folds, seeds, reconstruction
+and joint no-compensation interpretation are fixed before execution. It is not
+yet runnable because no reviewed trusted-executor mode implements the contract.
+
 ## Evaluation
 
 Marginal and finite-ensemble:
