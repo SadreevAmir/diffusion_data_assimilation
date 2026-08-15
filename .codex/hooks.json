@@ -1,0 +1,17 @@
+{
+  "description": "Hard boundary for the v2 disposable scientific worktree.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|shell_command|exec_command|apply_patch|Edit|Write|Agent|spawn_agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/amir/sciml/diffusion_autoresearch_v2/.venv/bin/python -m autoresearch_agent.guard",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
