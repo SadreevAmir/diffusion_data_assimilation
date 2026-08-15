@@ -21,6 +21,7 @@ REQUIRED_FILES = (
 )
 FIGURE_PATTERN = re.compile(r"!\[[^]]*\]\(([^)]+)\)")
 REFERENCE_PATTERN = re.compile(r"^(\d+)\. ", re.MULTILINE)
+CITATION_PATTERN = re.compile(r"\[([1-9]\d*(?:\s*,\s*[1-9]\d*)*)\]")
 CLAIM_PATTERN = re.compile(r"^\| C(\d+) \|", re.MULTILINE)
 FINAL_DIAGNOSTIC_ANCHORS = {
     "PAPER_DRAFT.md": (
@@ -193,6 +194,19 @@ def main() -> int:
         references == list(range(1, len(references) + 1)),
         "numbered references are not contiguous from 1",
     )
+    manuscript_body = manuscript.split(reference_heading, maxsplit=1)[0]
+    cited_references = {
+        int(value)
+        for citation in CITATION_PATTERN.findall(manuscript_body)
+        for value in re.split(r"\s*,\s*", citation)
+    }
+    require(
+        cited_references == set(references),
+        "reference/citation mismatch: cited="
+        + ",".join(map(str, sorted(cited_references)))
+        + "; listed="
+        + ",".join(map(str, references)),
+    )
 
     status_lines = re.findall(r"^Publication status: (\S+)$", readiness, re.MULTILINE)
     blocker_lines = re.findall(
@@ -208,8 +222,16 @@ def main() -> int:
     )
     if status == "READY_FOR_HUMAN_REVIEW":
         require(blockers == "none", "ready status requires no scientific blockers")
+        require(
+            "Status: BLOCKED_PENDING_EXTERNAL_AUTHORIZATION" not in frozen_handoff,
+            "ready status contradicts blocked frozen evaluation handoff",
+        )
     else:
         require(blockers != "none", "not-ready status requires explicit scientific blockers")
+        require(
+            "Status: BLOCKED_PENDING_EXTERNAL_AUTHORIZATION" in frozen_handoff,
+            "not-ready status requires the blocked frozen evaluation handoff",
+        )
 
     print(
         f"publication artifact audit passed: {len(REQUIRED_FILES)} files, "

@@ -160,11 +160,13 @@ inner-order reliability but still fails boundary and member-spatial families.
   than inheriting authority from these references.
 - A local fail-closed publication audit now checks required paper files,
   manuscript figure links, SVG parseability, contiguous numbered references and
-  consistency between publication status and the blocker declaration. It also
-  requires unique contiguous claim-ledger IDs and the decision-bearing rows of
-  all five manuscript evidence tables, so dropping a negative mechanism result
-  cannot silently leave the narrative intact. This is an integrity check and
-  does not relax any scientific blocker.
+  complete use of every listed reference. It requires consistency among
+  publication status, the blocker declaration and the frozen-evaluation handoff,
+  as well as unique contiguous claim-ledger IDs and the decision-bearing rows of
+  all five manuscript evidence tables. Dropping a citation, negative mechanism
+  result or active external boundary therefore cannot silently leave the
+  narrative intact. This is an integrity check and does not relax any scientific
+  blocker.
 
 ## External boundary
 
