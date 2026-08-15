@@ -19,6 +19,34 @@ REQUIRED_FILES = (
 )
 FIGURE_PATTERN = re.compile(r"!\[[^]]*\]\(([^)]+)\)")
 REFERENCE_PATTERN = re.compile(r"^(\d+)\. ", re.MULTILINE)
+FINAL_DIAGNOSTIC_ANCHORS = {
+    "PAPER_DRAFT.md": (
+        "0.055738",
+        "0.059107",
+        "0.071936",
+        "final fixed open-logit diagnostic",
+    ),
+    "CLAIM_LEDGER.md": (
+        "| C26 |",
+        "| C27 |",
+        "0.0557378",
+        "0.0591071",
+        "0.0719362",
+        "No post-hoc tuning follows.",
+    ),
+    "REPRODUCIBILITY.md": (
+        "0.0557378026",
+        "0.0591071355",
+        "0.0719361803",
+        "must not be tuned after this result",
+    ),
+    "PUBLICATION_READINESS.md": (
+        "0.0557378",
+        "0.0591071",
+        "0.0719362",
+        "no post-hoc tuning is admissible",
+    ),
+}
 
 
 def require(condition: bool, message: str) -> None:
@@ -32,6 +60,15 @@ def main() -> int:
 
     manuscript = (PAPER_DIR / "PAPER_DRAFT.md").read_text(encoding="utf-8")
     readiness = (PAPER_DIR / "PUBLICATION_READINESS.md").read_text(encoding="utf-8")
+
+    for name, anchors in FINAL_DIAGNOSTIC_ANCHORS.items():
+        document = (PAPER_DIR / name).read_text(encoding="utf-8")
+        missing_anchors = [anchor for anchor in anchors if anchor not in document]
+        require(
+            not missing_anchors,
+            f"{name} is missing final-diagnostic anchors: "
+            + ", ".join(missing_anchors),
+        )
 
     figures = FIGURE_PATTERN.findall(manuscript)
     require(figures, "manuscript contains no linked figures")
