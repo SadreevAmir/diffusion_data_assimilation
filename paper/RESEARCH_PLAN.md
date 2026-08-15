@@ -46,6 +46,17 @@ spatial structure. It counts as a strong negative mechanism baseline, not as an
 eligible calibrated ensemble and not as exhaustive coverage of the required
 baseline families.
 
+A targeted exact capped-simplex projection has now tested whether the frozen
+spread signal can be retained while preserving the raw ensemble mean exactly.
+It passes proper scores, all mean-field invariants and operational validity:
+fair CRPS improves from `0.0584906` to `0.0563001`, with both paired date and
+four-case-block intervals excluding zero, while maximum mean error is
+`3.87e-16`. It nevertheless fails boundary, finite-ensemble reliability and
+member-spatial safety. Upper-cap mass reaches `0.167438`, established-ice Brier
+worsens, inner-order error does not improve and local/member variogram
+tolerances fail. This rejects spread-only correction even under exact mean
+preservation and localizes the unresolved mechanism beyond mean-field shift.
+
 ## Predeclared calibration stop/go gate
 
 All candidates must be evaluated out of fold on the same 40 date-level cases

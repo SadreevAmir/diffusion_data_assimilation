@@ -3,7 +3,7 @@
 This ledger separates immutable evidence from hypotheses and planned results.
 Every manuscript claim must point to a row here before it is strengthened.
 
-Last audited: 2026-08-15.
+Last audited: 2026-08-16.
 
 ## Evidence status
 
@@ -31,6 +31,9 @@ Last audited: 2026-08-15.
 | C20 | Cross-fitted global anomaly scaling is the selected calibrated-ensemble method. | Rejected by the joint stop/go rule | Fair-CRPS improvement is date-paired and robust to the post-hoc four-date-block sensitivity, but boundary and spatial/physical mandatory families fail; paired mean IIEE worsens by `0.00437938`, with date CI `[0.00206475, 0.00671611]` and block CI `[0.00114932, 0.00784928]` | Retain it as a reproducible underdispersion correction and negative calibration baseline; statistical support for one proper-score gain cannot compensate for physical-structure failure. |
 | C21 | Purged hurdle isotonic bounded calibration with ECC-Q repairs boundary masses and rank reliability without sacrificing proper-score or spatial skill. | Rejected by the fixed joint gate | Versus raw, exact-zero mass error decreases by `0.274685`, exact-one mass error by `0.00904188`, and randomized-rank discrepancy by `0.0800337`; however fair CRPS worsens by `0.0270909` (date CI `[0.0217315, 0.0321109]`), RMSE by `0.0780843`, IIEE by `0.103785`, and edge disagreement by `0.270714` | This is a strong negative boundary-aware, rank-preserving mechanism baseline. It shows that marginal boundary/rank repair by this fixed purged hurdle-IDR/ECC-Q construction is insufficient for useful spatial calibration. |
 | C22 | The paper has now evaluated a boundary-aware distributional and rank-preserving comparator under the common joint gate. | Verified validation evidence | Five contiguous eight-date holdouts with a three-case purge; fixed hurdle isotonic bounded distribution; ten-member ECC-Q reconstruction; all 40 cases finite and zero rank-order violations | One failed fixed construction does not exhaust zero/one-inflated distributional, conformal or probabilistic-DA baselines, and it does not satisfy the minimum baseline tier by itself. |
+| C23 | Exact capped-simplex projection can preserve the raw ensemble mean and all audited mean-field diagnostics while retaining most of the fair-CRPS benefit of frozen spread inflation. | Supported validation mechanism claim | Maximum mean error `3.87e-16`; RMSE, IIEE, edge, area/extent and mean-field variograms equal raw; fair CRPS `0.0584906` → `0.0563001`, paired delta `-0.00219049`, date CI `[-0.00297734, -0.00139088]`, four-case-block CI `[-0.00340517, -0.000862635]` | One checkpoint and one development period. This isolates mean preservation as insufficient; it does not establish an eligible calibrated ensemble. |
+| C24 | Mean-preserving projected spread passes the common no-compensation gate. | Rejected by the fixed joint gate | `overall_eligible=false`: boundary, finite-ensemble reliability and member-spatial families fail despite proper-score, mean-field-invariant and operational families passing | Upper-cap mass is `0.167438`; established-ice Brier score worsens from `0.0569726` to `0.0596499`; inner-order error is not reduced; local and member variogram tolerances fail. |
+| C25 | Avoiding an exact-one atom is sufficient to make bounded spread inflation boundary-safe. | Rejected by the projected-spread audit | Avoidable exact-one mass falls from `0.00882086` to `0` and exact-one mass to the forced value `0.000221025`, but upper-cap mass rises from `0` to `0.167438` and the established-ice Brier criterion fails | Exact-one output mass and active upper-cap constraints are distinct diagnostics; reporting only the former would conceal the boundary failure. |
 
 ## Mandatory language discipline
 

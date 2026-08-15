@@ -80,15 +80,18 @@ The present validation study contributes:
 3. **An auditable sparse-observation protocol.** We record the conditioning
    channels, real footprint geometry, model-to-model observation values, frozen
    checkpoint and deterministic cross-fitting procedure.
-4. **Two complementary negative calibration mechanisms.** We show why
+4. **Three complementary negative calibration mechanisms.** We show why
    score improvement from an affine-logit transform is insufficient when it
    destroys exact boundary mass, and why a fixed purged hurdle-isotonic/ECC-Q
    construction can repair boundary masses and randomized ranks while severely
-   degrading proper scores and spatial skill.
+   degrading proper scores and spatial skill. An exact capped-simplex projection
+   then preserves the raw mean and every audited mean-field diagnostic while
+   showing that spread-only repair still fails boundary, inner-order and
+   member-spatial criteria.
 
 The methods and gates are frozen from validation evidence. Independent
 evaluation, multi-seed training and broader generalization remain outside the
-present claim. The two negative constructions do not exhaust the strong
+present claim. These negative constructions do not exhaust the strong
 distributional, conformal or probabilistic-DA baseline families required for a
 submission-ready comparison.
 
@@ -176,6 +179,11 @@ spatial/physical families decisively. This single failed construction does not
 exhaust strong SIC distributional, conformal or probabilistic-DA baselines, so
 the minimum strong domain/SciML baseline tier remains incomplete.
 
+We additionally evaluate the frozen cross-fitted scales followed by an exact
+capped-simplex projection of each ten-member pixel distribution. The projection
+preserves the raw ensemble mean while enforcing bounded members and preserving
+strict rank order. It is a targeted mechanism test, not a newly tuned method.
+
 ## 6. Preliminary validation results
 
 On the same 40 validation dates with ten generated members, changing the
@@ -256,6 +264,21 @@ ECC-Q can jointly repair reliability and preserve spatial skill. It remains a
 high-value negative ablation because it separates successful boundary/rank
 repair from severe loss of conditional interior and spatial fidelity.
 
+The mean-preserving capped-simplex mechanism removes center shift as an
+explanation for the global-spread tradeoff. All 40 cases complete, the maximum
+mean error is `3.87e-16`, and bounded ensemble-mean RMSE, mean IIEE, edge,
+area/extent and mean-field variograms equal raw. Fair CRPS falls from
+`0.058491` to `0.056300` (3.75%); the paired delta is `-0.00219049`, with
+date-bootstrap 95% CI `[-0.00297734, -0.00139088]` and post-hoc four-case-block
+CI `[-0.00340517, -0.000862635]`. Randomized-rank discrepancy and member-range
+error also improve. Nevertheless, `overall_eligible=false`: inner-order error
+does not improve, established-ice Brier score rises from `0.056973` to
+`0.059650`, and local/member variogram tolerances fail. Although avoidable
+exact-one mass is eliminated, upper-cap mass reaches `0.167438`; therefore
+absence of a literal exact-one atom is not sufficient evidence of boundary
+safety. This test falsifies the sufficiency of exact mean-preserving spread
+correction while retaining its proper-score and rank mechanism signal.
+
 Figure 1 summarizes the aggregate mechanism result. The dashed references are
 descriptive finite-ensemble targets, not confidence bounds.
 
@@ -311,6 +334,18 @@ ensemble sizes, regions or observation systems remains unverified.
 | Mean IIEE | 0.079600 | 0.183385 | 130% worse; spatial/physical family fails |
 | Edge disagreement | 0.035129 | 0.305843 | 771% worse |
 | Energy-score RMS | 0.145718 | 0.197985 | 35.9% worse |
+
+| Mean-preserving projected-spread diagnostic | Raw ensemble | Candidate | Interpretation |
+|---|---:|---:|---|
+| Fair CRPS | 0.058491 | 0.056300 | 3.75% better; date and block intervals exclude zero |
+| Ordinary CRPS | 0.062108 | 0.061071 | Date interval excludes zero; block interval crosses zero |
+| Ensemble-mean RMSE | 0.190337 | 0.190337 | Exact mean-field invariant |
+| Mean IIEE | 0.079600 | 0.079600 | Exact mean-field invariant |
+| Randomized-rank discrepancy per point-case | 0.079014 | 0.014813 | Reliability signal improves |
+| Established-ice Brier score | 0.056973 | 0.059650 | Worse; boundary family fails |
+| Avoidable exact-one mass | 0.008821 | 0 | Literal exact-one artifact removed |
+| Upper-cap mass | 0 | 0.167438 | Active-cap boundary failure remains |
+| Local variogram score, lag 1 | 0.009100 | 0.009224 | Exceeds the 2% safety tolerance |
 
 | Paired diagnostic | Mean delta (corrected - raw) | Date-bootstrap 95% CI | Four-date-block 95% CI |
 |---|---:|---:|---:|

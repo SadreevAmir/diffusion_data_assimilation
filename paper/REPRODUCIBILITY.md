@@ -50,6 +50,20 @@ non-overlapping four-case-block intervals; the latter remains a post-hoc
 temporal sensitivity. These anchors document a rejected method and must not be
 used to reconstruct case-level pairs.
 
+The mean-preserving projected-spread audit also reuses the same 40 server-side
+ensembles and the already frozen cross-fitted scales. For each ten-member pixel
+distribution it applies an exact capped-simplex projection with no runtime
+tuning parameters. Reconciliation anchors are fair CRPS `0.0563000911`,
+ordinary CRPS `0.0610710199`, ensemble-mean RMSE `0.1903366044`, mean IIEE
+`0.0796004071`, randomized-rank discrepancy per point-case `0.0148130296`,
+established-ice Brier score `0.0596498653`, avoidable exact-one mass `0`,
+upper-cap mass `0.1674381130`, and maximum mean error `3.87e-16`. The trusted
+summary reports fair-CRPS date CI `[-0.00297734, -0.00139088]` and non-overlap
+four-case-block CI `[-0.00340517, -0.000862635]`. These anchors support a
+rejected sufficiency hypothesis: proper scores and mean-field invariants pass,
+but boundary, inner-order and member-spatial families fail. They must not be
+used to reconstruct case-level pairs.
+
 ## Compact-artifact contract
 
 Two distinct compact contracts must not be conflated. The trusted 40-row
