@@ -80,12 +80,17 @@ The present validation study contributes:
 3. **An auditable sparse-observation protocol.** We record the conditioning
    channels, real footprint geometry, model-to-model observation values, frozen
    checkpoint and deterministic cross-fitting procedure.
-4. **A documented negative baseline.** We show why score improvement from an
-   affine-logit transform is insufficient when it destroys exact boundary mass
-   and worsens interval diagnostics.
+4. **Two complementary negative calibration mechanisms.** We show why
+   score improvement from an affine-logit transform is insufficient when it
+   destroys exact boundary mass, and why a fixed purged hurdle-isotonic/ECC-Q
+   construction can repair boundary masses and randomized ranks while severely
+   degrading proper scores and spatial skill.
 
-The method is frozen from validation evidence. Independent evaluation,
-multi-seed training and broader generalization remain outside the present claim.
+The methods and gates are frozen from validation evidence. Independent
+evaluation, multi-seed training and broader generalization remain outside the
+present claim. The two negative constructions do not exhaust the strong
+distributional, conformal or probabilistic-DA baseline families required for a
+submission-ready comparison.
 
 ## 2. Conditional generative assimilation
 

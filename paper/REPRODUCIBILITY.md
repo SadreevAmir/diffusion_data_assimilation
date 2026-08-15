@@ -66,8 +66,8 @@ server analysis can join them by `target_date` and compute paired date-level
 uncertainty plus a circular contiguous four-date-block temporal sensitivity.
 The reviewed CPU mode compares raw with all three fixed candidates and never
 reads raw ensembles. Its completed compact summary is the authoritative source
-for the paired intervals cited here; the worktree intentionally does not copy
-the per-case table or raw ensembles.
+for the paired intervals cited here and in the manuscript; the worktree
+intentionally does not copy the per-case table or raw ensembles.
 
 Accordingly, `paper/make_case_level_artifacts.py` is a guarded server-analysis
 generator with two explicit input layouts. Its `--long-form` layout consumes
@@ -77,8 +77,10 @@ pairs. It requires exactly 40 dates and both methods on every date, checks the
 proper-score, deterministic, boundary and spatial case means against the
 trusted aggregate anchors within `1e-10`, and only then writes paired date and
 contiguous-block intervals. The legacy two-table layout remains available for
-the earlier wide contract. Neither layout uses row order for pairing, and none
-of the interval outputs is yet cited.
+the earlier wide contract. Neither layout uses row order for pairing. Outputs
+from this local generator are not cited: the manuscript intervals come from
+the separately completed trusted compact uncertainty package, whose fixed
+resampling contract is authoritative.
 
 For the completed contract, the reviewed server invocation is:
 

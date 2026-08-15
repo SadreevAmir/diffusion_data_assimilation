@@ -79,6 +79,10 @@ Repeating completed analyses would not change the decision.
 - The fixed purged hurdle-isotonic/ECC-Q result is recorded as a negative
   mechanism ablation: boundary-mass and rank diagnostics improve, while paired
   proper-score, IIEE, edge and energy diagnostics reject method selection.
+- The claim ledger no longer describes the baseline evidence as raw plus
+  affine-logit only, and the manuscript contributions now expose both sides of
+  the boundary/rank-versus-spatial tradeoff without treating one failed
+  construction as exhaustive baseline coverage.
 - The manuscript evidence table reports the boundary and spatial failures next
   to the proper-score gains, including the improving lag-1/lag-2 variogram
   errors that are explicitly barred from compensating for failed mandatory
