@@ -72,6 +72,11 @@ either spread-only analysis or the joint audit would not change the decision.
   incomplete method pairs and provenance mismatches fail closed.
 - The claim ledger, manuscript and readiness audit now record the failed joint
   gate and its boundary/spatial mechanism without accessing raw ensembles.
+- The manuscript evidence table reports the boundary and spatial failures next
+  to the proper-score gains, including the improving lag-1/lag-2 variogram
+  errors that are explicitly barred from compensating for failed mandatory
+  families. This prevents the aggregate reliability figure from being read as
+  the complete scientific decision.
 - A fail-closed generator for the aggregate CRPS, spread-skill and coverage
   figure is present and documented; it uses only the trusted one-row summary
   and does not imply paired uncertainty or spatial preservation.

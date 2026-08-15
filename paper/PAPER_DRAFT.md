@@ -255,6 +255,13 @@ ensemble sizes, regions or observation systems remains unverified.
 | 90% interval diagnostic | 0.5051 | 0.8788 | Meets the predeclared acceptance interval |
 | 95% interval diagnostic | 0.5250 | 0.8915 | Improved but residual upper-tail undercoverage remains |
 | Pre-clipping center error | 0 | 4.16e-16 | Mean preservation holds to numerical precision |
+| Established-ice Brier score | 0.056973 | 0.058200 | 2.15% worse; fails the 1% boundary tolerance |
+| Exact-one member mass | 0.00904 | 0.16483 | Spurious upper-boundary atom; truth mass is 0 |
+| Mean IIEE | 0.07960 | 0.08398 | 5.50% worse; fails the 2% preservation tolerance |
+| Edge disagreement | 0.03513 | 0.03668 | 4.41% worse; fails the 2% preservation tolerance |
+| Absolute ice-extent error | 0.04615 | 0.05079 | 10.05% worse; fails the preservation gate |
+| Lag-1 analysis-mean variogram error | 0.000936 | 0.000896 | Improves, but cannot compensate for failed mandatory families |
+| Lag-2 analysis-mean variogram error | 0.002168 | 0.002066 | Improves, but cannot compensate for failed mandatory families |
 
 The earlier spread-only compact-table contract contains 40 corrected case rows
 without corresponding raw case-level fields. The later joint-audit contract is
