@@ -49,11 +49,13 @@ resampled as independent units. The same analysis should evaluate predeclared
 boundary-aware and rank-preserving/conformal baselines if an implemented trusted
 mode supports them.
 
-The currently implemented cross-fit spread modes do not, by their audited
-compact contract, provide those baselines or paired physical metrics. Repeating
-the same mode would reproduce an already known aggregate result and would not
-close the minimum-tier blockers. A new mode cannot be invented in a proposal;
-the trusted implementation must first extend an allowlisted analysis contract.
+The implemented `validation_existing_ensemble_calibration_audit` is now the
+fastest admissible next analysis. Its reviewed server contract reuses the
+existing learned-joint ensemble and fixes folds, random seed, calibration
+candidates, proper scores, randomized-rank diagnostics, boundary diagnostics
+and spatial diagnostics. It should be run before any new sampling. Repeating a
+spread-only mode would reproduce an already known aggregate result and would
+not close the minimum-tier blockers.
 
 ## Safe autonomous work completed or still possible
 
@@ -75,8 +77,8 @@ the trusted implementation must first extend an allowlisted analysis contract.
 
 ## External boundary
 
-The immediate boundary is not editorial review. It is the absence of an
-allowlisted server-analysis contract that can return the required paired
-uncertainty, baseline and spatial/physical evidence from existing ensembles.
-The frozen independent evaluation remains locked until explicit authorization
-after the pre-test evidence package and clean checkpoint are complete.
+The immediate next step is the allowlisted existing-ensemble calibration audit;
+its result determines whether a candidate passes the predeclared joint gate or
+whether the calibration claim must stop or be revised. The frozen independent
+evaluation remains locked until explicit authorization after the pre-test
+evidence package and clean checkpoint are complete.
