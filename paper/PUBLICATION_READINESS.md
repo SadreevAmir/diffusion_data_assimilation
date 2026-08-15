@@ -58,7 +58,9 @@ the trusted implementation must first extend an allowlisted analysis contract.
 - A guarded artifact generator exists and fails closed when paired raw columns
   are absent. It now requires an explicit ISO-date column and predeclared block
   length, then emits both paired case-bootstrap and circular contiguous-block
-  intervals; malformed or duplicate dates fail closed.
+  intervals; malformed or duplicate dates fail closed. Before writing any
+  artifact it also requires all four case means to reproduce the trusted
+  aggregate summary within `1e-10`.
 - Once an admissible compact paired table is returned, the guarded generator,
   claim ledger, result figure and manuscript uncertainty paragraph can be
   updated without accessing raw ensembles.

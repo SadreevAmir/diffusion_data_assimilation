@@ -24,6 +24,13 @@ METRICS = (
     "analysis_coverage_90",
 )
 EXPECTED_CASES = 40
+RECONCILIATION_TOLERANCE = 1e-10
+EXPECTED_CASE_MEANS = {
+    "analysis_fair_crps": (0.05849058504420133, 0.055689673560032536),
+    "analysis_crps": (0.06210828098743627, 0.06110134210979743),
+    "analysis_spread_skill_ratio": (0.7240662109968337, 1.061483512716757),
+    "analysis_coverage_90": (0.5050835783457039, 0.8787749038797623),
+}
 
 
 def percentile(values: list[float], probability: float) -> float:
@@ -162,6 +169,33 @@ def summarize(
     }
 
 
+def reconcile_case_means(summary: dict[str, object]) -> None:
+    """Fail closed unless case means reproduce the trusted aggregate summary."""
+    metrics = summary["metrics"]
+    assert isinstance(metrics, dict)
+    failures = []
+    for metric, (expected_raw, expected_corrected) in EXPECTED_CASE_MEANS.items():
+        values = metrics[metric]
+        assert isinstance(values, dict)
+        for label, expected in (
+            ("raw_case_mean", expected_raw),
+            ("corrected_case_mean", expected_corrected),
+        ):
+            observed = values[label]
+            assert isinstance(observed, float)
+            error = abs(observed - expected)
+            if error > RECONCILIATION_TOLERANCE:
+                failures.append(
+                    f"{metric}.{label}: observed {observed:.17g}, "
+                    f"expected {expected:.17g}, absolute error {error:.3g}"
+                )
+    if failures:
+        raise ValueError(
+            "case means do not reconcile with the trusted aggregate summary "
+            f"within {RECONCILIATION_TOLERANCE:g}: " + "; ".join(failures)
+        )
+
+
 def make_svg(deltas: list[float], output: Path) -> None:
     width, height = 760, 360
     left, right, top, bottom = 72, 24, 34, 58
@@ -214,6 +248,7 @@ def main() -> None:
         date_column=args.date_column,
         input_sha256=input_sha256,
     )
+    reconcile_case_means(summary)
     args.summary.parent.mkdir(parents=True, exist_ok=True)
     args.figure.parent.mkdir(parents=True, exist_ok=True)
     args.summary.write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")

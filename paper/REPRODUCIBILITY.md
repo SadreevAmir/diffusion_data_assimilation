@@ -52,8 +52,9 @@ trusted aggregate summary to ordinary floating-point tolerance:
 
 Treat a mismatch larger than `1e-10` in any listed case mean as a provenance or
 schema failure: do not publish the artifact and do not repair it by rounding or
-manual editing. No paired interval or improved-case count is part of the present
-evidence package.
+manual editing. The guarded generator enforces this check before creating its
+output directories or writing JSON/SVG artifacts. No paired interval or
+improved-case count is part of the present evidence package.
 
 ## Scope and audit trail
 
