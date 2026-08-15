@@ -27,11 +27,15 @@ summary separately reports corrected and raw means. Those means are sufficient
 for aggregate reconciliation but cannot identify paired case differences.
 
 Accordingly, `paper/make_case_level_artifacts.py` is retained as a guarded
-generator for a richer future compact contract, but it is not executable from
-the currently available table and none of its outputs are cited. Do not join
-tables by row order or synthesize raw case values from aggregate means.
+generator for two richer future compact contracts: one raw case table and one
+corrected case table. Both must carry the same unique ISO-date keys and the four
+metrics below. The generator joins only by date, rejects unequal date sets and
+never uses row order. It is not executable from the currently available table
+and none of its outputs are cited. Do not synthesize raw case values from
+aggregate means.
 
-The generator requires an explicit ISO-date column through `--date-column`,
+The corrected table is the positional input and the raw table is supplied via
+`--raw-csv`. The generator requires an explicit ISO-date column through `--date-column`,
 sorts cases by that column, rejects duplicate or malformed dates, and reports
 both a paired case bootstrap and a paired circular contiguous-block bootstrap.
 The block length is mandatory through `--block-length`, recorded in the JSON

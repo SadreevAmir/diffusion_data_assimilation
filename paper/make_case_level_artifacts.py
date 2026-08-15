@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Build the paired uncertainty summary and compact SVG for the frozen method.
+"""Build paired uncertainty artifacts from compact raw/corrected case tables.
 
-The input is the compact ``per_case_metrics.csv`` emitted by the established
-cross-fitted spread analysis.  No raw ensemble values are read or required.
+The inputs contain case-level metrics only.  They are joined by an explicit ISO
+date key; row order is never used and raw ensemble values are not required.
 """
 
 from __future__ import annotations
@@ -76,7 +76,9 @@ def circular_block_bootstrap_mean_ci(
     return percentile(means, 0.025), percentile(means, 0.975)
 
 
-def read_cases(path: Path, *, date_column: str) -> list[dict[str, float]]:
+def read_table(
+    path: Path, *, date_column: str, metric_prefix: str
+) -> dict[dt.date, dict[str, float]]:
     with path.open(newline="", encoding="utf-8") as handle:
         rows = list(csv.DictReader(handle))
     if not rows:
@@ -85,7 +87,7 @@ def read_cases(path: Path, *, date_column: str) -> list[dict[str, float]]:
         raise ValueError(
             f"expected {EXPECTED_CASES} cases from the frozen protocol, found {len(rows)}"
         )
-    required = {name for metric in METRICS for name in (metric, f"raw_{metric}")}
+    required = {f"{metric_prefix}{metric}" for metric in METRICS}
     required.add(date_column)
     missing = sorted(required - set(rows[0]))
     if missing:
@@ -94,7 +96,7 @@ def read_cases(path: Path, *, date_column: str) -> list[dict[str, float]]:
         case_ids = [row["case_index"] for row in rows]
         if len(set(case_ids)) != len(case_ids):
             raise ValueError("case_index values must be unique")
-    dated_rows = []
+    dated_rows: dict[dt.date, dict[str, float]] = {}
     for index, row in enumerate(rows):
         try:
             date = dt.date.fromisoformat(row[date_column])
@@ -102,22 +104,39 @@ def read_cases(path: Path, *, date_column: str) -> list[dict[str, float]]:
             raise ValueError(
                 f"case {index} has a non-ISO date in {date_column}: {row[date_column]!r}"
             ) from error
-        dated_rows.append((date, row))
-    dates = [date for date, _ in dated_rows]
-    if len(set(dates)) != len(dates):
-        raise ValueError(f"{date_column} values must be unique")
-    dated_rows.sort(key=lambda item: item[0])
-    cases = [
-        {name: float(row[name]) for name in required if name != date_column}
-        for _, row in dated_rows
-    ]
-    for index, case in enumerate(cases):
+        if date in dated_rows:
+            raise ValueError(f"{date_column} values must be unique")
+        case = {
+            metric: float(row[f"{metric_prefix}{metric}"]) for metric in METRICS
+        }
         nonfinite = sorted(name for name, value in case.items() if not math.isfinite(value))
         if nonfinite:
             raise ValueError(
                 f"case {index} has non-finite values in: {', '.join(nonfinite)}"
             )
-    return cases
+        dated_rows[date] = case
+    return dated_rows
+
+
+def read_cases(
+    corrected_path: Path, raw_path: Path, *, date_column: str
+) -> list[dict[str, float]]:
+    corrected = read_table(corrected_path, date_column=date_column, metric_prefix="")
+    raw = read_table(raw_path, date_column=date_column, metric_prefix="")
+    if corrected.keys() != raw.keys():
+        missing_raw = sorted(date.isoformat() for date in corrected.keys() - raw.keys())
+        missing_corrected = sorted(date.isoformat() for date in raw.keys() - corrected.keys())
+        raise ValueError(
+            "raw and corrected date sets differ; "
+            f"missing from raw: {missing_raw}; missing from corrected: {missing_corrected}"
+        )
+    return [
+        {
+            **corrected[date],
+            **{f"raw_{metric}": raw[date][metric] for metric in METRICS},
+        }
+        for date in sorted(corrected)
+    ]
 
 
 def summarize(
@@ -224,7 +243,8 @@ def make_svg(deltas: list[float], output: Path) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("input_csv", type=Path)
+    parser.add_argument("corrected_csv", type=Path)
+    parser.add_argument("--raw-csv", type=Path, required=True)
     parser.add_argument("--summary", type=Path, required=True)
     parser.add_argument("--figure", type=Path, required=True)
     parser.add_argument("--bootstrap-samples", type=int, default=20_000)
@@ -238,8 +258,12 @@ def main() -> None:
         parser.error("--summary and --figure must be different paths")
     if not 1 < args.block_length <= EXPECTED_CASES:
         parser.error(f"--block-length must be between 2 and {EXPECTED_CASES}")
-    cases = read_cases(args.input_csv, date_column=args.date_column)
-    input_sha256 = hashlib.sha256(args.input_csv.read_bytes()).hexdigest()
+    cases = read_cases(
+        args.corrected_csv, args.raw_csv, date_column=args.date_column
+    )
+    input_sha256 = hashlib.sha256(
+        args.corrected_csv.read_bytes() + b"\0" + args.raw_csv.read_bytes()
+    ).hexdigest()
     summary = summarize(
         cases,
         samples=args.bootstrap_samples,
