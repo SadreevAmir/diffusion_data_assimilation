@@ -75,12 +75,18 @@ failure isolates a scientifically useful tradeoff.
   the affine-logit family is a documented negative baseline; coverage is called
   a finite-ensemble pointwise diagnostic; and pre-clipping center invariance is
   verified numerically.
-- Not claimed: temporal-block uncertainty intervals, conditional calibration by
-  regime, randomized-rank uniformity after correction, or fieldwise coverage.
-  These are manuscript limitations, not reasons to reopen method selection.
-- Required before any broader confirmatory claim: repeat the frozen transform
-  without retuning on a genuinely independent period and add date/block-level
-  uncertainty estimates. Pixels must never be treated as independent replicates.
+- Now available for the narrow mechanism claim: paired date-bootstrap intervals
+  and a circular four-date-block interval. The latter is reported honestly as a
+  post-hoc temporal sensitivity, not as a predeclared acceptance gate. The
+  fair-CRPS interval excludes zero, the ordinary-CRPS interval does not, and the
+  IIEE interval supports degradation; none rescues the failed joint gate.
+- Not claimed: conditional calibration by regime, randomized-rank uniformity
+  after an accepted correction, or fieldwise coverage. These are manuscript
+  limitations, not reasons to reopen selection of the rejected global-spread
+  reference.
+- Required before any broader confirmatory claim: repeat the fully frozen
+  procedure without retuning on a genuinely independent period. Pixels must
+  never be treated as independent replicates.
 
 ## Deferred alternatives, not current method development
 
