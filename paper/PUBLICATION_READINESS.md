@@ -63,12 +63,13 @@ either spread-only analysis or the joint audit would not change the decision.
   for four methods. This makes a server-side paired analysis possible in
   principle, but does not make an interval available in the publication
   worktree.
-- A guarded artifact generator exists for separate compact raw and corrected
-  tables. It requires the same explicit ISO-date keys in both inputs and a
-  predeclared block length, then emits paired case-bootstrap and circular
-  contiguous-block intervals; unequal date sets, malformed dates and duplicates
-  fail closed. Before writing any artifact it also requires all four case means
-  to reproduce the trusted aggregate summary within `1e-10`.
+- The guarded artifact generator now accepts the completed 160-row long-form
+  contract directly. It pivots exactly named methods by unique ISO
+  `target_date`, requires both methods on all 40 dates and the predeclared
+  four-case block length, and emits paired case-bootstrap and circular-block
+  intervals only after proper-score, boundary and spatial means reproduce the
+  trusted aggregate anchors within `1e-10`. Malformed dates, duplicate pairs,
+  incomplete method pairs and provenance mismatches fail closed.
 - The claim ledger, manuscript and readiness audit now record the failed joint
   gate and its boundary/spatial mechanism without accessing raw ensembles.
 - A fail-closed generator for the aggregate CRPS, spread-skill and coverage

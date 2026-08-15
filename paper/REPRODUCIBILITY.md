@@ -50,21 +50,33 @@ predeclared contiguous-block uncertainty. This worktree does not contain that
 table or a resulting compact interval summary; therefore no such result is
 cited here.
 
-Accordingly, `paper/make_case_level_artifacts.py` is retained as a guarded
-generator for two richer future compact contracts: one raw case table and one
-corrected case table. Both must carry the same unique ISO-date keys and the four
-metrics below. The generator joins only by date, rejects unequal date sets and
-never uses row order. It is not executable from the currently available table
-and none of its outputs are cited. Do not synthesize raw case values from
-aggregate means.
+Accordingly, `paper/make_case_level_artifacts.py` is a guarded server-analysis
+generator with two explicit input layouts. Its `--long-form` layout consumes
+the completed joint-audit table directly, filters the exactly named raw and
+global-spread methods, and pivots only on unique ISO `target_date`/`method`
+pairs. It requires exactly 40 dates and both methods on every date, checks the
+proper-score, deterministic, boundary and spatial case means against the
+trusted aggregate anchors within `1e-10`, and only then writes paired date and
+contiguous-block intervals. The legacy two-table layout remains available for
+the earlier wide contract. Neither layout uses row order for pairing, and none
+of the interval outputs is yet cited.
 
-The corrected table is the positional input and the raw table is supplied via
-`--raw-csv`. The generator requires an explicit ISO-date column through `--date-column`,
-sorts cases by that column, rejects duplicate or malformed dates, and reports
-both a paired case bootstrap and a paired circular contiguous-block bootstrap.
-The block length is mandatory through `--block-length`, recorded in the JSON
-output, and must be fixed scientifically before inspecting interval results. This
-prevents an arbitrary CSV row order from being treated as temporal adjacency.
+For the completed contract, the reviewed server invocation is:
+
+```bash
+python3 paper/make_case_level_artifacts.py per_case_metrics.csv \
+  --long-form --date-column target_date --block-length 4 \
+  --summary case_level_uncertainty.json \
+  --figure case_level_fair_crps.svg
+```
+
+The default method labels match the audited contract; any override is recorded
+in the invocation. The block length is fixed at four cases by the predeclared
+gate. The generator sorts by parsed dates, rejects duplicates and malformed
+dates, and reports paired case bootstrap and paired circular contiguous-block
+bootstrap intervals. This prevents arbitrary CSV row order from being treated
+as temporal adjacency. In the legacy layout, the corrected table is positional
+and the raw table is supplied through `--raw-csv`.
 
 ## Required reconciliation checks
 
