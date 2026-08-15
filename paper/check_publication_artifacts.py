@@ -16,6 +16,7 @@ REQUIRED_FILES = (
     "REPRODUCIBILITY.md",
     "RESEARCH_PLAN.md",
     "PUBLICATION_READINESS.md",
+    "NEXT_BASELINE_CONTRACT.md",
 )
 FIGURE_PATTERN = re.compile(r"!\[[^]]*\]\(([^)]+)\)")
 REFERENCE_PATTERN = re.compile(r"^(\d+)\. ", re.MULTILINE)
@@ -47,6 +48,30 @@ FINAL_DIAGNOSTIC_ANCHORS = {
         "no post-hoc tuning is admissible",
     ),
 }
+NEXT_BASELINE_ANCHORS = {
+    "NEXT_BASELINE_CONTRACT.md": (
+        "exactly 13 fitted coefficients",
+        "source_experiment=joint_full_condition_validation_2022",
+        "No currently reviewed trusted-executor mode implements this contract.",
+    ),
+    "RESEARCH_PLAN.md": (
+        "NEXT_BASELINE_CONTRACT.md",
+        "date-balanced ZOIB-EMOS distribution",
+    ),
+    "CLAIM_LEDGER.md": (
+        "| C28 |",
+        "No reviewed trusted-executor mode implements this contract.",
+    ),
+    "REPRODUCIBILITY.md": (
+        "## Frozen next-baseline handoff",
+        "exactly 13 fitted coefficients",
+        "must not be scheduled under an",
+    ),
+    "PUBLICATION_READINESS.md": (
+        "implemented mode supplies a mechanistically distinct eligible family.",
+        "specification and review of a mechanistically distinct strong-baseline",
+    ),
+}
 
 
 def require(condition: bool, message: str) -> None:
@@ -67,6 +92,15 @@ def main() -> int:
         require(
             not missing_anchors,
             f"{name} is missing final-diagnostic anchors: "
+            + ", ".join(missing_anchors),
+        )
+
+    for name, anchors in NEXT_BASELINE_ANCHORS.items():
+        document = (PAPER_DIR / name).read_text(encoding="utf-8")
+        missing_anchors = [anchor for anchor in anchors if anchor not in document]
+        require(
+            not missing_anchors,
+            f"{name} is missing next-baseline anchors: "
             + ", ".join(missing_anchors),
         )
 

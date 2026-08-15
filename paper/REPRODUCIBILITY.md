@@ -80,6 +80,25 @@ boundary and member-spatial families fail despite the other four families
 passing. This is the terminal fixed diagnostic; epsilon, transform bounds,
 zero mask and transferred scales must not be tuned after this result.
 
+## Frozen next-baseline handoff
+
+The next mechanistically distinct baseline is design-frozen in
+`paper/NEXT_BASELINE_CONTRACT.md`: a date-balanced ZOIB-EMOS marginal model
+with exactly 13 fitted coefficients, five purged contiguous cross-fitting
+folds, and deterministic ECC-Q reconstruction. Its predictors, optimizer,
+initialization, seeds, uncertainty contract and no-compensation gate are fixed
+before execution. The sole intended runtime input is the server-side source
+experiment; no ensemble artifact is retrieved into this worktree.
+
+This is a specification, not completed evidence. No reviewed trusted-executor
+mode currently implements the contract, so it must not be scheduled under an
+existing mode identifier or described as a runnable proposal. Once a reviewed
+runner exists, its only runtime parameter must be
+`source_experiment=joint_full_condition_validation_2022`; runner provenance,
+fold convergence and all joint-gate families must be returned in the compact
+summary. Until then, claims C17 and C28 remain blocking and no result may be
+inferred from the design freeze itself.
+
 ## Compact-artifact contract
 
 Two distinct compact contracts must not be conflated. The trusted 40-row
