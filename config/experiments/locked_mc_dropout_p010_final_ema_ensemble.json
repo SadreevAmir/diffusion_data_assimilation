@@ -1,0 +1,102 @@
+{
+  "schema_version": 1,
+  "mode": "validation_locked_mc_dropout_sampling",
+  "candidate_method": "locked_mc_dropout_p010_final_ema_ensemble",
+  "source_experiment": "joint_full_condition_validation_2022",
+  "checkpoint": {
+    "name": "ema_last_model.pth",
+    "sha256": "cd73cedc97a9f19d15c70ba31d28d3248a77dc6ef568edf8793326763810fdfe"
+  },
+  "source_anchors": {
+    "config_sha256": "8623a048735b0f739807c90dd038cf52e9e834eae29fd32ff3b73ad4e8505634",
+    "metadata_sha256": "5fcb930c084d7bb7c6367a81bd5272e9bdee2614d949780d6d18c9d82553c95f",
+    "metrics_sha256": "c95dad7a279ec947b936a28b98b922b09222b438be97f8dc0839c793ff5b9ae3"
+  },
+  "model": {
+    "class": "UNet2DModel",
+    "sample_size": [320, 256],
+    "in_channels": 13,
+    "out_channels": 2,
+    "layers_per_block": 1,
+    "block_out_channels": [96, 192, 384, 384],
+    "down_block_types": [
+      "DownBlock2D",
+      "DownBlock2D",
+      "AttnDownBlock2D",
+      "DownBlock2D"
+    ],
+    "up_block_types": [
+      "UpBlock2D",
+      "AttnUpBlock2D",
+      "UpBlock2D",
+      "UpBlock2D"
+    ],
+    "norm_num_groups": 32
+  },
+  "schedule": {
+    "dataset_split": "valid",
+    "start_date": "2022-01-01",
+    "end_date": "2022-07-15",
+    "case_stride_days": 5,
+    "case_count": 40,
+    "member_count": 10,
+    "base_noise_seed": 1234,
+    "noise_seed_formula": "1234 + 10*case_index + member_index"
+  },
+  "sampler": {
+    "method": "dopri5",
+    "num_timesteps": 25,
+    "rtol": 0.00001,
+    "atol": 0.000001,
+    "precision": "float32",
+    "conditioning_mode": "full",
+    "cfg_mode": "none",
+    "sample_batch_size": 10
+  },
+  "locked_dropout": {
+    "probability": 0.1,
+    "active_layers": [
+      "down_blocks.0.resnets.0.dropout",
+      "down_blocks.1.resnets.0.dropout",
+      "down_blocks.2.resnets.0.dropout",
+      "down_blocks.3.resnets.0.dropout",
+      "mid_block.resnets.0.dropout",
+      "mid_block.resnets.1.dropout",
+      "up_blocks.0.resnets.0.dropout",
+      "up_blocks.0.resnets.1.dropout",
+      "up_blocks.1.resnets.0.dropout",
+      "up_blocks.1.resnets.1.dropout",
+      "up_blocks.2.resnets.0.dropout",
+      "up_blocks.2.resnets.1.dropout",
+      "up_blocks.3.resnets.0.dropout",
+      "up_blocks.3.resnets.1.dropout"
+    ],
+    "excluded_zero_probability_layers": [
+      "down_blocks.2.attentions.0.to_out.1",
+      "up_blocks.1.attentions.0.to_out.1",
+      "up_blocks.1.attentions.1.to_out.1",
+      "mid_block.attentions.0.to_out.1"
+    ],
+    "mask_seed_formula": "271828000 + 140*case_index + 14*member_index + layer_index",
+    "generator_device": "cpu",
+    "generator_dtype": "float32",
+    "keep_rule": "torch.rand(shape, float32, cpu_generator) >= 0.1",
+    "inverted_dropout_scale": 1.1111111111111112,
+    "mask_lifetime": "one case/member/layer for all DOPRI RHS evaluations"
+  },
+  "dependent_gate": {
+    "mode": "validation_locked_mc_dropout_gate",
+    "implementation": "existing deep_ensemble_gate full gate",
+    "families": [
+      "proper",
+      "reliability",
+      "boundary",
+      "spatial",
+      "operational"
+    ],
+    "paired_bootstrap_draws": 20000,
+    "block_sensitivity_is_diagnostic_only": true,
+    "no_compensation": true
+  },
+  "artifact_policy": "four compact top-level files; arrays remain server-side"
+}
