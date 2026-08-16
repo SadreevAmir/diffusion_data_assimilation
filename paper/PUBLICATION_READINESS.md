@@ -123,7 +123,9 @@ member/local-spatial feasibility constraints. The held-out result is negative:
 boundary and spatial/physical families pass with exact masks and maximum mean
 error at most `5e-13`, but all three reliability criteria, both fair-CRPS
 criteria and all-fold scale feasibility fail. `overall_eligible=false`; this is
-negative mechanism evidence, not a selected calibration.
+negative mechanism evidence, not a selected calibration. Raw and candidate
+fair CRPS are both `0.0584905850`, and raw and candidate spread-skill are both
+`0.7240662110`; the conclusion therefore does not rest only on threshold labels.
 
 Continuous calibration development therefore moves to the exact frozen
 `NEXT_METHOD_CONTRACT.md`: purged analog-residual ensemble dressing. Unlike all

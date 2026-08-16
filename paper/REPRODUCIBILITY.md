@@ -117,7 +117,11 @@ spatial/physical families pass with every memberwise mask exact and maximum
 mean error at most `5e-13`, but all three finite-ensemble reliability criteria,
 both fair-CRPS criteria and all-fold training feasibility fail. All 40 cases and
 reported metrics are complete and finite. The scale set, strata, folds, seed and
-thresholds must not be changed after this result.
+thresholds must not be changed after this result. The compact reconciliation
+anchors are identical raw/candidate fair CRPS (`0.0584905850`/
+`0.0584905850`) and spread-skill (`0.7240662110`/`0.7240662110`); they document
+an inactive held-out correction when training feasibility fails, not a rounded
+improvement.
 
 ## Compact-artifact contract
 

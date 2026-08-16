@@ -81,6 +81,8 @@ CALIBRATION_CONTRACT_ANCHORS = {
         "overall_eligible=false",
         "only operational validity passes at family level",
         "conformal and probabilistic-DA families",
+        "raw and candidate fair CRPS are both `0.0584905850`",
+        "raw and candidate spread-skill are both `0.7240662110`",
     ),
     "PAPER_DRAFT.md": (
         "| ZOIB-EMOS/ECC-Q diagnostic | Raw ensemble | Candidate | Interpretation |",
@@ -89,6 +91,8 @@ CALIBRATION_CONTRACT_ANCHORS = {
         "| Mean IIEE | 0.079600 | 0.087190 | Spatial/physical family fails |",
         "topology-preserving stratified transport",
         "completed fixed result rejects the hypothesis",
+        "`0.0584905850` versus `0.0584905850`",
+        "`0.7240662110` versus `0.7240662110`",
     ),
     "REPRODUCIBILITY.md": (
         "## Frozen ZOIB-EMOS/ECC-Q handoff",
@@ -99,6 +103,8 @@ CALIBRATION_CONTRACT_ANCHORS = {
         "## Completed topology-preserving transport handoff",
         "topology-preserving stratified transport",
         "all three finite-ensemble reliability criteria",
+        "(`0.0584905850`/\n`0.0584905850`)",
+        "(`0.7240662110`/`0.7240662110`)",
     ),
     "PUBLICATION_READINESS.md": (
         "No additional implemented mode",
@@ -106,6 +112,8 @@ CALIBRATION_CONTRACT_ANCHORS = {
         "Only operational validity passes at family level",
         "topology-preserving stratified-transport contract",
         "completed compact result",
+        "fair CRPS are both `0.0584905850`",
+        "spread-skill are both\n`0.7240662110`",
     ),
 }
 NEXT_METHOD_ANCHORS = (

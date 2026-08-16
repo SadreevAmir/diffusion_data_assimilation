@@ -324,7 +324,9 @@ same no-compensation gate. The completed fixed result rejects the hypothesis:
 all 40 cases and metrics are finite, every memberwise mask is exact, the maximum
 mean error is at most `5e-13`, and both boundary and spatial/physical families
 pass, but no finite-ensemble reliability criterion improves, fair CRPS misses
-the 3% threshold with a date interval that does not exclude zero, and at least
+the 3% threshold and is numerically unchanged from raw
+(`0.0584905850` versus `0.0584905850`), spread-skill is likewise unchanged
+(`0.7240662110` versus `0.7240662110`), the date interval does not exclude zero, and at least
 one fold has no feasible training scale. Thus preserving event topology and the
 mean field prevents the earlier structural damage but does not expose enough
 useful within-regime dispersion for calibration. No scale, stratum, fold, seed
