@@ -226,6 +226,21 @@ class External2024CalendarRawTests(unittest.TestCase):
         ):
             raw._validate_runtime()
 
+    def test_initial_sample_seal_rejects_invalid_dtypes_and_range(self) -> None:
+        valid = np.ones((2, 3), dtype=bool)
+        with self.assertRaisesRegex(ValueError, "float32"):
+            raw._validate_raw_sample_arrays(np.zeros((10, 2, 3), dtype=np.float64), valid, context="initial")
+        with self.assertRaisesRegex(ValueError, "boolean"):
+            raw._validate_raw_sample_arrays(
+                np.zeros((10, 2, 3), dtype=np.float32),
+                valid.astype(np.float32),
+                context="initial",
+            )
+        out_of_range = np.zeros((10, 2, 3), dtype=np.float32)
+        out_of_range[0, 0, 0] = 2.0
+        with self.assertRaisesRegex(ValueError, "within"):
+            raw._validate_raw_sample_arrays(out_of_range, valid, context="initial")
+
     def test_symlinked_input_root_and_checkpoint_mutation_are_rejected(self) -> None:
         with TemporaryDirectory() as temporary:
             root = Path(temporary)

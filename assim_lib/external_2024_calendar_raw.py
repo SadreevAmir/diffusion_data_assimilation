@@ -427,6 +427,19 @@ def _validate_sampling_metadata(root: Path) -> tuple[dict[str, Any], list[dict[s
     return metadata, cases
 
 
+def _validate_raw_sample_arrays(ensemble: np.ndarray, valid: np.ndarray, *, context: str) -> None:
+    if ensemble.ndim != 3 or ensemble.shape[0] != MEMBER_COUNT:
+        raise ValueError(f"{context} does not contain exactly ten 2D members")
+    if valid.shape != ensemble.shape[1:]:
+        raise ValueError(f"{context} ensemble/mask shapes differ")
+    if ensemble.dtype != np.float32:
+        raise ValueError(f"{context} ensemble must have exact float32 dtype")
+    if valid.dtype != np.bool_:
+        raise ValueError(f"{context} valid_mask must have exact boolean dtype")
+    if not np.all(np.isfinite(ensemble)) or np.any((ensemble < 0.0) | (ensemble > 1.0)):
+        raise ValueError(f"{context} ensemble must be finite and within [0, 1]")
+
+
 def seal_samples(
     sampling_root: Path, sealed_root: Path, input_seal: dict[str, Any] | None = None
 ) -> dict[str, Any]:
@@ -473,12 +486,7 @@ def seal_samples(
                 raise ValueError("sealed raw sample contains truth or an unexpected array")
             ensemble = np.asarray(payload["analysis_ensemble"])
             valid = np.asarray(payload["valid_mask"])
-            if ensemble.ndim != 3 or ensemble.shape[0] != MEMBER_COUNT:
-                raise ValueError("sealed sample does not contain exactly ten 2D members")
-            if valid.shape != ensemble.shape[1:]:
-                raise ValueError("sealed sample ensemble/mask shapes differ")
-            if not np.all(np.isfinite(ensemble)):
-                raise ValueError("sealed raw ensemble contains non-finite values")
+            _validate_raw_sample_arrays(ensemble, valid, context="sealed raw sample")
         case = cases[case_index]
         if (
             case.get("case_order") != case_index
@@ -663,15 +671,7 @@ def validate_existing_sample_seal(sealed_root: Path) -> dict[str, Any]:
                 raise ValueError("existing sealed raw sample arrays differ")
             ensemble = np.asarray(payload["analysis_ensemble"])
             valid = np.asarray(payload["valid_mask"])
-        if (
-            ensemble.ndim != 3
-            or ensemble.shape[0] != MEMBER_COUNT
-            or valid.shape != ensemble.shape[1:]
-            or valid.dtype != np.bool_
-            or not np.all(np.isfinite(ensemble))
-            or np.any((ensemble < 0.0) | (ensemble > 1.0))
-        ):
-            raise ValueError("existing sealed raw sample values differ")
+        _validate_raw_sample_arrays(ensemble, valid, context="existing sealed raw sample")
         paths.append(sample)
     if _sample_manifest(paths) != sealed.get("sample_manifest_sha256"):
         raise ValueError("existing raw aggregate manifest differs")
