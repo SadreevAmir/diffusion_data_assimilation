@@ -221,11 +221,11 @@ NEXT_GENERATIVE_METHOD_ANCHORS = {
     "PUBLICATION_READINESS.md": (
         "guidance-mixture result is now complete and rejected",
         "clean-checkpoint deep ensemble",
-        "training seeds `1701`, `1702`, and `1703`",
         "Both checkpoint-trajectory EMA stages have now completed",
-        "the terminal-safe sampling retry and its dependent CPU\ngate are queued",
-        "the exact evidence awaited\nis its dependent compact gate",
-        "No second proposal or post-hoc contract change is warranted",
+        "clean-checkpoint sampling\nretry was cancelled rather than completed",
+        "neither it nor its dependent CPU\ngate is evidence in flight",
+        "NEXT_LATENT_TEMPERATURE_CONTRACT.md",
+        "no second temperature may be\nselected post hoc",
     ),
 }
 STALE_READINESS_ANCHORS = (

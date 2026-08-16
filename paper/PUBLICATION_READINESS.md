@@ -272,14 +272,18 @@ a mechanism failure, not permission to retune weights or member allocation.
 Both checkpoint-trajectory EMA stages have now completed, but completion
 metadata do not contain the decision-bearing compact gate. Until one exact EMA
 gate payload is reconciled in this worktree, the manuscript admits neither a
-positive nor a negative EMA claim. The clean-checkpoint reserve is no longer a
-hypothetical next step: the terminal-safe sampling retry and its dependent CPU
-gate are queued under one consistent source/dependency pair. The sampling job
-is therefore the active autonomous dependency, and the exact evidence awaited
-is its dependent compact gate containing all mandatory family decisions,
-`overall_eligible`, the 3% fair-CRPS decision with paired-date interval,
-ordinary-CRPS tolerance, forty-case completeness and operational provenance.
-No second proposal or post-hoc contract change is warranted while that pair is
-in flight. Its training seeds `1701`, `1702`, and `1703`, fixed ten-member
-`4/3/3` case rotation, latent seeds, immutable clean training configuration,
-unchanged sampler and no-compensation gate remain fixed.
+positive nor a negative EMA claim. The terminal-safe clean-checkpoint sampling
+retry was cancelled rather than completed, so neither it nor its dependent CPU
+gate is evidence in flight. It must not be described as queued or used to defer
+the next autonomous mechanism test. Moreover, the measured clean-training
+throughput makes a fresh three-seed training cycle a months-long route rather
+than a fast fallback. Its frozen construction remains a reproducibility
+contract, not a scientific result or an active dependency.
+
+The fastest implemented mechanistically distinct next test is therefore the
+already frozen latent-temperature pair in `NEXT_LATENT_TEMPERATURE_CONTRACT.md`.
+It changes initial latent dispersion before the unchanged ODE solve, uses one
+pre-result temperature, and hands the completed forty-case sample directly to
+the unchanged no-compensation CPU gate. Until that compact gate is returned,
+no latent-temperature claim is admitted and no second temperature may be
+selected post hoc.
