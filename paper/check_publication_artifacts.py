@@ -87,6 +87,23 @@ CURRENT_DECISION_ANCHORS = (
     "locked-MC-dropout chain is complete and negative",
     "activates the already frozen iid calendar\nglobal-bias fallback",
 )
+EXTERNAL_PRIMARY_HANDOFF_ANCHORS = {
+    "PUBLICATION_READINESS.md": (
+        "## Frozen external-primary result handoff",
+        "external_2024_calendar_global_bias_raw48_primary_v1",
+        "external_2024_calendar_global_bias_confirm48_primary_v1",
+        "Publication status remains\n`NOT_READY` until its four compact artifacts are reconciled",
+        "formation of the\ncomplete candidate before scoring truth is opened",
+        "proper-score, finite-ensemble reliability, boundary,\nspatial/physical and operational families",
+        "claim ledger reserves C39",
+    ),
+    "CLAIM_LEDGER.md": (
+        "| C39 | The frozen calendar global-bias primary generalizes",
+        "No scientific outcome is inferred from stage status",
+        "Accept only four compact artifacts",
+        "do not resubmit or retune",
+    ),
+}
 REPRODUCIBILITY_SECTION_ORDER = (
     "## Frozen latent-temperature recovery handoff",
     "## Locked-MC-dropout wrapper recovery handoff",
@@ -450,6 +467,20 @@ def main() -> int:
         "publication readiness is missing current decision-chain anchors: "
         + ", ".join(missing_current_decision),
     )
+
+    external_primary_texts = {
+        "PUBLICATION_READINESS.md": readiness,
+        "CLAIM_LEDGER.md": claim_ledger,
+    }
+    for name, anchors in EXTERNAL_PRIMARY_HANDOFF_ANCHORS.items():
+        missing_anchors = [
+            anchor for anchor in anchors if anchor not in external_primary_texts[name]
+        ]
+        require(
+            not missing_anchors,
+            f"{name} is missing frozen external-primary handoff anchors: "
+            + ", ".join(missing_anchors),
+        )
 
     stale_readiness = [
         anchor for anchor in STALE_READINESS_ANCHORS if anchor in readiness

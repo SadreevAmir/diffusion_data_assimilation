@@ -316,6 +316,24 @@ for the coherent-offset failure; no slack, amplitude or fold retuning follows.
 
 ## External boundary
 
+## Frozen external-primary result handoff
+
+The sealed raw stage `external_2024_calendar_global_bias_raw48_primary_v1` is
+complete for all 48 cases. Its already queued dependent CPU stage,
+`external_2024_calendar_global_bias_confirm48_primary_v1`, is the only active
+decision-bearing external evidence. It must not be resubmitted, substituted or
+treated as a scientific result from job status alone. Publication status remains
+`NOT_READY` until its four compact artifacts are reconciled.
+
+Reconciliation is fail-closed. A positive primary claim requires verified signed
+contract identity, input/raw/truth seals, every recorded hash, formation of the
+complete candidate before scoring truth is opened, `overall_eligible=true`, and
+explicit passes for proper-score, finite-ensemble reliability, boundary,
+spatial/physical and operational families. Failure of any integrity check or
+mandatory family is a negative primary result; no development result may
+compensate for it. The claim ledger reserves C39 for this decision and records
+no outcome before the compact payload arrives.
+
 The preflight for this boundary is now explicit in
 `paper/FROZEN_EVALUATION_HANDOFF.md`. It requires controller-attested immutable
 checkpoint, dataset, code and environment identities; an implemented reviewed
