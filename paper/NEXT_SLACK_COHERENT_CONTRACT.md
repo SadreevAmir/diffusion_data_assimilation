@@ -64,14 +64,16 @@ h(p) = min_i {
 For candidate amplitude `a`, use
 
 ```
-s_a(p) = min(a, (1 - 1e-12) h(p)),
+s_a(p) = min(a, (1 - 1e-6) h(p)),
 z_i(p) = x_i(p) + s_a(p) q_i.
 ```
 
 The same scalar `s_a(p)` multiplies every member score at a pixel.  Because the
 scores sum to zero, the pixelwise ensemble mean is preserved.  Because the
 scale is strictly inside the available slack, the transform cannot create a
-new exact zero or one.  Pixels blocked by an outward-moving boundary member
+new exact zero or one even after float64 rounding at ordinary source spacing.
+The fixed `1e-6` relative margin is a numerical guard, not a selectable
+calibration parameter.  Pixels blocked by an outward-moving boundary member
 receive `s_a(p)=0`.  Do not clip, project, smooth, recenter, permute, rank-shuffle
 or add stochastic jitter.  Fail if any output is non-finite/outside `[0,1]`, if
 the maximum mean residual exceeds `1e-12`, or if a new exact-bound value is
@@ -125,4 +127,3 @@ thresholds in code.  It returns only `run_status.json`,
 `aggregate_case_mean_metrics.json`, `metadata.json` and
 `per_case_metrics.csv`, with `test_data_used=false` and
 `raw_arrays_copied=false`.
-
