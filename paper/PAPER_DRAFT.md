@@ -543,6 +543,26 @@ marginal mechanism result is valid.
 
 ## Data and code availability
 
+### Final frozen development fallback
+
+The last predeclared development fallback mixed raw and calendar-conditioned
+global-area-bias experts independently by member and drew purged historical
+training residuals. It produced a useful separation of calibration dimensions:
+all finite-ensemble reliability criteria passed, all audited boundary
+classifications were unchanged, and the spatial/physical and operational
+families passed. Fair CRPS, however, changed only from `0.0584905850` to
+`0.0582878868` (0.35%); the paired date interval
+`[-0.00100456, 0.000700186]` and four-case-block sensitivity interval
+`[-0.00139050, 0.00129663]` both include zero. Ordinary CRPS worsened from
+`0.0621082810` to `0.0623775052`. The proper-score family therefore fails and
+`overall_eligible=false`.
+
+This result strengthens the paper's negative mechanism map rather than selecting
+a calibrated ensemble: dispersion and ranks can improve without boundary or
+spatial compensation, yet those improvements do not imply a material proper-score
+gain. No mixture probability, residual kernel, fold or seed is retuned after the
+result.
+
 The manuscript reports only compact validation summaries. Raw ensembles remain
 outside the publication worktree. The frozen transform, scale grid, fold sizes,
 selected scales, scoring conventions and reconciliation values are documented

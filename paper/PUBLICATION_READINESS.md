@@ -19,6 +19,24 @@ the primary evaluation is admissible.
 
 ## Current decision-bearing evidence
 
+The complete compact result for the final frozen development fallback,
+`crossfit_iid_calendar_global_bias_mixture_valid`, is now reconciled. It is
+negative under the unchanged joint gate: `overall_eligible=false`. Reliability,
+boundary, spatial/physical and operational families pass, but proper scores do
+not. Fair CRPS improves only 0.35% (`0.0584905850` to `0.0582878868`), below the
+3% threshold, and both the paired date interval
+`[-0.00100456, 0.000700186]` and four-case-block sensitivity interval
+`[-0.00139050, 0.00129663]` include zero. Ordinary CRPS worsens slightly. The
+frozen iid mixture therefore closes as a negative mechanism result; it does not
+authorize post-hoc changes to probability, bandwidth, residuals, folds or seeds.
+
+All currently selectable frozen development calibration mechanisms have now
+failed at least one mandatory family. The paper can defend a broad negative
+mechanism map and a fail-closed evaluation protocol, but it cannot claim an
+eligible calibrated ensemble. Publication status remains `NOT_READY`; the
+remaining scientific gap cannot be erased by editorial narrowing of the minimum
+paper tier.
+
 The package is not waiting on clean-checkpoint training. Measured throughput
 makes that previously frozen three-seed route a months-long construction. The
 single frozen latent-temperature construction at scale `1.30` has been

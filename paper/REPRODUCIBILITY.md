@@ -316,6 +316,22 @@ uncertainty package, not to this generator invocation or the aggregate anchors.
 
 ## Scope and audit trail
 
+## Completed iid calendar global-bias mixture handoff
+
+The reviewed server-CPU run `crossfit_iid_calendar_global_bias_mixture_valid`
+completed all 40 cases with ten members per case. Its only runtime input was
+`source_experiment=joint_full_condition_validation_2022`; the fixed 0.5 expert
+probability, 30-day residual kernel, purged contiguous folds and seed schedule
+were not exposed for tuning. The compact gate identifies
+`crossfit_iid_calendar_global_bias_mixture_v1` and reports
+`overall_eligible=false`: finite-ensemble reliability, boundary behaviour,
+spatial/physical preservation and operational validity pass, while proper scores
+fail. Fair CRPS is `0.0582878868` versus `0.0584905850` raw, with paired date CI
+`[-0.00100456, 0.000700186]`; ordinary CRPS is `0.0623775052` versus
+`0.0621082810` raw. These compact values are cited directly and were not
+reconstructed from raw ensembles. No post-result change to the frozen mixture
+contract is admissible.
+
 The aggregate Figure 1 is generated without raw ensembles:
 
 ```bash
