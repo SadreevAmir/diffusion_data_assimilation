@@ -28,8 +28,27 @@ REQUIRED_FILES = (
     "analog_residual_reference.py",
     "NEXT_GENERATIVE_METHOD_CONTRACT.md",
     "LATENT_TEMPERATURE_RESULT_RECONCILIATION.md",
+    "LOCKED_MC_DROPOUT_RESULT_RECONCILIATION.md",
     "guidance_mixture_reference.py",
     "deep_ensemble_reference.py",
+)
+LOCKED_DROPOUT_RECONCILIATION_ANCHORS = (
+    "Status: pre-result, fail closed. This checklist records no scientific outcome.",
+    "locked_mc_dropout_p010_gate_valid",
+    "locked_mc_dropout_p010_sampling_valid",
+    "locked_mc_dropout_p010_final_ema_ensemble",
+    "exactly 40 completed cases and ten finite members per case",
+    "no_compensation_across_families=true",
+    "analysis_fair_crps",
+    "analysis_crps",
+    "exactly fourteen admitted training-time\n  dropout layers",
+    "271828000 + 140*case + 14*member + layer",
+    "all 5,600 frozen-mask checks passing",
+    "update all five files in one change",
+    "python3 paper/check_publication_artifacts.py",
+    "at least 3% lower than raw",
+    "does not establish independent\ngeneralization",
+    "cannot authorize\npost-hoc tuning",
 )
 
 LATENT_RECONCILIATION_ANCHORS = (
@@ -484,6 +503,20 @@ def main() -> int:
         not missing_latent_anchors,
         "LATENT_TEMPERATURE_RESULT_RECONCILIATION.md is missing anchors: "
         + ", ".join(missing_latent_anchors),
+    )
+
+    locked_dropout_reconciliation = (
+        PAPER_DIR / "LOCKED_MC_DROPOUT_RESULT_RECONCILIATION.md"
+    ).read_text(encoding="utf-8")
+    missing_locked_dropout_anchors = [
+        anchor
+        for anchor in LOCKED_DROPOUT_RECONCILIATION_ANCHORS
+        if anchor not in locked_dropout_reconciliation
+    ]
+    require(
+        not missing_locked_dropout_anchors,
+        "LOCKED_MC_DROPOUT_RESULT_RECONCILIATION.md is missing anchors: "
+        + ", ".join(missing_locked_dropout_anchors),
     )
 
     figures = FIGURE_PATTERN.findall(manuscript)
