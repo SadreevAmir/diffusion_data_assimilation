@@ -142,8 +142,9 @@ proper-score, finite-ensemble reliability, boundary and spatial/physical
 families. The mechanism is therefore closed without post-hoc changes to its
 weights or member allocation. Continuous calibration development now points to
 the mechanistically distinct clean-checkpoint deep ensemble frozen in
-`NEXT_GENERATIVE_METHOD_CONTRACT.md`; no currently implemented trusted mode
-executes that contract.
+`NEXT_GENERATIVE_METHOD_CONTRACT.md`. The reviewed trusted sampling and gate
+modes execute that reserve contract; admission remains conditional on the
+frozen checkpoint-trajectory EMA result rather than runner availability.
 
 The frozen coherent-member-offset contract has also been executed and rejected.
 Its purged training folds select amplitude `0.0`, leaving fair CRPS, ranks and

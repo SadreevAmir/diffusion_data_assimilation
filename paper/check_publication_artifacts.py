@@ -226,6 +226,7 @@ NEXT_GENERATIVE_METHOD_ANCHORS = {
 STALE_READINESS_ANCHORS = (
     "Continuous calibration development therefore moves to the pre-implementation",
     "Its fixed ten-member guidance mixture",
+    "no currently implemented trusted mode\nexecutes that contract",
 )
 MANUSCRIPT_EVIDENCE_ANCHORS = (
     "| Diagnostic | Raw ensemble | Cross-fitted correction | Interpretation |",
