@@ -1,5 +1,7 @@
 # Reproducibility handoff for the frozen mechanism result
 
+External primary evidence state: PENDING_ATOMIC_RECONCILIATION
+
 ## Amended primary gate provenance
 
 The primary evaluation must report the exact primary and gate digests from

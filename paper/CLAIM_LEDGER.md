@@ -5,6 +5,8 @@ Every manuscript claim must point to a row here before it is strengthened.
 
 Last audited: 2026-08-16.
 
+External primary evidence state: PENDING_ATOMIC_RECONCILIATION
+
 ## Evidence status
 
 | ID | Claim | Status | Evidence | Limitation / required upgrade |

@@ -1,5 +1,7 @@
 # Research plan: reliable finite generative ensembles
 
+External primary evidence state: PENDING_ATOMIC_RECONCILIATION
+
 ## Research question
 
 Can a finite ensemble from a conditional diffusion/flow data-assimilation model

@@ -2,6 +2,8 @@
 
 ## Amended primary decision policy
 
+External primary evidence state: PENDING_ATOMIC_RECONCILIATION
+
 All completed gates in this draft are development evidence. None of their
 historical `overall_eligible` values is final primary success. The frozen
 primary evaluation requires an absolutely good randomized rank histogram and

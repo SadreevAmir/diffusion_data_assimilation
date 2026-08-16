@@ -126,6 +126,16 @@ EXTERNAL_PRIMARY_RECONCILIATION_ANCHORS = (
     "python3 paper/check_publication_artifacts.py",
     "do not resubmit, retune or\nopen another external evaluation",
 )
+EXTERNAL_PRIMARY_STATE_MARKER = (
+    "External primary evidence state: PENDING_ATOMIC_RECONCILIATION"
+)
+EXTERNAL_PRIMARY_STATE_FILES = (
+    "PAPER_DRAFT.md",
+    "CLAIM_LEDGER.md",
+    "REPRODUCIBILITY.md",
+    "RESEARCH_PLAN.md",
+    "PUBLICATION_READINESS.md",
+)
 REPRODUCIBILITY_SECTION_ORDER = (
     "## Frozen latent-temperature recovery handoff",
     "## Locked-MC-dropout wrapper recovery handoff",
@@ -521,6 +531,13 @@ def main() -> int:
         "EXTERNAL_PRIMARY_RESULT_RECONCILIATION.md is missing anchors: "
         + ", ".join(missing_external_reconciliation_anchors),
     )
+
+    for name in EXTERNAL_PRIMARY_STATE_FILES:
+        document = (PAPER_DIR / name).read_text(encoding="utf-8")
+        require(
+            document.count(EXTERNAL_PRIMARY_STATE_MARKER) == 1,
+            f"{name} must contain exactly one pending external-primary state marker",
+        )
 
     stale_readiness = [
         anchor for anchor in STALE_READINESS_ANCHORS if anchor in readiness

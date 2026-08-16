@@ -8,6 +8,8 @@ Required scientific blockers: reconciliation of the active frozen external
 primary; an eligible spatially preserving calibration and the remaining
 minimum-tier comparisons
 
+External primary evidence state: PENDING_ATOMIC_RECONCILIATION
+
 The success definition has been amended fail-closed in
 `AMENDED_PRIMARY_EVALUATION_CONTRACT.md`. A good randomized rank histogram is
 an absolute requirement, high-SIC behaviour is compared with truth at
@@ -315,6 +317,10 @@ for the coherent-offset failure; no slack, amplitude or fold retuning follows.
   narrative intact. It also checks semantic numeric anchors in both linked SVGs,
   rather than accepting arbitrary well-formed XML at the expected path. This is
   an integrity check and does not relax any scientific blocker.
+- The five files that must be reconciled atomically after the external primary
+  now carry the identical `PENDING_ATOMIC_RECONCILIATION` state marker. The
+  checker requires exactly one marker in each file, so a partial narrative
+  update fails locally instead of mixing pre-result and post-result claims.
 
 ## External boundary
 
