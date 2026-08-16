@@ -4,8 +4,28 @@ Audit date: 2026-08-16
 
 Publication status: NOT_READY
 
-Required scientific blockers: an eligible spatially preserving calibration,
-clean checkpoint and frozen independent evaluation
+Required scientific blockers: an eligible spatially preserving calibration;
+after eligibility, a clean publication checkpoint, frozen independent
+evaluation and minimum-tier comparisons
+
+## Current decision-bearing evidence
+
+The package is not waiting on clean-checkpoint training. Measured throughput
+makes that previously frozen three-seed route a months-long construction, and
+no clean-checkpoint sampling or gate result is in flight. The next admissible
+scientific decision is instead the single frozen latent-temperature construction
+at scale `1.30`, followed by its unchanged no-compensation gate. Its result may
+be admitted only from the complete compact payload identified in
+`paper/LATENT_TEMPERATURE_RESULT_RECONCILIATION.md`; job status or partial
+aggregates are not evidence.
+
+This ordering does not waive the minimum publication tier. A positive
+validation-set latent-temperature result would establish candidate eligibility,
+not independent generalization, and would still leave the clean publication
+checkpoint, frozen independent evaluation and missing minimum-tier comparisons.
+A negative result activates only the already predeclared locked-MC-dropout
+fallback, unchanged; it does not authorize another temperature or retrospective
+tuning.
 
 ## Independent package re-audit
 

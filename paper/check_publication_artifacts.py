@@ -45,6 +45,14 @@ LATENT_RECONCILIATION_ANCHORS = (
     "predeclared locked-MC-dropout pair",
     "do not change\nthe temperature",
 )
+CURRENT_DECISION_ANCHORS = (
+    "Required scientific blockers: an eligible spatially preserving calibration;",
+    "The package is not waiting on clean-checkpoint training.",
+    "single frozen latent-temperature construction\nat scale `1.30`",
+    "job status or partial\naggregates are not evidence",
+    "would establish candidate eligibility,\nnot independent generalization",
+    "already predeclared locked-MC-dropout\nfallback, unchanged",
+)
 PYTHON_FILES = tuple(name for name in REQUIRED_FILES if name.endswith(".py"))
 FIGURE_PATTERN = re.compile(r"!\[[^]]*\]\(([^)]+)\)")
 REFERENCE_PATTERN = re.compile(r"^(\d+)\. ", re.MULTILINE)
@@ -310,6 +318,15 @@ def main() -> int:
     readiness = (PAPER_DIR / "PUBLICATION_READINESS.md").read_text(encoding="utf-8")
     frozen_handoff = (PAPER_DIR / "FROZEN_EVALUATION_HANDOFF.md").read_text(
         encoding="utf-8"
+    )
+
+    missing_current_decision = [
+        anchor for anchor in CURRENT_DECISION_ANCHORS if anchor not in readiness
+    ]
+    require(
+        not missing_current_decision,
+        "publication readiness is missing current decision-chain anchors: "
+        + ", ".join(missing_current_decision),
     )
 
     stale_readiness = [
