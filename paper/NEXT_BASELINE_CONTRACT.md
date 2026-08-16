@@ -154,13 +154,16 @@ this document does not invent one. The runner performs fitting, transport,
 scoring and uncertainty server-side and accepts no scale, fold, seed, threshold,
 path or optimizer override.
 
-Default retrieval is `summary_only`. Return one compact JSON containing schema
-version, immutable input/runner identities, fold selections and feasibility,
-invariant maxima/counts, aggregate metrics, paired intervals, family booleans,
-`no_compensation_across_families=true` and `overall_eligible`. No raw ensemble,
-pixel field or per-case table is requested. If a paper figure later requires it,
-the only eligible additional artifact is a compact 40-row case-summary table
-named by a separate reviewed request.
+Default retrieval is `summary_only`. Return exactly the controller's four fixed
+compact artifacts: `run_status.json`, `aggregate_case_mean_metrics.json`,
+`metadata.json` and `per_case_metrics.csv`. The per-case file contains only the
+40 raw and 40 held-out candidate metric rows; it contains no pixel fields or
+ensemble arrays. The JSON artifacts contain schema version, immutable
+input/runner identities, fold selections and feasibility, invariant
+maxima/counts, aggregate metrics, paired intervals, family booleans,
+`no_compensation_across_families=true` and `overall_eligible`. No raw ensemble or
+pixel-level artifact is retrieved. Any later paper figure must be derived from
+these compact outputs or use a separately reviewed exact artifact request.
 
 ## Execution status
 
