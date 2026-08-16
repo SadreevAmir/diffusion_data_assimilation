@@ -135,13 +135,15 @@ at one, while maximum ensemble-mean displacement reaches `0.753021`. Thus whole
 historical residual fields transfer useful rank diversity together with unsafe
 bias, boundary atoms and spatial error; no analog parameter is retuned.
 
-Continuous calibration development therefore moves to the pre-implementation
-`NEXT_GENERATIVE_METHOD_CONTRACT.md`. Its fixed ten-member guidance mixture
+The subsequent frozen guidance-mixture contract has also been executed. It
 draws two common-random-number members at each of five already evaluated
-independent-CFG weight pairs. It creates diversity inside the bounded
-conditional generator rather than by marginal mapping, member transport or
-historical-error transfer. Exact weights, allocation, seeds, unchanged sampler
-settings, full gate and summary-only return are frozen before runner work.
+independent-CFG weight pairs and is operationally valid, but it fails the
+proper-score, finite-ensemble reliability, boundary and spatial/physical
+families. The mechanism is therefore closed without post-hoc changes to its
+weights or member allocation. Continuous calibration development now points to
+the mechanistically distinct clean-checkpoint deep ensemble frozen in
+`NEXT_GENERATIVE_METHOD_CONTRACT.md`; no currently implemented trusted mode
+executes that contract.
 
 ## Safe autonomous work completed or still possible
 
@@ -201,7 +203,7 @@ settings, full gate and summary-only return are frozen before runner work.
   any future baseline family must add its own method-specific citation rather
   than inheriting authority from these references.
 - A local fail-closed publication audit now checks required paper files and
-  parses all four publication generators as Python,
+  parses all seven executable publication/reference scripts as Python,
   manuscript figure links, SVG parseability, contiguous numbered references and
   complete use of every listed reference. It requires consistency among
   publication status, the blocker declaration and the frozen-evaluation handoff,

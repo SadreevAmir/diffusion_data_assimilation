@@ -163,6 +163,28 @@ ANALOG_RESULT_ANCHORS = {
         "0.753021",
     ),
 }
+GUIDANCE_RESULT_ANCHORS = {
+    "PAPER_DRAFT.md": (
+        "frozen guidance-mixture test",
+        "exact two-member allocation",
+        "all three proper-score\ncriteria fail",
+        "without retuning weights or member",
+    ),
+    "CLAIM_LEDGER.md": (
+        "| C32 |",
+        "equal-allocation mixture across five independent-CFG guidance settings",
+        "every sampling-protocol check passes",
+        "weights and two-members-per-setting allocation must not be retuned",
+    ),
+    "REPRODUCIBILITY.md": (
+        "guidance-mixture result is complete and rejected",
+        "proper-score, reliability and boundary criteria fail",
+    ),
+    "PUBLICATION_READINESS.md": (
+        "subsequent frozen guidance-mixture contract has also been executed",
+        "fails the\nproper-score, finite-ensemble reliability, boundary and spatial/physical",
+    ),
+}
 NEXT_GENERATIVE_METHOD_ANCHORS = {
     "NEXT_GENERATIVE_METHOD_CONTRACT.md": (
         "clean-checkpoint deep ensemble",
@@ -195,6 +217,10 @@ NEXT_GENERATIVE_METHOD_ANCHORS = {
         "active autonomous dependency is implementation and review",
     ),
 }
+STALE_READINESS_ANCHORS = (
+    "Continuous calibration development therefore moves to the pre-implementation",
+    "Its fixed ten-member guidance mixture",
+)
 MANUSCRIPT_EVIDENCE_ANCHORS = (
     "| Diagnostic | Raw ensemble | Cross-fitted correction | Interpretation |",
     "| Established-ice Brier score | 0.056973 | 0.058200 |",
@@ -258,6 +284,15 @@ def main() -> int:
         encoding="utf-8"
     )
 
+    stale_readiness = [
+        anchor for anchor in STALE_READINESS_ANCHORS if anchor in readiness
+    ]
+    require(
+        not stale_readiness,
+        "publication readiness contains stale pre-guidance-result narrative: "
+        + ", ".join(stale_readiness),
+    )
+
     missing_handoff_anchors = [
         anchor for anchor in FROZEN_EVALUATION_ANCHORS if anchor not in frozen_handoff
     ]
@@ -317,6 +352,15 @@ def main() -> int:
         require(
             not missing_anchors,
             f"{name} is missing analog-result anchors: "
+            + ", ".join(missing_anchors),
+        )
+
+    for name, anchors in GUIDANCE_RESULT_ANCHORS.items():
+        document = (PAPER_DIR / name).read_text(encoding="utf-8")
+        missing_anchors = [anchor for anchor in anchors if anchor not in document]
+        require(
+            not missing_anchors,
+            f"{name} is missing guidance-result anchors: "
             + ", ".join(missing_anchors),
         )
 

@@ -345,6 +345,16 @@ bias, boundary atoms and spatial error. This fixed residual-library hypothesis
 is rejected without changing its features, purge, distance, neighbors or
 clipping rule.
 
+The frozen guidance-mixture test reuses two common-random-number members from
+each of five completed independent-CFG settings. All 40 cases complete and the
+shared sampling protocol, conditioning contexts and exact two-member allocation
+are verified. Nevertheless, `overall_eligible=false`: all three proper-score
+criteria fail; member-range and randomized-rank reliability do not improve;
+the established-ice and exact-one boundary criteria fail; and every
+spatial/physical criterion fails. Mixing already sampled guidance settings is
+therefore rejected as a diversity mechanism without retuning weights or member
+allocation.
+
 Figure 1 summarizes the aggregate mechanism result. The dashed references are
 descriptive finite-ensemble targets, not confidence bounds.
 
