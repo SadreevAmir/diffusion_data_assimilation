@@ -279,8 +279,11 @@ NEXT_GENERATIVE_METHOD_ANCHORS = {
     ),
     "REPRODUCIBILITY.md": (
         "NEXT_GENERATIVE_METHOD_CONTRACT.md",
-        "clean-checkpoint deep-ensemble executable handoff",
+        "Archived clean-checkpoint deep-ensemble executable handoff",
         "reviewed trusted sampling and gate modes",
+        "route is not selectable as a fast fallback",
+        "months-long route",
+        "not\na scientific result, an active dependency or authorization to launch",
         "Exactly three clean training seeds",
         "`2401`, `2402`, and `2403`",
         "`2404`",
@@ -295,6 +298,9 @@ NEXT_GENERATIVE_METHOD_ANCHORS = {
     "PUBLICATION_READINESS.md": (
         "guidance-mixture result is now complete and rejected",
         "clean-checkpoint deep ensemble",
+        "retained only as an archived\nreproducibility contract",
+        "It is not selectable as a fast fallback",
+        "no sampling or gate stage from that route is an active scientific dependency",
         "Both checkpoint-trajectory EMA stages have now completed",
         "clean-checkpoint sampling\nretry was cancelled rather than completed",
         "neither it nor its dependent CPU\ngate is evidence in flight",

@@ -177,8 +177,6 @@ error `0.0461536485` and `0.0814045891`; established-ice Brier
 Only reliability and operational validity pass. These values document a
 rejected mechanism and must not be used to reconstruct paired cases.
 
-## Frozen clean-checkpoint deep-ensemble executable handoff
-
 The guidance-mixture result is complete and rejected; its operational checks
 pass, but proper-score, reliability and boundary criteria fail. It is retained
 as negative mechanism evidence and is not retuned.
@@ -207,9 +205,15 @@ every paired metric and interval. The authoritative gate has
 families pass, while proper scores and finite-ensemble reliability fail. These
 anchors are sufficient to audit the mechanism decision without raw ensembles.
 
+## Archived clean-checkpoint deep-ensemble executable handoff
+
 `paper/NEXT_GENERATIVE_METHOD_CONTRACT.md` freezes the subsequent
 clean-checkpoint deep ensemble. The reviewed trusted sampling and gate modes
-implement this contract; this document alone does not launch either stage.
+implement this contract, but the route is not selectable as a fast fallback:
+measured throughput makes the frozen three-seed training construction a
+months-long route. This section preserves a reproducibility contract; it is not
+a scientific result, an active dependency or authorization to launch either
+stage.
 Exactly three clean training seeds, `1701`,
 `1702`, and `1703`, use identical non-seed configuration. Every checkpoint
 contributes latent seeds `2401`, `2402`, and `2403`; the checkpoint selected by

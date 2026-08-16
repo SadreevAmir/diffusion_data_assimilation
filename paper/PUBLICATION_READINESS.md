@@ -187,11 +187,11 @@ draws two common-random-number members at each of five already evaluated
 independent-CFG weight pairs and is operationally valid, but it fails the
 proper-score, finite-ensemble reliability, boundary and spatial/physical
 families. The mechanism is therefore closed without post-hoc changes to its
-weights or member allocation. Continuous calibration development now points to
-the mechanistically distinct clean-checkpoint deep ensemble frozen in
-`NEXT_GENERATIVE_METHOD_CONTRACT.md`. The reviewed trusted sampling and gate
-modes execute that reserve contract; admission remains conditional on the
-frozen checkpoint-trajectory EMA result rather than runner availability.
+weights or member allocation. The clean-checkpoint deep ensemble frozen in
+`NEXT_GENERATIVE_METHOD_CONTRACT.md` is retained only as an archived
+reproducibility contract. It is not selectable as a fast fallback: measured
+throughput implies months for the frozen three-seed training construction, and
+no sampling or gate stage from that route is an active scientific dependency.
 
 The frozen coherent-member-offset contract has also been executed and rejected.
 Its purged training folds select amplitude `0.0`, leaving fair CRPS, ranks and
@@ -325,7 +325,8 @@ gate is evidence in flight. It must not be described as queued or used to defer
 the next autonomous mechanism test. Moreover, the measured clean-training
 throughput makes a fresh three-seed training cycle a months-long route rather
 than a fast fallback. Its frozen construction remains a reproducibility
-contract, not a scientific result or an active dependency.
+contract, neither a scientific result nor a selectable next experiment or
+active dependency.
 
 The frozen latent-temperature result is complete and negative. Its reconciled
 gate reports `overall_eligible=false`: fair CRPS worsens by `0.0046271592` with
