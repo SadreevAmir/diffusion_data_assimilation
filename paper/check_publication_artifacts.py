@@ -222,8 +222,10 @@ NEXT_GENERATIVE_METHOD_ANCHORS = {
         "guidance-mixture result is now complete and rejected",
         "clean-checkpoint deep ensemble",
         "training seeds `1701`, `1702`, and `1703`",
-        "already\nrunning checkpoint-trajectory EMA sampling stage",
-        "no runner implementation remains a\nscientific blocker",
+        "Both checkpoint-trajectory EMA stages have now completed",
+        "the terminal-safe sampling retry and its dependent CPU\ngate are queued",
+        "the exact evidence awaited\nis its dependent compact gate",
+        "No second proposal or post-hoc contract change is warranted",
     ),
 }
 STALE_READINESS_ANCHORS = (

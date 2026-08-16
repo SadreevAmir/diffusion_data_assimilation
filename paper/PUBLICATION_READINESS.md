@@ -269,11 +269,17 @@ operationally valid, but all three proper-score criteria, two reliability
 criteria, and the established-ice and exact-one boundary criteria fail. This is
 a mechanism failure, not permission to retune weights or member allocation.
 
-The immediate autonomous dependency is the compact result from the already
-running checkpoint-trajectory EMA sampling stage and its queued unchanged joint
-gate. If that frozen mechanism fails, the reviewed clean-checkpoint sampling
-and gate modes implement the reserve contract in
-`paper/NEXT_GENERATIVE_METHOD_CONTRACT.md`; no runner implementation remains a
-scientific blocker. Its training seeds `1701`, `1702`, and `1703`, fixed
-ten-member `4/3/3` case rotation, latent seeds, immutable clean training
-configuration, unchanged sampler and no-compensation gate must remain fixed.
+Both checkpoint-trajectory EMA stages have now completed, but completion
+metadata do not contain the decision-bearing compact gate. Until one exact EMA
+gate payload is reconciled in this worktree, the manuscript admits neither a
+positive nor a negative EMA claim. The clean-checkpoint reserve is no longer a
+hypothetical next step: the terminal-safe sampling retry and its dependent CPU
+gate are queued under one consistent source/dependency pair. The sampling job
+is therefore the active autonomous dependency, and the exact evidence awaited
+is its dependent compact gate containing all mandatory family decisions,
+`overall_eligible`, the 3% fair-CRPS decision with paired-date interval,
+ordinary-CRPS tolerance, forty-case completeness and operational provenance.
+No second proposal or post-hoc contract change is warranted while that pair is
+in flight. Its training seeds `1701`, `1702`, and `1703`, fixed ten-member
+`4/3/3` case rotation, latent seeds, immutable clean training configuration,
+unchanged sampler and no-compensation gate remain fixed.
