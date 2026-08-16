@@ -378,8 +378,13 @@ def generate_ensemble(
     progress=None,
     background_mask: torch.Tensor | None = None,
     initial_noise_hashes: list[str] | None = None,
+    initial_noise_scale: float = 1.0,
+    scaled_initial_noise_hashes: list[str] | None = None,
 ) -> torch.Tensor:
     """Generate one conditional ensemble in GPU-friendly member batches."""
+    initial_noise_scale = float(initial_noise_scale)
+    if not math.isfinite(initial_noise_scale) or initial_noise_scale <= 0.0:
+        raise ValueError("initial_noise_scale must be finite and positive")
     samples: list[torch.Tensor] = []
     for start in range(0, ensemble_size, sample_batch_size):
         batch_size = min(sample_batch_size, ensemble_size - start)
@@ -389,11 +394,22 @@ def generate_ensemble(
             for member in range(start, start + batch_size):
                 _seed_member(seed + case_order * ensemble_size + member)
                 member_noise = torch.randn_like(background)
-                if initial_noise_hashes is not None:
-                    canonical = (
+                if initial_noise_hashes is not None or scaled_initial_noise_hashes is not None:
+                    base_canonical = (
                         member_noise.detach().cpu().to(dtype=torch.float32).contiguous().numpy()
                     )
-                    initial_noise_hashes.append(hashlib.sha256(canonical.tobytes()).hexdigest())
+                    if initial_noise_hashes is not None:
+                        initial_noise_hashes.append(
+                            hashlib.sha256(base_canonical.tobytes()).hexdigest()
+                        )
+                member_noise = member_noise * initial_noise_scale
+                if scaled_initial_noise_hashes is not None:
+                    scaled_canonical = (
+                        member_noise.detach().cpu().to(dtype=torch.float32).contiguous().numpy()
+                    )
+                    scaled_initial_noise_hashes.append(
+                        hashlib.sha256(scaled_canonical.tobytes()).hexdigest()
+                    )
                 noise.append(member_noise)
             initial_noise = torch.cat(noise, dim=0)
 

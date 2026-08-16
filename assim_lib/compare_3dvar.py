@@ -262,6 +262,7 @@ def _apply_runtime_args(args: argparse.Namespace, comparison: dict[str, Any]) ->
         "atol": 1e-6,
         "inference_precision": "float32",
         "seed": 1234,
+        "initial_noise_scale": 1.0,
         "field_protocol": "siconc-only",
         "conditioning_mode": "full",
         "track_weight": 0.5,
@@ -507,6 +508,8 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     experiment = load_json(experiment_path)
     experiment, selected_mode = _select_experiment_mode(experiment, args.mode)
     args = _apply_runtime_args(args, experiment.get("comparison", {}))
+    if not np.isfinite(float(args.initial_noise_scale)) or float(args.initial_noise_scale) <= 0.0:
+        raise ValueError("initial_noise_scale must be finite and positive")
     if not args.run_dir:
         raise ValueError("--run-dir is required")
 
@@ -648,6 +651,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
 
                 progress.set_postfix(case=f"{case_order + 1}/{len(case_indices)}")
                 initial_noise_hashes: list[str] = []
+                scaled_initial_noise_hashes: list[str] = []
                 generated = generate_ensemble(
                     sampler=sampler,
                     background=tensors["background"],
@@ -670,9 +674,13 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                     autocast_dtype=autocast_dtype,
                     progress=progress,
                     initial_noise_hashes=initial_noise_hashes,
+                    initial_noise_scale=float(args.initial_noise_scale),
+                    scaled_initial_noise_hashes=scaled_initial_noise_hashes,
                 )
                 if len(initial_noise_hashes) != int(args.ensemble_size):
                     raise AssertionError("Initial-noise accounting is incomplete")
+                if len(scaled_initial_noise_hashes) != int(args.ensemble_size):
+                    raise AssertionError("Scaled initial-noise accounting is incomplete")
 
                 ensemble = denormalize_and_clip(generated, means, stds, siconc_channel)[:, siconc_channel]
                 truth = denormalize_and_clip(item["truth"].unsqueeze(0), means, stds, siconc_channel)[
@@ -733,6 +741,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                     "sral_files_used": item["meta"].get("sral_files_used"),
                     "empty_obs_days": item["meta"].get("empty_obs_days"),
                     "initial_noise_sha256": initial_noise_hashes,
+                    "scaled_initial_noise_sha256": scaled_initial_noise_hashes,
                 }
                 cases.append(case_metadata)
 
@@ -830,6 +839,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         "atol": float(args.atol),
         "inference_precision": precision,
         "seed": int(args.seed),
+        "initial_noise_scale": float(args.initial_noise_scale),
         "normalization_means": means,
         "normalization_stds": stds,
         "normalization_source": (
@@ -891,6 +901,7 @@ def parse_args() -> argparse.Namespace:
         default=None,
     )
     parser.add_argument("--seed", type=int, default=None)
+    parser.add_argument("--initial-noise-scale", type=float, default=None)
     parser.add_argument(
         "--field-protocol",
         choices=("siconc-only", "native-two-field"),
