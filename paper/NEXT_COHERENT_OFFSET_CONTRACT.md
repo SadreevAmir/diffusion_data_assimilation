@@ -35,8 +35,8 @@ ensemble is known.
 
 ## Permutation-equivariant coherent member score
 
-For raw member fields `x_i(p)`, valid-cell weights `w(p)` and pixelwise ensemble
-mean `m(p)`, compute
+For raw member fields `x_i(p)`, fixed equal valid-cell weights `w(p)=1` and
+pixelwise ensemble mean `m(p)`, compute
 
 ```
 d_i = sum_p w(p) [x_i(p) - m(p)] / sum_p w(p)
