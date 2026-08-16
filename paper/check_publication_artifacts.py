@@ -321,6 +321,8 @@ STALE_READINESS_ANCHORS = (
     "A positive\nvalidation-set latent-temperature result would establish",
     "Its dependent unchanged CPU gate is\nqueued.",
     "Until the respective compact gates are returned",
+    "locked-MC-dropout sampler is in flight",
+    "its dependent gate already queued",
 )
 MANUSCRIPT_EVIDENCE_ANCHORS = (
     "# Auditing Reliability in Generative Data Assimilation under Sparse Spatial Observations",

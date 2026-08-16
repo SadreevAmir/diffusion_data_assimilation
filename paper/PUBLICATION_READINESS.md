@@ -26,9 +26,12 @@ recovered from the completed internal sampler without GPU recomputation, and
 its complete compact payload from `latent_temperature_1p30_gate_retry1` has
 been reconciled. The result is negative: `overall_eligible=false`; reliability
 passes, while proper-score, boundary and spatial/physical families fail. The
-mechanistically distinct frozen locked-MC-dropout sampler is in flight, with
-its dependent gate already queued. Its sampling completion alone will not be a
-scientific result; only the complete compact gate may support a claim.
+mechanistically distinct frozen locked-MC-dropout internal sampler completed
+all 40-by-10 outputs, but its outer wrapper failed on the external case-schema
+metadata check; sampling completion alone will not be a
+scientific result and does not authorize GPU recomputation. Only trusted
+server-CPU recovery with exact provenance checks,
+followed by the dependent complete compact gate, may support a claim.
 
 This ordering does not waive the minimum publication tier. The negative latent-
 temperature result activates only the already predeclared locked-MC-dropout
