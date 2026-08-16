@@ -49,6 +49,11 @@ LOCKED_DROPOUT_RECONCILIATION_ANCHORS = (
     "at least 3% lower than raw",
     "does not establish independent\ngeneralization",
     "cannot authorize\npost-hoc tuning",
+    "Wrapper-only recovery boundary",
+    "cases_file=cases.json",
+    "does not authorize a GPU retry",
+    "trusted server-CPU finalizer",
+    "all sample hashes and finiteness",
 )
 
 LATENT_RECONCILIATION_ANCHORS = (

@@ -10,6 +10,23 @@ Reconcile only the compact summary produced by
 or any other gate id is not a scientific substitute. Raw ensembles remain on
 the server.
 
+## Wrapper-only recovery boundary
+
+The audited internal sampler completed the exact 40-by-10 output set, but the
+outer wrapper failed because its metadata validator expected embedded cases
+while the worker recorded `cases_file=cases.json`. This is an operational
+schema failure, not a scientific result, and it does not authorize a GPU retry.
+The internal samples must remain server-side and unchanged.
+
+Admit a recovered sampling artifact only if a trusted server-CPU finalizer
+validates the exact failed job, publication commit, recorded launch, external
+case schema, all sample hashes and finiteness before copying within the server
+result root. The dependent gate must name that recovered artifact as its exact
+source. Until both recovery provenance and the decision-bearing compact gate
+are present, record neither a positive nor a negative dropout claim. Worker
+completion alone is insufficient evidence, and fields must not be merged from
+the failed wrapper, recovery summary and gate payload.
+
 Before admitting either a positive or negative claim, require all of the
 following in the same compact payload:
 

@@ -332,16 +332,21 @@ The frozen latent-temperature result is complete and negative. Its reconciled
 gate reports `overall_eligible=false`: fair CRPS worsens by `0.0046271592` with
 date CI `[0.0014355657, 0.0075956683]`; reliability passes, but proper-score,
 boundary and spatial/physical families fail. No second temperature is admissible.
-The active predeclared locked-MC-dropout chain is the next decision-bearing
-mechanism.
+The predeclared locked-MC-dropout chain remains the next decision-bearing
+mechanism, but it has no scientific result yet.
 
 The frozen pair remains specified in `NEXT_LATENT_TEMPERATURE_CONTRACT.md`.
 The latent-temperature internal sampler completed all forty cases, and the
 wrapper-only failure was recovered without GPU recomputation as
 `latent_temperature_1p30_sampling_retry1`. Its dependent unchanged CPU gate is
 complete and reconciled as the negative result above. The predeclared locked-
-MC-dropout sampler is active and its dependent gate is queued. Until that exact
-compact gate is returned, dropout receives no positive or negative scientific
-claim; no second temperature may be
+MC-dropout internal sampler completed the exact 40-by-10 outputs, but its outer
+wrapper failed on the external `cases_file=cases.json` metadata schema. This is
+an operational failure only: no GPU retry is admissible, and the samples must
+remain unchanged on the server. A trusted server-CPU finalizer must validate
+the failed job, launch, case schema, hashes and finiteness; only a dependent
+gate sourced from that recovered artifact can become scientific evidence.
+Until that exact compact gate is returned, dropout receives no positive or
+negative scientific claim; no second temperature may be
 selected post hoc, and neither may a different dropout probability or mask
 construction.

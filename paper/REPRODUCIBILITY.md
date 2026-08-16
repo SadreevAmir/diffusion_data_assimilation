@@ -150,6 +150,20 @@ aggregate sampling metadata are insufficient. The separate locked-MC-dropout
 sampling and gate chain remains a mechanistically distinct comparison, not a
 retry or tuning branch.
 
+## Locked-MC-dropout wrapper recovery handoff
+
+The locked-MC-dropout internal worker completed the frozen 40-case, ten-member
+sampling envelope. Its outer wrapper failed only because validation expected
+cases embedded in metadata while the worker wrote `cases_file=cases.json`.
+This operational schema mismatch is not a negative scientific result and must
+not trigger GPU recomputation. A trusted server-CPU finalizer must bind the
+exact failed job and publication commit to the recorded launch and external
+case schema, validate every sample hash and finiteness check, and copy only
+within the server result root. The subsequent gate must use the recovered
+artifact as its exact source and satisfy
+`LOCKED_MC_DROPOUT_RESULT_RECONCILIATION.md`; worker completion and wrapper
+metadata alone are insufficient for any manuscript claim.
+
 ## Completed purged analog-residual handoff
 
 The compact payload `latent_temperature_1p30_gate_retry1` is now reconciled to
