@@ -142,9 +142,26 @@ error `0.0461536485` and `0.0814045891`; established-ice Brier
 Only reliability and operational validity pass. These values document a
 rejected mechanism and must not be used to reconstruct paired cases.
 
+## Frozen guidance-mixture pre-implementation handoff
+
 `paper/NEXT_GENERATIVE_METHOD_CONTRACT.md` freezes the subsequent
 guidance-mixture sampling mechanism before runner implementation. It is not an
-executed result and cannot be cited as evidence.
+executed result and cannot be cited as evidence. The only admissible candidate
+has `cfg_mode=independent`, scale pairs `(0.5,0.5)`, `(0.625,0.375)`,
+`(0.75,0.25)`, `(0.875,0.125)`, `(1.0,0.0)`, and exactly two members per pair.
+The same ordered two seed identifiers and initial-noise identifiers are reused
+at every pair; member order is pair-major and seed-minor. The runner interface
+has only `source_experiment=joint_full_condition_validation_2022`, and return
+policy is `summary_only`.
+
+Before admission, a reviewer must run
+`python3 paper/guidance_mixture_reference.py` and obtain
+`guidance-mixture reference checks: PASS`. The runner's ordered member plan is
+then passed to `compact_operational_accounting`; its compact gate is passed to
+`validate_compact_gate`. Admission fails on any scale, allocation, order,
+seed/noise pairing, fallback-count, mandatory-family or `overall_eligible`
+drift. This executable check establishes contract conformance only; it is not a
+scientific result and does not authorize sampling.
 
 Two distinct compact contracts must not be conflated. The trusted 40-row
 spread-only corrected-case table has an audited contract containing
