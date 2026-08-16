@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import ast
 import re
 import sys
 import xml.etree.ElementTree as ET
@@ -18,7 +19,12 @@ REQUIRED_FILES = (
     "PUBLICATION_READINESS.md",
     "NEXT_BASELINE_CONTRACT.md",
     "FROZEN_EVALUATION_HANDOFF.md",
+    "check_publication_artifacts.py",
+    "make_calibration_summary_figure.py",
+    "make_case_level_artifacts.py",
+    "make_joint_gate_figure.py",
 )
+PYTHON_FILES = tuple(name for name in REQUIRED_FILES if name.endswith(".py"))
 FIGURE_PATTERN = re.compile(r"!\[[^]]*\]\(([^)]+)\)")
 REFERENCE_PATTERN = re.compile(r"^(\d+)\. ", re.MULTILINE)
 CITATION_PATTERN = re.compile(r"\[([1-9]\d*(?:\s*,\s*[1-9]\d*)*)\]")
@@ -122,6 +128,24 @@ FROZEN_EVALUATION_ANCHORS = (
     "`overall_eligible=true`",
     "every recorded mandatory family is true",
 )
+FIGURE_TEXT_ANCHORS = {
+    "figures/calibration_summary.svg": (
+        "Cross-fitted global spread correction",
+        "Aggregate validation diagnostics; 40 dates, 10 ensemble members",
+        "0.0585",
+        "0.0557",
+        "0.7241",
+        "1.0615",
+        "0.8788",
+    ),
+    "figures/joint_gate_summary.svg": (
+        "Mean-preserving spread: joint-gate diagnostics",
+        "Candidate/raw ratios; lower is better; 40 dates, 10 members",
+        "0.963x",
+        "1.047x",
+        "1.014x",
+    ),
+}
 
 
 def require(condition: bool, message: str) -> None:
@@ -132,6 +156,10 @@ def require(condition: bool, message: str) -> None:
 def main() -> int:
     missing = [name for name in REQUIRED_FILES if not (PAPER_DIR / name).is_file()]
     require(not missing, f"missing required publication files: {', '.join(missing)}")
+
+    for name in PYTHON_FILES:
+        source = (PAPER_DIR / name).read_text(encoding="utf-8")
+        ast.parse(source, filename=name)
 
     manuscript = (PAPER_DIR / "PAPER_DRAFT.md").read_text(encoding="utf-8")
     claim_ledger = (PAPER_DIR / "CLAIM_LEDGER.md").read_text(encoding="utf-8")
@@ -194,6 +222,14 @@ def main() -> int:
         require(figure.is_file(), f"linked figure does not exist: {relative_name}")
         if figure.suffix.lower() == ".svg":
             ET.parse(figure)
+        anchors = FIGURE_TEXT_ANCHORS.get(relative_name, ())
+        figure_text = figure.read_text(encoding="utf-8")
+        missing_figure_anchors = [anchor for anchor in anchors if anchor not in figure_text]
+        require(
+            not missing_figure_anchors,
+            f"{relative_name} is missing semantic anchors: "
+            + ", ".join(missing_figure_anchors),
+        )
 
     reference_heading = "## References\n"
     require(reference_heading in manuscript, "manuscript contains no References section")

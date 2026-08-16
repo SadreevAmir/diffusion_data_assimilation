@@ -19,6 +19,14 @@ Both now record the completed, rejected ZOIB-EMOS/ECC-Q result while retaining
 the genuinely missing conformal, probabilistic-DA and independent deterministic
 comparisons. The checker now requires these corrected inventory anchors.
 
+A subsequent independent integrity pass also closed a reproducibility hole in
+the checker itself. The audit now requires all four publication generators,
+parses each as Python before accepting the package, and checks semantic text and
+numeric anchors in both checked-in SVG figures in addition to XML well-formedness.
+Consequently, a missing or syntactically damaged generator, or a well-formed but
+stale replacement figure, fails the publication audit instead of silently
+passing on filename alone.
+
 The re-audit does not change the scientific decision. All completed trusted
 calibration routes are negative controls, no method passes the common gate, and
 the minimum strong domain/SciML tier still lacks a clean checkpoint and frozen
@@ -171,15 +179,17 @@ positive evidence.
 - The manuscript now cites the primary ECC and IIEE references at first use;
   any future baseline family must add its own method-specific citation rather
   than inheriting authority from these references.
-- A local fail-closed publication audit now checks required paper files,
+- A local fail-closed publication audit now checks required paper files and
+  parses all four publication generators as Python,
   manuscript figure links, SVG parseability, contiguous numbered references and
   complete use of every listed reference. It requires consistency among
   publication status, the blocker declaration and the frozen-evaluation handoff,
   as well as unique contiguous claim-ledger IDs and the decision-bearing rows of
   all five manuscript evidence tables. Dropping a citation, negative mechanism
   result or active external boundary therefore cannot silently leave the
-  narrative intact. This is an integrity check and does not relax any scientific
-  blocker.
+  narrative intact. It also checks semantic numeric anchors in both linked SVGs,
+  rather than accepting arbitrary well-formed XML at the expected path. This is
+  an integrity check and does not relax any scientific blocker.
 
 ## External boundary
 
