@@ -132,6 +132,58 @@ NEXT_METHOD_ANCHORS = (
     "no experiment has been launched",
     "analog_residual_reference.py",
 )
+ANALOG_RESULT_ANCHORS = {
+    "PAPER_DRAFT.md": (
+        "0.064305",
+        "0.067464",
+        "0.107720",
+        "0.753021",
+        "fields therefore improve ranks and attainable coverage but transfer unsafe",
+    ),
+    "CLAIM_LEDGER.md": (
+        "| C31 |",
+        "0.0643049265",
+        "0.0674642030",
+        "0.1077199457",
+        "0.7530213545",
+    ),
+    "REPRODUCIBILITY.md": (
+        "## Completed purged analog-residual handoff",
+        "0.0643049265",
+        "0.0674642030",
+        "0.1077199457",
+        "0.7530213545",
+    ),
+    "PUBLICATION_READINESS.md": (
+        "exact frozen purged analog-residual contract",
+        "worsens by 9.94%",
+        "mean IIEE by 35.3%",
+        "0.753021",
+    ),
+}
+NEXT_GENERATIVE_METHOD_ANCHORS = {
+    "NEXT_GENERATIVE_METHOD_CONTRACT.md": (
+        "guidance-mixture ensemble",
+        "ten-member deterministic mixture over the five already",
+        "evaluated independent-CFG track weights",
+        "Use exactly two members at each track/background",
+        "common random numbers",
+        "overall_eligible=true",
+        "summary_only",
+        "No trusted mode currently implements this contract",
+    ),
+    "REPRODUCIBILITY.md": (
+        "NEXT_GENERATIVE_METHOD_CONTRACT.md",
+        "guidance-mixture sampling mechanism before runner implementation",
+        "executed result and cannot be cited as evidence",
+    ),
+    "PUBLICATION_READINESS.md": (
+        "fixed ten-member guidance mixture",
+        "two common-random-number members",
+        "five already evaluated",
+        "active autonomous dependency is implementation and review",
+    ),
+}
 MANUSCRIPT_EVIDENCE_ANCHORS = (
     "| Diagnostic | Raw ensemble | Cross-fitted correction | Interpretation |",
     "| Established-ice Brier score | 0.056973 | 0.058200 |",
@@ -247,6 +299,24 @@ def main() -> int:
         "NEXT_METHOD_CONTRACT.md is missing anchors: "
         + ", ".join(missing_next_method),
     )
+
+    for name, anchors in ANALOG_RESULT_ANCHORS.items():
+        document = (PAPER_DIR / name).read_text(encoding="utf-8")
+        missing_anchors = [anchor for anchor in anchors if anchor not in document]
+        require(
+            not missing_anchors,
+            f"{name} is missing analog-result anchors: "
+            + ", ".join(missing_anchors),
+        )
+
+    for name, anchors in NEXT_GENERATIVE_METHOD_ANCHORS.items():
+        document = (PAPER_DIR / name).read_text(encoding="utf-8")
+        missing_anchors = [anchor for anchor in anchors if anchor not in document]
+        require(
+            not missing_anchors,
+            f"{name} is missing next-generative-method anchors: "
+            + ", ".join(missing_anchors),
+        )
 
     figures = FIGURE_PATTERN.findall(manuscript)
     require(figures, "manuscript contains no linked figures")
