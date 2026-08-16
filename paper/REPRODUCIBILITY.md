@@ -82,8 +82,8 @@ zero mask and transferred scales must not be tuned after this result.
 
 ## Frozen ZOIB-EMOS/ECC-Q handoff
 
-The design frozen in `paper/NEXT_BASELINE_CONTRACT.md` has now been executed by
-the reviewed server runner: a date-balanced ZOIB-EMOS marginal model with
+The previously frozen design has been executed by the reviewed server runner: a
+date-balanced ZOIB-EMOS marginal model with
 exactly 13 fitted coefficients, five purged contiguous cross-fitting folds and
 deterministic ECC-Q reconstruction. Its sole runtime parameter was
 `source_experiment=joint_full_condition_validation_2022`; no ensemble artifact
@@ -103,6 +103,16 @@ IIEE `0.0796004071` and `0.0871897938`; edge disagreement `0.0351291198` and
 not be tuned after this result. These compact anchors document a rejected
 parametric boundary-aware baseline and must not be used to reconstruct
 case-level pairs.
+
+## Next frozen runner contract
+
+`paper/NEXT_BASELINE_CONTRACT.md` now specifies a not-yet-executed,
+topology-preserving stratified transport. It freezes purged folds, six
+mechanistically spaced strengths, training-only selection, exact event-mask,
+boundary-atom and pixel-mean invariants, the complete joint gate and uncertainty
+seeds. The reviewed runner accepts only
+`source_experiment=joint_full_condition_validation_2022` and returns a compact
+summary by default. No local artifact or server run is implied.
 
 ## Compact-artifact contract
 

@@ -19,7 +19,7 @@ Both now record the completed, rejected ZOIB-EMOS/ECC-Q result while retaining
 the genuinely missing conformal, probabilistic-DA and independent deterministic
 comparisons. The checker now requires these corrected inventory anchors.
 
-The re-audit does not change the scientific decision. All available trusted
+The re-audit does not change the scientific decision. All completed trusted
 calibration routes are negative controls, no method passes the common gate, and
 the minimum strong domain/SciML tier still lacks a clean checkpoint and frozen
 independent evaluation. Publication status therefore remains `NOT_READY`.
@@ -106,6 +106,15 @@ The final open-logit result additionally rules out hard upper-cap saturation as
 the sole cause of failure. It improves the capped candidate's proper score and
 inner-order reliability but still fails boundary and member-spatial families.
 
+The remaining autonomous design gap is now closed by the frozen
+topology-preserving stratified-transport contract. It leaves boundary atoms and
+both memberwise ice-event masks unchanged, preserves the pixelwise ensemble
+mean, and expands only within raw physical strata. Purged training folds select
+among six frozen strengths under proper-score, reliability and stricter
+member/local-spatial feasibility constraints. The held-out result must still
+pass the unchanged full no-compensation gate. This is a planned mechanism, not
+positive evidence.
+
 ## Safe autonomous work completed or still possible
 
 - The frozen method, aggregate reconciliation values, clipping caveat and
@@ -140,6 +149,10 @@ inner-order reliability but still fails boundary and member-spatial families.
 - The frozen ZOIB-EMOS/ECC-Q result is recorded as a fifth negative mechanism:
   operational validity and marginal boundary/rank repair do not compensate for
   failed proper-score, inner-order, established-ice and spatial families.
+- The next topology-preserving mechanism is frozen in
+  `NEXT_BASELINE_CONTRACT.md`, including exact projection semantics, leakage-safe
+  selection, failure interpretations, server-side inputs, compact return schema
+  and a one-parameter trusted runner interface. No experiment was launched.
 - The claim ledger no longer describes the baseline evidence as raw plus
   affine-logit only, and the manuscript contributions now expose both sides of
   the boundary/rank-versus-spatial tradeoff without treating one failed
@@ -178,13 +191,13 @@ evaluation. It also fixes the summary-only return schema and forbids retuning
 after confirmatory evidence. This closes an autonomous reproducibility gap but
 does not constitute authorization or change `NOT_READY`.
 
-The joint gate decisions are complete: global spread scaling, purged
+The completed joint gate decisions are negative: global spread scaling, purged
 hurdle-isotonic/ECC-Q, exact mean-preserving projected spread, fixed open-logit
 desaturation and frozen ZOIB-EMOS/ECC-Q are rejected as
-the paper's calibrated-ensemble method. The immediate external scientific
-boundary is authorization of a clean checkpoint and the already frozen
-independent evaluation, or specification and review of a genuinely new
-mechanistically distinct calibration contract. All currently implemented
+the paper's calibrated-ensemble method. Independent evaluation is not yet the
+next scientific step because no eligible calibration exists. The immediate next
+step is controller review and implementation of the already frozen
+topology-preserving stratified-transport contract. All currently implemented
 boundary/rank comparators have been completed and rejected.
 The paired date/block CPU analysis of the existing compact audit is complete;
 its compact result has been reconciled into the evidence chain, while local

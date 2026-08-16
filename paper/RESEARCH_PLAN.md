@@ -152,13 +152,16 @@ method in those families fails.
 - probabilistic DA baseline such as EnKF/LETKF when a fair implementation is
   available.
 
-The completed baseline was design-frozen in `NEXT_BASELINE_CONTRACT.md`: a pooled,
-date-balanced ZOIB-EMOS distribution with purged contiguous cross-fitting and
-ECC-Q reconstruction. Its optimizer, predictors, folds, seeds, reconstruction
-and joint no-compensation interpretation were fixed before execution. The
-reviewed run is complete and rejected by the joint gate: boundary masses and
-randomized ranks improve, but proper-score, inner-order, boundary and spatial
-families fail.
+The completed ZOIB-EMOS/ECC-Q baseline was design-frozen before execution. Its
+optimizer, predictors, folds, seeds, reconstruction and joint no-compensation
+interpretation remain immutable in the reproducibility trail. The reviewed run
+is rejected by the joint gate.
+
+`NEXT_BASELINE_CONTRACT.md` now freezes a distinct mechanism:
+topology-preserving stratified transport of existing members. It preserves
+boundary atoms, memberwise ice-event masks and the pixelwise ensemble mean,
+while selecting within-stratum expansion only on purged training dates. It is
+not executed and requires a reviewed trusted server CPU runner.
 
 ## Evaluation
 

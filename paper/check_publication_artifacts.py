@@ -51,20 +51,24 @@ FINAL_DIAGNOSTIC_ANCHORS = {
         "no post-hoc tuning is admissible",
     ),
 }
-NEXT_BASELINE_ANCHORS = {
+CALIBRATION_CONTRACT_ANCHORS = {
     "NEXT_BASELINE_CONTRACT.md": (
-        "exactly 13 fitted coefficients",
+        "topology-preserving stratified transport",
+        "lambda in {1.0,1.25,1.5,2.0,2.75,4.0}",
+        "no_feasible_training_scale=true",
         "source_experiment=joint_full_condition_validation_2022",
-        "overall_eligible=false",
+        "no_compensation_across_families=true",
+        "Design frozen locally; no experiment has been launched.",
     ),
     "RESEARCH_PLAN.md": (
         "NEXT_BASELINE_CONTRACT.md",
-        "date-balanced ZOIB-EMOS distribution",
-        "ZOIB-EMOS/ECC-Q construction is completed and rejected",
+        "topology-preserving stratified transport",
+        "not executed",
     ),
     "CLAIM_LEDGER.md": (
         "| C28 |",
         "| C29 |",
+        "| C30 |",
         "0.0585570",
         "overall_eligible=false",
         "only operational validity passes at family level",
@@ -75,6 +79,8 @@ NEXT_BASELINE_ANCHORS = {
         "| Ordinary CRPS | 0.062108 | 0.064991 | 4.64% worse |",
         "| Inner-order attainable-coverage error | 0.175953 | 0.253947 | Reliability family fails |",
         "| Mean IIEE | 0.079600 | 0.087190 | Spatial/physical family fails |",
+        "topology-preserving stratified transport",
+        "planned falsifiable mechanism",
     ),
     "REPRODUCIBILITY.md": (
         "## Frozen ZOIB-EMOS/ECC-Q handoff",
@@ -82,11 +88,15 @@ NEXT_BASELINE_ANCHORS = {
         "0.0642804809",
         "Only operational validity passes at family level",
         "overall_eligible=false",
+        "## Next frozen runner contract",
+        "topology-preserving stratified transport",
     ),
     "PUBLICATION_READINESS.md": (
         "No additional implemented mode",
         "0.0585570",
         "Only operational validity passes at family level",
+        "topology-preserving stratified-transport contract",
+        "No experiment was launched",
     ),
 }
 MANUSCRIPT_EVIDENCE_ANCHORS = (
@@ -164,7 +174,7 @@ def main() -> int:
             + ", ".join(missing_anchors),
         )
 
-    for name, anchors in NEXT_BASELINE_ANCHORS.items():
+    for name, anchors in CALIBRATION_CONTRACT_ANCHORS.items():
         document = (PAPER_DIR / name).read_text(encoding="utf-8")
         missing_anchors = [anchor for anchor in anchors if anchor not in document]
         require(

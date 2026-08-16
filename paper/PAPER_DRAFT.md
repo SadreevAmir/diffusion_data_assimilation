@@ -313,6 +313,16 @@ to convert marginal boundary/rank repair into useful spatial calibration under
 the frozen model. No optimizer, predictor, link or regularization change
 follows this result.
 
+Before any further development result is inspected, we freeze a distinct
+topology-preserving stratified transport in `NEXT_BASELINE_CONTRACT.md`. It
+keeps each member's exact boundary atoms and ice-event masks unchanged,
+preserves the pixelwise ensemble mean, and expands anomalies only among members
+already in the same physical stratum. Strength is selected on purged training
+dates under stricter proper-score, reliability and member/local-spatial
+feasibility constraints, then evaluated once on each held-out block under the
+same no-compensation gate. This paragraph records a planned falsifiable mechanism,
+not a result or contribution claim.
+
 Figure 1 summarizes the aggregate mechanism result. The dashed references are
 descriptive finite-ensemble targets, not confidence bounds.
 

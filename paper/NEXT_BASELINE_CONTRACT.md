@@ -1,143 +1,170 @@
-# Frozen next-baseline contract: ZOIB-EMOS with ECC-Q
+# Frozen next-baseline contract: topology-preserving stratified transport
 
-## Scientific role and hypothesis
+## Scientific role and falsifiable hypothesis
 
-This is the next strong, mechanistically distinct calibration baseline. It is a
-zero/one-inflated Beta ensemble-model-output-statistics (ZOIB-EMOS) distribution
-with rank-preserving ECC-Q reconstruction. Unlike the rejected hurdle-isotonic
-construction, it estimates a low-dimensional parametric conditional
-distribution; unlike projected spread and open-logit transforms, it models both
-boundary probabilities explicitly instead of moving existing members.
+This is the next mechanistically distinct calibration method after the rejected
+global-spread, hurdle-isotonic/ECC-Q, projected-spread, open-logit and
+ZOIB-EMOS/ECC-Q routes. Those results isolate two coupled failure modes:
+marginal reconstruction changes memberwise ice-event geometry, while unrestricted
+spread expansion creates or removes boundary atoms. The proposed transport acts
+on the existing ten fields without ECC, preserves every member's event masks and
+preserves the ensemble mean at every pixel.
 
-The falsifiable hypothesis is that a leakage-safe ZOIB-EMOS marginal model can
-repair boundary masses and finite-ensemble reliability while ECC-Q preserves
-enough of the raw empirical copula to pass the already frozen joint
-no-compensation gate. Success requires every gate family below to pass. A
-proper-score gain alone is not success.
+The falsifiable hypothesis is that useful underdispersion remains *within* the
+raw physical regimes. A leakage-safe expansion restricted to those regimes will
+improve fair CRPS by at least 3% while exact invariants prevent the previously
+observed boundary and mean-field failures. Failure of proper scores rejects this
+within-regime hypothesis; failure of member/local spatial diagnostics shows that
+even topology-preserving amplitude transport damages scenario structure.
 
-## Data envelope and folds
+## Server-side inputs and development envelope
 
-- Input is the server-side ten-member output of
-  `joint_full_condition_validation_2022`; no raw ensemble is copied locally.
-- Evaluate the same 40 ordered development cases and no other split.
-- Use five contiguous eight-case holdout blocks. For holdout block `k`, remove
-  it and the three chronologically nearest cases on each side before fitting.
-  At the endpoints, remove the available one-sided neighbours; do not wrap.
-- Every transformation, standardization statistic and fitted coefficient for a
-  held-out case uses training cases only. Pixels are observations for fitting,
-  but each date has total weight one, so dates rather than pixels determine the
-  empirical objective. Uncertainty is computed only from paired case summaries.
-- Fit one pooled model over the domain per fold. No month, location, regime,
-  track-density or distance-to-track interactions are allowed in this baseline.
+- The only scientific input is the server-side ten-member ensemble and verifying
+  field from `joint_full_condition_validation_2022` for the same 40 ordered
+  development cases. No ensemble or pixel-level artifact is copied locally.
+- The runner additionally receives the immutable source manifest, ordered case
+  identifiers, grid-cell weights/mask and source runner identity already attached
+  to that experiment. It must reject any identity mismatch or missing case.
+- Use five contiguous eight-case holdouts. For holdout `k`, purge the three
+  chronologically nearest cases on each side from its training set (one-sided at
+  endpoints, never wrapping). All scale selection uses only the remaining dates.
+- Pixels contribute within a date, but every training date has total weight one.
+  Held-out dates never affect candidate feasibility, scale selection, tie rules,
+  tolerances or standardization (none is required).
 
-## Frozen predictors and distribution
+## Exact transport and invariants
 
-For every pixel, compute from the raw ten-member ensemble: mean `m`, standard
-deviation `s` with divisor ten, exact-zero fraction `z`, and exact-one fraction
-`o`. Define `clip_logit(x) = logit(min(max(x, 1e-4), 1-1e-4))` and
-`ls = log(s + 1e-4)`. Standardize `clip_logit(m)` and `ls` using weighted
-training-fold mean and standard deviation; a standard deviation below `1e-8`
-is replaced by one. Do not standardize `z` or `o`.
+For raw concentration `x[i,p]` of member `i` at pixel `p`, assign one immutable
+stratum using exact float64 comparisons:
 
-The mixture has masses `p0` at zero and `p1` at one and a Beta interior with
-mass `pi = 1-p0-p1`. Boundary logits are a three-class softmax with the interior
-class as reference:
+1. `Z`: `x == 0`;
+2. `L`: `0 < x <= 0.15`;
+3. `H`: `0.15 < x < 1`;
+4. `O`: `x == 1`.
 
-```
-eta0 = a0 + a1 * standardized_clip_logit_m + a2 * standardized_ls + a3 * z
-eta1 = b0 + b1 * standardized_clip_logit_m + b2 * standardized_ls + b3 * o
-(p0, pi, p1) = softmax(eta0, 0, eta1)
-```
-
-The interior Beta parameters are
+Reject source values outside `[0,1]` or non-finite values. Members in `Z` and `O`
+are unchanged. Independently for `L` and `H`, let `I` be the member indices in
+that stratum, `g` their raw mean and `lambda >= 1`. Form
+`v_i = g + lambda * (x_i-g)` and compute the unique Euclidean projection
 
 ```
-mu = sigmoid(c0 + c1 * standardized_clip_logit_m + c2 * standardized_ls)
-kappa = 2 + softplus(d0 + d1 * standardized_ls)
-alpha = mu * kappa
-beta = (1 - mu) * kappa
+y_I = argmin_z sum_i (z_i-v_i)^2
+      subject to sum_i z_i = sum_i x_i and lower <= z_i <= upper
 ```
 
-This is exactly 13 fitted coefficients. There is no case-specific, pixelwise or
-post-result parameter selection.
+with `(lower, upper)=(nextafter(0,+inf),0.15)` for `L` and
+`(nextafter(0.15,+inf),nextafter(1,-inf))` for `H`. Use deterministic bisection
+of the projection multiplier for at most 80 iterations, stopping when the
+absolute sum residual is at most `1e-13`; then apply a deterministic residual
+correction to the lowest original member indices with available slack. Reject a
+pixel if final sum error exceeds `5e-13` or any value crosses its closed/open
+bound. A stratum with fewer than two members is unchanged.
 
-## Frozen fitting contract
+This construction must verify, not merely assume, all of the following for every
+held-out value: exact `Z` and `O` masks unchanged; `siconc > 0` and
+`siconc > 0.15` masks unchanged member by member; member identity unchanged; no
+permutation; pixelwise ensemble-mean error at most `5e-13`; values finite and in
+`[0,1]`. There is no clipping, ECC, smoothing, location/regime fitting, random
+jitter or post-result repair.
 
-- Minimize date-balanced negative log likelihood of the mixed distribution plus
-  `1e-4 * sum(theta**2)` over all 13 coefficients. For targets strictly inside
-  `(0,1)`, use the Beta density; exact endpoints use their corresponding point
-  masses. The ridge coefficient is fixed and not searched.
-- Initialize all coefficients to zero except `c1=1`, `d0=log(expm1(18))`.
-- Use float64 L-BFGS with maximum 500 iterations, gradient infinity norm
-  tolerance `1e-8`, relative objective tolerance `1e-10`, and no random start.
-- A fold is operationally invalid if optimization is non-finite, does not
-  converge, or any fitted coefficient has absolute value above 50. There is no
-  fallback optimizer, alternate ridge value or refit after examining scores.
-- Record fold membership, purged cases, training standardizers, coefficients,
-  convergence status, iteration count, final objective and runner hash.
+## Leakage-safe selection of transport strength
 
-## Frozen ten-member reconstruction
+The candidate set is frozen to
+`lambda in {1.0,1.25,1.5,2.0,2.75,4.0}`. These log-spaced strengths distinguish
+no transport, mild, moderate and aggressive within-stratum expansion; they are
+not a local refinement of a previously observed optimum. For each fold, apply
+each value to training dates and retain it only if all conditions hold versus
+raw training summaries:
 
-For held-out pixels, evaluate mixture quantiles at `q_j=(j-0.5)/10`,
-`j=1,...,10`. Quantiles in the lower point mass are exactly zero and quantiles
-above `1-p1` are exactly one; interior quantiles use the deterministic float64
-inverse Beta CDF. Assign the ten sorted quantiles using the raw ensemble member
-rank order (ECC-Q). Break raw ties by increasing original member index. Report
-the number of strict order violations, which must be zero. No clipping, jitter,
-mean restoration, spatial smoothing or permutation search is permitted.
+- case-mean fair CRPS improves by at least 3%; ordinary CRPS worsens by no more
+  than 0.5%;
+- member-range and inner-order attainable-coverage absolute errors both decrease
+  and randomized-rank discrepancy decreases by at least 20%;
+- every member and local variogram diagnostic at lags 1, 2 and 4 worsens by no
+  more than 1%;
+- all exact invariants above pass.
 
-## Joint no-compensation stop/go gate
+Among retained values choose minimum case-mean fair CRPS, then the smaller
+`lambda` on an exact tie within `1e-12`. If none is retained, freeze
+`lambda=1.0` for that holdout and record `no_feasible_training_scale=true`; this
+is an informative mechanism failure, not permission to relax a condition. Apply
+the selected value once to the eight held-out dates. Do not pool held-out
+results to refit or select a common value.
 
-The candidate is eligible only when all families pass independently:
+Record fold/holdout/purge membership, every training candidate summary,
+feasibility flags, selected values, projection residual maxima, invariant counts,
+source manifest identity and runner hash. There are no runtime tuning parameters.
 
-1. **Proper scores:** fair CRPS improves by at least 3% versus raw; ordinary
-   CRPS is no worse than raw by more than 1%; paired date-bootstrap 95% interval
-   for the fair-CRPS delta excludes zero in the improving direction.
-2. **Finite-ensemble reliability:** randomized-rank discrepancy falls at least
-   20%; member-range and inner-order attainable-coverage absolute errors each
-   decrease, allowing at most `0.02` worsening for any additional frozen central
-   coverage diagnostic.
-3. **Boundary behaviour:** absolute errors of exact-zero and exact-one member
-   masses do not increase; Brier scores for presence and established ice are
-   each no worse than raw by more than 1%.
-4. **Spatial/physical preservation:** mean IIEE and edge disagreement are each
-   no worse than raw by more than 2%; absolute area and extent errors satisfy
-   the frozen relative/near-zero tolerance in `RESEARCH_PLAN.md`; all reported
-   member and local variogram diagnostics at lags 1, 2 and 4 are no worse than
-   raw by more than 2%.
-5. **Operational validity:** all 40 cases and all metrics are finite, every fold
-   converges under the single optimizer contract, and ECC-Q has zero strict
-   rank-order violations.
+## Frozen joint no-compensation gate
 
-Report fair and ordinary CRPS, energy score, rank histogram, both attainable
-coverage diagnostics, boundary masses and Brier scores, IIEE, area, extent,
-edge disagreement, and mean/member/local variogram diagnostics. Use 20,000
-paired date bootstrap resamples with seed `20220815` and the fixed ten
-non-overlapping consecutive four-case clusters with seed `20220816`. The block
-interval is a temporal sensitivity, not an acceptance gate.
+Eligibility requires every family independently:
 
-## Interpretation frozen before result
+1. **Proper scores:** held-out case-mean fair CRPS improves by at least 3% over
+   raw; ordinary CRPS is no worse by more than 1%; the paired date-bootstrap 95%
+   interval for candidate-minus-raw fair CRPS lies strictly below zero.
+2. **Finite-ensemble reliability:** randomized-rank discrepancy decreases at
+   least 20%; member-range and inner-order attainable-coverage absolute errors
+   each decrease; no additional frozen central-coverage error worsens by more
+   than `0.02`.
+3. **Boundary behaviour:** exact-zero and exact-one mass errors do not increase;
+   presence and established-ice Brier scores are each no worse by more than 1%.
+   In addition, all four memberwise masks declared above must be bitwise equal to
+   raw. Any mismatch fails the family regardless of aggregate metrics.
+4. **Spatial/physical preservation:** analysis-mean RMSE, mean IIEE, edge
+   disagreement, area error, extent error and every mean-field variogram value
+   must match raw within numerical tolerance (`5e-13` fieldwise mean and
+   `1e-12` aggregate). Every member and local variogram diagnostic at lags 1, 2
+   and 4 must be no worse than raw by more than 2%. Report energy score as a
+   diagnostic, not compensation.
+5. **Operational validity:** exactly 40 held-out cases and ten members complete;
+   all metrics are finite; every fold has a recorded selection; all projections
+   and exact invariants pass; no undeclared fallback occurs.
 
-- **Full pass:** supports the paper claim that explicit boundary-mixture
-  distributional regression plus empirical-copula reconstruction can jointly
-  improve a finite bounded ensemble on the development envelope.
-- **Boundary pass, spatial failure:** rejects ECC-Q as sufficient preservation
-  of the useful conditional spatial copula after parametric marginal repair.
-- **Proper-score/reliability pass, boundary failure:** rejects the fixed ZOIB
-  regression specification as adequate boundary calibration despite explicit
-  atoms; do not tune ridge, predictors or mixture links post hoc.
-- **Spatial pass, score failure:** the method is a boundary-aware negative
-  baseline, not a calibrated-ensemble method.
-- **Optimization failure:** the fixed low-dimensional baseline is operationally
-  invalid. Do not silently substitute another optimizer or regularizer.
+Use 20,000 paired date-bootstrap resamples with seed `20220815`. Also report the
+fixed ten non-overlapping consecutive four-case block bootstrap interval with
+seed `20220816`; it is a temporal sensitivity, not an acceptance gate. Report
+raw/candidate aggregate and paired summaries for fair and ordinary CRPS,
+ensemble-mean RMSE, energy score, rank histogram, attainable coverage, exact
+boundary masses, both Brier scores, IIEE, area, extent, edge, and mean/member/
+local variograms.
 
-## Execution record
+## Interpretation frozen before execution
 
-The reviewed server-CPU runner has executed this contract with
-`source_experiment=joint_full_condition_validation_2022` as its only runtime
-parameter. All 40 cases and folds completed, all reported metrics were finite
-and ECC-Q strict rank-order violations were zero. The fixed joint gate returned
-`overall_eligible=false`: only operational validity passed. The frozen ridge,
-predictors, optimizer and links remain unchanged after the result; the compact
-reconciliation anchors and interpretation are recorded in
-`REPRODUCIBILITY.md`, `CLAIM_LEDGER.md` and `PUBLICATION_READINESS.md`.
+- **Full pass:** supports the narrow claim that event-topology-preserving
+  within-regime transport can calibrate a finite bounded ensemble without
+  sacrificing its physical event geometry or analysis mean.
+- **No feasible scale in at least one fold or proper-score failure:** rejects
+  sufficient within-regime underdispersion under the frozen transport family;
+  do not densify the scale set.
+- **Reliability failure with proper-score pass:** amplitude expansion improves
+  scoring but cannot repair discrete ten-member reliability without changing
+  event topology.
+- **Member/local spatial failure:** preserving masks and pixel means is
+  insufficient to preserve memberwise dependence; reject the transport rather
+  than weakening the spatial gate.
+- **Invariant or projection failure:** operationally invalid runner; fix only a
+  demonstrable implementation error and rerun the identical contract.
+
+## Minimal trusted runner interface and compact return
+
+The reviewed server CPU runner must expose exactly one runtime parameter:
+`source_experiment=joint_full_condition_validation_2022`.
+The controller must assign an implemented mode identifier during runner review;
+this document does not invent one. The runner performs fitting, transport,
+scoring and uncertainty server-side and accepts no scale, fold, seed, threshold,
+path or optimizer override.
+
+Default retrieval is `summary_only`. Return one compact JSON containing schema
+version, immutable input/runner identities, fold selections and feasibility,
+invariant maxima/counts, aggregate metrics, paired intervals, family booleans,
+`no_compensation_across_families=true` and `overall_eligible`. No raw ensemble,
+pixel field or per-case table is requested. If a paper figure later requires it,
+the only eligible additional artifact is a compact 40-row case-summary table
+named by a separate reviewed request.
+
+## Execution status
+
+Design frozen locally; no experiment has been launched. Execution requires code
+review and registration of a trusted server CPU runner implementing this exact
+contract. The earlier ZOIB-EMOS/ECC-Q result remains an immutable negative
+baseline in `REPRODUCIBILITY.md`, `CLAIM_LEDGER.md` and the manuscript.
