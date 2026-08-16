@@ -24,6 +24,7 @@ REQUIRED_FILES = (
     "make_calibration_summary_figure.py",
     "make_case_level_artifacts.py",
     "make_joint_gate_figure.py",
+    "analog_residual_reference.py",
 )
 PYTHON_FILES = tuple(name for name in REQUIRED_FILES if name.endswith(".py"))
 FIGURE_PATTERN = re.compile(r"!\[[^]]*\]\(([^)]+)\)")
@@ -119,6 +120,7 @@ NEXT_METHOD_ANCHORS = (
     "overall_eligible=true",
     "source_experiment=joint_full_condition_validation_2022",
     "no experiment has been launched",
+    "analog_residual_reference.py",
 )
 MANUSCRIPT_EVIDENCE_ANCHORS = (
     "| Diagnostic | Raw ensemble | Cross-fitted correction | Interpretation |",

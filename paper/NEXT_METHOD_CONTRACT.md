@@ -83,3 +83,10 @@ requested.
 
 Design frozen after reconciliation of the rejected topology-preserving result;
 no experiment has been launched.
+
+`analog_residual_reference.py` is the executable, data-independent review oracle
+for the frozen feature order, population normalization, squared-distance tie
+rule, exact ten-residual reuse, clipping masses and ensemble-mean displacement.
+It is not an experiment entry point and does not read project data. The reviewed
+server runner must match its synthetic checks in addition to the complete gate
+and artifact contract above.
