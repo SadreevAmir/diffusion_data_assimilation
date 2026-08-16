@@ -44,18 +44,19 @@ recovered from the completed internal sampler without GPU recomputation, and
 its complete compact payload from `latent_temperature_1p30_gate_retry1` has
 been reconciled. The result is negative: `overall_eligible=false`; reliability
 passes, while proper-score, boundary and spatial/physical families fail. The
-mechanistically distinct frozen locked-MC-dropout internal sampler completed
-all 40-by-10 outputs, but its outer wrapper failed on the external case-schema
-metadata check; sampling completion alone will not be a
-scientific result and does not authorize GPU recomputation. Only trusted
-server-CPU recovery with exact provenance checks,
-followed by the dependent complete compact gate, may support a claim.
+mechanistically distinct frozen locked-MC-dropout route is also complete. Its
+wrapper-only schema failure was recovered without GPU recomputation, and the
+dependent trusted compact gate identifies the exact frozen candidate
+`locked_mc_dropout_p010_final_ema_ensemble` with `overall_eligible=false`.
+That negative decision is the contractual prerequisite that activated the final
+cross-fitted iid calendar global-bias fallback; no dropout probability, layer
+set, mask construction or refresh rule was changed after the result.
 
 This ordering does not waive the minimum publication tier. The negative latent-
 temperature result activates only the already predeclared locked-MC-dropout
 fallback, unchanged; it does not authorize another temperature or retrospective
-tuning. Even a positive validation-set dropout result would establish candidate
-eligibility, not independent generalization, and would still leave the clean
+tuning. The completed negative dropout result closes only this frozen candidate;
+it does not establish independent generalization and still leaves the clean
 publication checkpoint, frozen independent evaluation and missing minimum-tier
 comparisons.
 
@@ -361,21 +362,20 @@ The frozen latent-temperature result is complete and negative. Its reconciled
 gate reports `overall_eligible=false`: fair CRPS worsens by `0.0046271592` with
 date CI `[0.0014355657, 0.0075956683]`; reliability passes, but proper-score,
 boundary and spatial/physical families fail. No second temperature is admissible.
-The predeclared locked-MC-dropout chain remains the next decision-bearing
-mechanism, but it has no scientific result yet.
+The predeclared locked-MC-dropout chain is complete and negative under its
+unchanged gate; it is no longer an active dependency or the next mechanism.
+The closed sequence remains immutable: no second temperature may be
+selected post hoc, and the dropout contract may not be altered.
 
 The frozen pair remains specified in `NEXT_LATENT_TEMPERATURE_CONTRACT.md`.
 The latent-temperature internal sampler completed all forty cases, and the
 wrapper-only failure was recovered without GPU recomputation as
 `latent_temperature_1p30_sampling_retry1`. Its dependent unchanged CPU gate is
 complete and reconciled as the negative result above. The predeclared locked-
-MC-dropout internal sampler completed the exact 40-by-10 outputs, but its outer
-wrapper failed on the external `cases_file=cases.json` metadata schema. This is
-an operational failure only: no GPU retry is admissible, and the samples must
-remain unchanged on the server. A trusted server-CPU finalizer must validate
-the failed job, launch, case schema, hashes and finiteness; only a dependent
-gate sourced from that recovered artifact can become scientific evidence.
-Until that exact compact gate is returned, dropout receives no positive or
-negative scientific claim; no second temperature may be
-selected post hoc, and neither may a different dropout probability or mask
-construction.
+MC-dropout internal sampler completed the exact 40-by-10 outputs, and its outer
+`cases_file=cases.json` schema failure was finalized on server CPU without GPU
+resampling. The dependent compact gate then recorded the exact frozen candidate
+`locked_mc_dropout_p010_final_ema_ensemble` with `overall_eligible=false`.
+This closes the dropout mechanism and activates the already frozen iid calendar
+global-bias fallback reported above; no second temperature, different dropout
+probability or different mask construction is admissible post hoc.

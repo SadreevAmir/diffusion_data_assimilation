@@ -163,14 +163,14 @@ and spatial/physical families fail.
 The locked-MC-dropout internal worker completed the frozen 40-case, ten-member
 sampling envelope. Its outer wrapper failed only because validation expected
 cases embedded in metadata while the worker wrote `cases_file=cases.json`.
-This operational schema mismatch is not a negative scientific result and must
-not trigger GPU recomputation. A trusted server-CPU finalizer must bind the
-exact failed job and publication commit to the recorded launch and external
-case schema, validate every sample hash and finiteness check, and copy only
-within the server result root. The subsequent gate must use the recovered
-artifact as its exact source and satisfy
-`LOCKED_MC_DROPOUT_RESULT_RECONCILIATION.md`; worker completion and wrapper
-metadata alone are insufficient for any manuscript claim.
+The trusted server-CPU recovery validated the recorded launch, case schema,
+sample hashes and finiteness without GPU recomputation. The dependent compact
+gate identifies `locked_mc_dropout_p010_final_ema_ensemble` and records
+`overall_eligible=false`. This is now a negative scientific mechanism result,
+not an active recovery handoff. The frozen probability, fourteen-layer set,
+elementwise locked masks, seed schedule and unchanged gate must not be altered;
+the result is also the audited prerequisite for the completed iid calendar
+global-bias fallback.
 
 ## Completed purged analog-residual handoff
 

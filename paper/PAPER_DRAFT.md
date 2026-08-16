@@ -137,6 +137,15 @@ member variogram safeguards failed. Thus `overall_eligible=false`; latent
 temperature repairs ranks by adding diversity that is too large and physically
 unsafe, and no second temperature is selected.
 
+The predeclared locked-MC-dropout fallback was subsequently recovered from its
+completed server-side samples without GPU recomputation and evaluated under its
+unchanged gate. The exact frozen candidate
+`locked_mc_dropout_p010_final_ema_ensemble` also has
+`overall_eligible=false`. This closes that model-stochasticity mechanism without
+changing the probability, admitted layers, locked-mask construction or seed
+schedule, and it is the precondition for the final iid calendar global-bias
+fallback reported below.
+
 ## 2. Conditional generative assimilation
 
 Let `x` denote the target sea-ice state, `b` a dense background and `o` sparse

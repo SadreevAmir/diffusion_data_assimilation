@@ -79,11 +79,13 @@ CURRENT_DECISION_ANCHORS = (
     "complete compact payload from `latent_temperature_1p30_gate_retry1` has\nbeen reconciled",
     "The result is negative: `overall_eligible=false`",
     "reliability\npasses, while proper-score, boundary and spatial/physical families fail",
-    "sampling completion alone will not be a\nscientific result",
-    "would establish candidate\neligibility, not independent generalization",
+    "exact frozen candidate\n`locked_mc_dropout_p010_final_ema_ensemble` with `overall_eligible=false`",
+    "completed negative dropout result closes only this frozen candidate",
     "already predeclared locked-MC-dropout\nfallback, unchanged",
     "latent_temperature_1p30_gate_retry1",
     "dependent unchanged CPU gate is\ncomplete and reconciled as the negative result above",
+    "locked-MC-dropout chain is complete and negative",
+    "activates the already frozen iid calendar\nglobal-bias fallback",
 )
 REPRODUCIBILITY_SECTION_ORDER = (
     "## Frozen latent-temperature recovery handoff",
@@ -128,6 +130,7 @@ FINAL_DIAGNOSTIC_ANCHORS = {
         "0.059107",
         "0.071936",
         "final fixed open-logit diagnostic",
+        "`locked_mc_dropout_p010_final_ema_ensemble` also has\n`overall_eligible=false`",
     ),
     "CLAIM_LEDGER.md": (
         "| C26 |",
@@ -136,18 +139,22 @@ FINAL_DIAGNOSTIC_ANCHORS = {
         "0.0591071",
         "0.0719362",
         "No post-hoc tuning follows.",
+        "| C38 | The frozen locked-MC-dropout candidate",
+        "contractual prerequisite for the subsequently completed iid calendar global-bias fallback",
     ),
     "REPRODUCIBILITY.md": (
         "0.0557378026",
         "0.0591071355",
         "0.0719361803",
         "must not be tuned after this result",
+        "gate identifies `locked_mc_dropout_p010_final_ema_ensemble` and records\n`overall_eligible=false`",
     ),
     "PUBLICATION_READINESS.md": (
         "0.0557378",
         "0.0591071",
         "0.0719362",
         "no post-hoc tuning is admissible",
+        "locked-MC-dropout chain is complete and negative",
     ),
 }
 CALIBRATION_CONTRACT_ANCHORS = {
@@ -332,6 +339,8 @@ STALE_READINESS_ANCHORS = (
     "Until the respective compact gates are returned",
     "locked-MC-dropout sampler is in flight",
     "its dependent gate already queued",
+    "locked-MC-dropout chain remains the next decision-bearing",
+    "Until that exact compact gate is returned",
 )
 MANUSCRIPT_EVIDENCE_ANCHORS = (
     "# Auditing Reliability in Generative Data Assimilation under Sparse Spatial Observations",
