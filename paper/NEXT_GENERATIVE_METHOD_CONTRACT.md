@@ -82,6 +82,17 @@ The reference plan oracle is `deep_ensemble_reference.py`. Admission must agree
 with its forty case allocations, `14/13/13` extra-member accounting, ordered
 member identifiers and fail-closed metadata checks.
 
+The compact pre-score admission manifest has exactly the schema implemented by
+`validate_admission_manifest`: schema version, source experiment, one shared
+non-seed configuration hash, three ordered training-run records, and forty
+ordered case records. Each training record proves normal completion, one finite
+selected checkpoint and the same non-seed configuration hash. Each member
+record carries its exact member identity, checkpoint and latent seeds,
+checkpoint hash, initial-noise hash and finite flag. Unknown or missing fields,
+duplicate checkpoint identities, reordered cases or members, a substituted
+checkpoint, a non-finite member, or unequal initial-noise hashes for the same
+case/latent seed across checkpoints fail before any score is evaluated.
+
 ## Frozen evaluation and decision
 
 Evaluate the same ordered forty development cases and the complete existing

@@ -160,11 +160,14 @@ The future runner interface has only
 `source_experiment=joint_full_condition_validation_2022`, and return policy is
 `summary_only`. Before runner admission, execute
 `python3 paper/deep_ensemble_reference.py` and require the message
-`checkpoint extras 14/13/13`. Review must additionally verify immutable clean
-training/configuration hashes, exact checkpoint selection, common-noise hashes,
-all member identities, zero substitution and the full unchanged gate. The
-reference establishes member-plan contract conformance only; it is not a
-scientific result.
+`checkpoint extras 14/13/13; metadata admission fails closed`. The executable
+oracle now validates the exact compact pre-score manifest: immutable shared
+non-seed configuration hash, three distinct selected-checkpoint hashes, normal
+and unique checkpoint selection, all ordered member identities, common-noise
+hash equality within each case/latent seed, finite outputs and zero
+substitution. Review must additionally verify the full unchanged gate. The
+reference establishes construction and metadata-admission contract conformance
+only; it is not a scientific result.
 
 Two distinct compact contracts must not be conflated. The trusted 40-row
 spread-only corrected-case table has an audited contract containing

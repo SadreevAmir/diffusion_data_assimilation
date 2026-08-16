@@ -196,6 +196,8 @@ NEXT_GENERATIVE_METHOD_ANCHORS = {
         "summary_only",
         "No currently implemented trusted mode executes this contract",
         "deep_ensemble_reference.py",
+        "validate_admission_manifest",
+        "Unknown or missing fields",
     ),
     "REPRODUCIBILITY.md": (
         "NEXT_GENERATIVE_METHOD_CONTRACT.md",
@@ -208,7 +210,9 @@ NEXT_GENERATIVE_METHOD_ANCHORS = {
         "source_experiment=joint_full_condition_validation_2022",
         "python3 paper/deep_ensemble_reference.py",
         "checkpoint extras 14/13/13",
-        "contract conformance only",
+        "metadata admission fails closed",
+        "exact compact pre-score manifest",
+        "metadata-admission contract conformance",
     ),
     "PUBLICATION_READINESS.md": (
         "guidance-mixture result is now complete and rejected",
