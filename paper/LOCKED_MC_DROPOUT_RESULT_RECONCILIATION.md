@@ -12,6 +12,10 @@ the server.
 
 ## Wrapper-only recovery boundary
 
+The implementation-ready operational contract is frozen in
+`NEXT_LOCKED_MC_DROPOUT_RECOVERY_CONTRACT.md`. It narrows no scientific gate and
+authorizes no new sampling.
+
 The audited internal sampler completed the exact 40-by-10 output set, but the
 outer wrapper failed because its metadata validator expected embedded cases
 while the worker recorded `cases_file=cases.json`. This is an operational
