@@ -1,19 +1,22 @@
 # Frozen independent evaluation handoff
 
-Status: BLOCKED_PENDING_EXTERNAL_AUTHORIZATION
+Status: AUTHORIZED_ACTIVE_PENDING_COMPACT_RESULT
 
 The scientific decision rules and immutable identities in
 `AMENDED_PRIMARY_EVALUATION_CONTRACT.md` are controlling. In particular, no
 earlier `overall_eligible` value is final success, randomized-rank quality has
 an absolute requirement, and high-SIC boundary decisions are truth-referenced.
 
-This document fixes the preflight boundary for the confirmatory run. It is not
-an authorization to open the locked evaluation data, train a checkpoint or
-launch an experiment. No independent result is present in this worktree.
+This document fixes the preflight boundary for the confirmatory run. The trusted
+controller has admitted the signed contract: the sealed raw stage is complete
+and its single dependent confirmatory CPU stage is already queued. That stage
+status is not a scientific outcome, and no independent result is present in this
+worktree.
 
 ## Required external inputs
 
-The trusted controller must provide all of the following before admission:
+The trusted controller attested all of the following before admitting the
+single active chain:
 
 1. an explicit authorization naming the clean checkpoint and the frozen
    independent evaluation;
@@ -23,9 +26,9 @@ The trusted controller must provide all of the following before admission:
 4. the deterministic comparator identity and its aligned case manifest;
 5. the frozen random seeds and confirmation that every case is evaluated once.
 
-Absence or mismatch of any item is a hard preflight failure. The worktree must
-not infer an identifier, substitute the legacy checkpoint, repair a manifest or
-fall back to development data.
+Absence or mismatch of any item was and remains a hard preflight failure. The
+worktree must not infer an identifier, substitute the legacy checkpoint, repair
+a manifest or fall back to development data.
 
 ## Frozen scientific contract
 
@@ -68,8 +71,8 @@ paper claim demonstrates that aggregate summaries are insufficient.
 
 ## Stop/go and reconciliation
 
-The run is admissible only after the five external-input conditions above are
-attested by the trusted controller. After return, local manuscript integration
+The admitted run remains valid only while the five external-input attestations
+above hold. After return, local manuscript integration
 must stop on any provenance mismatch, incomplete case count, non-finite metric,
 missing family decision or missing comparator alignment. `overall_eligible=true`
 supports selection only when both exact amended-contract digests and controller

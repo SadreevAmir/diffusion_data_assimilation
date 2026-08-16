@@ -1,6 +1,6 @@
 # Amended primary evaluation contract
 
-Status: FROZEN_PENDING_CONTROLLER_DEPLOY_AND_AUDIT
+Status: DEPLOYED_AUDITED_PRIMARY_IN_FLIGHT
 
 This contract supersedes every earlier scientific success decision. Completed
 development gates remain useful mechanism evidence, but none of their recorded
@@ -13,10 +13,11 @@ development gates remain useful mechanism evidence, but none of their recorded
 - gate contract:
   `57e8dd1859c4ac9a144be68904450926a6098b08a3b58a35e3d7dcc6a5bb9185`
 
-The primary evaluation is admissible only after the trusted controller deploys
-and audits both exact digests. This worktree does not implement, substitute or
+The trusted controller has deployed and audited both exact digests and admitted
+the single signed primary chain. This worktree does not implement, substitute or
 launch that runner. A digest mismatch, absent audit attestation or fallback to
-an earlier gate fails closed.
+an earlier gate fails closed. Admission and stage completion metadata do not
+constitute a scientific outcome; only the complete compact primary result does.
 
 ## Amended scientific decision rules
 

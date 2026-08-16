@@ -117,7 +117,7 @@ REPRODUCIBILITY_SECTION_ORDER = (
 )
 AMENDED_PRIMARY_ANCHORS = {
     "AMENDED_PRIMARY_EVALUATION_CONTRACT.md": (
-        "FROZEN_PENDING_CONTROLLER_DEPLOY_AND_AUDIT",
+        "DEPLOYED_AUDITED_PRIMARY_IN_FLIGHT",
         "f2225da7a05cab53b14604e45bed840a0ec559aed20856ae8ef2dd72d915b8f8",
         "57e8dd1859c4ac9a144be68904450926a6098b08a3b58a35e3d7dcc6a5bb9185",
         "absolute uniformity criterion",
@@ -386,7 +386,9 @@ MANUSCRIPT_EVIDENCE_ANCHORS = (
     "| Mean IIEE | 0.004379 | [0.002065, 0.006716] | [0.001149, 0.007849] |",
 )
 FROZEN_EVALUATION_ANCHORS = (
-    "Status: BLOCKED_PENDING_EXTERNAL_AUTHORIZATION",
+    "Status: AUTHORIZED_ACTIVE_PENDING_COMPACT_RESULT",
+    "sealed raw stage is complete",
+    "stage\nstatus is not a scientific outcome",
     "immutable checkpoint identity, dataset-manifest digest, code revision",
     "No calibration family, coefficient, threshold,",
     "no-compensation families remain those in `RESEARCH_PLAN.md`",
@@ -668,14 +670,14 @@ def main() -> int:
     if status == "READY_FOR_HUMAN_REVIEW":
         require(blockers == "none", "ready status requires no scientific blockers")
         require(
-            "Status: BLOCKED_PENDING_EXTERNAL_AUTHORIZATION" not in frozen_handoff,
-            "ready status contradicts blocked frozen evaluation handoff",
+            "Status: AUTHORIZED_ACTIVE_PENDING_COMPACT_RESULT" not in frozen_handoff,
+            "ready status contradicts active evaluation awaiting compact result",
         )
     else:
         require(blockers != "none", "not-ready status requires explicit scientific blockers")
         require(
-            "Status: BLOCKED_PENDING_EXTERNAL_AUTHORIZATION" in frozen_handoff,
-            "not-ready status requires the blocked frozen evaluation handoff",
+            "Status: AUTHORIZED_ACTIVE_PENDING_COMPACT_RESULT" in frozen_handoff,
+            "not-ready status requires the active handoff awaiting compact result",
         )
 
     print(
