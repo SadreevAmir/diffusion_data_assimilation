@@ -12,7 +12,7 @@ def _debug(message: str) -> None:
     print(f"[assim_lib] {message}", flush=True)
 
 
-def main(config: dict, config_dir: Path):
+def main(config: dict, config_dir: Path, *, trainer_class=None, scheduler_factory=None):
     _debug(f"run config project={config.get('project_name')} task={config.get('task_name')}")
     data_config_path = resolve_path(config["data_config"], config_dir)
     model_config_path = resolve_path(config["model_config"], config_dir)
@@ -77,13 +77,15 @@ def main(config: dict, config_dir: Path):
     _debug(f"model parameters={num_parameters:,} ({num_parameters / 1_000_000:.2f}M)")
     _debug("building optimizer and scheduler")
     optimizer = torch.optim.AdamW(model.parameters(), lr=train_config.learning_rate)
-    lr_scheduler = get_cosine_schedule_with_warmup(
+    scheduler_builder = scheduler_factory or get_cosine_schedule_with_warmup
+    lr_scheduler = scheduler_builder(
         optimizer=optimizer,
         num_warmup_steps=train_config.lr_warmup_steps,
         num_training_steps=max(1, len(train_loader) * train_config.num_epochs),
     )
     _debug("initializing trainer and ClearML task")
-    trainer = UNetTrainer(
+    trainer_type = trainer_class or UNetTrainer
+    trainer = trainer_type(
         config=train_config,
         model=model,
         optimizer=optimizer,

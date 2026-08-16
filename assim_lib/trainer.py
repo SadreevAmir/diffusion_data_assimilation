@@ -153,6 +153,13 @@ class UNetTrainer:
             return torch.distributions.Beta(alpha, beta).sample((batch_size,)).to(device)
         return torch.rand(batch_size, device=device)
 
+    def _training_loop_start(self) -> tuple[int, int]:
+        """Extension point for trusted epoch-boundary resume implementations."""
+        return 0, 0
+
+    def _after_training_epoch(self, epoch: int, global_step: int) -> None:
+        """Extension point called after all ordinary epoch artifacts are durable."""
+
     def _batch_to_device(self, batch: dict) -> dict[str, torch.Tensor]:
         return {
             key: batch[key].to(self.accelerator.device, dtype=torch.float32, non_blocking=True)
@@ -1316,9 +1323,11 @@ class UNetTrainer:
         _debug(f"dashboard sampling done epoch={epoch}")
 
     def train_loop(self):
-        global_step = 0
+        start_epoch, global_step = self._training_loop_start()
+        if not 0 <= start_epoch <= self.config.num_epochs or global_step < 0:
+            raise ValueError("training loop start state is invalid")
         _debug(f"training start epochs={self.config.num_epochs} train_batches={len(self.train_dataloader)}")
-        for epoch in range(self.config.num_epochs):
+        for epoch in range(start_epoch, self.config.num_epochs):
             self.model.train()
             _debug(f"epoch {epoch} start")
             progress_bar = tqdm(
@@ -1435,6 +1444,7 @@ class UNetTrainer:
                     _debug("saved best checkpoint")
                     if self.clearml is not None:
                         self.clearml.report_single_value("best_val_loss", val_loss)
+            self._after_training_epoch(epoch, global_step)
 
         if self.accelerator.is_main_process:
             _debug("uploading ClearML artifacts")

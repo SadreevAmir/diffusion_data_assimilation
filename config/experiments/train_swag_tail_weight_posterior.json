@@ -1,0 +1,77 @@
+{
+  "project_name": "swag_tail_weight_posterior",
+  "task_name": "swag_tail_weight_posterior",
+  "data_config": "../data/m2m_2f_1y.json",
+  "data_overrides": {
+    "observation_mask": {
+      "synthetic_probability": 0.5,
+      "empty_probability": 0.0
+    }
+  },
+  "model_config": "../methods/concat_conditioning_diffusion_balanced_2f.json",
+  "training": {
+    "base_output_dir": "training",
+    "run_name": "swag_tail",
+    "seed": 1701,
+    "num_workers_train": 0,
+    "num_workers_val": 0,
+    "sample_every_n_epochs": 0,
+    "metric_every_n_epochs": 0,
+    "metric_num_cases": 0
+  },
+  "swag": {
+    "schema_version": 1,
+    "training_seed": 1701,
+    "epochs": 40,
+    "initialization": "from_scratch_with_current_UNet_and_training_split",
+    "optimizer": {
+      "class": "AdamW",
+      "betas": [0.9, 0.999],
+      "epsilon": 1e-8,
+      "weight_decay": 0.01,
+      "amsgrad": false,
+      "state_policy": "retained continuously for all 40 epochs"
+    },
+    "learning_rate": 0.0001,
+    "warmup_steps": 500,
+    "pre_tail_schedule": "current cosine schedule through the epoch-30 boundary",
+    "tail_schedule": "learning rate frozen at the epoch-30 boundary for epochs 30..39",
+    "tail_start_epoch_zero_based": 30,
+    "snapshot_epochs_zero_based": [30, 31, 32, 33, 34, 35, 36, 37, 38, 39],
+    "snapshot_state": "raw non-EMA end-of-epoch weights",
+    "weight_sample_seeds": [170100, 170101, 170102, 170103, 170104, 170105, 170106, 170107, 170108, 170109],
+    "covariance": "standard SWAG diagonal plus rank-9; canonical one-half split",
+    "deviation_definition": "each snapshot minus the final ten-snapshot mean",
+    "matrix_chunk_parameters": 262144,
+    "resume": "epoch boundary only; exact model/optimizer/scheduler/RNG/EMA restore or fail",
+    "validation_selection": false,
+    "member_count": 10,
+    "latent_seed_formula": "1234 + 10*case_index + member_index",
+    "sampling": {
+      "dataset_split": "valid",
+      "start_date": "2022-01-01",
+      "end_date": "2022-07-15",
+      "case_stride_days": 5,
+      "case_count": 40,
+      "method": "dopri5",
+      "num_timesteps": 25,
+      "rtol": 0.00001,
+      "atol": 0.000001,
+      "precision": "float32",
+      "conditioning_mode": "full",
+      "cfg_mode": "none"
+    },
+    "dependent_gate": {
+      "mode": "validation_swag_tail_weight_posterior_gate",
+      "implementation": "existing deep_ensemble_gate full no-compensation gate",
+      "families": ["proper", "reliability", "boundary", "spatial", "operational"],
+      "paired_bootstrap_draws": 20000,
+      "block_sensitivity_is_diagnostic_only": true,
+      "no_compensation": true
+    }
+  },
+  "clearml": {
+    "enabled": false,
+    "upload_checkpoints": false
+  }
+}
