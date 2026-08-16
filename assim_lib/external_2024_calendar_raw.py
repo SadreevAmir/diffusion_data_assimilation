@@ -162,6 +162,15 @@ def _record(path: Path, root: Path) -> dict[str, object]:
     }
 
 
+def _resolved_without_symlinks(path: Path, label: str) -> Path:
+    lexical = path.expanduser().absolute()
+    # Reject the configured lexical target before resolve(); system prefixes
+    # such as macOS /var -> /private/var are outside the configurable root.
+    if lexical.is_symlink():
+        raise ValueError(f"{label} is a symlink")
+    return lexical.resolve(strict=True)
+
+
 def build_input_seal(
     repo: Path,
     dataset_root: Path,
@@ -169,12 +178,10 @@ def build_input_seal(
     mask_path: Path,
 ) -> dict[str, Any]:
     """Hash every exact holdout input before any model or truth evaluation starts."""
-    repo = repo.resolve()
-    dataset_root = dataset_root.resolve()
-    sral_root = sral_root.resolve()
-    mask_path = mask_path.resolve()
-    if dataset_root.is_symlink() or sral_root.is_symlink():
-        raise ValueError("holdout input roots cannot be symlinks")
+    repo = _resolved_without_symlinks(repo, "publication repository")
+    dataset_root = _resolved_without_symlinks(dataset_root, "dataset root")
+    sral_root = _resolved_without_symlinks(sral_root, "SRAL root")
+    mask_path = _resolved_without_symlinks(mask_path, "valid mask")
     preds = dataset_root / "preds"
     if preds.is_symlink() or not preds.is_dir() or not sral_root.is_dir():
         raise ValueError("holdout prediction or SRAL root is unavailable")
@@ -212,8 +219,8 @@ def build_input_seal(
         "sral_records": sral_records,
         "mask_record": _record(mask_path, mask_path.parent),
         "config_records": config_records,
-        "truth_values_read": False,
-        "outcomes_read": False,
+        "dense_target_may_be_loaded_only_to_construct_masked_model_observations": True,
+        "holdout_outcomes_used_for_metrics_or_method_selection": False,
     }
     if payload["target_date_manifest_sha256"] != TARGET_DATE_MANIFEST_SHA256:
         raise RuntimeError("compiled target-date manifest differs from the signed contract")
@@ -252,6 +259,33 @@ def _input_seal_unchanged(
     after = build_input_seal(repo, dataset_root, sral_root, mask_path)
     if after != before:
         raise RuntimeError("sealed holdout inputs changed during raw sampling")
+
+
+def _sampling_stage_complete(sampling_root: Path) -> bool:
+    if sampling_root.is_symlink() or not sampling_root.is_dir():
+        return False
+    for name in ("run_status.json", "metadata.json", "cases.json"):
+        path = sampling_root / name
+        if path.is_symlink() or not path.is_file():
+            return False
+    status = load_json(sampling_root / "run_status.json")
+    samples = sampling_root / "samples"
+    expected = [
+        f"{case_index:03d}_{target.isoformat()}_h23.npz" for case_index, target in enumerate(EXPECTED_DATES)
+    ]
+    return (
+        status.get("status") == "completed"
+        and status.get("completed_cases") == CASE_COUNT
+        and samples.is_dir()
+        and not samples.is_symlink()
+        and sorted(path.name for path in samples.iterdir()) == expected
+        and all((samples / name).is_file() and not (samples / name).is_symlink() for name in expected)
+    )
+
+
+def _checkpoint_source_unchanged(run_dir: Path, expected: dict[str, Any]) -> None:
+    if _validate_source(run_dir) != expected:
+        raise RuntimeError("checkpoint source changed during holdout processing")
 
 
 def _validate_sampling_metadata(root: Path) -> tuple[dict[str, Any], list[dict[str, Any]]]:
@@ -304,11 +338,22 @@ def _validate_sampling_metadata(root: Path) -> tuple[dict[str, Any], list[dict[s
     return metadata, cases
 
 
-def seal_samples(sampling_root: Path, sealed_root: Path) -> dict[str, Any]:
+def seal_samples(
+    sampling_root: Path, sealed_root: Path, input_seal: dict[str, Any] | None = None
+) -> dict[str, Any]:
     """Validate and seal 48x10 raw members before any downstream truth access."""
     if sampling_root.is_symlink() or sealed_root.is_symlink() or sealed_root.exists():
         raise ValueError("sampling/sealed roots violate the new-directory contract")
     _, cases = _validate_sampling_metadata(sampling_root)
+    sealed_sral_names = (
+        {
+            Path(str(record["path"])).name
+            for record in input_seal.get("sral_records", [])
+            if isinstance(record, dict) and isinstance(record.get("path"), str)
+        }
+        if input_seal is not None
+        else None
+    )
     sample_source = sampling_root / "samples"
     if sample_source.is_symlink() or not sample_source.is_dir():
         raise ValueError("sampling samples directory is unavailable")
@@ -355,12 +400,28 @@ def seal_samples(sampling_root: Path, sealed_root: Path) -> dict[str, Any]:
                 or any(parse_date(Path(str(path)).name) != expected_date for path in record["sral_files"])
             ):
                 raise ValueError("sampling conditioning-track provenance differs")
+        case_sral_names = {Path(str(path)).name for record in track_days for path in record["sral_files"]}
+        if sealed_sral_names is not None and not case_sral_names <= sealed_sral_names:
+            raise ValueError("sampling case references an SRAL file outside the input seal")
         if (
             case.get("track_imitation_date") != (target + timedelta(days=1)).isoformat()
             or case.get("mask_kind") != "sral_tracks"
             or case.get("sral_files_used") != sum(row["num_sral_files"] for row in track_days)
+            or case.get("empty_obs_days") != 0
+            or type(case.get("conditioning_obs_count")) is not int
+            or case["conditioning_obs_count"] <= 0
+            or type(case.get("track_imitation_count")) is not int
+            or case["track_imitation_count"] <= 0
         ):
             raise ValueError("sampling SRAL/mask provenance differs")
+        for key in ("conditioning_mask_sha256", "track_imitation_mask_sha256"):
+            value = str(case.get(key, ""))
+            try:
+                decoded = bytes.fromhex(value)
+            except ValueError as error:
+                raise ValueError(f"sampling {key} is not hexadecimal") from error
+            if len(decoded) != 32:
+                raise ValueError(f"sampling {key} is not a SHA-256 digest")
         base_hashes = case.get("initial_noise_sha256")
         scaled_hashes = case.get("scaled_initial_noise_sha256")
         if (
@@ -588,11 +649,14 @@ def run(output_dir: Path, source_experiment: str, run_dir: Path) -> None:
         raise ValueError("source_experiment differs from the frozen primary contract")
     if _canonical_hash(frozen_primary_contract()) != PRIMARY_CONTRACT_SHA256:
         raise RuntimeError("compiled primary contract hash differs from its signature")
-    output_dir = output_dir.resolve()
-    run_dir = run_dir.resolve()
-    if output_dir.is_symlink() or run_dir.is_symlink():
-        raise ValueError("input and output directories cannot be symlinks")
+    lexical_output = output_dir.expanduser().absolute()
+    if lexical_output.is_symlink():
+        raise ValueError("output directory cannot be a symlink")
+    output_parent = _resolved_without_symlinks(lexical_output.parent, "output parent")
+    output_dir = output_parent / lexical_output.name
     output_dir.mkdir(parents=True, exist_ok=True)
+    output_dir = _resolved_without_symlinks(output_dir, "output directory")
+    run_dir = _resolved_without_symlinks(run_dir, "checkpoint run directory")
     unexpected = {path.name for path in output_dir.iterdir()} - COMPACT_OUTPUTS - {"internal"}
     if unexpected:
         raise ValueError(f"output_dir contains unexpected entries: {sorted(unexpected)}")
@@ -622,16 +686,7 @@ def run(output_dir: Path, source_experiment: str, run_dir: Path) -> None:
                 if sealed_root.is_symlink():
                     raise ValueError("partial sealed stage is a symlink")
                 shutil.rmtree(sealed_root)
-            sampling_complete = False
-            sampling_status = sampling_root / "run_status.json"
-            if sampling_status.is_file() and not sampling_status.is_symlink():
-                status = load_json(sampling_status)
-                sampling_complete = (
-                    status.get("status") == "completed"
-                    and status.get("completed_cases") == CASE_COUNT
-                    and (sampling_root / "metadata.json").is_file()
-                    and (sampling_root / "cases.json").is_file()
-                )
+            sampling_complete = _sampling_stage_complete(sampling_root)
             if not sampling_complete:
                 if sampling_root.exists():
                     if sampling_root.is_symlink():
@@ -656,8 +711,9 @@ def run(output_dir: Path, source_experiment: str, run_dir: Path) -> None:
                     0,
                     total_units=CASE_COUNT,
                 )
-            sealed = seal_samples(sampling_root, sealed_root)
+            sealed = seal_samples(sampling_root, sealed_root, input_seal)
         _input_seal_unchanged(input_seal, repo, dataset_root, sral_root, mask_path)
+        _checkpoint_source_unchanged(run_dir, checkpoint_record)
         if (truth_root / TRUTH_SEAL_NAME).is_file():
             truth_seal = validate_existing_truth_seal(truth_root, sealed)
         else:
@@ -667,6 +723,7 @@ def run(output_dir: Path, source_experiment: str, run_dir: Path) -> None:
                 shutil.rmtree(truth_root)
             truth_seal = write_truth_bundle(repo, sampling_root, sealed_root, truth_root)
         _input_seal_unchanged(input_seal, repo, dataset_root, sral_root, mask_path)
+        _checkpoint_source_unchanged(run_dir, checkpoint_record)
         per_case = [
             {
                 "case_index": row["case_index"],
@@ -729,7 +786,8 @@ def run(output_dir: Path, source_experiment: str, run_dir: Path) -> None:
                 "raw_arrays_retrieved": False,
                 "outcome_values_exposed": False,
                 "gate_pending": True,
-                "offline_enforced": True,
+                "library_downloads_disabled_by_offline_environment": True,
+                "network_namespace_isolation_required_from_controller": True,
                 "visible_cuda_devices": 1,
                 "compact_outputs": sorted(COMPACT_OUTPUTS),
                 "runner_sha256": _file_hash(Path(__file__)),

@@ -7,6 +7,7 @@ import unittest
 from datetime import timedelta
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 import numpy as np
 
@@ -61,8 +62,8 @@ class External2024CalendarRawTests(unittest.TestCase):
             mask = root / "land_mask.npy"
             mask.write_bytes(b"m")
             seal = raw.build_input_seal(repo, dataset, sral, mask)
-            self.assertFalse(seal["truth_values_read"])
-            self.assertFalse(seal["outcomes_read"])
+            self.assertTrue(seal["dense_target_may_be_loaded_only_to_construct_masked_model_observations"])
+            self.assertFalse(seal["holdout_outcomes_used_for_metrics_or_method_selection"])
             self.assertEqual(len(seal["forecast_records"]), 99)
             self.assertEqual(len(seal["sral_records"]), 51)
             payload = {key: value for key, value in seal.items() if key != "seal_sha256"}
@@ -96,8 +97,13 @@ class External2024CalendarRawTests(unittest.TestCase):
                             for offset in range(3)
                         ],
                         "track_imitation_date": (target + timedelta(days=1)).isoformat(),
+                        "conditioning_obs_count": 3,
+                        "track_imitation_count": 1,
+                        "conditioning_mask_sha256": f"{case_index + 1:064x}",
+                        "track_imitation_mask_sha256": f"{case_index + 101:064x}",
                         "mask_kind": "sral_tracks",
                         "sral_files_used": 3,
+                        "empty_obs_days": 0,
                         "initial_noise_sha256": noise,
                         "scaled_initial_noise_sha256": noise,
                     }
@@ -142,7 +148,13 @@ class External2024CalendarRawTests(unittest.TestCase):
                 "cases_file": "cases.json",
             }
             (sampling / "metadata.json").write_text(json.dumps(metadata), encoding="utf-8")
-            sealed = raw.seal_samples(sampling, root / "sealed")
+            (sampling / "run_status.json").write_text(
+                json.dumps({"status": "completed", "completed_cases": 48}), encoding="utf-8"
+            )
+            input_seal = {
+                "sral_records": [{"path": f"{target.isoformat()}.npy"} for target in raw.TRACK_DATES]
+            }
+            sealed = raw.seal_samples(sampling, root / "sealed", input_seal)
             self.assertEqual(sealed["case_count"], 48)
             self.assertEqual(sum(len(row["members"]) for row in sealed["cases"]), 480)
             self.assertFalse(sealed["candidate_transform_started"])
@@ -152,6 +164,9 @@ class External2024CalendarRawTests(unittest.TestCase):
                 raw.validate_existing_sample_seal(root / "sealed")["sealed_manifest_sha256"],
                 sealed["sealed_manifest_sha256"],
             )
+            # A crash after the atomic directory move must not be mistaken for a
+            # resumable completed sampling stage; run() will resample safely.
+            self.assertFalse(raw._sampling_stage_complete(sampling))
             with np.load(root / "sealed/samples/000_2024-01-01_h23.npz", allow_pickle=False) as payload:
                 self.assertEqual(set(payload.files), {"analysis_ensemble", "valid_mask"})
 
@@ -180,8 +195,6 @@ class External2024CalendarRawTests(unittest.TestCase):
                 raw.build_input_seal(repo, dataset, sral, mask)
 
     def test_runtime_requires_offline_single_gpu(self) -> None:
-        from unittest.mock import patch
-
         with (
             patch.dict(
                 "os.environ",
@@ -191,6 +204,20 @@ class External2024CalendarRawTests(unittest.TestCase):
             self.assertRaisesRegex(RuntimeError, "exactly one"),
         ):
             raw._validate_runtime()
+
+    def test_symlinked_input_root_and_checkpoint_mutation_are_rejected(self) -> None:
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            real = root / "real"
+            real.mkdir()
+            alias = root / "alias"
+            alias.symlink_to(real, target_is_directory=True)
+            with self.assertRaisesRegex(ValueError, "is a symlink"):
+                raw._resolved_without_symlinks(alias, "dataset root")
+            expected = {"checkpoint_sha256": "a" * 64}
+            with patch.object(raw, "_validate_source", return_value={"checkpoint_sha256": "b" * 64}):
+                with self.assertRaisesRegex(RuntimeError, "checkpoint source changed"):
+                    raw._checkpoint_source_unchanged(real, expected)
 
     def test_help_and_shell_are_fail_closed(self) -> None:
         repo = Path(raw.__file__).resolve().parents[1]
