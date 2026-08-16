@@ -157,11 +157,14 @@ policy is `summary_only`.
 Before admission, a reviewer must run
 `python3 paper/guidance_mixture_reference.py` and obtain
 `guidance-mixture reference checks: PASS`. The runner's ordered member plan is
-then passed to `compact_operational_accounting`; its compact gate is passed to
-`validate_compact_gate`. Admission fails on any scale, allocation, order,
-seed/noise pairing, fallback-count, mandatory-family or `overall_eligible`
-drift. This executable check establishes contract conformance only; it is not a
-scientific result and does not authorize sampling.
+checked for every case through `compact_run_accounting`; the one-parameter
+interface and retrieval policy are passed to `validate_runner_interface`; and
+the compact gate is passed to `validate_compact_gate`. The lower-level
+`compact_operational_accounting` remains the single-case oracle. Admission
+fails on any scale, allocation, order, seed/noise pairing, nonzero reported fallback count,
+missing case plan, extra runtime parameter, mandatory-family or
+`overall_eligible` drift. This executable check establishes contract conformance only;
+it is not a scientific result and does not authorize sampling.
 
 Two distinct compact contracts must not be conflated. The trusted 40-row
 spread-only corrected-case table has an audited contract containing

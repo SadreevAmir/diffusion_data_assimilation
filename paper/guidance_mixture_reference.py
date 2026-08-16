@@ -22,6 +22,8 @@ SCALE_PAIRS = (
 MEMBERS_PER_PAIR = 2
 EXPECTED_CASES = 40
 EXPECTED_MEMBERS = 10
+SOURCE_EXPERIMENT = "joint_full_condition_validation_2022"
+ARTIFACT_POLICY = "summary_only"
 MANDATORY_FAMILIES = (
     "proper_scores",
     "finite_ensemble_reliability",
@@ -62,12 +64,26 @@ def frozen_member_plan(seed_ids: Sequence[str], noise_ids: Sequence[str]) -> tup
     )
 
 
-def compact_operational_accounting(plan: Sequence[Mapping[str, object]], completed_cases: int) -> dict[str, object]:
+def validate_runner_interface(parameters: Mapping[str, object], artifact_policy: str) -> None:
+    """Reject runtime knobs or retrieval beyond the frozen one-parameter interface."""
+    if dict(parameters) != {"source_experiment": SOURCE_EXPERIMENT}:
+        raise ValueError("runner must expose only the frozen source_experiment")
+    if artifact_policy != ARTIFACT_POLICY:
+        raise ValueError("runner retrieval must remain summary_only")
+
+
+def compact_operational_accounting(
+    plan: Sequence[Mapping[str, object]],
+    completed_cases: int,
+    fallback_member_count: int = 0,
+) -> dict[str, object]:
     """Validate runner records and return the frozen compact accounting."""
     if completed_cases != EXPECTED_CASES:
         raise ValueError("all forty cases must complete")
     if len(plan) != EXPECTED_MEMBERS:
         raise ValueError("every case must have exactly ten members")
+    if fallback_member_count != 0:
+        raise ValueError("fallback member substitution is forbidden")
     expected = frozen_member_plan(
         [str(plan[index]["seed_id"]) for index in range(MEMBERS_PER_PAIR)],
         [str(plan[index]["noise_id"]) for index in range(MEMBERS_PER_PAIR)],
@@ -86,8 +102,25 @@ def compact_operational_accounting(plan: Sequence[Mapping[str, object]], complet
             noise_ids[offset : offset + MEMBERS_PER_PAIR] == noise_ids[:MEMBERS_PER_PAIR]
             for offset in range(0, EXPECTED_MEMBERS, MEMBERS_PER_PAIR)
         ),
-        "fallback_member_count": 0,
+        "fallback_member_count": fallback_member_count,
     }
+
+
+def compact_run_accounting(
+    case_plans: Sequence[Sequence[Mapping[str, object]]],
+    fallback_member_count: int,
+) -> dict[str, object]:
+    """Validate the ordered plan for every case, then emit one compact report."""
+    if len(case_plans) != EXPECTED_CASES:
+        raise ValueError("runner must report one member plan for each of forty cases")
+    reports = [
+        compact_operational_accounting(plan, EXPECTED_CASES, fallback_member_count)
+        for plan in case_plans
+    ]
+    reference = reports[0]
+    if any(report != reference for report in reports[1:]):
+        raise ValueError("compact operational accounting differs between cases")
+    return {**reference, "validated_case_plan_count": len(case_plans)}
 
 
 def validate_compact_gate(gate: Mapping[str, object]) -> None:
@@ -106,11 +139,17 @@ def validate_compact_gate(gate: Mapping[str, object]) -> None:
 
 
 def _self_test() -> None:
+    validate_runner_interface(
+        {"source_experiment": SOURCE_EXPERIMENT},
+        ARTIFACT_POLICY,
+    )
     plan = frozen_member_plan(("seed-000", "seed-001"), ("noise-000", "noise-001"))
     report = compact_operational_accounting(plan, EXPECTED_CASES)
     assert report["ensemble_size"] == EXPECTED_MEMBERS
     assert report["per_scale_member_counts"] == [2, 2, 2, 2, 2]
     assert report["exact_common_noise_pairing"] is True
+    run_report = compact_run_accounting([plan] * EXPECTED_CASES, fallback_member_count=0)
+    assert run_report["validated_case_plan_count"] == EXPECTED_CASES
     gate = {
         "families": {name: {} for name in MANDATORY_FAMILIES},
         "family_pass": {name: True for name in MANDATORY_FAMILIES},
@@ -126,6 +165,29 @@ def _self_test() -> None:
         assert "pairing drifted" in str(exc)
     else:
         raise AssertionError("common-noise mutation did not fail closed")
+    case_plans = [plan] * EXPECTED_CASES
+    case_plans[17] = mutated
+    try:
+        compact_run_accounting(case_plans, fallback_member_count=0)
+    except ValueError as exc:
+        assert "pairing drifted" in str(exc)
+    else:
+        raise AssertionError("single-case member-plan mutation did not fail closed")
+    try:
+        compact_run_accounting([plan] * EXPECTED_CASES, fallback_member_count=1)
+    except ValueError as exc:
+        assert "fallback" in str(exc)
+    else:
+        raise AssertionError("fallback substitution did not fail closed")
+    try:
+        validate_runner_interface(
+            {"source_experiment": SOURCE_EXPERIMENT, "track_scale": 0.75},
+            ARTIFACT_POLICY,
+        )
+    except ValueError as exc:
+        assert "only" in str(exc)
+    else:
+        raise AssertionError("extra runtime parameter did not fail closed")
     gate["overall_eligible"] = False
     try:
         validate_compact_gate(gate)
