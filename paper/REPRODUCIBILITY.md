@@ -125,6 +125,21 @@ improvement.
 
 ## Compact-artifact contract
 
+## Frozen latent-temperature recovery handoff
+
+The original `latent_temperature_1p30_sampling_valid` wrapper failed after its
+audited internal sampler had completed all 40 cases and ten members per case.
+The reviewed CPU recovery
+`latent_temperature_1p30_sampling_retry1` validates the recorded launch,
+external case schema, all 400 sample hashes and finiteness before copying the
+unchanged samples within the server result root. It performs no GPU sampling
+and creates no new scientific candidate. Only the dependent compact payload
+from `latent_temperature_1p30_gate_retry1`, whose source is exactly the recovery
+id, may support a positive or negative latent-temperature claim. Completion or
+aggregate sampling metadata are insufficient. The separate locked-MC-dropout
+sampling and gate chain remains a mechanistically distinct comparison, not a
+retry or tuning branch.
+
 ## Completed purged analog-residual handoff
 
 The reviewed runner used only

@@ -11,11 +11,14 @@ evaluation and minimum-tier comparisons
 ## Current decision-bearing evidence
 
 The package is not waiting on clean-checkpoint training. Measured throughput
-makes that previously frozen three-seed route a months-long construction, and
-no clean-checkpoint sampling or gate result is in flight. The next admissible
-scientific decision is instead the single frozen latent-temperature construction
-at scale `1.30`, followed by its unchanged no-compensation gate. Its result may
-be admitted only from the complete compact payload identified in
+makes that previously frozen three-seed route a months-long construction. The
+single frozen latent-temperature construction at scale `1.30` has been
+recovered from the completed internal sampler without GPU recomputation; its
+unchanged no-compensation gate is queued as
+`latent_temperature_1p30_gate_retry1`. The mechanistically distinct frozen
+locked-MC-dropout sampler is also in flight, with its dependent gate already
+queued. Neither sampling completion is a scientific result. The latent result
+may be admitted only from the complete compact payload identified in
 `paper/LATENT_TEMPERATURE_RESULT_RECONCILIATION.md`; job status or partial
 aggregates are not evidence.
 
@@ -300,10 +303,12 @@ throughput makes a fresh three-seed training cycle a months-long route rather
 than a fast fallback. Its frozen construction remains a reproducibility
 contract, not a scientific result or an active dependency.
 
-The fastest implemented mechanistically distinct next test is therefore the
-already frozen latent-temperature pair in `NEXT_LATENT_TEMPERATURE_CONTRACT.md`.
-It changes initial latent dispersion before the unchanged ODE solve, uses one
-pre-result temperature, and hands the completed forty-case sample directly to
-the unchanged no-compensation CPU gate. Until that compact gate is returned,
-no latent-temperature claim is admitted and no second temperature may be
-selected post hoc.
+The frozen pair remains specified in `NEXT_LATENT_TEMPERATURE_CONTRACT.md`.
+The latent-temperature internal sampler completed all forty cases, and
+the wrapper-only failure was recovered without GPU recomputation as
+`latent_temperature_1p30_sampling_retry1`. Its dependent unchanged CPU gate is
+queued. In parallel, the predeclared locked-MC-dropout sampler is active and
+its dependent gate is queued. Until the respective compact gates are returned,
+neither mechanism receives a positive or negative scientific claim; no second temperature may be
+selected post hoc, and neither may a different dropout
+probability or mask construction.

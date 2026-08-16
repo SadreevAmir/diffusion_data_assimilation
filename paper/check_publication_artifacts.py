@@ -33,7 +33,9 @@ REQUIRED_FILES = (
 
 LATENT_RECONCILIATION_ANCHORS = (
     "Status: pre-result, fail closed. This checklist records no scientific outcome.",
-    "latent_temperature_1p30_gate_valid",
+    "latent_temperature_1p30_gate_retry1",
+    "latent_temperature_1p30_sampling_retry1",
+    "integrity-checked, server-side recovery",
     "exactly 40 completed cases and ten finite members per case",
     "gate.overall_eligible",
     "analysis_fair_crps",
@@ -48,10 +50,12 @@ LATENT_RECONCILIATION_ANCHORS = (
 CURRENT_DECISION_ANCHORS = (
     "Required scientific blockers: an eligible spatially preserving calibration;",
     "The package is not waiting on clean-checkpoint training.",
-    "single frozen latent-temperature construction\nat scale `1.30`",
+    "single frozen latent-temperature construction at scale `1.30`",
     "job status or partial\naggregates are not evidence",
     "would establish candidate eligibility,\nnot independent generalization",
     "already predeclared locked-MC-dropout\nfallback, unchanged",
+    "latent_temperature_1p30_gate_retry1",
+    "Neither sampling completion is a scientific result.",
 )
 PYTHON_FILES = tuple(name for name in REQUIRED_FILES if name.endswith(".py"))
 FIGURE_PATTERN = re.compile(r"!\[[^]]*\]\(([^)]+)\)")
