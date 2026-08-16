@@ -133,8 +133,6 @@ anchors are identical raw/candidate fair CRPS (`0.0584905850`/
 an inactive held-out correction when training feasibility fails, not a rounded
 improvement.
 
-## Compact-artifact contract
-
 ## Frozen latent-temperature recovery handoff
 
 The original `latent_temperature_1p30_sampling_valid` wrapper failed after its
@@ -149,6 +147,16 @@ id, may support a positive or negative latent-temperature claim. Completion or
 aggregate sampling metadata are insufficient. The separate locked-MC-dropout
 sampling and gate chain remains a mechanistically distinct comparison, not a
 retry or tuning branch.
+
+The compact payload `latent_temperature_1p30_gate_retry1` is now reconciled to
+the recovery source. All 40 cases and 400 members pass checkpoint, scale
+`1.30`, seed, base/scaled-hash, finiteness and no-substitution checks. It reports
+`overall_eligible=false`: raw/candidate fair CRPS is
+`0.0584905850`/`0.0631177443`, paired delta `0.0046271592`, date CI
+`[0.0014355657, 0.0075956683]`, and sensitivity-only block CI
+`[-0.0005197500, 0.0082640843]`; ordinary CRPS is
+`0.0621082810`/`0.0684128432`. Reliability passes, while proper-score, boundary
+and spatial/physical families fail.
 
 ## Locked-MC-dropout wrapper recovery handoff
 
@@ -165,16 +173,6 @@ artifact as its exact source and satisfy
 metadata alone are insufficient for any manuscript claim.
 
 ## Completed purged analog-residual handoff
-
-The compact payload `latent_temperature_1p30_gate_retry1` is now reconciled to
-the recovery source. All 40 cases and 400 members pass checkpoint, scale
-`1.30`, seed, base/scaled-hash, finiteness and no-substitution checks. It reports
-`overall_eligible=false`: raw/candidate fair CRPS is
-`0.0584905850`/`0.0631177443`, paired delta `0.0046271592`, date CI
-`[0.0014355657, 0.0075956683]`, and sensitivity-only block CI
-`[-0.0005197500, 0.0082640843]`; ordinary CRPS is
-`0.0621082810`/`0.0684128432`. Reliability passes, while proper-score, boundary
-and spatial/physical families fail.
 
 The reviewed runner used only
 `source_experiment=joint_full_condition_validation_2022` and the contract in
@@ -247,6 +245,8 @@ hash equality within each case/latent seed, finite outputs and zero
 substitution. Review must additionally verify the full unchanged gate. The
 reference establishes construction and metadata-admission contract conformance
 only; it is not a scientific result.
+
+## Compact-artifact contract
 
 Two distinct compact contracts must not be conflated. The trusted 40-row
 spread-only corrected-case table has an audited contract containing

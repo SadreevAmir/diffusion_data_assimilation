@@ -82,6 +82,14 @@ contribution is a failure map and fail-closed protocol. The checker requires
 these scope anchors so a later edit cannot silently restore a positive method
 claim before an eligible result exists.
 
+The reproducibility handoff was then audited section by section. A misplaced
+`Compact-artifact contract` heading had made the latent-temperature compact
+result appear under the analog-residual section even though all numeric content
+was correct. The result is now colocated with its recovery provenance, the
+compact-artifact heading immediately precedes the two schema contracts, and the
+checker enforces both semantic section order and absence of latent-temperature
+evidence from the analog-residual section.
+
 ## Scientific readiness decision
 
 The validation-set mechanism result and completed joint calibration audit are

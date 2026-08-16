@@ -85,6 +85,15 @@ CURRENT_DECISION_ANCHORS = (
     "latent_temperature_1p30_gate_retry1",
     "dependent unchanged CPU gate is\ncomplete and reconciled as the negative result above",
 )
+REPRODUCIBILITY_SECTION_ORDER = (
+    "## Frozen latent-temperature recovery handoff",
+    "## Locked-MC-dropout wrapper recovery handoff",
+    "## Completed purged analog-residual handoff",
+    "## Completed coherent-member-offset handoff",
+    "## Archived clean-checkpoint deep-ensemble executable handoff",
+    "## Compact-artifact contract",
+    "## Required reconciliation checks",
+)
 AMENDED_PRIMARY_ANCHORS = {
     "AMENDED_PRIMARY_EVALUATION_CONTRACT.md": (
         "FROZEN_PENDING_CONTROLLER_DEPLOY_AND_AUDIT",
@@ -395,6 +404,33 @@ def main() -> int:
     readiness = (PAPER_DIR / "PUBLICATION_READINESS.md").read_text(encoding="utf-8")
     frozen_handoff = (PAPER_DIR / "FROZEN_EVALUATION_HANDOFF.md").read_text(
         encoding="utf-8"
+    )
+    reproducibility = (PAPER_DIR / "REPRODUCIBILITY.md").read_text(encoding="utf-8")
+
+    section_positions = [
+        reproducibility.find(heading) for heading in REPRODUCIBILITY_SECTION_ORDER
+    ]
+    require(
+        all(position >= 0 for position in section_positions),
+        "reproducibility handoff is missing a required section heading",
+    )
+    require(
+        section_positions == sorted(section_positions),
+        "reproducibility handoff sections are out of semantic order",
+    )
+    latent_start = section_positions[0]
+    locked_start = section_positions[1]
+    latent_section = reproducibility[latent_start:locked_start]
+    require(
+        "The compact payload `latent_temperature_1p30_gate_retry1`" in latent_section,
+        "latent-temperature compact result is outside its recovery section",
+    )
+    analog_start = section_positions[2]
+    coherent_start = section_positions[3]
+    analog_section = reproducibility[analog_start:coherent_start]
+    require(
+        "latent_temperature_1p30_gate_retry1" not in analog_section,
+        "analog-residual section contains latent-temperature evidence",
     )
 
     missing_current_decision = [
