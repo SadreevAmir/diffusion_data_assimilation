@@ -151,8 +151,15 @@ Its purged training folds select amplitude `0.0`, leaving fair CRPS, ranks and
 coverage exactly equal to raw. Boundary, mean-field, member-spatial and
 operational families pass, but proper-score and finite-ensemble-reliability
 families fail and `overall_eligible=false`. This closes global coherent offsets
-without post-hoc changes; the active checkpoint-trajectory EMA experiment is
-the next mechanistically distinct evidence already in flight.
+without post-hoc changes. The checkpoint-trajectory EMA sampling and gate jobs
+have completed for all 40 validation cases, but completion status alone is not
+a scientific result. The publication worktree does not yet contain the compact
+numeric gate fields needed to verify `overall_eligible`, every mandatory family,
+the 3% fair-CRPS criterion, its paired-date interval, and operational checks.
+The base gate id and the separately completed retry id remain distinct evidence
+units and must not be merged or substituted. Until one complete compact result
+is reconciled, no positive or negative EMA claim is admitted and the conditional
+clean-checkpoint reserve is not launched from status metadata alone.
 
 The projection-free slack-limited ablation is also complete and rejected.
 Although it creates no boundary or spatial damage, every pixel is blocked, the

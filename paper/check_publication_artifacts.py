@@ -118,6 +118,9 @@ CALIBRATION_CONTRACT_ANCHORS = {
         "completed compact result",
         "fair CRPS are both `0.0584905850`",
         "spread-skill are both\n`0.7240662110`",
+        "completion status alone is not\na scientific result",
+        "base gate id and the separately completed retry id remain distinct evidence",
+        "clean-checkpoint reserve is not launched from status metadata alone",
     ),
 }
 NEXT_METHOD_ANCHORS = (
