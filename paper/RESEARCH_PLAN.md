@@ -160,8 +160,10 @@ is rejected by the joint gate.
 `NEXT_BASELINE_CONTRACT.md` now freezes a distinct mechanism:
 topology-preserving stratified transport of existing members. It preserves
 boundary atoms, memberwise ice-event masks and the pixelwise ensemble mean,
-while selecting within-stratum expansion only on purged training dates. It is
-not executed and requires a reviewed trusted server CPU runner.
+while selecting within-stratum expansion only on purged training dates. The
+reviewed run is complete and rejected: topology and mean-field invariants pass,
+but no reliability criterion or fair-CRPS criterion passes and at least one fold
+has no feasible training scale. The frozen scale set and strata are not extended.
 
 ## Evaluation
 

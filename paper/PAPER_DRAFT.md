@@ -313,15 +313,22 @@ to convert marginal boundary/rank repair into useful spatial calibration under
 the frozen model. No optimizer, predictor, link or regularization change
 follows this result.
 
-Before any further development result is inspected, we freeze a distinct
+Before inspecting its result, we froze a distinct
 topology-preserving stratified transport in `NEXT_BASELINE_CONTRACT.md`. It
 keeps each member's exact boundary atoms and ice-event masks unchanged,
 preserves the pixelwise ensemble mean, and expands anomalies only among members
 already in the same physical stratum. Strength is selected on purged training
 dates under stricter proper-score, reliability and member/local-spatial
 feasibility constraints, then evaluated once on each held-out block under the
-same no-compensation gate. This paragraph records a planned falsifiable mechanism,
-not a result or contribution claim.
+same no-compensation gate. The completed fixed result rejects the hypothesis:
+all 40 cases and metrics are finite, every memberwise mask is exact, the maximum
+mean error is at most `5e-13`, and both boundary and spatial/physical families
+pass, but no finite-ensemble reliability criterion improves, fair CRPS misses
+the 3% threshold with a date interval that does not exclude zero, and at least
+one fold has no feasible training scale. Thus preserving event topology and the
+mean field prevents the earlier structural damage but does not expose enough
+useful within-regime dispersion for calibration. No scale, stratum, fold, seed
+or threshold is changed after this result.
 
 Figure 1 summarizes the aggregate mechanism result. The dashed references are
 descriptive finite-ensemble targets, not confidence bounds.

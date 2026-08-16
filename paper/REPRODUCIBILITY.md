@@ -104,15 +104,20 @@ not be tuned after this result. These compact anchors document a rejected
 parametric boundary-aware baseline and must not be used to reconstruct
 case-level pairs.
 
-## Next frozen runner contract
+## Completed topology-preserving transport handoff
 
-`paper/NEXT_BASELINE_CONTRACT.md` now specifies a not-yet-executed,
-topology-preserving stratified transport. It freezes purged folds, six
+`paper/NEXT_BASELINE_CONTRACT.md` specifies the pre-result contract for the
+completed topology-preserving stratified transport. It freezes purged folds, six
 mechanistically spaced strengths, training-only selection, exact event-mask,
 boundary-atom and pixel-mean invariants, the complete joint gate and uncertainty
-seeds. The reviewed runner accepts only
-`source_experiment=joint_full_condition_validation_2022` and returns a compact
-summary by default. No local artifact or server run is implied.
+seeds. The reviewed runner accepted only
+`source_experiment=joint_full_condition_validation_2022`; no raw ensemble was
+retrieved. The compact gate reports `overall_eligible=false`: boundary and
+spatial/physical families pass with every memberwise mask exact and maximum
+mean error at most `5e-13`, but all three finite-ensemble reliability criteria,
+both fair-CRPS criteria and all-fold training feasibility fail. All 40 cases and
+reported metrics are complete and finite. The scale set, strata, folds, seed and
+thresholds must not be changed after this result.
 
 ## Compact-artifact contract
 

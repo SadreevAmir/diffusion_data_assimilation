@@ -18,6 +18,7 @@ REQUIRED_FILES = (
     "RESEARCH_PLAN.md",
     "PUBLICATION_READINESS.md",
     "NEXT_BASELINE_CONTRACT.md",
+    "NEXT_METHOD_CONTRACT.md",
     "FROZEN_EVALUATION_HANDOFF.md",
     "check_publication_artifacts.py",
     "make_calibration_summary_figure.py",
@@ -69,7 +70,7 @@ CALIBRATION_CONTRACT_ANCHORS = {
     "RESEARCH_PLAN.md": (
         "NEXT_BASELINE_CONTRACT.md",
         "topology-preserving stratified transport",
-        "not executed",
+        "reviewed run is complete and rejected",
     ),
     "CLAIM_LEDGER.md": (
         "| C28 |",
@@ -86,7 +87,7 @@ CALIBRATION_CONTRACT_ANCHORS = {
         "| Inner-order attainable-coverage error | 0.175953 | 0.253947 | Reliability family fails |",
         "| Mean IIEE | 0.079600 | 0.087190 | Spatial/physical family fails |",
         "topology-preserving stratified transport",
-        "planned falsifiable mechanism",
+        "completed fixed result rejects the hypothesis",
     ),
     "REPRODUCIBILITY.md": (
         "## Frozen ZOIB-EMOS/ECC-Q handoff",
@@ -94,17 +95,27 @@ CALIBRATION_CONTRACT_ANCHORS = {
         "0.0642804809",
         "Only operational validity passes at family level",
         "overall_eligible=false",
-        "## Next frozen runner contract",
+        "## Completed topology-preserving transport handoff",
         "topology-preserving stratified transport",
+        "all three finite-ensemble reliability criteria",
     ),
     "PUBLICATION_READINESS.md": (
         "No additional implemented mode",
         "0.0585570",
         "Only operational validity passes at family level",
         "topology-preserving stratified-transport contract",
-        "No experiment was launched",
+        "completed compact result",
     ),
 }
+NEXT_METHOD_ANCHORS = (
+    "purged analog-residual ensemble dressing",
+    "five contiguous eight-case holdouts",
+    "Select the ten training dates",
+    "clip(m + r_j, 0, 1)",
+    "overall_eligible=true",
+    "source_experiment=joint_full_condition_validation_2022",
+    "no experiment has been launched",
+)
 MANUSCRIPT_EVIDENCE_ANCHORS = (
     "| Diagnostic | Raw ensemble | Cross-fitted correction | Interpretation |",
     "| Established-ice Brier score | 0.056973 | 0.058200 |",
@@ -210,6 +221,16 @@ def main() -> int:
             f"{name} is missing next-baseline anchors: "
             + ", ".join(missing_anchors),
         )
+
+    next_method = (PAPER_DIR / "NEXT_METHOD_CONTRACT.md").read_text(encoding="utf-8")
+    missing_next_method = [
+        anchor for anchor in NEXT_METHOD_ANCHORS if anchor not in next_method
+    ]
+    require(
+        not missing_next_method,
+        "NEXT_METHOD_CONTRACT.md is missing anchors: "
+        + ", ".join(missing_next_method),
+    )
 
     figures = FIGURE_PATTERN.findall(manuscript)
     require(figures, "manuscript contains no linked figures")

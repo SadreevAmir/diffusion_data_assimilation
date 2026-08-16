@@ -114,14 +114,24 @@ The final open-logit result additionally rules out hard upper-cap saturation as
 the sole cause of failure. It improves the capped candidate's proper score and
 inner-order reliability but still fails boundary and member-spatial families.
 
-The remaining autonomous design gap is now closed by the frozen
-topology-preserving stratified-transport contract. It leaves boundary atoms and
+The final frozen topology-preserving stratified-transport contract has now been
+executed. It leaves boundary atoms and
 both memberwise ice-event masks unchanged, preserves the pixelwise ensemble
 mean, and expands only within raw physical strata. Purged training folds select
 among six frozen strengths under proper-score, reliability and stricter
-member/local-spatial feasibility constraints. The held-out result must still
-pass the unchanged full no-compensation gate. This is a planned mechanism, not
-positive evidence.
+member/local-spatial feasibility constraints. The held-out result is negative:
+boundary and spatial/physical families pass with exact masks and maximum mean
+error at most `5e-13`, but all three reliability criteria, both fair-CRPS
+criteria and all-fold scale feasibility fail. `overall_eligible=false`; this is
+negative mechanism evidence, not a selected calibration.
+
+Continuous calibration development therefore moves to the exact frozen
+`NEXT_METHOD_CONTRACT.md`: purged analog-residual ensemble dressing. Unlike all
+completed member transformations, it sources ensemble diversity from ten whole
+spatial residual fields selected on training-only raw-mean features. The fixed
+folds, purge, features, distance, tie rule, library size, clipping construction,
+joint gate and summary-only return are specified before execution. This is a
+new residual-library hypothesis, not a neighboring transport parameter point.
 
 ## Safe autonomous work completed or still possible
 
@@ -157,10 +167,11 @@ positive evidence.
 - The frozen ZOIB-EMOS/ECC-Q result is recorded as a fifth negative mechanism:
   operational validity and marginal boundary/rank repair do not compensate for
   failed proper-score, inner-order, established-ice and spatial families.
-- The next topology-preserving mechanism is frozen in
+- The topology-preserving mechanism was frozen before execution in
   `NEXT_BASELINE_CONTRACT.md`, including exact projection semantics, leakage-safe
   selection, failure interpretations, server-side inputs, compact return schema
-  and a one-parameter trusted runner interface. No experiment was launched.
+  and a one-parameter trusted runner interface. Its completed compact result is
+  reconciled as a negative mechanism test without post-hoc changes.
 - The claim ledger no longer describes the baseline evidence as raw plus
   affine-logit only, and the manuscript contributions now expose both sides of
   the boundary/rank-versus-spatial tradeoff without treating one failed
@@ -203,12 +214,13 @@ does not constitute authorization or change `NOT_READY`.
 
 The completed joint gate decisions are negative: global spread scaling, purged
 hurdle-isotonic/ECC-Q, exact mean-preserving projected spread, fixed open-logit
-desaturation and frozen ZOIB-EMOS/ECC-Q are rejected as
+desaturation, frozen ZOIB-EMOS/ECC-Q and topology-preserving stratified
+transport are rejected as
 the paper's calibrated-ensemble method. Independent evaluation is not yet the
-next scientific step because no eligible calibration exists. The immediate next
-step is controller review and implementation of the already frozen
-topology-preserving stratified-transport contract. All currently implemented
-boundary/rank comparators have been completed and rejected.
+next scientific step because no eligible calibration exists. All currently
+implemented mechanistically distinct calibration routes have been completed and
+rejected under the common gate; repeating or post-hoc retuning them would not
+create confirmatory evidence.
 The paired date/block CPU analysis of the existing compact audit is complete;
 its compact result has been reconciled into the evidence chain, while local
 reconstruction remains intentionally excluded. The currently implemented modes
