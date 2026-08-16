@@ -332,6 +332,19 @@ mean field prevents the earlier structural damage but does not expose enough
 useful within-regime dispersion for calibration. No scale, stratum, fold, seed
 or threshold is changed after this result.
 
+Purged analog-residual dressing then tests a different source of diversity:
+ten whole historical error fields selected by training-only forecast-state
+features. It passes all finite-ensemble reliability and operational criteria,
+but the full gate rejects it. Fair CRPS worsens from `0.058491` to `0.064305`
+(9.94%) and ordinary CRPS from `0.062108` to `0.067464` (8.62%). Mean IIEE
+rises from `0.079600` to `0.107720`, and absolute extent error from `0.046154`
+to `0.081405`. Lower and upper clipping masses reach `0.243596` and `0.102705`,
+while maximum ensemble-mean displacement reaches `0.753021`. Whole residual
+fields therefore improve ranks and attainable coverage but transfer unsafe
+bias, boundary atoms and spatial error. This fixed residual-library hypothesis
+is rejected without changing its features, purge, distance, neighbors or
+clipping rule.
+
 Figure 1 summarizes the aggregate mechanism result. The dashed references are
 descriptive finite-ensemble targets, not confidence bounds.
 

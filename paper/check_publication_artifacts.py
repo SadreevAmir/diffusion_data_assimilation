@@ -25,6 +25,7 @@ REQUIRED_FILES = (
     "make_case_level_artifacts.py",
     "make_joint_gate_figure.py",
     "analog_residual_reference.py",
+    "NEXT_GENERATIVE_METHOD_CONTRACT.md",
 )
 PYTHON_FILES = tuple(name for name in REQUIRED_FILES if name.endswith(".py"))
 FIGURE_PATTERN = re.compile(r"!\[[^]]*\]\(([^)]+)\)")
@@ -77,6 +78,7 @@ CALIBRATION_CONTRACT_ANCHORS = {
         "| C28 |",
         "| C29 |",
         "| C30 |",
+        "| C31 |",
         "0.0585570",
         "overall_eligible=false",
         "only operational validity passes at family level",

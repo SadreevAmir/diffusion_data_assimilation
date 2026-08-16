@@ -127,13 +127,21 @@ negative mechanism evidence, not a selected calibration. Raw and candidate
 fair CRPS are both `0.0584905850`, and raw and candidate spread-skill are both
 `0.7240662110`; the conclusion therefore does not rest only on threshold labels.
 
-Continuous calibration development therefore moves to the exact frozen
-`NEXT_METHOD_CONTRACT.md`: purged analog-residual ensemble dressing. Unlike all
-completed member transformations, it sources ensemble diversity from ten whole
-spatial residual fields selected on training-only raw-mean features. The fixed
-folds, purge, features, distance, tie rule, library size, clipping construction,
-joint gate and summary-only return are specified before execution. This is a
-new residual-library hypothesis, not a neighboring transport parameter point.
+The exact frozen purged analog-residual contract has now been executed and is
+rejected. It improves all three finite-ensemble reliability criteria, but fair
+CRPS worsens by 9.94%, ordinary CRPS by 8.62%, mean IIEE by 35.3% and extent
+absolute error by 76.4%. Clipping mass reaches `0.243596` at zero and `0.102705`
+at one, while maximum ensemble-mean displacement reaches `0.753021`. Thus whole
+historical residual fields transfer useful rank diversity together with unsafe
+bias, boundary atoms and spatial error; no analog parameter is retuned.
+
+Continuous calibration development therefore moves to the pre-implementation
+`NEXT_GENERATIVE_METHOD_CONTRACT.md`. Its fixed ten-member guidance mixture
+draws two common-random-number members at each of five already evaluated
+independent-CFG weight pairs. It creates diversity inside the bounded
+conditional generator rather than by marginal mapping, member transport or
+historical-error transfer. Exact weights, allocation, seeds, unchanged sampler
+settings, full gate and summary-only return are frozen before runner work.
 
 ## Safe autonomous work completed or still possible
 
@@ -216,8 +224,8 @@ does not constitute authorization or change `NOT_READY`.
 
 The completed joint gate decisions are negative: global spread scaling, purged
 hurdle-isotonic/ECC-Q, exact mean-preserving projected spread, fixed open-logit
-desaturation, frozen ZOIB-EMOS/ECC-Q and topology-preserving stratified
-transport are rejected as
+desaturation, frozen ZOIB-EMOS/ECC-Q, topology-preserving stratified transport
+and purged analog-residual dressing are rejected as
 the paper's calibrated-ensemble method. Independent evaluation is not yet the
 next scientific step because no eligible calibration exists. All currently
 implemented mechanistically distinct calibration routes have been completed and
@@ -230,3 +238,9 @@ cannot supply another independent strong baseline family beyond the completed
 negative comparators. The frozen independent evaluation
 also remains locked until explicit authorization after the pre-test evidence
 package and clean checkpoint are complete.
+
+The active autonomous dependency is implementation and review of the frozen
+`paper/NEXT_GENERATIVE_METHOD_CONTRACT.md`, not an external blocker. Until that
+runner exists, the exact guidance weights, two-per-weight allocation, common
+random numbers, unchanged sampler settings and no-compensation gate must remain
+unchanged.

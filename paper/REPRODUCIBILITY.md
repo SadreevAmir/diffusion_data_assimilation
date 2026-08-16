@@ -125,6 +125,27 @@ improvement.
 
 ## Compact-artifact contract
 
+## Completed purged analog-residual handoff
+
+The reviewed runner used only
+`source_experiment=joint_full_condition_validation_2022` and the contract in
+`paper/NEXT_METHOD_CONTRACT.md`: five contiguous purged holdouts, six
+forecast-only features, training-only population standardization, ten complete
+nearest residual fields and fixed clipping. All 40 cases have ten distinct
+analogs and finite metrics. The gate rejects the candidate. Reconciliation
+anchors are fair CRPS `0.0584905850` raw and `0.0643049265` candidate; ordinary
+CRPS `0.0621082810` and `0.0674642030`; mean RMSE `0.1903366044` and
+`0.1800823325`; mean IIEE `0.0796004071` and `0.1077199457`; extent absolute
+error `0.0461536485` and `0.0814045891`; established-ice Brier
+`0.0569726083` and `0.0796927236`; lower/upper clipping masses
+`0.2435959763`/`0.1027051936`; and maximum mean displacement `0.7530213545`.
+Only reliability and operational validity pass. These values document a
+rejected mechanism and must not be used to reconstruct paired cases.
+
+`paper/NEXT_GENERATIVE_METHOD_CONTRACT.md` freezes the subsequent
+guidance-mixture sampling mechanism before runner implementation. It is not an
+executed result and cannot be cited as evidence.
+
 Two distinct compact contracts must not be conflated. The trusted 40-row
 spread-only corrected-case table has an audited contract containing
 `analysis_fair_crps`, `analysis_crps`, `analysis_spread_skill_ratio`, and
