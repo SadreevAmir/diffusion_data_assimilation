@@ -26,6 +26,7 @@ REQUIRED_FILES = (
     "make_joint_gate_figure.py",
     "analog_residual_reference.py",
     "NEXT_GENERATIVE_METHOD_CONTRACT.md",
+    "guidance_mixture_reference.py",
 )
 PYTHON_FILES = tuple(name for name in REQUIRED_FILES if name.endswith(".py"))
 FIGURE_PATTERN = re.compile(r"!\[[^]]*\]\(([^)]+)\)")
@@ -171,6 +172,7 @@ NEXT_GENERATIVE_METHOD_ANCHORS = {
         "overall_eligible=true",
         "summary_only",
         "No trusted mode currently implements this contract",
+        "guidance_mixture_reference.py",
     ),
     "REPRODUCIBILITY.md": (
         "NEXT_GENERATIVE_METHOD_CONTRACT.md",

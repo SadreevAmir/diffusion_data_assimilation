@@ -67,4 +67,6 @@ hashes and operational counts. No raw member or truth field is requested.
 
 No trusted mode currently implements this contract. This is an autonomous
 engineering task for the next controller cycle, not an external dependency and
-not permission to substitute an existing mode or launch an experiment.
+not permission to substitute an existing mode or launch an experiment. Before
+admission, the runner review must agree with the dependency-free member-plan,
+accounting and gate oracle in `guidance_mixture_reference.py`.
