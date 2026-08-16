@@ -1,4 +1,4 @@
-# Reliable Generative Data Assimilation: Finite-Ensemble Calibration under Sparse Spatial Observations
+# Auditing Reliability in Generative Data Assimilation under Sparse Spatial Observations
 
 ## Amended primary decision policy
 
@@ -41,8 +41,15 @@ results support a narrow diagnosis of predominantly global underdispersion. A
 predeclared joint audit nevertheless rejects the correction as a well-calibrated
 ensemble: clipping creates a large spurious exact-one atom, established-ice
 Brier score worsens by 2.15%, and IIEE and edge disagreement worsen beyond their
-2% tolerances. The result exposes a marginal-score/physical-structure tradeoff,
-not an independent generalization claim or superiority to a deterministic
+2% tolerances. We then test a frozen, mechanistically diverse suite spanning
+bounded marginal models with ECC-Q, exact mean-preserving transports, coherent
+member offsets, historical residual fields, guidance mixing and latent-space
+inflation. None passes the common development gate: methods that materially
+improve ranks or coverage either degrade proper scores, boundary behaviour or
+spatial structure, whereas topology- and boundary-preserving constructions
+select an inactive correction. The contribution is therefore an auditable
+failure map and a fail-closed evaluation protocol, not a successful calibrated
+ensemble, an independent generalization claim or superiority to a deterministic
 method.
 
 ## 1. Introduction

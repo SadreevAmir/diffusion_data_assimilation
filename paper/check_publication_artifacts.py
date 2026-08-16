@@ -293,6 +293,10 @@ STALE_READINESS_ANCHORS = (
     "Until the respective compact gates are returned",
 )
 MANUSCRIPT_EVIDENCE_ANCHORS = (
+    "# Auditing Reliability in Generative Data Assimilation under Sparse Spatial Observations",
+    "None passes the common development gate",
+    "The contribution is therefore an auditable\nfailure map and a fail-closed evaluation protocol",
+    "not a successful calibrated\nensemble",
     "A mechanistically diverse negative-calibration suite.",
     "topology-preserving stratified transport preserves boundary and\n   spatial structure but selects no effective correction",
     "historical residual\n   dressing improves reliability while damaging proper scores and physical\n   fields",

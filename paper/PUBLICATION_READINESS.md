@@ -71,6 +71,14 @@ contribution states the distinct failure modes and explicitly avoids claiming
 that the implemented suite exhausts all calibration families. The local checker
 now fails if this scope correction is lost.
 
+The title and abstract were independently tightened to match that evidentiary
+scope. They now present an audit of reliability rather than implying that a
+reliable calibrated ensemble has already been obtained, summarize the full
+mechanistically diverse negative suite, and state explicitly that the current
+contribution is a failure map and fail-closed protocol. The checker requires
+these scope anchors so a later edit cannot silently restore a positive method
+claim before an eligible result exists.
+
 ## Scientific readiness decision
 
 The validation-set mechanism result and completed joint calibration audit are
