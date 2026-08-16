@@ -24,14 +24,21 @@ metric, residual scale or library size on these dates.
 - On every retained training case form one full spatial residual field as
   verifying field minus raw ensemble mean. No held-out truth enters the library,
   feature normalization or neighbor selection.
-- Represent each case by exactly six raw-mean features: weighted ice area,
-  weighted ice extent at threshold `0.15`, weighted spatial mean, weighted
-  spatial standard deviation, and weighted variogram errors at lags 1 and 4.
+- Represent each case by exactly six forecast-only raw-mean features: weighted
+  ice area, weighted ice extent at threshold `0.15`, weighted spatial mean,
+  weighted spatial standard deviation, and weighted raw-mean semivariogram
+  values at lags 1 and 4. The semivariogram features are the same weighted
+  valid-pair mean half-squared increments used by the existing spatial audit,
+  applied to `m` itself; they are not errors against the verifying field. Thus
+  the held-out feature vector is computable without held-out truth.
   Standardize each feature with the retained training mean and population
   standard deviation; reject a fold if any standard deviation is zero.
 - Select the ten training dates with smallest squared Euclidean feature
   distance. Break ties by earlier ordered case index. The library size, features,
   metric and tie rule are fixed and are not hyperparameters.
+- Verifying fields are used only to construct residuals for retained training
+  cases and to score a held-out candidate after construction. They are never
+  used in a held-out feature, feature normalization, distance or tie decision.
 
 ## Candidate construction
 

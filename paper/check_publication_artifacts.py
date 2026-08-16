@@ -110,6 +110,10 @@ CALIBRATION_CONTRACT_ANCHORS = {
 NEXT_METHOD_ANCHORS = (
     "purged analog-residual ensemble dressing",
     "five contiguous eight-case holdouts",
+    "six forecast-only raw-mean features",
+    "they are not errors against the verifying field",
+    "They are never",
+    "used in a held-out feature, feature normalization, distance or tie decision.",
     "Select the ten training dates",
     "clip(m + r_j, 0, 1)",
     "overall_eligible=true",
