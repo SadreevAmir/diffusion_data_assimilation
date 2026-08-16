@@ -12,6 +12,8 @@
   "training": {
     "base_output_dir": "training",
     "run_name": "clean_checkpoint",
+    "num_workers_train": 0,
+    "num_workers_val": 0,
     "sample_every_n_epochs": 0,
     "metric_every_n_epochs": 0,
     "metric_num_cases": 0

@@ -185,6 +185,8 @@ def _validate_training(run_dir: Path, seed: int) -> dict[str, Any]:
     training = dict(metadata.get("training_config") or {})
     if training.get("seed") != seed or training.get("num_epochs") != 40:
         raise ValueError("effective training configuration differs from the frozen contract")
+    if training.get("num_workers_train") != 0 or training.get("num_workers_val") != 0:
+        raise ValueError("training must avoid container shared-memory worker processes")
     if training.get("sample_every_n_epochs") != 0 or training.get("metric_every_n_epochs") != 0:
         raise ValueError("expensive in-training sampling was not disabled")
     data_config = metadata.get("data_config") or {}
