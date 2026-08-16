@@ -2,6 +2,11 @@
 
 Status: BLOCKED_PENDING_EXTERNAL_AUTHORIZATION
 
+The scientific decision rules and immutable identities in
+`AMENDED_PRIMARY_EVALUATION_CONTRACT.md` are controlling. In particular, no
+earlier `overall_eligible` value is final success, randomized-rank quality has
+an absolute requirement, and high-SIC boundary decisions are truth-referenced.
+
 This document fixes the preflight boundary for the confirmatory run. It is not
 an authorization to open the locked evaluation data, train a checkpoint or
 launch an experiment. No independent result is present in this worktree.
@@ -51,8 +56,9 @@ Retrieval defaults to `summary_only`. The trusted result must contain:
 - paired date-level effect summaries and predeclared uncertainty intervals for
   every decision-bearing proper-score and spatial/physical metric;
 - finite-ensemble rank, attainable-coverage and boundary-mass diagnostics;
-- the complete per-family Boolean gate, `no_compensation_across_families` and
-  `overall_eligible`;
+- the complete per-family Boolean gate, `no_compensation_across_families`,
+  `overall_eligible`, the absolute randomized-rank decision and the
+  truth-referenced `q={0,.15,.90,.95,.99}` high-SIC decisions;
 - counts for attempted, completed, failed and non-finite cases, plus explicit
   convergence and rank-order checks where applicable.
 
@@ -66,7 +72,9 @@ The run is admissible only after the five external-input conditions above are
 attested by the trusted controller. After return, local manuscript integration
 must stop on any provenance mismatch, incomplete case count, non-finite metric,
 missing family decision or missing comparator alignment. `overall_eligible=true`
-supports selection only when every recorded mandatory family is true; otherwise
+supports selection only when both exact amended-contract digests and controller
+deploy/audit attestation are present and every recorded mandatory family is true;
+otherwise
 the outcome is a negative confirmatory result and claims must be narrowed.
 
 Before changing `Publication status`, update `PAPER_DRAFT.md`,

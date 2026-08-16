@@ -69,14 +69,16 @@ average may compensate for a failed family.
    and contiguous four-case block 95% intervals; the fair-CRPS interval must not
    cross zero for a positive calibration claim.
 2. **Finite-ensemble reliability:** randomized-rank histogram with randomized
-   tie handling must reduce a predeclared discrepancy from discrete uniformity
-   by at least 20% versus raw. Report attainable order-statistic coverage and
+   tie handling must pass the absolute uniformity criterion frozen in
+   `AMENDED_PRIMARY_EVALUATION_CONTRACT.md`. A reduction of at least 20% versus
+   raw remains a descriptive mechanism comparison, not an acceptance
+   substitute. Report attainable order-statistic coverage and
    width for `M=10`; each reported central coverage diagnostic must move closer
    to its finite-ensemble target, with none worsening by more than 0.02.
-3. **Boundary behaviour:** report exact-zero and exact-one member mass and Brier
-   scores for `siconc > 0` and `siconc > 0.15`. Neither Brier score may worsen by
-   more than 1%, and the absolute error in each boundary mass may not increase
-   versus raw. A method that removes an observed boundary atom fails.
+3. **Boundary behaviour:** compare high-SIC behaviour with truth at
+   `q={0,.15,.90,.95,.99}` under the frozen amended gate. Report `>=.999` and
+   exact-one member masses only as encoding diagnostics; neither is a scientific
+   boundary acceptance criterion, and near-one-versus-raw is not a valid gate.
 4. **Spatial and physical preservation:** paired case-level IIEE plus ice area,
    extent and an edge metric are mandatory. Mean IIEE and edge error may worsen
    by at most 2%; absolute mean area and extent bias may worsen by at most 2% of
@@ -91,6 +93,10 @@ average may compensate for a failed family.
 Failure of any mandatory family rejects a broad "well-calibrated ensemble"
 claim. A method may remain a named mechanism or negative baseline when its
 failure isolates a scientifically useful tradeoff.
+
+The amended primary decision is identified by the exact contract digests in
+`AMENDED_PRIMARY_EVALUATION_CONTRACT.md`. Earlier `overall_eligible` values are
+development evidence only and cannot establish final success.
 
 ## Correctness status
 

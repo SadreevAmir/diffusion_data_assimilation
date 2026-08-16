@@ -8,6 +8,15 @@ Required scientific blockers: an eligible spatially preserving calibration;
 after eligibility, a clean publication checkpoint, frozen independent
 evaluation and minimum-tier comparisons
 
+The success definition has been amended fail-closed in
+`AMENDED_PRIMARY_EVALUATION_CONTRACT.md`. A good randomized rank histogram is
+an absolute requirement, high-SIC behaviour is compared with truth at
+`q={0,.15,.90,.95,.99}`, and `>=.999`/exact-one masses are encoding diagnostics
+rather than boundary acceptance criteria. Consequently, no historical
+`overall_eligible` from the superseded gate is final success. The exact amended
+primary and gate digests require trusted controller deployment and audit before
+the primary evaluation is admissible.
+
 ## Current decision-bearing evidence
 
 The package is not waiting on clean-checkpoint training. Measured throughput

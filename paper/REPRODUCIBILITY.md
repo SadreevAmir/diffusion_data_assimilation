@@ -1,5 +1,15 @@
 # Reproducibility handoff for the frozen mechanism result
 
+## Amended primary gate provenance
+
+The primary evaluation must report the exact primary and gate digests from
+`AMENDED_PRIMARY_EVALUATION_CONTRACT.md` plus trusted controller deploy/audit
+attestation. Earlier compact gates remain frozen development evidence and
+cannot establish final success. The return must include the absolute
+randomized-rank decision, truth-referenced high-SIC diagnostics at
+`q={0,.15,.90,.95,.99}`, and `>=.999`/exact-one masses labelled only as encoding
+diagnostics. Missing identity, attestation or decision fields fails closed.
+
 This handoff covers the 40-case development-period mechanism analysis and the
 completed fixed-contract joint calibration audit. Neither requires raw
 ensembles in the publication worktree.

@@ -20,6 +20,7 @@ REQUIRED_FILES = (
     "NEXT_BASELINE_CONTRACT.md",
     "NEXT_METHOD_CONTRACT.md",
     "FROZEN_EVALUATION_HANDOFF.md",
+    "AMENDED_PRIMARY_EVALUATION_CONTRACT.md",
     "check_publication_artifacts.py",
     "make_calibration_summary_figure.py",
     "make_case_level_artifacts.py",
@@ -60,6 +61,29 @@ CURRENT_DECISION_ANCHORS = (
     "latent_temperature_1p30_gate_retry1",
     "dependent unchanged CPU gate is\ncomplete and reconciled as the negative result above",
 )
+AMENDED_PRIMARY_ANCHORS = {
+    "AMENDED_PRIMARY_EVALUATION_CONTRACT.md": (
+        "FROZEN_PENDING_CONTROLLER_DEPLOY_AND_AUDIT",
+        "f2225da7a05cab53b14604e45bed840a0ec559aed20856ae8ef2dd72d915b8f8",
+        "57e8dd1859c4ac9a144be68904450926a6098b08a3b58a35e3d7dcc6a5bb9185",
+        "absolute uniformity criterion",
+        "q={0,.15,.90,.95,.99}",
+        "encoding diagnostics only",
+    ),
+    "RESEARCH_PLAN.md": (
+        "AMENDED_PRIMARY_EVALUATION_CONTRACT.md",
+        "near-one-versus-raw is not a valid gate",
+        "development evidence only and cannot establish final success",
+    ),
+    "PUBLICATION_READINESS.md": (
+        "no historical\n`overall_eligible` from the superseded gate is final success",
+        "trusted controller deployment and audit",
+    ),
+    "FROZEN_EVALUATION_HANDOFF.md": (
+        "both exact amended-contract digests and controller\ndeploy/audit attestation are present",
+        "truth-referenced `q={0,.15,.90,.95,.99}` high-SIC decisions",
+    ),
+}
 PYTHON_FILES = tuple(name for name in REQUIRED_FILES if name.endswith(".py"))
 FIGURE_PATTERN = re.compile(r"!\[[^]]*\]\(([^)]+)\)")
 REFERENCE_PATTERN = re.compile(r"^(\d+)\. ", re.MULTILINE)
@@ -363,6 +387,15 @@ def main() -> int:
         "frozen evaluation handoff is missing anchors: "
         + ", ".join(missing_handoff_anchors),
     )
+
+    for name, anchors in AMENDED_PRIMARY_ANCHORS.items():
+        document = (PAPER_DIR / name).read_text(encoding="utf-8")
+        missing_anchors = [anchor for anchor in anchors if anchor not in document]
+        require(
+            not missing_anchors,
+            f"{name} is missing amended-primary anchors: "
+            + ", ".join(missing_anchors),
+        )
 
     claim_ids = [int(value) for value in CLAIM_PATTERN.findall(claim_ledger)]
     require(claim_ids, "claim ledger contains no claim rows")

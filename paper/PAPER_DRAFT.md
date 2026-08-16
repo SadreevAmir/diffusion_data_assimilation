@@ -1,5 +1,16 @@
 # Reliable Generative Data Assimilation: Finite-Ensemble Calibration under Sparse Spatial Observations
 
+## Amended primary decision policy
+
+All completed gates in this draft are development evidence. None of their
+historical `overall_eligible` values is final primary success. The frozen
+primary evaluation requires an absolutely good randomized rank histogram and
+truth-referenced high-SIC diagnostics at `q={0,.15,.90,.95,.99}`; relative rank
+improvement alone is insufficient. Masses `>=.999` and exact-one remain useful
+encoding diagnostics but are not boundary acceptance criteria. The exact
+contract identities and controller preflight are recorded in
+`AMENDED_PRIMARY_EVALUATION_CONTRACT.md`.
+
 > Validation-mechanism draft, not a submission-ready paper. See
 > `CLAIM_LEDGER.md` and `PUBLICATION_READINESS.md` for provenance, minimum-tier
 > blockers and limitations. This document does not report an independent
