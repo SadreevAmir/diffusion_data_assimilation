@@ -88,7 +88,14 @@ def case_plan(case_index: int) -> tuple[tuple[int, int], ...]:
     return plan
 
 
-def _write_status(output_dir: Path, stage: str, completed: int, **extra: object) -> None:
+def _write_status(
+    output_dir: Path,
+    stage: str,
+    completed: int,
+    *,
+    total_units: int = 3 + 3 + CASE_COUNT,
+    **extra: object,
+) -> None:
     _atomic_json(
         output_dir / "run_status.json",
         {
@@ -96,7 +103,7 @@ def _write_status(output_dir: Path, stage: str, completed: int, **extra: object)
             "experiment_id": output_dir.parent.name,
             "stage": stage,
             "completed_units": completed,
-            "total_units": 3 + 3 + CASE_COUNT,
+            "total_units": total_units,
             "updated_epoch_seconds": time.time(),
             **extra,
         },
@@ -114,7 +121,15 @@ def _forward_signal(signum: int, _frame: object) -> None:
     raise SystemExit(128 + signum)
 
 
-def _run_checked(command: list[str], cwd: Path, output_dir: Path, stage: str, completed: int) -> None:
+def _run_checked(
+    command: list[str],
+    cwd: Path,
+    output_dir: Path,
+    stage: str,
+    completed: int,
+    *,
+    total_units: int = 3 + 3 + CASE_COUNT,
+) -> None:
     global _active_process
     immutable_repo = Path(__file__).resolve().parents[1]
     _active_process = subprocess.Popen(
@@ -125,7 +140,13 @@ def _run_checked(command: list[str], cwd: Path, output_dir: Path, stage: str, co
     )
     try:
         while _active_process.poll() is None:
-            _write_status(output_dir, stage, completed, child_pid=_active_process.pid)
+            _write_status(
+                output_dir,
+                stage,
+                completed,
+                total_units=total_units,
+                child_pid=_active_process.pid,
+            )
             time.sleep(30)
         if _active_process.returncode:
             raise RuntimeError(f"trusted subprocess failed in {stage}: rc={_active_process.returncode}")
