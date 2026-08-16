@@ -153,6 +153,13 @@ families fail and `overall_eligible=false`. This closes global coherent offsets
 without post-hoc changes; the active checkpoint-trajectory EMA experiment is
 the next mechanistically distinct evidence already in flight.
 
+The projection-free slack-limited ablation is also complete and rejected.
+Although it creates no boundary or spatial damage, every pixel is blocked, the
+selected and effective amplitudes are `0.0`, and all candidate metrics equal
+raw on all 40 dates. Proper-score and finite-ensemble-reliability families fail
+and `overall_eligible=false`. This closes projection as the sole explanation
+for the coherent-offset failure; no slack, amplitude or fold retuning follows.
+
 ## Safe autonomous work completed or still possible
 
 - The frozen method, aggregate reconciliation values, clipping caveat and

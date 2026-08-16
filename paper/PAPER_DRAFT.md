@@ -364,6 +364,18 @@ and operational families pass, but `overall_eligible=false`. This rejects
 useful coherent-offset inflation under the frozen contract; it does not show
 that the unchanged raw ensemble is calibrated.
 
+The predeclared projection ablation replaces bounded-simplex projection with a
+common offset limited by every member's existing per-pixel slack. It creates no
+new exact boundary values and preserves all mean-field and member-spatial
+checks, but every pixel is blocked. Training-only selection and the effective
+amplitude are therefore both `0.0`; candidate and raw are identical for every
+audited metric on all 40 dates, including fair CRPS `0.0584905850`, with paired
+date and four-case-block deltas and intervals exactly zero. Consequently the
+proper-score and finite-ensemble-reliability families fail and
+`overall_eligible=false`. This falsifies the hypothesis that projection alone
+caused the coherent-offset failure: under the frozen common-slack contract,
+exact-boundary members make every nonzero global coherent offset infeasible.
+
 Figure 1 summarizes the aggregate mechanism result. The dashed references are
 descriptive finite-ensemble targets, not confidence bounds.
 

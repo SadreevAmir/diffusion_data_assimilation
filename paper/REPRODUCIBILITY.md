@@ -162,6 +162,16 @@ operational families pass, while proper-score and finite-ensemble-reliability
 families fail; `overall_eligible=false`. These compact anchors document a
 rejected mechanism and do not authorize reconstruction of case-level pairs.
 
+The subsequent slack-limited ablation used the same sole source and purged
+folds, but admitted only a common amplitude allowed by every member's existing
+distance to `[0,1]`, with no clipping or projection. Its compact result reports
+all 40 cases finite, `blocked_pixel_fraction=1.0`, selected and effective
+amplitudes `0.0`, zero new exact boundary values, and exact equality to raw for
+every paired metric and interval. The authoritative gate has
+`overall_eligible=false`: boundary, mean-field, member-spatial and operational
+families pass, while proper scores and finite-ensemble reliability fail. These
+anchors are sufficient to audit the mechanism decision without raw ensembles.
+
 `paper/NEXT_GENERATIVE_METHOD_CONTRACT.md` freezes the subsequent
 clean-checkpoint deep ensemble. The reviewed trusted sampling and gate modes
 implement this contract; this document alone does not launch either stage.
