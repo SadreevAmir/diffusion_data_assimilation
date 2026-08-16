@@ -51,11 +51,14 @@ CURRENT_DECISION_ANCHORS = (
     "Required scientific blockers: an eligible spatially preserving calibration;",
     "The package is not waiting on clean-checkpoint training.",
     "single frozen latent-temperature construction at scale `1.30`",
-    "job status or partial\naggregates are not evidence",
-    "would establish candidate eligibility,\nnot independent generalization",
+    "complete compact payload from `latent_temperature_1p30_gate_retry1` has\nbeen reconciled",
+    "The result is negative: `overall_eligible=false`",
+    "reliability\npasses, while proper-score, boundary and spatial/physical families fail",
+    "sampling completion alone will not be a\nscientific result",
+    "would establish candidate\neligibility, not independent generalization",
     "already predeclared locked-MC-dropout\nfallback, unchanged",
     "latent_temperature_1p30_gate_retry1",
-    "Neither sampling completion is a scientific result.",
+    "dependent unchanged CPU gate is\ncomplete and reconciled as the negative result above",
 )
 PYTHON_FILES = tuple(name for name in REQUIRED_FILES if name.endswith(".py"))
 FIGURE_PATTERN = re.compile(r"!\[[^]]*\]\(([^)]+)\)")
@@ -260,6 +263,10 @@ STALE_READINESS_ANCHORS = (
     "Continuous calibration development therefore moves to the pre-implementation",
     "Its fixed ten-member guidance mixture",
     "no currently implemented trusted mode\nexecutes that contract",
+    "unchanged no-compensation gate is queued as",
+    "A positive\nvalidation-set latent-temperature result would establish",
+    "Its dependent unchanged CPU gate is\nqueued.",
+    "Until the respective compact gates are returned",
 )
 MANUSCRIPT_EVIDENCE_ANCHORS = (
     "A mechanistically diverse negative-calibration suite.",

@@ -13,22 +13,21 @@ evaluation and minimum-tier comparisons
 The package is not waiting on clean-checkpoint training. Measured throughput
 makes that previously frozen three-seed route a months-long construction. The
 single frozen latent-temperature construction at scale `1.30` has been
-recovered from the completed internal sampler without GPU recomputation; its
-unchanged no-compensation gate is queued as
-`latent_temperature_1p30_gate_retry1`. The mechanistically distinct frozen
-locked-MC-dropout sampler is also in flight, with its dependent gate already
-queued. Neither sampling completion is a scientific result. The latent result
-may be admitted only from the complete compact payload identified in
-`paper/LATENT_TEMPERATURE_RESULT_RECONCILIATION.md`; job status or partial
-aggregates are not evidence.
+recovered from the completed internal sampler without GPU recomputation, and
+its complete compact payload from `latent_temperature_1p30_gate_retry1` has
+been reconciled. The result is negative: `overall_eligible=false`; reliability
+passes, while proper-score, boundary and spatial/physical families fail. The
+mechanistically distinct frozen locked-MC-dropout sampler is in flight, with
+its dependent gate already queued. Its sampling completion alone will not be a
+scientific result; only the complete compact gate may support a claim.
 
-This ordering does not waive the minimum publication tier. A positive
-validation-set latent-temperature result would establish candidate eligibility,
-not independent generalization, and would still leave the clean publication
-checkpoint, frozen independent evaluation and missing minimum-tier comparisons.
-A negative result activates only the already predeclared locked-MC-dropout
+This ordering does not waive the minimum publication tier. The negative latent-
+temperature result activates only the already predeclared locked-MC-dropout
 fallback, unchanged; it does not authorize another temperature or retrospective
-tuning.
+tuning. Even a positive validation-set dropout result would establish candidate
+eligibility, not independent generalization, and would still leave the clean
+publication checkpoint, frozen independent evaluation and missing minimum-tier
+comparisons.
 
 ## Independent package re-audit
 
@@ -319,11 +318,12 @@ The active predeclared locked-MC-dropout chain is the next decision-bearing
 mechanism.
 
 The frozen pair remains specified in `NEXT_LATENT_TEMPERATURE_CONTRACT.md`.
-The latent-temperature internal sampler completed all forty cases, and
-the wrapper-only failure was recovered without GPU recomputation as
+The latent-temperature internal sampler completed all forty cases, and the
+wrapper-only failure was recovered without GPU recomputation as
 `latent_temperature_1p30_sampling_retry1`. Its dependent unchanged CPU gate is
-queued. In parallel, the predeclared locked-MC-dropout sampler is active and
-its dependent gate is queued. Until the respective compact gates are returned,
-neither mechanism receives a positive or negative scientific claim; no second temperature may be
-selected post hoc, and neither may a different dropout
-probability or mask construction.
+complete and reconciled as the negative result above. The predeclared locked-
+MC-dropout sampler is active and its dependent gate is queued. Until that exact
+compact gate is returned, dropout receives no positive or negative scientific
+claim; no second temperature may be
+selected post hoc, and neither may a different dropout probability or mask
+construction.
