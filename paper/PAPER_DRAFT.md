@@ -80,7 +80,7 @@ The present validation study contributes:
 3. **An auditable sparse-observation protocol.** We record the conditioning
    channels, real footprint geometry, model-to-model observation values, frozen
    checkpoint and deterministic cross-fitting procedure.
-4. **Five complementary negative calibration mechanisms.** We show why
+4. **A mechanistically diverse negative-calibration suite.** We show why
    score improvement from an affine-logit transform is insufficient when it
    destroys exact boundary mass, and why a fixed purged hurdle-isotonic/ECC-Q
    construction can repair boundary masses and randomized ranks while severely
@@ -92,6 +92,14 @@ The present validation study contributes:
    boundary and member-spatial safety. Finally, a frozen zero/one-inflated
    Beta EMOS marginal model with ECC-Q improves boundary masses and randomized
    ranks, but fails proper-score, inner-order, boundary and spatial families.
+   Four further frozen tests separate dependence preservation from usable
+   dispersion: topology-preserving stratified transport preserves boundary and
+   spatial structure but selects no effective correction; historical residual
+   dressing improves reliability while damaging proper scores and physical
+   fields; a fixed guidance mixture fails every scientific family; and coherent
+   member offsets, with and without projection, select the null action. Together
+   these are mechanism falsifications under one no-compensation gate, not a
+   claim that all calibration families have been exhausted.
 
 The methods and gates are frozen from validation evidence. Independent
 evaluation, multi-seed training and broader generalization remain outside the

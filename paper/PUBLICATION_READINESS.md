@@ -55,6 +55,14 @@ calibration routes are negative controls, no method passes the common gate, and
 the minimum strong domain/SciML tier still lacks a clean checkpoint and frozen
 independent evaluation. Publication status therefore remains `NOT_READY`.
 
+The manuscript contribution inventory was also reconciled with the completed
+mechanism suite. It no longer labels the evidence as five negative mechanisms
+while later sections report topology-preserving transport, analog residual
+dressing, guidance mixing and two coherent-offset constructions. The revised
+contribution states the distinct failure modes and explicitly avoids claiming
+that the implemented suite exhausts all calibration families. The local checker
+now fails if this scope correction is lost.
+
 ## Scientific readiness decision
 
 The validation-set mechanism result and completed joint calibration audit are

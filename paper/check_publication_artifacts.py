@@ -262,6 +262,12 @@ STALE_READINESS_ANCHORS = (
     "no currently implemented trusted mode\nexecutes that contract",
 )
 MANUSCRIPT_EVIDENCE_ANCHORS = (
+    "A mechanistically diverse negative-calibration suite.",
+    "topology-preserving stratified transport preserves boundary and\n   spatial structure but selects no effective correction",
+    "historical residual\n   dressing improves reliability while damaging proper scores and physical\n   fields",
+    "a fixed guidance mixture fails every scientific family",
+    "coherent\n   member offsets, with and without projection, select the null action",
+    "not a\n   claim that all calibration families have been exhausted",
     "| Diagnostic | Raw ensemble | Cross-fitted correction | Interpretation |",
     "| Established-ice Brier score | 0.056973 | 0.058200 |",
     "| Purged hurdle-IDR/ECC-Q diagnostic | Raw ensemble | Candidate | Interpretation |",
