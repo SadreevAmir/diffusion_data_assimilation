@@ -26,8 +26,24 @@ REQUIRED_FILES = (
     "make_joint_gate_figure.py",
     "analog_residual_reference.py",
     "NEXT_GENERATIVE_METHOD_CONTRACT.md",
+    "LATENT_TEMPERATURE_RESULT_RECONCILIATION.md",
     "guidance_mixture_reference.py",
     "deep_ensemble_reference.py",
+)
+
+LATENT_RECONCILIATION_ANCHORS = (
+    "Status: pre-result, fail closed. This checklist records no scientific outcome.",
+    "latent_temperature_1p30_gate_valid",
+    "exactly 40 completed cases and ten finite members per case",
+    "gate.overall_eligible",
+    "analysis_fair_crps",
+    "analysis_crps",
+    "base and\n  scaled latent-hash checks",
+    "update all four files in one change",
+    "python3 paper/check_publication_artifacts.py",
+    "at least 3% lower than raw",
+    "predeclared locked-MC-dropout pair",
+    "do not change\nthe temperature",
 )
 PYTHON_FILES = tuple(name for name in REQUIRED_FILES if name.endswith(".py"))
 FIGURE_PATTERN = re.compile(r"!\[[^]]*\]\(([^)]+)\)")
@@ -384,6 +400,20 @@ def main() -> int:
             f"{name} is missing next-generative-method anchors: "
             + ", ".join(missing_anchors),
         )
+
+    latent_reconciliation = (
+        PAPER_DIR / "LATENT_TEMPERATURE_RESULT_RECONCILIATION.md"
+    ).read_text(encoding="utf-8")
+    missing_latent_anchors = [
+        anchor
+        for anchor in LATENT_RECONCILIATION_ANCHORS
+        if anchor not in latent_reconciliation
+    ]
+    require(
+        not missing_latent_anchors,
+        "LATENT_TEMPERATURE_RESULT_RECONCILIATION.md is missing anchors: "
+        + ", ".join(missing_latent_anchors),
+    )
 
     figures = FIGURE_PATTERN.findall(manuscript)
     require(figures, "manuscript contains no linked figures")
