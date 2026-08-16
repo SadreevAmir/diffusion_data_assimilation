@@ -29,6 +29,7 @@ REQUIRED_FILES = (
     "NEXT_GENERATIVE_METHOD_CONTRACT.md",
     "LATENT_TEMPERATURE_RESULT_RECONCILIATION.md",
     "LOCKED_MC_DROPOUT_RESULT_RECONCILIATION.md",
+    "EXTERNAL_PRIMARY_RESULT_RECONCILIATION.md",
     "guidance_mixture_reference.py",
     "deep_ensemble_reference.py",
 )
@@ -106,6 +107,25 @@ EXTERNAL_PRIMARY_HANDOFF_ANCHORS = {
         "do not resubmit or retune",
     ),
 }
+EXTERNAL_PRIMARY_RECONCILIATION_ANCHORS = (
+    "Status: pre-result, fail closed. This checklist records no scientific outcome.",
+    "external_2024_calendar_global_bias_confirm48_primary_v1",
+    "external_2024_calendar_global_bias_raw48_primary_v1",
+    "four compact artifacts",
+    "both exact amended-contract digests",
+    "input, raw-member and truth-bundle seal checks",
+    "complete candidate was formed\n  before scoring truth was opened",
+    "exactly 48 attempted and completed cases",
+    "ten finite members per case",
+    "no_compensation_across_families=true",
+    "gate.overall_eligible",
+    "proper-score, finite-ensemble\n  reliability, boundary, spatial/physical and operational family",
+    "q={0,.15,.90,.95,.99}",
+    "update all five files in one\nchange",
+    "resolve C39",
+    "python3 paper/check_publication_artifacts.py",
+    "do not resubmit, retune or\nopen another external evaluation",
+)
 REPRODUCIBILITY_SECTION_ORDER = (
     "## Frozen latent-temperature recovery handoff",
     "## Locked-MC-dropout wrapper recovery handoff",
@@ -487,6 +507,20 @@ def main() -> int:
             f"{name} is missing frozen external-primary handoff anchors: "
             + ", ".join(missing_anchors),
         )
+
+    external_reconciliation = (
+        PAPER_DIR / "EXTERNAL_PRIMARY_RESULT_RECONCILIATION.md"
+    ).read_text(encoding="utf-8")
+    missing_external_reconciliation_anchors = [
+        anchor
+        for anchor in EXTERNAL_PRIMARY_RECONCILIATION_ANCHORS
+        if anchor not in external_reconciliation
+    ]
+    require(
+        not missing_external_reconciliation_anchors,
+        "EXTERNAL_PRIMARY_RESULT_RECONCILIATION.md is missing anchors: "
+        + ", ".join(missing_external_reconciliation_anchors),
+    )
 
     stale_readiness = [
         anchor for anchor in STALE_READINESS_ANCHORS if anchor in readiness

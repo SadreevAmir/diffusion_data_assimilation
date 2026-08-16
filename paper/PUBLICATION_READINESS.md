@@ -326,6 +326,9 @@ complete for all 48 cases. Its already queued dependent CPU stage,
 decision-bearing external evidence. It must not be resubmitted, substituted or
 treated as a scientific result from job status alone. Publication status remains
 `NOT_READY` until its four compact artifacts are reconciled.
+The exact fail-closed ingest and atomic-update procedure is frozen in
+`paper/EXTERNAL_PRIMARY_RESULT_RECONCILIATION.md`; that checklist records no
+scientific outcome before the complete payload arrives.
 
 Reconciliation is fail-closed. A positive primary claim requires verified signed
 contract identity, input/raw/truth seals, every recorded hash, formation of the
