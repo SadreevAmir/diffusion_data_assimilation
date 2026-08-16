@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
 import math
 import random
@@ -376,6 +377,7 @@ def generate_ensemble(
     autocast_dtype: torch.dtype | None = None,
     progress=None,
     background_mask: torch.Tensor | None = None,
+    initial_noise_hashes: list[str] | None = None,
 ) -> torch.Tensor:
     """Generate one conditional ensemble in GPU-friendly member batches."""
     samples: list[torch.Tensor] = []
@@ -386,7 +388,13 @@ def generate_ensemble(
             noise = []
             for member in range(start, start + batch_size):
                 _seed_member(seed + case_order * ensemble_size + member)
-                noise.append(torch.randn_like(background))
+                member_noise = torch.randn_like(background)
+                if initial_noise_hashes is not None:
+                    canonical = (
+                        member_noise.detach().cpu().to(dtype=torch.float32).contiguous().numpy()
+                    )
+                    initial_noise_hashes.append(hashlib.sha256(canonical.tobytes()).hexdigest())
+                noise.append(member_noise)
             initial_noise = torch.cat(noise, dim=0)
 
         autocast_context = (

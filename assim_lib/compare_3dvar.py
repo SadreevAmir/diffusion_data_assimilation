@@ -647,6 +647,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                         raise AssertionError("Non-siconc information leaked into strict comparison")
 
                 progress.set_postfix(case=f"{case_order + 1}/{len(case_indices)}")
+                initial_noise_hashes: list[str] = []
                 generated = generate_ensemble(
                     sampler=sampler,
                     background=tensors["background"],
@@ -668,7 +669,10 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                     atol=float(args.atol),
                     autocast_dtype=autocast_dtype,
                     progress=progress,
+                    initial_noise_hashes=initial_noise_hashes,
                 )
+                if len(initial_noise_hashes) != int(args.ensemble_size):
+                    raise AssertionError("Initial-noise accounting is incomplete")
 
                 ensemble = denormalize_and_clip(generated, means, stds, siconc_channel)[:, siconc_channel]
                 truth = denormalize_and_clip(item["truth"].unsqueeze(0), means, stds, siconc_channel)[
@@ -728,6 +732,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                     "mask_kind": item["meta"].get("mask_kind"),
                     "sral_files_used": item["meta"].get("sral_files_used"),
                     "empty_obs_days": item["meta"].get("empty_obs_days"),
+                    "initial_noise_sha256": initial_noise_hashes,
                 }
                 cases.append(case_metadata)
 

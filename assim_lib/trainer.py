@@ -1008,6 +1008,10 @@ class UNetTrainer:
 
     @torch.no_grad()
     def report_unconditional_dashboard_sample(self, epoch: int):
+        if self.config.sample_every_n_epochs <= 0:
+            return
+        if epoch % self.config.sample_every_n_epochs != 0:
+            return
         if _UNCONDITIONAL_DASHBOARD_EVERY_N_EPOCHS <= 0:
             return
         if epoch % _UNCONDITIONAL_DASHBOARD_EVERY_N_EPOCHS != 0:
@@ -1123,6 +1127,10 @@ class UNetTrainer:
 
     @torch.no_grad()
     def report_dashboard_samples(self, epoch: int):
+        if self.config.sample_every_n_epochs <= 0:
+            return
+        if epoch % self.config.sample_every_n_epochs != 0:
+            return
         if _DASHBOARD_EVERY_N_EPOCHS <= 0:
             return
         if epoch % _DASHBOARD_EVERY_N_EPOCHS != 0:

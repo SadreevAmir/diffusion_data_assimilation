@@ -1,0 +1,24 @@
+{
+  "project_name": "clean_checkpoint_deep_ensemble",
+  "task_name": "clean_checkpoint_deep_ensemble",
+  "data_config": "../data/m2m_2f_1y.json",
+  "data_overrides": {
+    "observation_mask": {
+      "synthetic_probability": 0.5,
+      "empty_probability": 0.0
+    }
+  },
+  "model_config": "../methods/concat_conditioning_diffusion_balanced_2f.json",
+  "training": {
+    "base_output_dir": "training",
+    "run_name": "clean_checkpoint",
+    "sample_every_n_epochs": 0,
+    "metric_every_n_epochs": 0,
+    "metric_num_cases": 0
+  },
+  "clearml": {
+    "enabled": false,
+    "tags": ["clean_split", "deep_ensemble", "frozen"],
+    "upload_checkpoints": false
+  }
+}

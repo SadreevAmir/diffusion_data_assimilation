@@ -105,6 +105,26 @@
         "field_protocol": "siconc-only"
       }
     },
+    "validation_clean_checkpoint_member_sampling": {
+      "comparison": {
+        "dataset_split": "valid",
+        "start_date": "2022-01-01",
+        "end_date": "2022-07-15",
+        "expected_num_cases": 40,
+        "case_stride_days": 5,
+        "conditioning_mode": "full",
+        "field_protocol": "siconc-only",
+        "ensemble_size": 4,
+        "sample_batch_size": 4,
+        "num_timesteps": 25,
+        "method": "dopri5",
+        "rtol": 0.00001,
+        "atol": 0.000001,
+        "inference_precision": "float32",
+        "seed": 2401,
+        "save_ensembles": true
+      }
+    },
     "validation_track_only": {
       "comparison": {
         "dataset_split": "valid",
