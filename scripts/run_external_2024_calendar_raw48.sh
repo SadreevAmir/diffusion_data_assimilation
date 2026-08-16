@@ -7,6 +7,7 @@ OUTPUT_DIR="${OUTPUT_DIR:-}"
 SOURCE_EXPERIMENT="${SOURCE_EXPERIMENT:-}"
 RUN_DIR="${RUN_DIR:-}"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
+CUDA_DEVICE="${CUDA_DEVICE:-0}"
 
 if [[ "$MODE" != "external_2024_calendar_global_bias_raw48_primary" ]]; then
   echo "[external-2024-calendar] untrusted mode: $MODE" >&2
@@ -16,9 +17,17 @@ if [[ -z "$OUTPUT_DIR" || -z "$SOURCE_EXPERIMENT" || -z "$RUN_DIR" ]]; then
   echo "[external-2024-calendar] OUTPUT_DIR, SOURCE_EXPERIMENT and RUN_DIR are required" >&2
   exit 2
 fi
+if [[ -z "$CUDA_DEVICE" || "$CUDA_DEVICE" == *,* || "$CUDA_DEVICE" =~ [[:space:]] ]]; then
+  echo "[external-2024-calendar] exactly one CUDA device token is required" >&2
+  exit 2
+fi
 
 cd "$REPO_DIR"
-export CUDA_VISIBLE_DEVICES="${CUDA_DEVICE:-0}"
+export CUDA_VISIBLE_DEVICES="$CUDA_DEVICE"
+export HF_HUB_OFFLINE=1
+export TRANSFORMERS_OFFLINE=1
+export WANDB_MODE=offline
+unset HTTP_PROXY HTTPS_PROXY ALL_PROXY http_proxy https_proxy all_proxy
 exec "$PYTHON_BIN" -m assim_lib.external_2024_calendar_raw \
   --output-dir "$OUTPUT_DIR" \
   --source-experiment "$SOURCE_EXPERIMENT" \

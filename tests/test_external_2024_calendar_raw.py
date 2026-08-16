@@ -4,6 +4,7 @@ import json
 import subprocess
 import sys
 import unittest
+from datetime import timedelta
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -83,6 +84,20 @@ class External2024CalendarRawTests(unittest.TestCase):
                         "case_order": case_index,
                         "target_date": target.isoformat(),
                         "background_date": background.isoformat(),
+                        "conditioning_track_days": [
+                            {
+                                "offset": offset,
+                                "date": (target - timedelta(days=offset)).isoformat(),
+                                "num_sral_files": 1,
+                                "sral_files": [
+                                    f"/sealed/sral/{(target - timedelta(days=offset)).isoformat()}.npy"
+                                ],
+                            }
+                            for offset in range(3)
+                        ],
+                        "track_imitation_date": (target + timedelta(days=1)).isoformat(),
+                        "mask_kind": "sral_tracks",
+                        "sral_files_used": 3,
                         "initial_noise_sha256": noise,
                         "scaled_initial_noise_sha256": noise,
                     }
@@ -90,7 +105,6 @@ class External2024CalendarRawTests(unittest.TestCase):
                 np.savez_compressed(
                     samples / f"{case_index:03d}_{target.isoformat()}_h23.npz",
                     analysis_ensemble=np.zeros((10, 2, 3), dtype=np.float32),
-                    truth=np.zeros((2, 3), dtype=np.float32),
                     valid_mask=np.ones((2, 3), dtype=bool),
                 )
             (sampling / "cases.json").write_text(json.dumps(cases), encoding="utf-8")
@@ -116,11 +130,15 @@ class External2024CalendarRawTests(unittest.TestCase):
                 "cfg_background_scale": 1.0,
                 "cfg_observation_scale": 1.0,
                 "save_ensembles": True,
+                "sealed_raw_only": True,
+                "outcome_metrics_computed": False,
+                "truth_saved_with_raw_samples": False,
                 "checkpoint": f"/frozen/{raw.CHECKPOINT_NAME}",
                 "checkpoint_training_split_kind": "legacy_overlapping_2023_validation",
                 "checkpoint_selection": (
                     "fixed final epoch; legacy 2023 validation was not used for checkpoint selection"
                 ),
+                "temporal_split_protocol": "external_chronological_holdout",
                 "cases_file": "cases.json",
             }
             (sampling / "metadata.json").write_text(json.dumps(metadata), encoding="utf-8")
@@ -130,6 +148,49 @@ class External2024CalendarRawTests(unittest.TestCase):
             self.assertFalse(sealed["candidate_transform_started"])
             self.assertFalse(sealed["candidate_truth_read"])
             self.assertTrue((root / "sealed" / raw.SAMPLE_SEAL_NAME).is_file())
+            self.assertEqual(
+                raw.validate_existing_sample_seal(root / "sealed")["sealed_manifest_sha256"],
+                sealed["sealed_manifest_sha256"],
+            )
+            with np.load(root / "sealed/samples/000_2024-01-01_h23.npz", allow_pickle=False) as payload:
+                self.assertEqual(set(payload.files), {"analysis_ensemble", "valid_mask"})
+
+    def test_duplicate_input_or_noise_inventory_fails_closed(self) -> None:
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            repo = root / "repo"
+            dataset = root / "dataset"
+            preds = dataset / "preds"
+            sral = root / "sral"
+            preds.mkdir(parents=True)
+            sral.mkdir()
+            for relative in (raw.CONFIG_PATH, raw.DATA_CONFIG_PATH, raw.MODEL_CONFIG_PATH):
+                path = repo / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(relative, encoding="utf-8")
+            dates = sorted({*raw.BACKGROUND_DATES, *raw.TRACK_DATES})
+            for target in dates:
+                (preds / f"ocean+atmosphere_24_{target.isoformat()}.npy").write_bytes(b"p")
+            (preds / "ocean+atmosphere_24_duplicate_2024-01-01.npy").write_bytes(b"p")
+            for target in raw.TRACK_DATES:
+                (sral / f"{target.isoformat()}.npy").write_bytes(b"s")
+            mask = root / "mask.npy"
+            mask.write_bytes(b"m")
+            with self.assertRaisesRegex(ValueError, "exactly one file per date"):
+                raw.build_input_seal(repo, dataset, sral, mask)
+
+    def test_runtime_requires_offline_single_gpu(self) -> None:
+        from unittest.mock import patch
+
+        with (
+            patch.dict(
+                "os.environ",
+                {"CUDA_VISIBLE_DEVICES": "0,1", "HF_HUB_OFFLINE": "1", "TRANSFORMERS_OFFLINE": "1"},
+                clear=True,
+            ),
+            self.assertRaisesRegex(RuntimeError, "exactly one"),
+        ):
+            raw._validate_runtime()
 
     def test_help_and_shell_are_fail_closed(self) -> None:
         repo = Path(raw.__file__).resolve().parents[1]

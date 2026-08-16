@@ -683,9 +683,11 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                     raise AssertionError("Scaled initial-noise accounting is incomplete")
 
                 ensemble = denormalize_and_clip(generated, means, stds, siconc_channel)[:, siconc_channel]
-                truth = denormalize_and_clip(item["truth"].unsqueeze(0), means, stds, siconc_channel)[
-                    0, siconc_channel
-                ]
+                truth = None
+                if not args.sealed_raw_only:
+                    truth = denormalize_and_clip(item["truth"].unsqueeze(0), means, stds, siconc_channel)[
+                        0, siconc_channel
+                    ]
                 background = denormalize_and_clip(
                     item["background"].unsqueeze(0), means, stds, siconc_channel
                 )[0, siconc_channel]
@@ -714,22 +716,32 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                     "track_imitation_date": next_track_date.isoformat(),
                     "track_imitation_count": int(next_track_mask.sum()),
                 }
-                for region, mask in (
-                    ("full", valid),
-                    ("track_imitation", next_track_mask),
-                ):
+                if args.sealed_raw_only:
                     per_case_rows.append(
                         {
                             **common,
-                            "region": region,
-                            **_comparison_metrics(
-                                ensemble=ensemble,
-                                truth=truth,
-                                background=background,
-                                mask=mask,
-                            ),
+                            "region": "raw_sampling_only",
+                            "outcome_metrics_computed": False,
                         }
                     )
+                else:
+                    assert truth is not None
+                    for region, mask in (
+                        ("full", valid),
+                        ("track_imitation", next_track_mask),
+                    ):
+                        per_case_rows.append(
+                            {
+                                **common,
+                                "region": region,
+                                **_comparison_metrics(
+                                    ensemble=ensemble,
+                                    truth=truth,
+                                    background=background,
+                                    mask=mask,
+                                ),
+                            }
+                        )
 
                 track_days = _track_days(dataset, target_date)
                 case_metadata = {
@@ -749,17 +761,26 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                     obs_values = denormalize_and_clip(
                         item["obs_values"].unsqueeze(0), means, stds, siconc_channel
                     )[0, siconc_channel]
-                    np.savez_compressed(
-                        samples_dir / f"{case_order:03d}_{target_date.isoformat()}_h23.npz",
-                        analysis_ensemble=ensemble.astype(np.float32),
-                        analysis_mean=ensemble.mean(axis=0).astype(np.float32),
-                        truth=truth.astype(np.float32),
-                        background=background.astype(np.float32),
-                        obs_values=obs_values.astype(np.float32),
-                        conditioning_mask=conditioning_mask,
-                        track_imitation_mask=next_track_mask,
-                        valid_mask=valid,
-                    )
+                    sample_path = samples_dir / f"{case_order:03d}_{target_date.isoformat()}_h23.npz"
+                    if args.sealed_raw_only:
+                        np.savez_compressed(
+                            sample_path,
+                            analysis_ensemble=ensemble.astype(np.float32),
+                            valid_mask=valid,
+                        )
+                    else:
+                        assert truth is not None
+                        np.savez_compressed(
+                            sample_path,
+                            analysis_ensemble=ensemble.astype(np.float32),
+                            analysis_mean=ensemble.mean(axis=0).astype(np.float32),
+                            truth=truth.astype(np.float32),
+                            background=background.astype(np.float32),
+                            obs_values=obs_values.astype(np.float32),
+                            conditioning_mask=conditioning_mask,
+                            track_imitation_mask=next_track_mask,
+                            valid_mask=valid,
+                        )
 
                 _write_csv(output_dir / "per_case_metrics.csv", per_case_rows)
                 status.write(
@@ -773,7 +794,17 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             status.write("failed", len(cases), error=str(error))
             raise
 
-    aggregate_rows = _aggregate_case_means(per_case_rows)
+    aggregate_rows = (
+        [
+            {
+                "region": "raw_sampling_only",
+                "num_cases": len(per_case_rows),
+                "outcome_metrics_computed": False,
+            }
+        ]
+        if args.sealed_raw_only
+        else _aggregate_case_means(per_case_rows)
+    )
     _write_csv(output_dir / "per_case_metrics.csv", per_case_rows)
     _write_csv(output_dir / "aggregate_case_mean_metrics.csv", aggregate_rows)
     (output_dir / "aggregate_case_mean_metrics.json").write_text(
@@ -787,7 +818,11 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
 
     sampler_metadata = getattr(sampler, "metadata", {}) or {}
     metadata = {
-        "protocol": "LiubovAnt/3d_var model-to-model main_200d",
+        "protocol": (
+            "sealed external chronological holdout raw sampling"
+            if args.sealed_raw_only
+            else "LiubovAnt/3d_var model-to-model main_200d"
+        ),
         "colleague_reference": {
             "branch": "origin/vae_exp",
             "config": "config/assimilation/model2model/main_200d/var_100_main_200d.yaml",
@@ -799,8 +834,10 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         "experiment_mode": selected_mode,
         "checkpoint": str(checkpoint_path),
         "dataset_split": dataset_split,
-        "temporal_split_protocol": "3dvar_main_200d",
-        "temporal_splits": THREEDVAR_MAIN_200D_SPLITS,
+        "temporal_split_protocol": (
+            "external_chronological_holdout" if args.sealed_raw_only else "3dvar_main_200d"
+        ),
+        "temporal_splits": None if args.sealed_raw_only else THREEDVAR_MAIN_200D_SPLITS,
         "checkpoint_training_split_kind": split_kind,
         "checkpoint_selection": (
             "fixed final epoch; legacy 2023 validation was not used for checkpoint selection"
@@ -856,6 +893,9 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         ),
         "edge_threshold": 0.15,
         "save_ensembles": bool(args.save_ensembles),
+        "sealed_raw_only": bool(args.sealed_raw_only),
+        "outcome_metrics_computed": not bool(args.sealed_raw_only),
+        "truth_saved_with_raw_samples": not bool(args.sealed_raw_only),
         "cases_file": "cases.json",
     }
     (output_dir / "metadata.json").write_text(
@@ -918,6 +958,7 @@ def parse_args() -> argparse.Namespace:
         action=argparse.BooleanOptionalAction,
         default=None,
     )
+    parser.add_argument("--sealed-raw-only", action="store_true")
     return parser.parse_args()
 
 
