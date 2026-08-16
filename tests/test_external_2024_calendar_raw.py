@@ -1,0 +1,151 @@
+from __future__ import annotations
+
+import json
+import subprocess
+import sys
+import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
+
+import numpy as np
+
+from assim_lib import external_2024_calendar_raw as raw
+
+
+class External2024CalendarRawTests(unittest.TestCase):
+    def test_signed_contract_and_static_config_are_exact(self) -> None:
+        self.assertEqual(raw._canonical_hash(raw.frozen_primary_contract()), raw.PRIMARY_CONTRACT_SHA256)
+        self.assertEqual(raw.EXPECTED_DATES[0].isoformat(), "2024-01-01")
+        self.assertEqual(raw.EXPECTED_DATES[-1].isoformat(), "2024-02-17")
+        self.assertEqual(len(raw.EXPECTED_DATES), 48)
+        self.assertEqual(
+            raw._canonical_hash([value.isoformat() for value in raw.EXPECTED_DATES]),
+            raw.TARGET_DATE_MANIFEST_SHA256,
+        )
+        repo = Path(raw.__file__).resolve().parents[1]
+        config = json.loads((repo / raw.CONFIG_PATH).read_text(encoding="utf-8"))
+        self.assertIsNone(config["data_overrides"]["split_protocol"])
+        self.assertEqual(config["data_overrides"]["test"]["obs_start_day"], "2024-01-01")
+        self.assertEqual(config["comparison"]["expected_num_cases"], 48)
+        self.assertEqual(config["comparison"]["ensemble_size"], 10)
+        self.assertTrue(config["comparison"]["save_ensembles"])
+
+    def test_noise_schedule_is_exact_and_unique(self) -> None:
+        values = [
+            raw.noise_seed(case_index, member_index)
+            for case_index in range(raw.CASE_COUNT)
+            for member_index in range(raw.MEMBER_COUNT)
+        ]
+        self.assertEqual(values, list(range(1234, 1714)))
+        with self.assertRaises(ValueError):
+            raw.noise_seed(48, 0)
+
+    def test_input_seal_hashes_only_exact_inventory(self) -> None:
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            repo = root / "repo"
+            dataset = root / "dataset"
+            preds = dataset / "preds"
+            sral = root / "sral"
+            preds.mkdir(parents=True)
+            sral.mkdir()
+            for relative in (raw.CONFIG_PATH, raw.DATA_CONFIG_PATH, raw.MODEL_CONFIG_PATH):
+                path = repo / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(relative, encoding="utf-8")
+            for target in sorted({*raw.BACKGROUND_DATES, *raw.TRACK_DATES}):
+                (preds / f"ocean+atmosphere_24_{target.isoformat()}.npy").write_bytes(b"p")
+            for target in raw.TRACK_DATES:
+                (sral / f"{target.isoformat()}.npy").write_bytes(b"s")
+            mask = root / "land_mask.npy"
+            mask.write_bytes(b"m")
+            seal = raw.build_input_seal(repo, dataset, sral, mask)
+            self.assertFalse(seal["truth_values_read"])
+            self.assertFalse(seal["outcomes_read"])
+            self.assertEqual(len(seal["forecast_records"]), 99)
+            self.assertEqual(len(seal["sral_records"]), 51)
+            payload = {key: value for key, value in seal.items() if key != "seal_sha256"}
+            self.assertEqual(seal["seal_sha256"], raw._canonical_hash(payload))
+
+    def test_sample_seal_is_complete_before_candidate_access(self) -> None:
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            sampling = root / "sampling"
+            samples = sampling / "samples"
+            samples.mkdir(parents=True)
+            cases = []
+            for case_index, (target, background) in enumerate(
+                zip(raw.EXPECTED_DATES, raw.BACKGROUND_DATES, strict=True)
+            ):
+                noise = [f"{raw.noise_seed(case_index, member):064x}" for member in range(10)]
+                cases.append(
+                    {
+                        "case_order": case_index,
+                        "target_date": target.isoformat(),
+                        "background_date": background.isoformat(),
+                        "initial_noise_sha256": noise,
+                        "scaled_initial_noise_sha256": noise,
+                    }
+                )
+                np.savez_compressed(
+                    samples / f"{case_index:03d}_{target.isoformat()}_h23.npz",
+                    analysis_ensemble=np.zeros((10, 2, 3), dtype=np.float32),
+                    truth=np.zeros((2, 3), dtype=np.float32),
+                    valid_mask=np.ones((2, 3), dtype=bool),
+                )
+            (sampling / "cases.json").write_text(json.dumps(cases), encoding="utf-8")
+            metadata = {
+                "dataset_split": "test",
+                "start_date": "2024-01-01",
+                "end_date": "2024-02-17",
+                "num_cases": 48,
+                "case_stride_days": 1,
+                "target_hour": 23,
+                "ensemble_size": 10,
+                "sample_batch_size": 10,
+                "num_timesteps": 25,
+                "method": "dopri5",
+                "rtol": 1e-5,
+                "atol": 1e-6,
+                "inference_precision": "float32",
+                "seed": 1234,
+                "initial_noise_scale": 1.0,
+                "field_protocol": "siconc-only",
+                "conditioning_mode": "full",
+                "cfg_mode": "none",
+                "cfg_background_scale": 1.0,
+                "cfg_observation_scale": 1.0,
+                "save_ensembles": True,
+                "checkpoint": f"/frozen/{raw.CHECKPOINT_NAME}",
+                "checkpoint_training_split_kind": "legacy_overlapping_2023_validation",
+                "checkpoint_selection": (
+                    "fixed final epoch; legacy 2023 validation was not used for checkpoint selection"
+                ),
+                "cases_file": "cases.json",
+            }
+            (sampling / "metadata.json").write_text(json.dumps(metadata), encoding="utf-8")
+            sealed = raw.seal_samples(sampling, root / "sealed")
+            self.assertEqual(sealed["case_count"], 48)
+            self.assertEqual(sum(len(row["members"]) for row in sealed["cases"]), 480)
+            self.assertFalse(sealed["candidate_transform_started"])
+            self.assertFalse(sealed["candidate_truth_read"])
+            self.assertTrue((root / "sealed" / raw.SAMPLE_SEAL_NAME).is_file())
+
+    def test_help_and_shell_are_fail_closed(self) -> None:
+        repo = Path(raw.__file__).resolve().parents[1]
+        result = subprocess.run(
+            [sys.executable, "-m", "assim_lib.external_2024_calendar_raw", "--help"],
+            cwd=repo,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        script = (repo / "scripts/run_external_2024_calendar_raw48.sh").read_text(encoding="utf-8")
+        self.assertIn('MODE" != "external_2024_calendar_global_bias_raw48_primary', script)
+        self.assertNotIn("curl", script)
+        self.assertNotIn("wget", script)
+
+
+if __name__ == "__main__":
+    unittest.main()

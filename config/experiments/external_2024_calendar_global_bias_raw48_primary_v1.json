@@ -1,0 +1,49 @@
+{
+  "project_name": "external_2024_calendar_global_bias_primary",
+  "task_name": "sealed_raw48_sampling",
+  "data_config": "../data/m2m_2f_1y.json",
+  "data_overrides": {
+    "split_protocol": null,
+    "observed_channels": [0],
+    "assimilation_range": 3,
+    "target_hour_index": 23,
+    "hour_mode": "all",
+    "background_strategy": "indexed",
+    "observation_mask": {
+      "kind": "sral_tracks",
+      "sral_transform_index": 1,
+      "synthetic_probability": 0.0,
+      "empty_probability": 0.0,
+      "require_finite_model_values": false
+    },
+    "test": {
+      "back_start_day": "2023-01-01",
+      "back_end_day": "2023-02-17",
+      "obs_start_day": "2024-01-01",
+      "obs_end_day": "2024-02-17"
+    }
+  },
+  "model_config": "../methods/concat_conditioning_diffusion_balanced_2f.json",
+  "comparison": {
+    "checkpoint_name": "ema_last_model.pth",
+    "dataset_split": "test",
+    "start_date": "2024-01-01",
+    "end_date": "2024-02-17",
+    "target_hour": 23,
+    "expected_num_cases": 48,
+    "case_stride_days": 1,
+    "field_protocol": "siconc-only",
+    "conditioning_mode": "full",
+    "track_weight": 0.5,
+    "ensemble_size": 10,
+    "sample_batch_size": 10,
+    "num_timesteps": 25,
+    "method": "dopri5",
+    "rtol": 0.00001,
+    "atol": 0.000001,
+    "inference_precision": "float32",
+    "seed": 1234,
+    "initial_noise_scale": 1.0,
+    "save_ensembles": true
+  }
+}
