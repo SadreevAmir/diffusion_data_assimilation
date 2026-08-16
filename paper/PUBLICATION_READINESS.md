@@ -13,9 +13,11 @@ The success definition has been amended fail-closed in
 an absolute requirement, high-SIC behaviour is compared with truth at
 `q={0,.15,.90,.95,.99}`, and `>=.999`/exact-one masses are encoding diagnostics
 rather than boundary acceptance criteria. Consequently, no historical
-`overall_eligible` from the superseded gate is final success. The exact amended
-primary and gate digests require trusted controller deployment and audit before
-the primary evaluation is admissible.
+`overall_eligible` from the superseded gate is final success. The trusted
+controller has deployed and audited the exact amended primary and gate digests,
+so the single signed chain is admissible and active. This admission establishes
+provenance only: the scientific outcome remains unknown until the dependent
+confirmatory CPU stage returns and its four compact artifacts are reconciled.
 
 ## Current decision-bearing evidence
 

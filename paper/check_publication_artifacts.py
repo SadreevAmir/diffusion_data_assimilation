@@ -131,7 +131,9 @@ AMENDED_PRIMARY_ANCHORS = {
     ),
     "PUBLICATION_READINESS.md": (
         "no historical\n`overall_eligible` from the superseded gate is final success",
-        "trusted controller deployment and audit",
+        "controller has deployed and audited the exact amended primary and gate digests",
+        "admission establishes\nprovenance only",
+        "scientific outcome remains unknown until the dependent\nconfirmatory CPU stage returns",
     ),
     "FROZEN_EVALUATION_HANDOFF.md": (
         "both exact amended-contract digests and controller\ndeploy/audit attestation are present",
