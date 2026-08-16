@@ -73,7 +73,7 @@ LATENT_RECONCILIATION_ANCHORS = (
     "do not change\nthe temperature",
 )
 CURRENT_DECISION_ANCHORS = (
-    "Required scientific blockers: an eligible spatially preserving calibration;",
+    "Required scientific blockers: reconciliation of the active frozen external\nprimary;",
     "The package is not waiting on clean-checkpoint training.",
     "single frozen latent-temperature construction at scale `1.30`",
     "complete compact payload from `latent_temperature_1p30_gate_retry1` has\nbeen reconciled",
@@ -96,6 +96,8 @@ EXTERNAL_PRIMARY_HANDOFF_ANCHORS = {
         "formation of the\ncomplete candidate before scoring truth is opened",
         "proper-score, finite-ensemble reliability, boundary,\nspatial/physical and operational families",
         "claim ledger reserves C39",
+        "already active, is independent of\ndevelopment-gate outcomes",
+        "No second external evaluation is authorized",
     ),
     "CLAIM_LEDGER.md": (
         "| C39 | The frozen calendar global-bias primary generalizes",

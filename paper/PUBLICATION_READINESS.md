@@ -1,12 +1,12 @@
 # Publication readiness audit
 
-Audit date: 2026-08-16
+Audit date: 2026-08-17
 
 Publication status: NOT_READY
 
-Required scientific blockers: an eligible spatially preserving calibration;
-after eligibility, a clean publication checkpoint, frozen independent
-evaluation and minimum-tier comparisons
+Required scientific blockers: reconciliation of the active frozen external
+primary; an eligible spatially preserving calibration and the remaining
+minimum-tier comparisons
 
 The success definition has been amended fail-closed in
 `AMENDED_PRIMARY_EVALUATION_CONTRACT.md`. A good randomized rank histogram is
@@ -342,22 +342,24 @@ evaluation. It also fixes the summary-only return schema and forbids retuning
 after confirmatory evidence. This closes an autonomous reproducibility gap but
 does not constitute authorization or change `NOT_READY`.
 
-The completed joint gate decisions are negative: global spread scaling, purged
-hurdle-isotonic/ECC-Q, exact mean-preserving projected spread, fixed open-logit
-desaturation, frozen ZOIB-EMOS/ECC-Q, topology-preserving stratified transport
+The completed development joint gate decisions are negative: global spread
+scaling, purged hurdle-isotonic/ECC-Q, exact mean-preserving projected spread,
+fixed open-logit desaturation, frozen ZOIB-EMOS/ECC-Q, topology-preserving stratified transport
 and purged analog-residual dressing are rejected as
-the paper's calibrated-ensemble method. Independent evaluation is not yet the
-next scientific step because no eligible calibration exists. All currently
-implemented mechanistically distinct calibration routes have been completed and
+the paper's calibrated-ensemble method. All currently implemented
+mechanistically distinct development calibration routes have been completed and
 rejected under the common gate; repeating or post-hoc retuning them would not
-create confirmatory evidence.
+create confirmatory evidence. This does not invalidate or pause the separately
+frozen external primary above: that chain is already active, is independent of
+development-gate outcomes, and must be reconciled exactly once when its compact
+payload arrives.
 The paired date/block CPU analysis of the existing compact audit is complete;
 its compact result has been reconciled into the evidence chain, while local
 reconstruction remains intentionally excluded. The currently implemented modes
 cannot supply another independent strong baseline family beyond the completed
-negative comparators. The frozen independent evaluation
-also remains locked until explicit authorization after the pre-test evidence
-package and clean checkpoint are complete.
+negative comparators. No second external evaluation is authorized. The sole
+active external primary is the already queued raw/confirmatory chain identified
+above.
 
 The guidance-mixture result is now complete and rejected. Its construction is
 operationally valid, but all three proper-score criteria, two reliability
