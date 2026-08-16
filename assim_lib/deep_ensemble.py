@@ -116,7 +116,13 @@ def _forward_signal(signum: int, _frame: object) -> None:
 
 def _run_checked(command: list[str], cwd: Path, output_dir: Path, stage: str, completed: int) -> None:
     global _active_process
-    _active_process = subprocess.Popen(command, cwd=cwd, stdin=subprocess.DEVNULL)
+    immutable_repo = Path(__file__).resolve().parents[1]
+    _active_process = subprocess.Popen(
+        command,
+        cwd=cwd,
+        env={**os.environ, "PYTHONPATH": str(immutable_repo)},
+        stdin=subprocess.DEVNULL,
+    )
     try:
         while _active_process.poll() is None:
             _write_status(output_dir, stage, completed, child_pid=_active_process.pid)
