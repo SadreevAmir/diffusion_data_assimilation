@@ -49,7 +49,11 @@ CHECKPOINT_NAME = "ema_last_model.pth"
 CHECKPOINT_SHA256 = "cd73cedc97a9f19d15c70ba31d28d3248a77dc6ef568edf8793326763810fdfe"
 DEVELOPMENT_SOURCE_SAMPLE_MANIFEST_SHA256 = "d69cd03b183b75bac368c2ed59af5aef84d8bec2205031e1cdfc57ceed90c907"
 DEVELOPMENT_FAMILY_CONTRACT_SHA256 = "087bddd55453f4a45eaecb226a6181c4624a297cb556eee824efb95802b0ee7b"
-PRIMARY_CONTRACT_SHA256 = "5d77ac9d40dfd8ccba0ba75729a5f8a7830b72bbe63368ea4eaab8a8e17abaf3"
+SUPERSEDED_ORIGINAL_PRIMARY_CONTRACT_SHA256 = (
+    "5d77ac9d40dfd8ccba0ba75729a5f8a7830b72bbe63368ea4eaab8a8e17abaf3"
+)
+CONFIRMATORY_GATE_CONTRACT_SHA256 = "57e8dd1859c4ac9a144be68904450926a6098b08a3b58a35e3d7dcc6a5bb9185"
+PRIMARY_CONTRACT_SHA256 = "f2225da7a05cab53b14604e45bed840a0ec559aed20856ae8ef2dd72d915b8f8"
 CONFIG_PATH = "config/experiments/external_2024_calendar_global_bias_raw48_primary_v1.json"
 MODEL_CONFIG_PATH = "config/methods/concat_conditioning_diffusion_balanced_2f.json"
 DATA_CONFIG_PATH = "config/data/m2m_2f_1y.json"
@@ -58,10 +62,86 @@ SAMPLE_SEAL_NAME = "sealed_manifest.json"
 TRUTH_SEAL_NAME = "truth_manifest.json"
 
 
+def confirmatory_gate_contract() -> dict[str, Any]:
+    return {
+        "protocol": "external_2024_calendar_global_bias_confirm48_primary_v1",
+        "case_weighting": "equal_weight_per_date",
+        "methods": ["raw", PRIMARY_CANDIDATE],
+        "proper_scores": {
+            "fair_crps_candidate_le_raw_times": 0.97,
+            "ordinary_crps_candidate_le_raw_times": 1.01,
+            "fair_date_and_block_95ci_upper_below": 0.0,
+            "energy_score_candidate_le_raw_times": 1.02,
+        },
+        "rank_reliability": {
+            "randomized_rank_tie_rng": "default_rng(20220815+case_index)",
+            "histogram_bins": 11,
+            "total_variation_to_uniform_max": 0.10,
+            "max_bin_deviation_from_uniform_max": 0.03,
+            "normalized_mean_rank_interval": [0.45, 0.55],
+            "normalized_mean_rank_block_95ci_must_contain": 0.5,
+            "member_range_error_vs_9_over_11_max": 0.05,
+            "inner_order_error_vs_7_over_11_max": 0.05,
+        },
+        "boundary": {
+            "thresholds": [0.0, 0.15, 0.90, 0.95, 0.99],
+            "event_definition": "member>q and truth>q for every q",
+            "attainable_probabilities": 11,
+            "metrics": ["brier", "reliability_l1", "marginal_frequency_error"],
+            "each_brier_candidate_le_raw_times": 1.02,
+            "each_brier_block_noninferiority": (
+                "for d_i=candidate_i-1.02*raw_i, shared 12-block bootstrap 95% upper<=0"
+            ),
+            "mean_high_sic_brier_thresholds": [0.90, 0.95, 0.99],
+            "mean_high_sic_brier_candidate_le_raw": True,
+            "mean_reliability_l1_candidate_le_raw": True,
+            "mean_marginal_frequency_error_candidate_le_raw": True,
+            "exact_zero_exact_one_and_ge_0999_are_encoding_diagnostics_only": True,
+            "structural_mask_equality_is_provenance_only": True,
+        },
+        "spatial": {
+            "lags": [1, 2, 4],
+            "member_mean_semivariogram_relative_error_to_truth_max": 0.20,
+            "semivariogram_tolerance_source": (
+                "frozen from 2022 raw errors 0.146 through 0.184 before holdout access"
+            ),
+            "local_variogram_score_candidate_le_raw_times": 1.02,
+            "local_variogram_block_noninferiority": (
+                "for each lag d_i=candidate_i-1.02*raw_i, shared 12-block bootstrap 95% upper<=0"
+            ),
+            "analysis_mean_rmse_and_iiee_candidate_le_raw_times": 1.02,
+            "edge_error_candidate_le_raw_times": 1.02,
+            "area_extent_and_analysis_mean_variogram_use_existing_absolute_or_2pct_tolerance": True,
+            "worst_member_gate": False,
+        },
+        "bootstrap": {
+            "samples": 20_000,
+            "date_seed": 20220815,
+            "block_seed": 20220816,
+            "shared_across_metrics": True,
+            "blocks": "12_fixed_noncircular_nonoverlapping_consecutive_four_date_blocks",
+        },
+        "operational": {
+            "cases": 48,
+            "members": 10,
+            "finite": True,
+            "sealed_before_truth_scoring": True,
+            "gate_generates_and_seals_all_candidate_draws_and_arrays_before_opening_any_truth_npz": (True),
+            "no_compensation_across_families": True,
+        },
+    }
+
+
 def frozen_primary_contract() -> dict[str, Any]:
     """Return the pre-registered primary contract whose hash was frozen before outcomes."""
     return {
         "protocol_id": PROTOCOL_ID,
+        "supersedes": SUPERSEDED_ORIGINAL_PRIMARY_CONTRACT_SHA256,
+        "amendment_reason": (
+            "domain correction before any 2024 outcome access; truth-support audit used 2022 only"
+        ),
+        "amendment_timestamp": "2026-08-16T22:47:56+03:00",
+        "amendment_based_on_publication_commit": ("e8a5e950c56b847dd48ec8657cb9db46cecf38e9"),
         "primary_candidate": PRIMARY_CANDIDATE,
         "alternative_not_tested": "locked_mc_dropout_p010_final_ema_ensemble",
         "launch_rule": (
@@ -122,9 +202,8 @@ def frozen_primary_contract() -> dict[str, Any]:
             "block_seed": 20220816,
             "blocks": "12_fixed_nonoverlapping_consecutive_four_date_blocks",
         },
-        "gate": (
-            "unchanged_calendar_global_bias_full_no_compensation_gate_scaled_only_to_exact_48_case_operational_count"
-        ),
+        "confirmatory_gate_contract_sha256": CONFIRMATORY_GATE_CONTRACT_SHA256,
+        "gate": confirmatory_gate_contract(),
         "compact_outputs": [
             "aggregate_case_mean_metrics.json",
             "metadata.json",
@@ -210,6 +289,15 @@ def build_input_seal(
         _record(repo / DATA_CONFIG_PATH, repo),
         _record(repo / MODEL_CONFIG_PATH, repo),
     ]
+    source_records = [
+        _record(repo / relative, repo)
+        for relative in (
+            "assim_lib/external_2024_calendar_raw.py",
+            "assim_lib/compare_3dvar.py",
+            "assim_lib/data.py",
+            "assim_lib/evaluate.py",
+        )
+    ]
     payload = {
         "schema_version": 1,
         "protocol_id": PROTOCOL_ID,
@@ -219,6 +307,7 @@ def build_input_seal(
         "sral_records": sral_records,
         "mask_record": _record(mask_path, mask_path.parent),
         "config_records": config_records,
+        "source_records": source_records,
         "dense_target_may_be_loaded_only_to_construct_masked_model_observations": True,
         "holdout_outcomes_used_for_metrics_or_method_selection": False,
     }
@@ -344,16 +433,29 @@ def seal_samples(
     """Validate and seal 48x10 raw members before any downstream truth access."""
     if sampling_root.is_symlink() or sealed_root.is_symlink() or sealed_root.exists():
         raise ValueError("sampling/sealed roots violate the new-directory contract")
-    _, cases = _validate_sampling_metadata(sampling_root)
-    sealed_sral_names = (
-        {
-            Path(str(record["path"])).name
-            for record in input_seal.get("sral_records", [])
-            if isinstance(record, dict) and isinstance(record.get("path"), str)
-        }
-        if input_seal is not None
-        else None
-    )
+    sampling_metadata, cases = _validate_sampling_metadata(sampling_root)
+    normalization_means = np.asarray(sampling_metadata.get("normalization_means"), dtype=np.float64)
+    normalization_stds = np.asarray(sampling_metadata.get("normalization_stds"), dtype=np.float64)
+    if (
+        normalization_means.ndim != 1
+        or normalization_stds.shape != normalization_means.shape
+        or normalization_means.size < 1
+        or not np.all(np.isfinite(normalization_means))
+        or not np.all(np.isfinite(normalization_stds))
+        or np.any(normalization_stds <= 0.0)
+    ):
+        raise ValueError("sampling normalization arrays are invalid")
+    sealed_sral_by_date: dict[date, set[str]] | None = None
+    if input_seal is not None:
+        sealed_sral_by_date = {target: set() for target in TRACK_DATES}
+        for record in input_seal.get("sral_records", []):
+            if not isinstance(record, dict) or not isinstance(record.get("path"), str):
+                raise ValueError("input seal contains an invalid SRAL record")
+            name = Path(record["path"]).name
+            parsed = parse_date(name)
+            if parsed not in sealed_sral_by_date:
+                raise ValueError("input seal SRAL record is outside the frozen schedule")
+            sealed_sral_by_date[parsed].add(name)
     sample_source = sampling_root / "samples"
     if sample_source.is_symlink() or not sample_source.is_dir():
         raise ValueError("sampling samples directory is unavailable")
@@ -400,9 +502,18 @@ def seal_samples(
                 or any(parse_date(Path(str(path)).name) != expected_date for path in record["sral_files"])
             ):
                 raise ValueError("sampling conditioning-track provenance differs")
-        case_sral_names = {Path(str(path)).name for record in track_days for path in record["sral_files"]}
-        if sealed_sral_names is not None and not case_sral_names <= sealed_sral_names:
-            raise ValueError("sampling case references an SRAL file outside the input seal")
+        if sealed_sral_by_date is not None:
+            for record, expected_date in zip(track_days, expected_track_days, strict=True):
+                observed = {Path(str(path)).name for path in record["sral_files"]}
+                if observed != sealed_sral_by_date[expected_date]:
+                    raise ValueError("sampling conditioning SRAL set differs from the input seal")
+            imitation = case.get("track_imitation_sral_files")
+            if (
+                not isinstance(imitation, list)
+                or {Path(str(path)).name for path in imitation}
+                != sealed_sral_by_date[target + timedelta(days=1)]
+            ):
+                raise ValueError("sampling imitation SRAL set differs from the input seal")
         if (
             case.get("track_imitation_date") != (target + timedelta(days=1)).isoformat()
             or case.get("mask_kind") != "sral_tracks"
@@ -479,6 +590,9 @@ def seal_samples(
         "member_count": MEMBER_COUNT,
         "checkpoint_name": CHECKPOINT_NAME,
         "checkpoint_sha256": CHECKPOINT_SHA256,
+        "sampling_metadata_sha256": _file_hash(sampling_root / "metadata.json"),
+        "normalization_means": normalization_means.tolist(),
+        "normalization_stds": normalization_stds.tolist(),
         "sample_manifest_sha256": _sample_manifest(sample_paths),
         "cases": case_records,
     }
@@ -513,6 +627,14 @@ def validate_existing_sample_seal(sealed_root: Path) -> dict[str, Any]:
     for key, value in expected.items():
         if sealed.get(key) != value:
             raise ValueError(f"existing raw seal differs for {key}")
+    if (
+        not isinstance(sealed.get("sampling_metadata_sha256"), str)
+        or len(sealed["sampling_metadata_sha256"]) != 64
+        or not isinstance(sealed.get("normalization_means"), list)
+        or not isinstance(sealed.get("normalization_stds"), list)
+        or len(sealed["normalization_means"]) != len(sealed["normalization_stds"])
+    ):
+        raise ValueError("existing raw seal normalization provenance differs")
     cases = sealed.get("cases")
     samples = sealed_root / "samples"
     if not isinstance(cases, list) or len(cases) != CASE_COUNT or samples.is_symlink():
@@ -521,15 +643,35 @@ def validate_existing_sample_seal(sealed_root: Path) -> dict[str, Any]:
     for case_index, (target, record) in enumerate(zip(EXPECTED_DATES, cases, strict=True)):
         expected_name = f"{case_index:03d}_{target.isoformat()}_h23.npz"
         sample = samples / expected_name
+        members = record.get("members") if isinstance(record, dict) else None
         if (
             not isinstance(record, dict)
             or record.get("case_index") != case_index
+            or record.get("target_date") != target.isoformat()
+            or record.get("background_date") != BACKGROUND_DATES[case_index].isoformat()
             or record.get("sample_name") != expected_name
+            or not isinstance(members, list)
+            or len(members) != MEMBER_COUNT
+            or _canonical_hash(members) != record.get("member_manifest_sha256")
             or sample.is_symlink()
             or not sample.is_file()
             or _file_hash(sample) != record.get("sample_sha256")
         ):
             raise ValueError("existing sealed raw sample differs")
+        with np.load(sample, allow_pickle=False) as payload:
+            if set(payload.files) != {"analysis_ensemble", "valid_mask"}:
+                raise ValueError("existing sealed raw sample arrays differ")
+            ensemble = np.asarray(payload["analysis_ensemble"])
+            valid = np.asarray(payload["valid_mask"])
+        if (
+            ensemble.ndim != 3
+            or ensemble.shape[0] != MEMBER_COUNT
+            or valid.shape != ensemble.shape[1:]
+            or valid.dtype != np.bool_
+            or not np.all(np.isfinite(ensemble))
+            or np.any((ensemble < 0.0) | (ensemble > 1.0))
+        ):
+            raise ValueError("existing sealed raw sample values differ")
         paths.append(sample)
     if _sample_manifest(paths) != sealed.get("sample_manifest_sha256"):
         raise ValueError("existing raw aggregate manifest differs")
@@ -556,9 +698,11 @@ def write_truth_bundle(
     indices = _case_indices(dataset, EXPECTED_DATES[0], EXPECTED_DATES[-1], 23, 1)
     if len(indices) != CASE_COUNT:
         raise ValueError("truth extraction schedule differs from the signed 48 dates")
-    sampling_metadata = load_json(sampling_root / "metadata.json")
-    means = sampling_metadata.get("normalization_means")
-    stds = sampling_metadata.get("normalization_stds")
+    raw_seal = load_json(sealed_root / SAMPLE_SEAL_NAME)
+    if _file_hash(sampling_root / "metadata.json") != raw_seal.get("sampling_metadata_sha256"):
+        raise ValueError("sampling metadata changed after the raw seal")
+    means = raw_seal.get("normalization_means")
+    stds = raw_seal.get("normalization_stds")
     fields = list(data_config["fields"])
     channel = fields.index("siconc")
     truth_root.mkdir()
@@ -712,6 +856,12 @@ def run(output_dir: Path, source_experiment: str, run_dir: Path) -> None:
                     total_units=CASE_COUNT,
                 )
             sealed = seal_samples(sampling_root, sealed_root, input_seal)
+        if (
+            (sampling_root / "metadata.json").is_symlink()
+            or not (sampling_root / "metadata.json").is_file()
+            or _file_hash(sampling_root / "metadata.json") != sealed.get("sampling_metadata_sha256")
+        ):
+            raise ValueError("sampling metadata is missing or differs from the raw seal")
         _input_seal_unchanged(input_seal, repo, dataset_root, sral_root, mask_path)
         _checkpoint_source_unchanged(run_dir, checkpoint_record)
         if (truth_root / TRUTH_SEAL_NAME).is_file():

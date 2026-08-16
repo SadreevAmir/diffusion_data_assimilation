@@ -747,6 +747,9 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                 case_metadata = {
                     **common,
                     "conditioning_track_days": track_days,
+                    "track_imitation_sral_files": [
+                        str(path) for path in dataset.sral_records.get(next_track_date, [])
+                    ],
                     "conditioning_mask_sha256": _mask_hash(conditioning_mask),
                     "track_imitation_mask_sha256": _mask_hash(next_track_mask),
                     "mask_kind": item["meta"].get("mask_kind"),

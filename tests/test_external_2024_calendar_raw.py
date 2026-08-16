@@ -51,7 +51,15 @@ class External2024CalendarRawTests(unittest.TestCase):
             sral = root / "sral"
             preds.mkdir(parents=True)
             sral.mkdir()
-            for relative in (raw.CONFIG_PATH, raw.DATA_CONFIG_PATH, raw.MODEL_CONFIG_PATH):
+            for relative in (
+                raw.CONFIG_PATH,
+                raw.DATA_CONFIG_PATH,
+                raw.MODEL_CONFIG_PATH,
+                "assim_lib/external_2024_calendar_raw.py",
+                "assim_lib/compare_3dvar.py",
+                "assim_lib/data.py",
+                "assim_lib/evaluate.py",
+            ):
                 path = repo / relative
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text(relative, encoding="utf-8")
@@ -97,6 +105,9 @@ class External2024CalendarRawTests(unittest.TestCase):
                             for offset in range(3)
                         ],
                         "track_imitation_date": (target + timedelta(days=1)).isoformat(),
+                        "track_imitation_sral_files": [
+                            f"/sealed/sral/{(target + timedelta(days=1)).isoformat()}.npy"
+                        ],
                         "conditioning_obs_count": 3,
                         "track_imitation_count": 1,
                         "conditioning_mask_sha256": f"{case_index + 1:064x}",
@@ -139,6 +150,8 @@ class External2024CalendarRawTests(unittest.TestCase):
                 "sealed_raw_only": True,
                 "outcome_metrics_computed": False,
                 "truth_saved_with_raw_samples": False,
+                "normalization_means": [0.0, 0.0],
+                "normalization_stds": [1.0, 1.0],
                 "checkpoint": f"/frozen/{raw.CHECKPOINT_NAME}",
                 "checkpoint_training_split_kind": "legacy_overlapping_2023_validation",
                 "checkpoint_selection": (
@@ -179,7 +192,15 @@ class External2024CalendarRawTests(unittest.TestCase):
             sral = root / "sral"
             preds.mkdir(parents=True)
             sral.mkdir()
-            for relative in (raw.CONFIG_PATH, raw.DATA_CONFIG_PATH, raw.MODEL_CONFIG_PATH):
+            for relative in (
+                raw.CONFIG_PATH,
+                raw.DATA_CONFIG_PATH,
+                raw.MODEL_CONFIG_PATH,
+                "assim_lib/external_2024_calendar_raw.py",
+                "assim_lib/compare_3dvar.py",
+                "assim_lib/data.py",
+                "assim_lib/evaluate.py",
+            ):
                 path = repo / relative
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text(relative, encoding="utf-8")
