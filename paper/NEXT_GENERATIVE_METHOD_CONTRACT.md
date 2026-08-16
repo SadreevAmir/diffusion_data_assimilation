@@ -114,8 +114,10 @@ family closes this construction without compensation.
 
 ## Execution and artifact contract
 
-No currently implemented trusted mode executes this contract. The future
-reviewed mode has a one-parameter interface only:
+The reviewed trusted modes
+`validation_clean_checkpoint_deep_ensemble_sampling` and
+`validation_clean_checkpoint_deep_ensemble_gate` execute this contract. The
+sampling mode has a one-parameter interface only:
 `source_experiment=joint_full_condition_validation_2022`. Training seeds,
 member seeds, allocation, configuration, sampler and gate are constants.
 
@@ -126,6 +128,5 @@ hashes, selected-checkpoint identities, per-case checkpoint/member counts,
 ordered seed hashes, common-noise checks and operational counts. No raw member,
 conditioning or truth field is requested.
 
-Implementation and independent runner review are autonomous engineering work,
-not an external blocker. This document freezes the scientific contract before
-that implementation and does not authorize an experiment launch.
+This document freezes the scientific contract and does not itself authorize or
+launch an experiment.

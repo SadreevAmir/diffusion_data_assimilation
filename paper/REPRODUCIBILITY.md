@@ -142,7 +142,7 @@ error `0.0461536485` and `0.0814045891`; established-ice Brier
 Only reliability and operational validity pass. These values document a
 rejected mechanism and must not be used to reconstruct paired cases.
 
-## Frozen clean-checkpoint deep-ensemble pre-implementation handoff
+## Frozen clean-checkpoint deep-ensemble executable handoff
 
 The guidance-mixture result is complete and rejected; its operational checks
 pass, but proper-score, reliability and boundary criteria fail. It is retained
@@ -163,16 +163,18 @@ families fail; `overall_eligible=false`. These compact anchors document a
 rejected mechanism and do not authorize reconstruction of case-level pairs.
 
 `paper/NEXT_GENERATIVE_METHOD_CONTRACT.md` freezes the subsequent
-clean-checkpoint deep ensemble before runner implementation. It does not
-authorize training or sampling. Exactly three clean training seeds, `1701`,
+clean-checkpoint deep ensemble. The reviewed trusted sampling and gate modes
+implement this contract; this document alone does not launch either stage.
+Exactly three clean training seeds, `1701`,
 `1702`, and `1703`, use identical non-seed configuration. Every checkpoint
 contributes latent seeds `2401`, `2402`, and `2403`; the checkpoint selected by
 the frozen case-index rotation also contributes `2404`. The extra-member totals
 over forty cases are `14/13/13`, while every case retains ten members.
 
-The future runner interface has only
+The reviewed sampling runner interface has only
 `source_experiment=joint_full_condition_validation_2022`, and return policy is
-`summary_only`. Before runner admission, execute
+`summary_only`; the dependent gate accepts only the sampling experiment as its
+source. As a local contract check, execute
 `python3 paper/deep_ensemble_reference.py` and require the message
 `checkpoint extras 14/13/13; metadata admission fails closed`. The executable
 oracle now validates the exact compact pre-score manifest: immutable shared

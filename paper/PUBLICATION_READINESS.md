@@ -254,8 +254,11 @@ operationally valid, but all three proper-score criteria, two reliability
 criteria, and the established-ice and exact-one boundary criteria fail. This is
 a mechanism failure, not permission to retune weights or member allocation.
 
-The active autonomous dependency is implementation and review of the frozen
-clean-checkpoint deep ensemble in `paper/NEXT_GENERATIVE_METHOD_CONTRACT.md`,
-not an external blocker. Its training seeds `1701`, `1702`, and `1703`, fixed
+The immediate autonomous dependency is the compact result from the already
+running checkpoint-trajectory EMA sampling stage and its queued unchanged joint
+gate. If that frozen mechanism fails, the reviewed clean-checkpoint sampling
+and gate modes implement the reserve contract in
+`paper/NEXT_GENERATIVE_METHOD_CONTRACT.md`; no runner implementation remains a
+scientific blocker. Its training seeds `1701`, `1702`, and `1703`, fixed
 ten-member `4/3/3` case rotation, latent seeds, immutable clean training
 configuration, unchanged sampler and no-compensation gate must remain fixed.
