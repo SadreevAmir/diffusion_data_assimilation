@@ -239,8 +239,13 @@ negative comparators. The frozen independent evaluation
 also remains locked until explicit authorization after the pre-test evidence
 package and clean checkpoint are complete.
 
+The guidance-mixture result is now complete and rejected. Its construction is
+operationally valid, but all three proper-score criteria, two reliability
+criteria, and the established-ice and exact-one boundary criteria fail. This is
+a mechanism failure, not permission to retune weights or member allocation.
+
 The active autonomous dependency is implementation and review of the frozen
-`paper/NEXT_GENERATIVE_METHOD_CONTRACT.md`, not an external blocker. Until that
-runner exists, the exact guidance weights, two-per-weight allocation, common
-random numbers, unchanged sampler settings and no-compensation gate must remain
-unchanged.
+clean-checkpoint deep ensemble in `paper/NEXT_GENERATIVE_METHOD_CONTRACT.md`,
+not an external blocker. Its training seeds `1701`, `1702`, and `1703`, fixed
+ten-member `4/3/3` case rotation, latent seeds, immutable clean training
+configuration, unchanged sampler and no-compensation gate must remain fixed.

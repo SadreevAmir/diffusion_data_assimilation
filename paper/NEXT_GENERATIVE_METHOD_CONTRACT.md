@@ -1,72 +1,120 @@
-# Frozen next generative-method contract: guidance-mixture ensemble
+# Frozen next generative-method contract: clean-checkpoint deep ensemble
 
-## Scientific role and falsifiable hypothesis
+## Decision context and scientific role
 
-The completed postprocessors show a repeated tradeoff: anomaly inflation can
-improve fair CRPS but damages bounded spatial fields, whereas topology-preserving
-transport cannot expose useful new dispersion. Purged analog residuals improve
-finite-ensemble ranks and coverage but transfer large mean, boundary and spatial
-errors. The next mechanism therefore creates diversity inside the conditional
-generator, before any clipping or member reconstruction.
+The fixed independent-CFG guidance mixture is complete and rejected by the
+unchanged no-compensation gate. Operational construction succeeded, but the
+candidate failed all three proper-score criteria, two of three finite-ensemble
+reliability criteria, and the established-ice and exact-one boundary criteria.
+Changing its weights, member allocation, seeds or guidance scales after seeing
+that result is prohibited.
 
-The candidate is a ten-member deterministic mixture over the five already
-evaluated independent-CFG track weights. It tests whether guidance uncertainty,
-rather than a post-hoc marginal transform, supplies useful bounded joint
-scenarios. A pass requires the unchanged no-compensation gate. Failure rejects
-this fixed guidance-mixture mechanism and must not trigger weight, allocation,
-seed or clipping adjustment on these dates.
+The next mechanism moves uncertainty upstream of sampling and postprocessing:
+it combines independently trained clean checkpoints. This tests whether the
+remaining underdispersion is primarily epistemic/model uncertainty that cannot
+be recovered by latent-noise sampling from one fitted checkpoint. It also
+produces the clean multi-seed checkpoint evidence required by the minimum paper
+tier, so a negative result remains publication-relevant.
 
-## Frozen construction
+## Falsifiable prediction and paper claim
 
-- Use the same learned checkpoint, conditioning tensors, ordered 40 cases and
-  physical output transform as the existing independent-CFG validation runs.
-- Set `cfg_mode=independent`. Use exactly two members at each track/background
-  scale pair: `(0.5,0.5)`, `(0.625,0.375)`, `(0.75,0.25)`,
-  `(0.875,0.125)`, and `(1.0,0.0)`. Member order is the listed scale order,
-  with the two seeds in ascending order within each pair.
-- Use the first two already frozen member seeds from the original validation
-  sampling contract for every scale pair. Reuse the same two initial-noise
-  tensors across all five scale pairs (common random numbers); do not search or
-  regenerate seeds after scoring.
-- Keep `start_mode`, `sample_start_noise_level`, `sample_target`, solver,
-  timesteps, observation enforcement, normalization and masks identical to the
-  source independent-CFG runs. Do not clip, recenter, rank-shuffle, rescale or
-  postprocess members beyond the established physical output transform.
-- The raw comparison remains the ten-member learned-joint ensemble from
-  `joint_full_condition_validation_2022`. The candidate is not described as a
-  calibrated distribution unless it passes the full gate.
+Three independently initialized checkpoints trained with the same corrected,
+disjoint training protocol will produce complementary conditional analyses.
+Their pooled ten-member ensemble is predicted to pass the full proper-score,
+finite-ensemble reliability, boundary, spatial/physical and operational gate
+against the frozen learned-joint raw ensemble. In particular, fair CRPS must
+improve by at least 3% with its paired-date interval excluding zero, ordinary
+CRPS may worsen by at most 1%, randomized-rank discrepancy must fall by at
+least 20%, and every boundary and spatial/physical safeguard must pass without
+family compensation.
 
-## Frozen decision and reporting
+Success supports the narrow claim that clean multi-checkpoint epistemic
+diversity supplies useful bounded joint scenarios where single-checkpoint
+latent and guidance diversity do not. Failure rejects this fixed three-seed
+deep-ensemble construction; it means that independent initialization under the
+same training objective is insufficient. Failure must not trigger seed
+selection, checkpoint weighting, member reallocation or post-hoc calibration
+on the development dates.
 
-Evaluate all 40 cases with the existing proper-score, finite-ensemble
-reliability, boundary, spatial/physical and operational families. Success is
-only `gate.overall_eligible=true`, including at least 3% lower
-`analysis_fair_crps`, paired date CI excluding zero, ordinary CRPS no worse than
-1%, and every other mandatory family passing without compensation. Report the
-fixed four-case-block interval as temporal sensitivity, not as a predeclared
-gate.
+## Frozen training contract
 
-Operational validity additionally requires exactly two finite members from
-each scale pair for every case, exact seed/noise pairing across the five pairs,
-and no fallback member substitution. Report per-scale member counts and hashes
-of the ordered seed identifiers. A proper-score failure means guidance mixture
-does not provide useful conditional diversity; a reliability failure means it
-does not repair finite-ensemble exchangeability; a boundary or spatial failure
-means heterogeneous guidance changes physical regimes or joint geometry
-unsafely. Any such failure closes the fixed mechanism.
+- Train exactly three checkpoints with training seeds `1701`, `1702`, and
+  `1703`, in that order.
+- Every seed uses the corrected disjoint split and the exact architecture,
+  loss, optimizer, schedule, normalization, observation-mask policy, stopping
+  epoch and checkpoint-selection rule of the clean publication training
+  configuration. Only the initialization/data-order seed differs.
+- The runner must resolve one controller-attested immutable publication
+  training configuration. Configuration hashes must match across seeds after
+  removing only the seed field. No fallback to a legacy checkpoint is allowed.
+- A seed is admissible only when training finishes normally, the selected
+  checkpoint is finite, and the frozen selection rule identifies exactly one
+  checkpoint without looking at calibration-gate metrics.
+- If any seed is missing or inadmissible, the experiment fails operationally;
+  it must not proceed with two checkpoints or replace the seed.
+
+The exact clean publication training configuration and stopping rule must be
+implemented and independently reviewed in the trusted runner before admission.
+They are not runtime parameters. Runner review may expose a mismatch with this
+contract, but may not choose them after reading candidate scores.
+
+## Frozen ten-member construction
+
+For ordered case index `i` in `0..39`, allocate four members to checkpoint
+`i mod 3` and three members to each other checkpoint. Thus the extra member is
+balanced as `14/13/13` over the forty cases rather than permanently favoring
+one seed. Use latent member seeds `2401`, `2402`, `2403` for every checkpoint;
+the checkpoint receiving the fourth member additionally uses `2404`.
+
+Reuse the same initial-noise tensor for a given latent seed across checkpoints
+and cases only according to the existing deterministic case/seed derivation;
+this is a common-random-number comparison, not a shared tensor across different
+cases. Member order is checkpoint seed ascending and then latent seed ascending.
+
+Use learned-joint conditioning and the exact frozen publication sampler. Keep
+conditioning tensors, physical output transform, `start_mode`, start noise
+level, target, solver, timesteps, observation enforcement, normalization and
+masks identical across checkpoints. Do not clip beyond the established physical
+output transform, recenter, rank-shuffle, rescale, weight checkpoints, or apply
+postprocessing.
+
+The reference plan oracle is `deep_ensemble_reference.py`. Admission must agree
+with its forty case allocations, `14/13/13` extra-member accounting, ordered
+member identifiers and fail-closed metadata checks.
+
+## Frozen evaluation and decision
+
+Evaluate the same ordered forty development cases and the complete existing
+no-compensation gate. The comparison baseline remains the ten-member raw
+learned-joint ensemble. Paired date uncertainty is mandatory; the fixed
+four-case-block interval is reported only as temporal sensitivity.
+
+Operational validity additionally requires:
+
+- all three training seeds and all three checkpoint identities;
+- identical non-seed training metadata hashes;
+- exactly ten finite members per case and the frozen `4/3/3` rotation;
+- exact checkpoint/member seed identities and common-noise hashes;
+- no checkpoint, member or case substitution;
+- all forty cases completed and every reported metric finite.
+
+Only `gate.overall_eligible=true` permits selection. Any failed mandatory
+family closes this construction without compensation.
 
 ## Execution and artifact contract
 
-This contract is frozen before implementation. A reviewed GPU runner must have
-only `source_experiment=joint_full_condition_validation_2022`; the scale pairs,
-allocation, seeds, solver and full gate are constants, not runtime parameters.
-All sampling and analysis run server-side. Retrieval is `summary_only`; the
-compact return contains the complete gate, raw/candidate aggregates, paired
-date and four-case-block uncertainty, per-scale member counts, seed-identifier
-hashes and operational counts. No raw member or truth field is requested.
+No currently implemented trusted mode executes this contract. The future
+reviewed mode has a one-parameter interface only:
+`source_experiment=joint_full_condition_validation_2022`. Training seeds,
+member seeds, allocation, configuration, sampler and gate are constants.
 
-No trusted mode currently implements this contract. This is an autonomous
-engineering task for the next controller cycle, not an external dependency and
-not permission to substitute an existing mode or launch an experiment. Before
-admission, the runner review must agree with the dependency-free member-plan,
-accounting and gate oracle in `guidance_mixture_reference.py`.
+Training, sampling and analysis run server-side. Retrieval is `summary_only`.
+The compact result must include the complete gate, raw/candidate aggregates,
+paired date and four-case-block uncertainty, immutable training/configuration
+hashes, selected-checkpoint identities, per-case checkpoint/member counts,
+ordered seed hashes, common-noise checks and operational counts. No raw member,
+conditioning or truth field is requested.
+
+Implementation and independent runner review are autonomous engineering work,
+not an external blocker. This document freezes the scientific contract before
+that implementation and does not authorize an experiment launch.

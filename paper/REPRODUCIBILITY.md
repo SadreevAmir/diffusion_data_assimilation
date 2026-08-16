@@ -142,29 +142,29 @@ error `0.0461536485` and `0.0814045891`; established-ice Brier
 Only reliability and operational validity pass. These values document a
 rejected mechanism and must not be used to reconstruct paired cases.
 
-## Frozen guidance-mixture pre-implementation handoff
+## Frozen clean-checkpoint deep-ensemble pre-implementation handoff
+
+The guidance-mixture result is complete and rejected; its operational checks
+pass, but proper-score, reliability and boundary criteria fail. It is retained
+as negative mechanism evidence and is not retuned.
 
 `paper/NEXT_GENERATIVE_METHOD_CONTRACT.md` freezes the subsequent
-guidance-mixture sampling mechanism before runner implementation. It is not an
-executed result and cannot be cited as evidence. The only admissible candidate
-has `cfg_mode=independent`, scale pairs `(0.5,0.5)`, `(0.625,0.375)`,
-`(0.75,0.25)`, `(0.875,0.125)`, `(1.0,0.0)`, and exactly two members per pair.
-The same ordered two seed identifiers and initial-noise identifiers are reused
-at every pair; member order is pair-major and seed-minor. The runner interface
-has only `source_experiment=joint_full_condition_validation_2022`, and return
-policy is `summary_only`.
+clean-checkpoint deep ensemble before runner implementation. It does not
+authorize training or sampling. Exactly three clean training seeds, `1701`,
+`1702`, and `1703`, use identical non-seed configuration. Every checkpoint
+contributes latent seeds `2401`, `2402`, and `2403`; the checkpoint selected by
+the frozen case-index rotation also contributes `2404`. The extra-member totals
+over forty cases are `14/13/13`, while every case retains ten members.
 
-Before admission, a reviewer must run
-`python3 paper/guidance_mixture_reference.py` and obtain
-`guidance-mixture reference checks: PASS`. The runner's ordered member plan is
-checked for every case through `compact_run_accounting`; the one-parameter
-interface and retrieval policy are passed to `validate_runner_interface`; and
-the compact gate is passed to `validate_compact_gate`. The lower-level
-`compact_operational_accounting` remains the single-case oracle. Admission
-fails on any scale, allocation, order, seed/noise pairing, nonzero reported fallback count,
-missing case plan, extra runtime parameter, mandatory-family or
-`overall_eligible` drift. This executable check establishes contract conformance only;
-it is not a scientific result and does not authorize sampling.
+The future runner interface has only
+`source_experiment=joint_full_condition_validation_2022`, and return policy is
+`summary_only`. Before runner admission, execute
+`python3 paper/deep_ensemble_reference.py` and require the message
+`checkpoint extras 14/13/13`. Review must additionally verify immutable clean
+training/configuration hashes, exact checkpoint selection, common-noise hashes,
+all member identities, zero substitution and the full unchanged gate. The
+reference establishes member-plan contract conformance only; it is not a
+scientific result.
 
 Two distinct compact contracts must not be conflated. The trusted 40-row
 spread-only corrected-case table has an audited contract containing
