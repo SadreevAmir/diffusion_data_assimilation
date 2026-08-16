@@ -355,6 +355,15 @@ spatial/physical criterion fails. Mixing already sampled guidance settings is
 therefore rejected as a diversity mechanism without retuning weights or member
 allocation.
 
+A final mean-preserving diagnostic applies purged, permutation-equivariant
+spatially constant offsets to whole members. Training-only selection chooses
+the null amplitude (`0.0`), so held-out fair CRPS is unchanged at
+`0.0584905850`, ranks and coverage are unchanged, and the proper-score and
+finite-ensemble-reliability families fail. Mean-field, boundary, member-spatial
+and operational families pass, but `overall_eligible=false`. This rejects
+useful coherent-offset inflation under the frozen contract; it does not show
+that the unchanged raw ensemble is calibrated.
+
 Figure 1 summarizes the aggregate mechanism result. The dashed references are
 descriptive finite-ensemble targets, not confidence bounds.
 

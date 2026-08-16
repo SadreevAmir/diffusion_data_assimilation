@@ -145,6 +145,14 @@ the mechanistically distinct clean-checkpoint deep ensemble frozen in
 `NEXT_GENERATIVE_METHOD_CONTRACT.md`; no currently implemented trusted mode
 executes that contract.
 
+The frozen coherent-member-offset contract has also been executed and rejected.
+Its purged training folds select amplitude `0.0`, leaving fair CRPS, ranks and
+coverage exactly equal to raw. Boundary, mean-field, member-spatial and
+operational families pass, but proper-score and finite-ensemble-reliability
+families fail and `overall_eligible=false`. This closes global coherent offsets
+without post-hoc changes; the active checkpoint-trajectory EMA experiment is
+the next mechanistically distinct evidence already in flight.
+
 ## Safe autonomous work completed or still possible
 
 - The frozen method, aggregate reconciliation values, clipping caveat and

@@ -148,6 +148,20 @@ The guidance-mixture result is complete and rejected; its operational checks
 pass, but proper-score, reliability and boundary criteria fail. It is retained
 as negative mechanism evidence and is not retuned.
 
+## Completed coherent-member-offset handoff
+
+The reviewed runner used only
+`source_experiment=joint_full_condition_validation_2022` and the frozen purged
+coherent-member contract. Five contiguous holdouts with a three-case purge,
+the fixed amplitude set, permutation-equivariant member score and bounded-
+simplex projection were not changed after execution. All 40 cases are finite.
+Training-only selection chooses amplitude `0.0`; raw and candidate fair CRPS
+are both `0.0584905850`, randomized ranks and coverage are unchanged, and the
+maximum mean-invariance error is zero. Boundary, mean-field, member-spatial and
+operational families pass, while proper-score and finite-ensemble-reliability
+families fail; `overall_eligible=false`. These compact anchors document a
+rejected mechanism and do not authorize reconstruction of case-level pairs.
+
 `paper/NEXT_GENERATIVE_METHOD_CONTRACT.md` freezes the subsequent
 clean-checkpoint deep ensemble before runner implementation. It does not
 authorize training or sampling. Exactly three clean training seeds, `1701`,
