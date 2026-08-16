@@ -142,6 +142,16 @@ retry or tuning branch.
 
 ## Completed purged analog-residual handoff
 
+The compact payload `latent_temperature_1p30_gate_retry1` is now reconciled to
+the recovery source. All 40 cases and 400 members pass checkpoint, scale
+`1.30`, seed, base/scaled-hash, finiteness and no-substitution checks. It reports
+`overall_eligible=false`: raw/candidate fair CRPS is
+`0.0584905850`/`0.0631177443`, paired delta `0.0046271592`, date CI
+`[0.0014355657, 0.0075956683]`, and sensitivity-only block CI
+`[-0.0005197500, 0.0082640843]`; ordinary CRPS is
+`0.0621082810`/`0.0684128432`. Reliability passes, while proper-score, boundary
+and spatial/physical families fail.
+
 The reviewed runner used only
 `source_experiment=joint_full_condition_validation_2022` and the contract in
 `paper/NEXT_METHOD_CONTRACT.md`: five contiguous purged holdouts, six

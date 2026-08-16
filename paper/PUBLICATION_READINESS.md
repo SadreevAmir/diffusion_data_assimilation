@@ -311,6 +311,13 @@ throughput makes a fresh three-seed training cycle a months-long route rather
 than a fast fallback. Its frozen construction remains a reproducibility
 contract, not a scientific result or an active dependency.
 
+The frozen latent-temperature result is complete and negative. Its reconciled
+gate reports `overall_eligible=false`: fair CRPS worsens by `0.0046271592` with
+date CI `[0.0014355657, 0.0075956683]`; reliability passes, but proper-score,
+boundary and spatial/physical families fail. No second temperature is admissible.
+The active predeclared locked-MC-dropout chain is the next decision-bearing
+mechanism.
+
 The frozen pair remains specified in `NEXT_LATENT_TEMPERATURE_CONTRACT.md`.
 The latent-temperature internal sampler completed all forty cases, and
 the wrapper-only failure was recovered without GPU recomputation as

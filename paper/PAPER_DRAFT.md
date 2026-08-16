@@ -107,6 +107,18 @@ present claim. These negative constructions do not exhaust the strong
 distributional, conformal or probabilistic-DA baseline families required for a
 submission-ready comparison.
 
+A frozen model-space diagnostic multiplied every initial latent by `1.30`
+before the unchanged ODE solve. It improved all finite-ensemble reliability
+criteria, including randomized-rank discrepancy from `0.0790135` to
+`0.00990828`, but worsened fair CRPS from `0.0584906` to `0.0631177` (paired
+delta `0.00462716`, date-bootstrap 95% CI `[0.00143557, 0.00759567]`) and
+ordinary CRPS from `0.0621083` to `0.0684128`. Boundary and spatial/physical
+families also failed: exact-one mass error rose from `0.00904188` to
+`0.0638730`, edge disagreement from `0.0351291` to `0.0397475`, and local and
+member variogram safeguards failed. Thus `overall_eligible=false`; latent
+temperature repairs ranks by adding diversity that is too large and physically
+unsafe, and no second temperature is selected.
+
 ## 2. Conditional generative assimilation
 
 Let `x` denote the target sea-ice state, `b` a dense background and `o` sparse
