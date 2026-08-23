@@ -29,10 +29,10 @@ an absolute requirement, high-SIC behaviour is compared with truth at
 `q={0,.15,.90,.95,.99}`, and `>=.999`/exact-one masses are encoding diagnostics
 rather than boundary acceptance criteria. Consequently, no historical
 `overall_eligible` from the superseded gate is final success. The trusted
-controller has deployed and audited the exact amended primary and gate digests,
-so the single signed chain is admissible and active. This admission establishes
-provenance only: the scientific outcome remains unknown until the dependent
-confirmatory CPU stage returns and its four compact artifacts are reconciled.
+controller deployed and audited the exact amended primary and gate digests, and
+the single signed chain has now completed through its permitted recovery. Its
+four compact artifacts establish both admissible provenance and the reconciled
+negative scientific outcome reported above.
 
 ## Current decision-bearing evidence
 
@@ -70,12 +70,12 @@ cross-fitted iid calendar global-bias fallback; no dropout probability, layer
 set, mask construction or refresh rule was changed after the result.
 
 This ordering does not waive the minimum publication tier. The negative latent-
-temperature result activates only the already predeclared locked-MC-dropout
-fallback, unchanged; it does not authorize another temperature or retrospective
-tuning. The completed negative dropout result closes only this frozen candidate;
-it does not establish independent generalization and still leaves the clean
-publication checkpoint, frozen independent evaluation and missing minimum-tier
-comparisons.
+temperature result activated only the already predeclared locked-MC-dropout
+fallback, unchanged; it did not authorize another temperature or retrospective
+tuning. The completed negative dropout result closes only this frozen candidate.
+The subsequently completed primary supplies independent negative evidence for
+one frozen candidate, but not an eligible calibration or the missing independent
+deterministic and broader baseline comparisons.
 
 ## Independent package re-audit
 
@@ -98,9 +98,11 @@ stale replacement figure, fails the publication audit instead of silently
 passing on filename alone.
 
 The re-audit does not change the scientific decision. All completed trusted
-calibration routes are negative controls, no method passes the common gate, and
-the minimum strong domain/SciML tier still lacks a clean checkpoint and frozen
-independent evaluation. Publication status therefore remains `NOT_READY`.
+calibration routes are negative controls and no method passes the common gate.
+The frozen independent primary is complete but negative; the minimum strong
+domain/SciML tier still lacks an eligible method and the required independent
+deterministic and broader baseline comparisons. Publication status therefore
+remains `NOT_READY`.
 
 The manuscript contribution inventory was also reconciled with the completed
 mechanism suite. It no longer labels the evidence as five negative mechanisms
@@ -246,14 +248,11 @@ coverage exactly equal to raw. Boundary, mean-field, member-spatial and
 operational families pass, but proper-score and finite-ensemble-reliability
 families fail and `overall_eligible=false`. This closes global coherent offsets
 without post-hoc changes. The checkpoint-trajectory EMA sampling and gate jobs
-have completed for all 40 validation cases, but completion status alone is not
-a scientific result. The publication worktree does not yet contain the compact
-numeric gate fields needed to verify `overall_eligible`, every mandatory family,
-the 3% fair-CRPS criterion, its paired-date interval, and operational checks.
-The base gate id and the separately completed retry id remain distinct evidence
-units and must not be merged or substituted. Until one complete compact result
-is reconciled, no positive or negative EMA claim is admitted and the conditional
-clean-checkpoint reserve is not launched from status metadata alone.
+have completed for all 40 validation cases, but the publication worktree still
+lacks a reconciled compact gate payload. Job completion alone is not scientific
+evidence. The base gate id and separately completed retry id remain distinct
+evidence units and must not be merged or substituted; the manuscript therefore
+makes no positive or negative EMA claim.
 
 The projection-free slack-limited ablation is also complete and rejected.
 Although it creates no boundary or spatial damage, every pixel is blocked, the
@@ -330,24 +329,21 @@ for the coherent-offset failure; no slack, amplitude or fold retuning follows.
   narrative intact. It also checks semantic numeric anchors in both linked SVGs,
   rather than accepting arbitrary well-formed XML at the expected path. This is
   an integrity check and does not relax any scientific blocker.
-- The five files that must be reconciled atomically after the external primary
-  now carry the identical `PENDING_ATOMIC_RECONCILIATION` state marker. The
-  checker requires exactly one marker in each file, so a partial narrative
-  update fails locally instead of mixing pre-result and post-result claims.
+- The five decision-bearing files were reconciled atomically after the external
+  primary. The checker now requires their shared reconciled-negative state and
+  decision anchors, so a partial narrative update fails locally instead of
+  mixing pre-result and post-result claims.
 
 ## External boundary
 
-## Frozen external-primary result handoff
+## Reconciled external-primary result
 
-The sealed raw stage `external_2024_calendar_global_bias_raw48_primary_v1` is
-complete for all 48 cases. Its already queued dependent CPU stage,
-`external_2024_calendar_global_bias_confirm48_primary_v1`, is the only active
-decision-bearing external evidence. It must not be resubmitted, substituted or
-treated as a scientific result from job status alone. Publication status remains
-`NOT_READY` until its four compact artifacts are reconciled.
-The exact fail-closed ingest and atomic-update procedure is frozen in
-`paper/EXTERNAL_PRIMARY_RESULT_RECONCILIATION.md`; that checklist records no
-scientific outcome before the complete payload arrives.
+The sealed raw stage `external_2024_calendar_global_bias_raw48_primary_v1` and
+the exact permitted CPU recovery are complete. The four compact artifacts have
+been reconciled atomically under
+`paper/EXTERNAL_PRIMARY_RESULT_RECONCILIATION.md`. Their authoritative decision
+is negative, so there is no active external evidence job and no admissible
+resubmission, substitution, retuning or second evaluation.
 
 Reconciliation is fail-closed. A positive primary claim requires verified signed
 contract identity, input/raw/truth seals, every recorded hash, formation of the
@@ -373,17 +369,15 @@ and purged analog-residual dressing are rejected as
 the paper's calibrated-ensemble method. All currently implemented
 mechanistically distinct development calibration routes have been completed and
 rejected under the common gate; repeating or post-hoc retuning them would not
-create confirmatory evidence. This does not invalidate or pause the separately
-frozen external primary above: that chain is already active, is independent of
-development-gate outcomes, and must be reconciled exactly once when its compact
-payload arrives.
+create confirmatory evidence. This does not invalidate the separately frozen
+external primary above: that chain was independent of development-gate outcomes
+and has now been reconciled exactly once as a negative result.
 The paired date/block CPU analysis of the existing compact audit is complete;
 its compact result has been reconciled into the evidence chain, while local
 reconstruction remains intentionally excluded. The currently implemented modes
 cannot supply another independent strong baseline family beyond the completed
-negative comparators. No second external evaluation is authorized. The sole
-active external primary is the already queued raw/confirmatory chain identified
-above.
+negative comparators. No second external evaluation is authorized, and no
+external primary remains active.
 
 The guidance-mixture result is now complete and rejected. Its construction is
 operationally valid, but all three proper-score criteria, two reliability

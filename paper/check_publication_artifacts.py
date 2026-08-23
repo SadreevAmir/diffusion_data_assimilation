@@ -152,9 +152,9 @@ AMENDED_PRIMARY_ANCHORS = {
     ),
     "PUBLICATION_READINESS.md": (
         "no historical\n`overall_eligible` from the superseded gate is final success",
-        "controller has deployed and audited the exact amended primary and gate digests",
-        "admission establishes\nprovenance only",
-        "scientific outcome remains unknown until the dependent\nconfirmatory CPU stage returns",
+        "controller deployed and audited the exact amended primary and gate digests",
+        "four compact artifacts establish both admissible provenance and the reconciled\nnegative scientific outcome",
+        "no\nexternal primary remains active",
     ),
     "FROZEN_EVALUATION_HANDOFF.md": (
         "both exact amended-contract digests and controller\ndeploy/audit attestation are present",
@@ -255,9 +255,9 @@ CALIBRATION_CONTRACT_ANCHORS = {
         "completed compact result",
         "fair CRPS are both `0.0584905850`",
         "spread-skill are both\n`0.7240662110`",
-        "completion status alone is not\na scientific result",
-        "base gate id and the separately completed retry id remain distinct evidence",
-        "clean-checkpoint reserve is not launched from status metadata alone",
+        "Job completion alone is not scientific\nevidence",
+        "base gate id and separately completed retry id remain distinct\nevidence units",
+        "manuscript therefore\nmakes no positive or negative EMA claim",
     ),
 }
 NEXT_METHOD_ANCHORS = (
@@ -383,6 +383,9 @@ STALE_READINESS_ANCHORS = (
     "its dependent gate already queued",
     "locked-MC-dropout chain remains the next decision-bearing",
     "Until that exact compact gate is returned",
+    "scientific outcome remains unknown until the dependent",
+    "the only active\ndecision-bearing external evidence",
+    "The sole\nactive external primary",
 )
 MANUSCRIPT_EVIDENCE_ANCHORS = (
     "# Auditing Reliability in Generative Data Assimilation under Sparse Spatial Observations",
