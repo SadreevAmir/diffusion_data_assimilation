@@ -25,7 +25,8 @@ The local engineering handoff is now executable: `rank_coherent_reference.py`
 checks the exact five purged folds, deterministic date/member tie ordering,
 complete-field rank pairing, frozen alpha selection, sole runner parameter and
 the `1e-10` capped-simplex mean invariant on synthetic inputs. The publication
-audit requires and parses this oracle. This is implementation evidence only:
+audit requires, parses and executes this oracle, and fails closed unless it
+prints the exact success sentinel. This is implementation evidence only:
 until a separately reviewed trusted mode executes the full server-side gate,
 the method remains untested and publication status remains `NOT_READY`.
 

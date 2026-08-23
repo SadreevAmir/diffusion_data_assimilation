@@ -53,6 +53,9 @@ projection mean error above `1e-10`. Its synthetic identity checks ensure that
 complete anomaly fields, rather than independently shuffled pixel values, are
 paired by the frozen date and member order statistics. Passing this check is a
 runner-review prerequisite, not scientific evidence or an implemented mode.
+The unified publication audit invokes the same command with the current Python
+interpreter and requires its exact success sentinel, so syntax-only acceptance
+cannot hide a failing executable invariant.
 
 ## Frozen inputs and procedure
 

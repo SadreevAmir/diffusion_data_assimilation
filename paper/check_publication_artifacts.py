@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import ast
 import re
+import subprocess
 import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -483,6 +484,20 @@ def main() -> int:
     for name in PYTHON_FILES:
         source = (PAPER_DIR / name).read_text(encoding="utf-8")
         ast.parse(source, filename=name)
+
+    rank_oracle = subprocess.run(
+        [sys.executable, str(PAPER_DIR / "rank_coherent_reference.py")],
+        cwd=PAPER_DIR.parent,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    require(
+        rank_oracle.returncode == 0
+        and rank_oracle.stdout.strip() == "rank-coherent reference checks: PASS",
+        "rank-coherent executable oracle failed: "
+        + (rank_oracle.stderr.strip() or rank_oracle.stdout.strip() or "no output"),
+    )
 
     manuscript = (PAPER_DIR / "PAPER_DRAFT.md").read_text(encoding="utf-8")
     claim_ledger = (PAPER_DIR / "CLAIM_LEDGER.md").read_text(encoding="utf-8")
