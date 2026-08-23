@@ -21,6 +21,7 @@ REQUIRED_FILES = (
     "NEXT_BASELINE_CONTRACT.md",
     "NEXT_METHOD_CONTRACT.md",
     "NEXT_RANK_COHERENT_CONTRACT.md",
+    "NEXT_RAW_MEMBER_REWEIGHTING_CONTRACT.md",
     "RANK_COHERENT_RUNNER_REVIEW_CHECKLIST.md",
     "RANK_COHERENT_CONTROLLER_HANDOFF.md",
     "FROZEN_EVALUATION_HANDOFF.md",
@@ -202,6 +203,21 @@ RANK_COHERENT_CONTRACT_ANCHORS = (
     "all five mandatory\nfamily flags are present as JSON booleans",
     "ten rank-target counts must each equal 40",
     "maximum mean error\nmust not exceed `1e-10`",
+)
+RAW_MEMBER_REWEIGHTING_CONTRACT_ANCHORS = (
+    "Status: DESIGN_FROZEN_CONTINGENT_NO_RUNNER",
+    "activated only if the frozen\nwhole-field rank-coherent anomaly-transport candidate is completed and rejected",
+    "five contiguous\n  eight-case holdouts",
+    "non-circular three-case purge",
+    "p[r] = (c[r] + 0.5) / 15",
+    "u_j=(j+0.5)/10",
+    "bitwise equality with that source field",
+    "analysis_fair_crps",
+    "overall_eligible=true",
+    "probability sum error above `1e-12`",
+    "source_experiment=joint_full_condition_validation_2022",
+    "summary_only",
+    "no experiment proposal or invented mode identifier",
 )
 RANK_COHERENT_REVIEW_CHECKLIST_ANCHORS = (
     "Status: REVIEW_CONTRACT_READY_NO_IMPLEMENTED_MODE",
@@ -763,6 +779,19 @@ def main() -> int:
         not missing_rank_coherent,
         "NEXT_RANK_COHERENT_CONTRACT.md is missing anchors: "
         + ", ".join(missing_rank_coherent),
+    )
+    raw_member_reweighting_contract = (
+        PAPER_DIR / "NEXT_RAW_MEMBER_REWEIGHTING_CONTRACT.md"
+    ).read_text(encoding="utf-8")
+    missing_raw_member_reweighting = [
+        anchor
+        for anchor in RAW_MEMBER_REWEIGHTING_CONTRACT_ANCHORS
+        if anchor not in raw_member_reweighting_contract
+    ]
+    require(
+        not missing_raw_member_reweighting,
+        "NEXT_RAW_MEMBER_REWEIGHTING_CONTRACT.md is missing anchors: "
+        + ", ".join(missing_raw_member_reweighting),
     )
     rank_coherent_checklist = (
         PAPER_DIR / "RANK_COHERENT_RUNNER_REVIEW_CHECKLIST.md"

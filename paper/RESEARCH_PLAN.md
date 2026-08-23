@@ -11,6 +11,15 @@ amplitude feasibility and the unchanged no-compensation gate. It has no trusted
 runner or scientific result yet; it neither reopens the completed independent
 evaluation nor permits tuning of the closed postprocessors.
 
+`NEXT_RAW_MEMBER_REWEIGHTING_CONTRACT.md` freezes the contingent mechanism if
+that whole-field transport is completed and rejected. It changes only the
+empirical probability mass assigned to exact raw complete-member fields using
+purged forecast-only analog truth ranks. It is mechanistically distinct from
+moving anomaly fields: exact source-field and boundary-mask identity are hard
+invariants, while rank, proper-score and mean-field physical effects remain
+decision-bearing. It has no trusted mode and must not be proposed before its
+activation condition.
+
 ## Primary evaluation closed without selection
 
 The single frozen independent primary has completed through the exact permitted

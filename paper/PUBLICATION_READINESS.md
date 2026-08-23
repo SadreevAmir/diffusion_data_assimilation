@@ -13,6 +13,16 @@ Controller readiness: NOT_READY
 Scientific primary reconciliation: COMPLETE_NEGATIVE
 Autonomous publication work remaining: YES
 
+The idle-state audit also froze a contingent method in
+`NEXT_RAW_MEMBER_REWEIGHTING_CONTRACT.md` rather than waiting for integration of
+the first rank-coherent runner. It tests probability-mass error among unchanged
+complete raw scenarios by purged analog truth-rank reweighting. Exact copied
+fields and boundary masks are hard invariants; the unchanged rank, proper-score,
+mean-field spatial/physical and operational families remain no-compensation
+requirements. This is pre-result design evidence only, is activated solely by a
+negative completed whole-field transport gate, and does not create a trusted
+mode or change `NOT_READY`.
+
 The 2026-08-23 independent publication-readiness rerun completed the unified
 fail-closed audit and the focused rank-coherent handoff suites against the
 current worktree. The audit passed with 29 required files, two figures, six
