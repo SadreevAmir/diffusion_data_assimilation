@@ -26,7 +26,8 @@ checks the exact five purged folds, training-only six-feature standardization,
 ten-neighbor forecast-only selection, deterministic date/member/distance tie
 ordering, finite shape-compatible complete-field rank pairing, bounded normalized
 truth ranks, frozen alpha selection, sole runner
-parameter and the `1e-10` capped-simplex mean invariant on synthetic inputs. The publication
+parameter, full spatial candidate construction, physical bounds and the `1e-10`
+per-pixel capped-simplex mean invariant on synthetic inputs. The publication
 audit requires, parses and executes this oracle, and fails closed unless it
 prints the exact success sentinel. This is implementation evidence only:
 until a separately reviewed trusted mode executes the full server-side gate,

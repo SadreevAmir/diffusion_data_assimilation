@@ -231,6 +231,49 @@ def capped_simplex_projection(
     return projected
 
 
+def construct_projected_candidate(
+    heldout_mean: Sequence[Sequence[float]],
+    paired_anomaly_fields: Sequence[Sequence[Sequence[float]]],
+    alpha: float,
+) -> tuple[tuple[tuple[float, ...], ...], ...]:
+    """Apply one frozen alpha and project every pixel to the held-out mean."""
+    mean_shape = _field_shape_and_finiteness(heldout_mean)
+    if len(paired_anomaly_fields) != EXPECTED_MEMBERS:
+        raise ValueError("candidate construction requires ten paired fields")
+    for field in paired_anomaly_fields:
+        _field_shape_and_finiteness(field, mean_shape)
+    if alpha not in ALPHAS:
+        raise ValueError("candidate alpha must come from the frozen set")
+
+    rows, columns = mean_shape
+    candidate = [
+        [[0.0 for _ in range(columns)] for _ in range(rows)]
+        for _ in range(EXPECTED_MEMBERS)
+    ]
+    for row in range(rows):
+        for column in range(columns):
+            target_mean = heldout_mean[row][column]
+            provisional = tuple(
+                target_mean + alpha * paired_anomaly_fields[member][row][column]
+                for member in range(EXPECTED_MEMBERS)
+            )
+            projected = capped_simplex_projection(provisional, target_mean)
+            for member, value in enumerate(projected):
+                candidate[member][row][column] = value
+
+    frozen = tuple(
+        tuple(tuple(row) for row in member_field) for member_field in candidate
+    )
+    for row in range(rows):
+        for column in range(columns):
+            values = tuple(field[row][column] for field in frozen)
+            if min(values) < 0.0 or max(values) > 1.0:
+                raise AssertionError("projected candidate escaped physical bounds")
+            if abs(sum(values) / EXPECTED_MEMBERS - heldout_mean[row][column]) > 1e-10:
+                raise AssertionError("projected candidate changed the held-out mean")
+    return frozen
+
+
 def select_alpha(training_scores: Mapping[float, float], feasible: Mapping[float, bool]) -> tuple[float, bool]:
     """Select minimum fair CRPS among feasible frozen alphas, tie to smaller."""
     if set(training_scores) != set(ALPHAS) or set(feasible) != set(ALPHAS):
@@ -320,6 +363,30 @@ def _self_test() -> None:
     )
     assert min(projected) == 0.0 and max(projected) == 1.0
     assert abs(sum(projected) / 10 - 0.5) <= 1e-10
+    heldout_mean = ((0.05, 0.5), (0.95, 0.25))
+    coherent_fields = tuple(
+        tuple(
+            tuple((member - 4.5) * (row + column + 1) / 5.0 for column in range(2))
+            for row in range(2)
+        )
+        for member in range(EXPECTED_MEMBERS)
+    )
+    candidate = construct_projected_candidate(heldout_mean, coherent_fields, 1.25)
+    assert len(candidate) == EXPECTED_MEMBERS
+    assert any(value == 0.0 for field in candidate for row in field for value in row)
+    assert any(value == 1.0 for field in candidate for row in field for value in row)
+    for row in range(2):
+        for column in range(2):
+            assert abs(
+                sum(field[row][column] for field in candidate) / EXPECTED_MEMBERS
+                - heldout_mean[row][column]
+            ) <= 1e-10
+    try:
+        construct_projected_candidate(heldout_mean, coherent_fields, 0.6)
+    except ValueError as exc:
+        assert "frozen set" in str(exc)
+    else:
+        raise AssertionError("non-frozen alpha did not fail closed")
     selected_alpha, no_positive = select_alpha(
         {alpha: abs(alpha - 1.0) for alpha in ALPHAS},
         {alpha: alpha <= 1.0 for alpha in ALPHAS},

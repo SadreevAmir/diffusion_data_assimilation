@@ -51,11 +51,12 @@ fold/purge drift, extra runtime parameters, non-finite or zero-variance
 training-only forecast features, incomplete ten-neighbor, ten-date or ten-member
 inputs, out-of-range normalized truth ranks, non-finite ordering quantities,
 empty, ragged, non-scalar, non-finite or shape-incompatible complete fields,
-a changed alpha set, and bounded
-projection mean error above `1e-10`. Its synthetic identity checks ensure that
+a changed alpha set, an alpha outside that set, escaped physical bounds, and bounded
+projection mean error above `1e-10` at every pixel. Its synthetic identity checks ensure that
 complete anomaly fields, rather than independently shuffled pixel values, are
 selected after training-only standardization and deterministic forecast-distance
-ties, then paired by the frozen date and member order statistics. Passing this check is a
+ties, paired by the frozen date and member order statistics, and carried through
+the full spatial candidate construction. Passing this check is a
 runner-review prerequisite, not scientific evidence or an implemented mode.
 The unified publication audit invokes the same command with the current Python
 interpreter and requires its exact success sentinel, so syntax-only acceptance
