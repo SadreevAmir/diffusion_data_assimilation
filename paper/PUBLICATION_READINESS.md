@@ -24,7 +24,8 @@ independent evaluation.
 The local engineering handoff is now executable: `rank_coherent_reference.py`
 checks the exact five purged folds, training-only six-feature standardization,
 ten-neighbor forecast-only selection, deterministic date/member/distance tie
-ordering, complete-field rank pairing, frozen alpha selection, sole runner
+ordering, finite shape-compatible complete-field rank pairing, bounded normalized
+truth ranks, frozen alpha selection, sole runner
 parameter and the `1e-10` capped-simplex mean invariant on synthetic inputs. The publication
 audit requires, parses and executes this oracle, and fails closed unless it
 prints the exact success sentinel. This is implementation evidence only:

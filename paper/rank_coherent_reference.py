@@ -23,6 +23,28 @@ SOURCE_EXPERIMENT = "joint_full_condition_validation_2022"
 ARTIFACT_POLICY = "summary_only"
 
 
+def _field_shape_and_finiteness(
+    field: Sequence[Sequence[float]], expected_shape: tuple[int, int] | None = None
+) -> tuple[int, int]:
+    """Validate a finite, non-empty rectangular 2-D anomaly field."""
+    rows = len(field)
+    if rows == 0:
+        raise ValueError("anomaly fields must be non-empty")
+    columns = len(field[0])
+    if columns == 0 or any(len(row) != columns for row in field):
+        raise ValueError("anomaly fields must be non-empty rectangular arrays")
+    try:
+        finite = all(math.isfinite(value) for row in field for value in row)
+    except TypeError as exc:
+        raise ValueError("anomaly fields must contain scalar values") from exc
+    if not finite:
+        raise ValueError("anomaly fields must be finite")
+    shape = (rows, columns)
+    if expected_shape is not None and shape != expected_shape:
+        raise ValueError("all anomaly fields must share one spatial shape")
+    return shape
+
+
 def purged_folds() -> tuple[tuple[tuple[int, ...], tuple[int, ...]], ...]:
     """Return five contiguous holdouts and their non-circular purged training sets."""
     folds = []
@@ -124,12 +146,19 @@ def select_rank_stratified_fields(
         raise ValueError("exactly ten selected analog dates are required")
     if len(set(analog_case_indices)) != EXPECTED_MEMBERS:
         raise ValueError("selected analog dates must be distinct")
-    if not all(math.isfinite(rank) for rank in analog_truth_ranks):
-        raise ValueError("analog truth ranks must be finite")
+    if any(index < 0 or index >= EXPECTED_CASES for index in analog_case_indices):
+        raise ValueError("selected analog date is outside the frozen envelope")
+    if not all(math.isfinite(rank) and 0.0 <= rank <= 1.0 for rank in analog_truth_ranks):
+        raise ValueError("normalized analog truth ranks must be finite and bounded")
     if any(len(means) != EXPECTED_MEMBERS for means in anomaly_case_means):
         raise ValueError("every analog date must contain ten anomaly means")
     if any(len(fields) != EXPECTED_MEMBERS for fields in anomaly_fields):
         raise ValueError("every analog date must contain ten anomaly fields")
+
+    spatial_shape = _field_shape_and_finiteness(anomaly_fields[0][0])
+    for fields in anomaly_fields:
+        for field in fields:
+            _field_shape_and_finiteness(field, spatial_shape)
 
     date_order = sorted(
         range(EXPECTED_MEMBERS),
@@ -253,7 +282,7 @@ def _self_test() -> None:
         raise AssertionError("zero-variance training feature did not fail closed")
 
     fields = [
-        [[[1000 * case + 10 * member + row + col] for col in range(2)] for row in range(2)]
+        [[1000 * case + 10 * member + row + col for col in range(2)] for row in range(2)]
         for case in range(10)
         for member in range(10)
     ]
@@ -266,6 +295,25 @@ def _self_test() -> None:
     assert selected[9] is nested_fields[0][9]
     paired = pair_with_heldout_member_order(list(reversed(range(10))), selected)
     assert paired[9] is selected[0] and paired[0] is selected[9]
+    malformed_fields = [[field for field in case] for case in nested_fields]
+    malformed_fields[0] = [field for field in malformed_fields[0]]
+    malformed_fields[0][0] = [[math.nan]]
+    try:
+        select_rank_stratified_fields(
+            list(range(10)), [0.5] * 10, means, malformed_fields
+        )
+    except ValueError as exc:
+        assert "spatial shape" in str(exc) or "finite" in str(exc)
+    else:
+        raise AssertionError("malformed anomaly field did not fail closed")
+    try:
+        select_rank_stratified_fields(
+            list(range(10)), [1.1] + [0.5] * 9, means, nested_fields
+        )
+    except ValueError as exc:
+        assert "truth ranks" in str(exc)
+    else:
+        raise AssertionError("out-of-range normalized truth rank did not fail closed")
 
     projected = capped_simplex_projection(
         (-0.5, -0.2, 0.0, 0.2, 0.4, 0.6, 0.8, 1.0, 1.2, 1.5), 0.5

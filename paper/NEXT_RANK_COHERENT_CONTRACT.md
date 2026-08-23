@@ -103,6 +103,8 @@ external scientific blocker.
 The dependency-free review oracle `rank_coherent_reference.py` makes the exact
 non-circular purge, date/member tie ordering, complete-field pairing, frozen
 alpha selection, one-parameter interface and capped-simplex mean invariant
-executable on synthetic inputs. It reads no project data and is not an
+executable on synthetic inputs. It also fails closed on non-finite, empty,
+ragged or spatially incompatible complete anomaly fields and on normalized
+truth ranks outside `[0,1]`. It reads no project data and is not an
 experiment entry point; a trusted server implementation and independent review
 remain required before this method can be proposed.

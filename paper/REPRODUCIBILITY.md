@@ -49,7 +49,9 @@ python3 paper/rank_coherent_reference.py
 The oracle reads no data and cannot launch an experiment. It fails closed on
 fold/purge drift, extra runtime parameters, non-finite or zero-variance
 training-only forecast features, incomplete ten-neighbor, ten-date or ten-member
-inputs, non-finite ordering quantities, a changed alpha set, and bounded
+inputs, out-of-range normalized truth ranks, non-finite ordering quantities,
+empty, ragged, non-scalar, non-finite or shape-incompatible complete fields,
+a changed alpha set, and bounded
 projection mean error above `1e-10`. Its synthetic identity checks ensure that
 complete anomaly fields, rather than independently shuffled pixel values, are
 selected after training-only standardization and deterministic forecast-distance
