@@ -111,12 +111,13 @@ truth-normalization recovery
 `external_2024_calendar_global_bias_confirm48_primary_retry2`; all superseded
 `retry1` metrics are excluded. All 48 cases, 480 member records, signed identities, input/raw/truth
 seals, hashes and candidate-before-truth ordering pass. The scientific decision
-is negative: `overall_eligible=false`. Proper scores, truth-relative boundary
-calibration and operational validity pass; absolute rank reliability and
-spatial/physical preservation fail. In particular, normalized mean rank is
-`0.960757` (block 95% CI `[0.951620,0.969164]`) and the three member-semivariogram
-relative errors are `1.147`, `1.058`, and `1.031`. No resubmission, retuning or
-second external evaluation is admissible.
+is negative: `overall_eligible=false`. Proper scores, absolute rank reliability,
+truth-relative boundary calibration and spatial/physical preservation fail;
+only operational validity passes. Fair CRPS worsens from
+`0.05541808434196047` raw to `0.061833300537408264` candidate. Normalized mean
+rank also worsens from `0.23610946912844127` raw to approximately `0.225`
+candidate, farther from `0.5`. No resubmission, retuning or second external
+evaluation is admissible.
 
 The success definition has been amended fail-closed in
 `AMENDED_PRIMARY_EVALUATION_CONTRACT.md`. A good randomized rank histogram is

@@ -7,10 +7,13 @@ The four compact artifacts from the truth-normalization repair
 one payload. The superseded `retry1` metrics are excluded from every scientific
 claim. Identity, seals, hashes, 48/48 completeness, 480 member records,
 candidate-before-truth ordering and finiteness checks pass. The authoritative
-gate reports `overall_eligible=false`: absolute rank reliability and
-spatial/physical preservation fail. Proper-score, truth-relative boundary and
-operational families pass. This closes the frozen primary without retuning,
-resubmission or another external evaluation.
+gate reports `overall_eligible=false`: proper scores, absolute rank reliability,
+truth-relative boundary calibration and spatial/physical preservation fail;
+only operational validity passes. Fair CRPS worsens from
+`0.05541808434196047` raw to `0.061833300537408264` candidate, and normalized
+mean rank worsens from `0.23610946912844127` raw to approximately `0.225`
+candidate. This closes the frozen primary without retuning, resubmission or
+another external evaluation.
 
 ## Admissible evidence unit
 

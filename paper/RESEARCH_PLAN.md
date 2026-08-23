@@ -17,8 +17,12 @@ The single frozen independent primary has completed through the exact permitted
 CPU truth-normalization recovery
 `external_2024_calendar_global_bias_confirm48_primary_retry2`; superseded
 `retry1` metrics are excluded. Its integrity and operational checks pass, but
-`overall_eligible=false`: proper-score and truth-relative boundary gains coexist
-with failed absolute rank reliability and failed member/local spatial criteria.
+`overall_eligible=false`: proper scores, absolute rank reliability,
+truth-relative boundary calibration and spatial/physical preservation all fail;
+only operational validity passes. Fair CRPS worsens from
+`0.05541808434196047` raw to `0.061833300537408264` candidate, and normalized
+mean rank worsens from `0.23610946912844127` raw to approximately `0.225`
+candidate.
 The primary hypothesis is therefore rejected under the no-compensation rule.
 The candidate will not be retuned, resubmitted or replaced by another external
 evaluation. The remaining paper is a negative mechanism and evaluation-protocol

@@ -96,7 +96,7 @@ CURRENT_DECISION_ANCHORS = (
     "Required scientific blockers: an eligible spatially preserving calibration and\nthe remaining minimum-tier comparisons",
     "Controller readiness: NOT_READY",
     "Scientific primary reconciliation: COMPLETE_NEGATIVE",
-    "normalized mean rank is\n`0.960757`",
+    "Normalized mean\nrank also worsens from `0.23610946912844127` raw to approximately `0.225`",
     "The package is not waiting on clean-checkpoint training.",
     "single frozen latent-temperature construction at scale `1.30`",
     "complete compact payload from `latent_temperature_1p30_gate_retry1` has\nbeen reconciled",
@@ -118,8 +118,8 @@ EXTERNAL_PRIMARY_HANDOFF_ANCHORS = {
         "external_2024_calendar_global_bias_raw48_primary_v1",
         "All 48 cases, 480 member records",
         "`overall_eligible=false`",
-        "absolute rank reliability and\nspatial/physical preservation fail",
-        "No resubmission, retuning or\nsecond external evaluation is admissible",
+        "Proper scores, absolute rank reliability,\ntruth-relative boundary calibration and spatial/physical preservation fail",
+        "No resubmission, retuning or second external\nevaluation is admissible",
     ),
     "CLAIM_LEDGER.md": (
         "| C39 | The frozen calendar global-bias primary generalizes",
@@ -137,7 +137,9 @@ EXTERNAL_PRIMARY_RECONCILIATION_ANCHORS = (
     "480 member records",
     "candidate-before-truth ordering",
     "`overall_eligible=false`",
-    "without retuning,\nresubmission or another external evaluation",
+    "Fair CRPS worsens from\n`0.05541808434196047` raw to `0.061833300537408264` candidate",
+    "normalized\nmean rank worsens from `0.23610946912844127` raw to approximately `0.225`",
+    "without retuning, resubmission or\nanother external evaluation",
 )
 EXTERNAL_PRIMARY_STATE_MARKER = (
     "External primary evidence state: RECONCILED_NEGATIVE"
@@ -509,9 +511,9 @@ MANUSCRIPT_EVIDENCE_ANCHORS = (
     "| Paired diagnostic | Mean delta (corrected - raw) | Date-bootstrap 95% CI | Four-date-block 95% CI |",
     "| Mean IIEE | 0.004379 | [0.002065, 0.006716] | [0.001149, 0.007849] |",
     "| Independent primary diagnostic | Raw ensemble | Frozen candidate | Decision |",
-    "| Fair CRPS | 0.232585 | 0.211849 | Improves, but cannot compensate for failed mandatory families |",
-    "| Normalized mean rank | — | 0.960757 | Absolute rank reliability fails; block 95% CI is [0.951620, 0.969164] |",
-    "| Member-semivariogram relative error, lag 1 | — | 1.147 | Spatial/physical preservation fails |",
+    "| Fair CRPS | 0.05541808434196047 | 0.061833300537408264 | Worsens; proper scores fail |",
+    "| Normalized mean rank | 0.23610946912844127 | approximately 0.225 | Worsens; absolute rank reliability fails |",
+    "| Truth-relative boundary calibration | — | — | Fails |",
     "| Overall no-compensation gate | — | false | Independent primary is rejected |",
     "The single frozen independent primary is presented as a\nnegative generalization result",
 )

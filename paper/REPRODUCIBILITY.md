@@ -19,9 +19,12 @@ The candidate manifest digest is
 `55221b8cd165e6adcbb07be403f5e84ea5eb9a0a708ab31e79947ad07f8a5f67`.
 All metrics are finite, no network or raw-array retrieval was used, and the
 boundary masks equal raw. The authoritative no-compensation decision is
-`overall_eligible=false`: absolute rank reliability and spatial/physical
-preservation fail, while proper scores, truth-relative boundary calibration and
-operational validity pass. These compact anchors support rejection only.
+`overall_eligible=false`: proper scores, absolute rank reliability,
+truth-relative boundary calibration and spatial/physical preservation fail;
+only operational validity passes. Fair CRPS worsens from
+`0.05541808434196047` raw to `0.061833300537408264` candidate, and normalized
+mean rank worsens from `0.23610946912844127` raw to approximately `0.225`
+candidate. These compact anchors support rejection only.
 
 ## Amended primary gate provenance
 

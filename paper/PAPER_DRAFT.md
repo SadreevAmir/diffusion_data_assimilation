@@ -29,19 +29,17 @@ verifies the source identity, 48 raw and
 48 truth hashes, all 480 member records, the pre-truth candidate seal, and
 formation of every candidate array before scoring truth was opened. The frozen
 `calendar_global_bias_mixture_v1_refit_all40` candidate is not jointly eligible:
-`overall_eligible=false`. Proper scores, truth-relative boundary calibration and
-operational validity pass, but absolute rank reliability and spatial/physical
-preservation fail.
+`overall_eligible=false`. Proper scores, absolute rank reliability,
+truth-relative boundary calibration and spatial/physical preservation fail;
+only operational validity passes.
 
-The candidate improves fair CRPS from `0.232585` to `0.211849` (paired delta
-`-0.0207364`, date-bootstrap 95% CI `[-0.0226941,-0.0188402]`; four-case-block
-sensitivity `[-0.0219023,-0.0195641]`) and mean RMSE from `0.313941` to
-`0.299920`. Those gains do not repair severe underdispersion: normalized mean
-rank is `0.960757`, with block 95% CI `[0.951620,0.969164]`, far from `0.5`.
-Local variogram scores worsen at lags 1 and 2, and member-mean semivariogram
-relative errors are `1.147`, `1.058`, and `1.031`, all above the frozen `0.20`
-tolerance. Under the no-compensation rule this independently rejects the frozen
-calibration claim; no retuning or additional external evaluation follows.
+The candidate worsens fair CRPS from `0.05541808434196047` to
+`0.061833300537408264`. It also worsens an already low normalized mean rank:
+the raw value is `0.23610946912844127` and the candidate value is approximately
+`0.225`, farther from `0.5`. Under the no-compensation rule, the failed proper-score,
+absolute-rank, truth-relative-boundary and spatial/physical families independently
+reject the frozen calibration claim; no retuning or additional external evaluation
+follows.
 
 ## Abstract
 
@@ -568,11 +566,11 @@ a predeclared acceptance gate.
 
 | Independent primary diagnostic | Raw ensemble | Frozen candidate | Decision |
 |---|---:|---:|---|
-| Fair CRPS | 0.232585 | 0.211849 | Improves, but cannot compensate for failed mandatory families |
-| Normalized mean rank | — | 0.960757 | Absolute rank reliability fails; block 95% CI is [0.951620, 0.969164] |
-| Member-semivariogram relative error, lag 1 | — | 1.147 | Spatial/physical preservation fails |
-| Member-semivariogram relative error, lag 2 | — | 1.058 | Spatial/physical preservation fails |
-| Member-semivariogram relative error, lag 4 | — | 1.031 | Spatial/physical preservation fails |
+| Fair CRPS | 0.05541808434196047 | 0.061833300537408264 | Worsens; proper scores fail |
+| Normalized mean rank | 0.23610946912844127 | approximately 0.225 | Worsens; absolute rank reliability fails |
+| Truth-relative boundary calibration | — | — | Fails |
+| Spatial/physical preservation | — | — | Fails |
+| Operational validity | — | — | Passes |
 | Overall no-compensation gate | — | false | Independent primary is rejected |
 
 The earlier spread-only compact-table contract contains 40 corrected case rows
