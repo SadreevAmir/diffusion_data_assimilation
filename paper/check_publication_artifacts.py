@@ -192,6 +192,10 @@ RANK_COHERENT_HANDOFF_ANCHORS = {
         "missing or non-boolean mandatory gate families",
         "rank-target counts\nother than ten uses of 40",
         "maximum projection mean error\nabove `1e-10`",
+        "aggregate deltas that do not equal candidate minus\nraw",
+        "paired summaries that do not reconcile with the same aggregate metric set",
+        "member-spatial decisions that do\nnot follow their frozen absolute tolerances",
+        "family flags that differ from\ntheir complete criterion conjunctions",
     ),
     "REPRODUCIBILITY.md": (
         "## Rank-coherent runner review handoff",
@@ -203,6 +207,9 @@ RANK_COHERENT_HANDOFF_ANCHORS = {
         "exact alpha/boolean consistency\nfor `no_positive_feasible_alpha`",
         "rank-target counts each equal to 40",
         "Negative fixtures exercise incomplete folds",
+        "projection-invariant failure, an inconsistent aggregate\ndelta",
+        "member-spatial pass flag that violates its frozen\ntolerance",
+        "exact member-spatial-to-gate linkage",
     ),
 }
 FIGURE_PATTERN = re.compile(r"!\[[^]]*\]\(([^)]+)\)")

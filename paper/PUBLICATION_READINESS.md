@@ -36,7 +36,13 @@ between `selected_alpha` and `no_positive_feasible_alpha`, rank-target counts
 other than ten uses of 40, projection fractions outside `[0,1]`, non-finite
 diagnostics, missing or extra diagnostic fields, and maximum projection mean error
 above `1e-10`. These checks make fold selection, target balance and bounded
-projection accounting executable rather than narrative-only requirements. The publication
+projection accounting executable rather than narrative-only requirements. The
+same oracle now rejects aggregate deltas that do not equal candidate minus
+raw, paired summaries that do not reconcile with the same aggregate metric set,
+non-finite or unordered uncertainty intervals, member-spatial decisions that do
+not follow their frozen absolute tolerances, and family flags that differ from
+their complete criterion conjunctions. Thus the full numeric compact handoff is
+fail-closed without presuming a positive scientific outcome. The publication
 audit requires, parses and executes this oracle, and fails closed unless it
 prints the exact success sentinel. This is implementation evidence only:
 until a separately reviewed trusted mode executes the full server-side gate,

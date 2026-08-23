@@ -47,6 +47,26 @@ PROJECTION_DIAGNOSTIC_KEYS = (
     "member_semivariogram_distortion_pre",
     "member_semivariogram_distortion_post",
 )
+REQUIRED_AGGREGATE_METRICS = (
+    "analysis_fair_crps",
+    "analysis_crps",
+    "analysis_mean_rmse",
+)
+METRIC_RECORD_KEYS = ("raw", "candidate", "delta")
+PAIRED_RECORD_KEYS = (
+    "raw",
+    "candidate",
+    "paired_mean_delta",
+    "paired_date_95_ci",
+    "four_case_block_95_ci",
+)
+MEMBER_SPATIAL_RECORD_KEYS = (
+    "raw",
+    "candidate",
+    "absolute_delta",
+    "maximum_allowed_absolute_delta",
+    "passed",
+)
 
 
 def _field_shape_and_finiteness(
@@ -186,18 +206,131 @@ def validate_projection_diagnostics(diagnostics: Mapping[str, object]) -> None:
         raise ValueError("projection diagnostics violate the frozen mean invariant")
 
 
+def _finite_number(value: object, context: str) -> float:
+    if type(value) not in (int, float) or type(value) is bool or not math.isfinite(value):
+        raise ValueError(f"{context} must be a finite JSON number")
+    return float(value)
+
+
+def _close(left: float, right: float) -> bool:
+    return math.isclose(left, right, rel_tol=1e-10, abs_tol=1e-12)
+
+
+def validate_aggregate_metrics(metrics: Mapping[str, object]) -> None:
+    """Require complete proper-score anchors and arithmetically exact deltas."""
+    if not set(REQUIRED_AGGREGATE_METRICS) <= set(metrics):
+        raise ValueError("aggregate metrics omit a mandatory proper-score anchor")
+    if not metrics:
+        raise ValueError("aggregate metrics must not be empty")
+    for name, record in metrics.items():
+        if not isinstance(name, str) or not name or not isinstance(record, Mapping):
+            raise ValueError("aggregate metrics must be named JSON objects")
+        if set(record) != set(METRIC_RECORD_KEYS):
+            raise ValueError("aggregate metric has missing or extra fields")
+        raw = _finite_number(record["raw"], f"aggregate {name}.raw")
+        candidate = _finite_number(record["candidate"], f"aggregate {name}.candidate")
+        delta = _finite_number(record["delta"], f"aggregate {name}.delta")
+        if not _close(delta, candidate - raw):
+            raise ValueError("aggregate metric delta does not equal candidate minus raw")
+
+
+def _validate_interval(value: object, point: float, context: str) -> None:
+    if not isinstance(value, Sequence) or isinstance(value, (str, bytes)) or len(value) != 2:
+        raise ValueError(f"{context} must be a two-number interval")
+    lower = _finite_number(value[0], f"{context} lower")
+    upper = _finite_number(value[1], f"{context} upper")
+    if lower > upper:
+        raise ValueError(f"{context} must be ordered")
+
+
+def validate_paired_uncertainty(
+    paired: Mapping[str, object], aggregates: Mapping[str, object]
+) -> None:
+    """Reconcile paired summaries with the same complete aggregate metric set."""
+    if set(paired) != set(aggregates):
+        raise ValueError("paired uncertainty must cover exactly the aggregate metrics")
+    for name, record in paired.items():
+        if not isinstance(record, Mapping) or set(record) != set(PAIRED_RECORD_KEYS):
+            raise ValueError("paired uncertainty record has missing or extra fields")
+        aggregate = aggregates[name]
+        raw = _finite_number(record["raw"], f"paired {name}.raw")
+        candidate = _finite_number(record["candidate"], f"paired {name}.candidate")
+        delta = _finite_number(record["paired_mean_delta"], f"paired {name}.delta")
+        if not (_close(raw, aggregate["raw"]) and _close(candidate, aggregate["candidate"])):
+            raise ValueError("paired and aggregate raw/candidate means disagree")
+        if not _close(delta, candidate - raw):
+            raise ValueError("paired mean delta does not equal candidate minus raw")
+        _validate_interval(record["paired_date_95_ci"], delta, f"paired {name} date interval")
+        _validate_interval(record["four_case_block_95_ci"], delta, f"paired {name} block interval")
+
+
+def validate_member_spatial_deltas(spatial: Mapping[str, object]) -> None:
+    """Require every member-spatial decision to follow its frozen absolute tolerance."""
+    if not spatial:
+        raise ValueError("member-spatial deltas must not be empty")
+    for name, record in spatial.items():
+        if not isinstance(name, str) or not name or not isinstance(record, Mapping):
+            raise ValueError("member-spatial deltas must be named JSON objects")
+        if set(record) != set(MEMBER_SPATIAL_RECORD_KEYS):
+            raise ValueError("member-spatial record has missing or extra fields")
+        raw = _finite_number(record["raw"], f"member-spatial {name}.raw")
+        candidate = _finite_number(record["candidate"], f"member-spatial {name}.candidate")
+        delta = _finite_number(record["absolute_delta"], f"member-spatial {name}.delta")
+        tolerance = _finite_number(
+            record["maximum_allowed_absolute_delta"], f"member-spatial {name}.tolerance"
+        )
+        if tolerance < 0.0 or delta < 0.0 or not _close(delta, abs(candidate - raw)):
+            raise ValueError("member-spatial absolute delta or tolerance is inconsistent")
+        if type(record["passed"]) is not bool or record["passed"] is not (delta <= tolerance):
+            raise ValueError("member-spatial pass flag must follow its frozen tolerance")
+
+
+def validate_gate_inputs(
+    inputs: Mapping[str, object], gate: Mapping[str, object], spatial: Mapping[str, object]
+) -> None:
+    """Tie every family decision to complete criterion flags and spatial records."""
+    if set(inputs) != set(MANDATORY_GATE_FAMILIES):
+        raise ValueError("gate inputs must contain every mandatory family exactly once")
+    for family, criteria in inputs.items():
+        if not isinstance(criteria, Mapping) or not criteria:
+            raise ValueError("every gate family must contain criterion flags")
+        if any(not isinstance(name, str) or not name for name in criteria):
+            raise ValueError("gate criteria must have non-empty names")
+        if any(type(value) is not bool for value in criteria.values()):
+            raise ValueError("gate criterion flags must be JSON booleans")
+        if gate[family] is not all(criteria.values()):
+            raise ValueError("family gate flag must equal its criterion conjunction")
+    spatial_flags = inputs["spatial_physical"]
+    if set(spatial_flags) != set(spatial):
+        raise ValueError("spatial gate criteria must cover exactly member-spatial deltas")
+    if any(spatial_flags[name] is not spatial[name]["passed"] for name in spatial):
+        raise ValueError("spatial gate criteria disagree with member-spatial decisions")
+
+
 def validate_compact_handoff(payload: Mapping[str, object]) -> None:
     """Validate the decision-bearing structural subset of the compact result."""
-    expected = {"gate", "fold_selections", "rank_target_balance", "projection_diagnostics"}
+    expected = {
+        "gate", "gate_inputs", "aggregate_metrics", "paired_uncertainty",
+        "fold_selections", "rank_target_balance", "projection_diagnostics",
+        "member_spatial_deltas",
+    }
     if set(payload) != expected:
         raise ValueError("compact handoff has missing or extra structural sections")
-    for name in expected:
-        if name != "rank_target_balance" and not isinstance(payload[name], Mapping if name != "fold_selections" else Sequence):
-            raise ValueError("compact handoff section has the wrong container type")
+    mapping_sections = expected - {"fold_selections", "rank_target_balance"}
+    if any(not isinstance(payload[name], Mapping) for name in mapping_sections):
+        raise ValueError("compact handoff mapping section has the wrong container type")
+    if not isinstance(payload["fold_selections"], Sequence) or isinstance(payload["fold_selections"], (str, bytes)):
+        raise ValueError("compact fold selections have the wrong container type")
+    if not isinstance(payload["rank_target_balance"], Sequence) or isinstance(payload["rank_target_balance"], (str, bytes)):
+        raise ValueError("rank-target balance has the wrong container type")
     validate_compact_gate(payload["gate"])
+    validate_aggregate_metrics(payload["aggregate_metrics"])
+    validate_paired_uncertainty(payload["paired_uncertainty"], payload["aggregate_metrics"])
     validate_fold_selections(payload["fold_selections"])
     validate_rank_target_balance(payload["rank_target_balance"])
     validate_projection_diagnostics(payload["projection_diagnostics"])
+    validate_member_spatial_deltas(payload["member_spatial_deltas"])
+    validate_gate_inputs(payload["gate_inputs"], payload["gate"], payload["member_spatial_deltas"])
 
 
 def select_forecast_analogs(
@@ -483,11 +616,57 @@ def _self_test() -> None:
         "member_semivariogram_distortion_pre": 0.03,
         "member_semivariogram_distortion_post": 0.04,
     }
+    aggregate_metrics = {
+        name: {"raw": 1.0, "candidate": 0.95, "delta": -0.05}
+        for name in REQUIRED_AGGREGATE_METRICS
+    }
+    paired_uncertainty = {
+        name: {
+            "raw": 1.0,
+            "candidate": 0.95,
+            "paired_mean_delta": -0.05,
+            "paired_date_95_ci": (-0.08, -0.02),
+            "four_case_block_95_ci": (-0.09, 0.01),
+        }
+        for name in REQUIRED_AGGREGATE_METRICS
+    }
+    member_spatial_deltas = {
+        "member_semivariogram_lag_1": {
+            "raw": 0.20,
+            "candidate": 0.205,
+            "absolute_delta": 0.005,
+            "maximum_allowed_absolute_delta": 0.01,
+            "passed": True,
+        },
+        "member_semivariogram_lag_4": {
+            "raw": 0.30,
+            "candidate": 0.32,
+            "absolute_delta": 0.02,
+            "maximum_allowed_absolute_delta": 0.01,
+            "passed": False,
+        },
+    }
+    gate_inputs = {
+        "proper_score": {"fair_crps": True, "crps": True, "mean_rmse": True},
+        "finite_ensemble_reliability": {"rank_uniformity": True, "coverage": True},
+        "boundary": {"exact_zero": True, "exact_one": True},
+        "spatial_physical": {
+            "member_semivariogram_lag_1": True,
+            "member_semivariogram_lag_4": False,
+        },
+        "operational": {"case_count": True, "finite_members": True},
+    }
+    passing_gate["spatial_physical"] = False
+    passing_gate["overall_eligible"] = False
     compact_handoff = {
         "gate": passing_gate,
+        "gate_inputs": gate_inputs,
+        "aggregate_metrics": aggregate_metrics,
+        "paired_uncertainty": paired_uncertainty,
         "fold_selections": fold_records,
         "rank_target_balance": (EXPECTED_CASES,) * EXPECTED_MEMBERS,
         "projection_diagnostics": projection_diagnostics,
+        "member_spatial_deltas": member_spatial_deltas,
     }
     validate_compact_handoff(compact_handoff)
     malformed_handoffs = (
@@ -508,6 +687,41 @@ def _self_test() -> None:
             "projection_diagnostics": {
                 **projection_diagnostics,
                 "maximum_mean_error": 1.1e-10,
+            },
+        },
+        {
+            **compact_handoff,
+            "aggregate_metrics": {
+                **aggregate_metrics,
+                "analysis_fair_crps": {
+                    **aggregate_metrics["analysis_fair_crps"], "delta": -0.04
+                },
+            },
+        },
+        {
+            **compact_handoff,
+            "paired_uncertainty": {
+                **paired_uncertainty,
+                "analysis_crps": {
+                    **paired_uncertainty["analysis_crps"], "raw": 0.9
+                },
+            },
+        },
+        {
+            **compact_handoff,
+            "member_spatial_deltas": {
+                **member_spatial_deltas,
+                "member_semivariogram_lag_4": {
+                    **member_spatial_deltas["member_semivariogram_lag_4"],
+                    "passed": True,
+                },
+            },
+        },
+        {
+            **compact_handoff,
+            "gate_inputs": {
+                **gate_inputs,
+                "proper_score": {**gate_inputs["proper_score"], "fair_crps": False},
             },
         },
     )

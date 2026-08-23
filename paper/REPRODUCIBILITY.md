@@ -62,7 +62,14 @@ for `no_positive_feasible_alpha`, ten rank-target counts each equal to 40, and
 exact projection diagnostics. It rejects missing or extra fields, non-finite or
 negative values, fractions outside `[0,1]`, and maximum mean error above `1e-10`.
 Negative fixtures exercise incomplete folds, a contradictory zero-alpha flag,
-rank-target imbalance and projection-invariant failure. Its synthetic identity checks ensure that
+rank-target imbalance, projection-invariant failure, an inconsistent aggregate
+delta, and paired means that disagree
+with the aggregates, a member-spatial pass flag that violates its frozen
+tolerance, and a family flag that disagrees with its criterion conjunction.
+The numeric validator requires the three proper-score anchors, exact metric-set
+coverage by paired uncertainty, finite arithmetic reconciliation, ordered date
+and four-case-block intervals, and exact member-spatial-to-gate linkage.
+Synthetic identity checks ensure that
 complete anomaly fields, rather than independently shuffled pixel values, are
 selected after training-only standardization and deterministic forecast-distance
 ties, paired by the frozen date and member order statistics, and carried through

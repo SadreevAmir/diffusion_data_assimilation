@@ -125,3 +125,15 @@ must not exceed `1e-10`. Missing, extra, non-finite or contradictory structural
 evidence therefore cannot become decision-bearing. It reads no project data and is not an
 experiment entry point; a trusted server implementation and independent review
 remain required before this method can be proposed.
+
+The numeric compact handoff is also fail-closed. Aggregate records must include
+`analysis_fair_crps`, `analysis_crps` and `analysis_mean_rmse`, use finite
+raw/candidate/delta values, and reproduce `delta=candidate-raw`. Paired records
+must cover exactly the same metric names, reproduce the same raw and candidate
+means and delta, and provide ordered finite two-endpoint date and four-case-block
+intervals. Every finite member-spatial absolute delta must reproduce the raw to
+candidate change, its boolean decision must follow its non-negative frozen
+tolerance, and the spatial family criteria must cover exactly those records.
+Finally, every mandatory family flag must equal the conjunction of its complete,
+non-empty boolean criterion map. Negative fixtures reject aggregate-delta,
+paired-mean, spatial-decision and family-gate contradictions.
