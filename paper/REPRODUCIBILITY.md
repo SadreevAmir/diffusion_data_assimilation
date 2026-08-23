@@ -47,7 +47,8 @@ python3 paper/rank_coherent_reference.py
 ```
 
 The oracle reads no data and cannot launch an experiment. It fails closed on
-fold/purge drift, extra runtime parameters, non-finite or zero-variance
+fold/purge drift, any change to the exact `valid`, 40-case, ten-member,
+stride-five development envelope, extra runtime parameters, non-finite or zero-variance
 training-only forecast features, incomplete ten-neighbor, ten-date or ten-member
 inputs, out-of-range normalized truth ranks, non-finite ordering quantities,
 empty, ragged, non-scalar, non-finite or shape-incompatible complete fields,

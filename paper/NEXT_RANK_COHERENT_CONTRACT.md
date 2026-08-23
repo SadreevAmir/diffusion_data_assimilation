@@ -104,7 +104,9 @@ The dependency-free review oracle `rank_coherent_reference.py` makes the exact
 non-circular purge, date/member tie ordering, complete-field pairing, frozen
 alpha selection, one-parameter interface and full spatial candidate construction
 through per-pixel capped-simplex projection executable on synthetic inputs. It
-checks physical bounds and the `1e-10` raw-mean invariant at every pixel, and
+also rejects drift in the exact `valid`, 40-case, ten-member, stride-five
+development envelope before construction. It checks physical bounds and the
+`1e-10` raw-mean invariant at every pixel, and
 fails closed on non-finite, empty, ragged or spatially incompatible complete
 anomaly fields, normalized truth ranks outside `[0,1]`, or an alpha outside the
 frozen set. It reads no project data and is not an

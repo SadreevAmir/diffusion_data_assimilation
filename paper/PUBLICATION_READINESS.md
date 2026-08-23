@@ -24,7 +24,8 @@ independent evaluation.
 The local engineering handoff is now executable: `rank_coherent_reference.py`
 checks the exact five purged folds, training-only six-feature standardization,
 ten-neighbor forecast-only selection, deterministic date/member/distance tie
-ordering, finite shape-compatible complete-field rank pairing, bounded normalized
+ordering, the exact `valid`, 40-case, ten-member, stride-five development
+envelope, finite shape-compatible complete-field rank pairing, bounded normalized
 truth ranks, frozen alpha selection, sole runner
 parameter, full spatial candidate construction, physical bounds and the `1e-10`
 per-pixel capped-simplex mean invariant on synthetic inputs. The publication

@@ -178,10 +178,12 @@ RANK_COHERENT_CONTRACT_ANCHORS = (
     "summary_only",
     "no currently\nimplemented trusted mode implements it",
     "rank_coherent_reference.py",
+    "exact `valid`, 40-case, ten-member, stride-five\ndevelopment envelope",
 )
 RANK_COHERENT_HANDOFF_ANCHORS = {
     "PUBLICATION_READINESS.md": (
         "rank_coherent_reference.py",
+        "exact `valid`, 40-case, ten-member, stride-five development\nenvelope",
         "implementation evidence only",
         "publication status remains `NOT_READY`",
     ),
@@ -189,6 +191,7 @@ RANK_COHERENT_HANDOFF_ANCHORS = {
         "## Rank-coherent runner review handoff",
         "python3 paper/rank_coherent_reference.py",
         "bounded\nprojection mean error above `1e-10`",
+        "exact `valid`, 40-case, ten-member,\nstride-five development envelope",
         "not scientific evidence or an implemented mode",
     ),
 }

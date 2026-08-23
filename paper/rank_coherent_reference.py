@@ -21,6 +21,10 @@ PURGE = 3
 ALPHAS = (0.0, 0.5, 0.75, 1.0, 1.25)
 SOURCE_EXPERIMENT = "joint_full_condition_validation_2022"
 ARTIFACT_POLICY = "summary_only"
+DATASET_SPLIT = "valid"
+START_DATE = "2022-01-01"
+END_DATE = "2022-07-15"
+CASE_STRIDE = 5
 
 
 def _field_shape_and_finiteness(
@@ -70,6 +74,35 @@ def validate_runner_interface(
         raise ValueError("runner must expose only the frozen source_experiment")
     if artifact_policy != ARTIFACT_POLICY:
         raise ValueError("runner retrieval must remain summary_only")
+
+
+def validate_run_envelope(
+    dataset_split: str,
+    start_date: str,
+    end_date: str,
+    cases: int,
+    ensemble_size: int,
+    case_stride: int,
+) -> None:
+    """Reject any drift from the frozen development sampling envelope."""
+    observed = (
+        dataset_split,
+        start_date,
+        end_date,
+        cases,
+        ensemble_size,
+        case_stride,
+    )
+    expected = (
+        DATASET_SPLIT,
+        START_DATE,
+        END_DATE,
+        EXPECTED_CASES,
+        EXPECTED_MEMBERS,
+        CASE_STRIDE,
+    )
+    if observed != expected:
+        raise ValueError("runner must use the exact frozen development envelope")
 
 
 def select_forecast_analogs(
@@ -291,6 +324,30 @@ def select_alpha(training_scores: Mapping[float, float], feasible: Mapping[float
 
 
 def _self_test() -> None:
+    validate_runner_interface(
+        {"source_experiment": SOURCE_EXPERIMENT}, ARTIFACT_POLICY
+    )
+    validate_run_envelope(
+        DATASET_SPLIT,
+        START_DATE,
+        END_DATE,
+        EXPECTED_CASES,
+        EXPECTED_MEMBERS,
+        CASE_STRIDE,
+    )
+    for changed in (
+        ("external_holdout", START_DATE, END_DATE, 40, 10, 5),
+        (DATASET_SPLIT, START_DATE, END_DATE, 39, 10, 5),
+        (DATASET_SPLIT, START_DATE, END_DATE, 40, 9, 5),
+        (DATASET_SPLIT, START_DATE, END_DATE, 40, 10, 1),
+    ):
+        try:
+            validate_run_envelope(*changed)
+        except ValueError as exc:
+            assert "exact frozen" in str(exc)
+        else:
+            raise AssertionError("modified run envelope did not fail closed")
+
     folds = purged_folds()
     assert len(folds) == 5
     assert folds[0][0] == tuple(range(8)) and folds[-1][0] == tuple(range(32, 40))
