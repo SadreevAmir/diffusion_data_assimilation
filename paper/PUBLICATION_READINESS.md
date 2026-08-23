@@ -13,6 +13,17 @@ Controller readiness: NOT_READY
 Scientific primary reconciliation: COMPLETE_NEGATIVE
 Autonomous publication work remaining: YES
 
+The 2026-08-23 independent table audit found one stale scope sentence after the
+reconciled primary had been added: the evidence section still said that no
+independent-period study was presented as a contribution. The manuscript now
+states the narrower, accurate scope and includes a compact independent-primary
+table with fair CRPS, absolute normalized rank, all three member-semivariogram
+errors and the negative no-compensation decision. The unified checker requires
+the table and conclusion, preventing a later edit from retaining the proper-score
+gain while silently dropping the rank or spatial failures. This closes a
+publication-consistency gap but does not change `NOT_READY` or scientific
+eligibility.
+
 The independent manuscript-to-ledger audit found that the ledger declared
 itself normative, but the manuscript contained no executable claim-level
 traceability map. `PAPER_DRAFT.md` now maps every empirical and scope section to

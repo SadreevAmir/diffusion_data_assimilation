@@ -492,6 +492,12 @@ MANUSCRIPT_EVIDENCE_ANCHORS = (
     "| Fair CRPS | 0.058491 | 0.058557 | No 3% improvement; proper-score family fails |",
     "| Paired diagnostic | Mean delta (corrected - raw) | Date-bootstrap 95% CI | Four-date-block 95% CI |",
     "| Mean IIEE | 0.004379 | [0.002065, 0.006716] | [0.001149, 0.007849] |",
+    "| Independent primary diagnostic | Raw ensemble | Frozen candidate | Decision |",
+    "| Fair CRPS | 0.232585 | 0.211849 | Improves, but cannot compensate for failed mandatory families |",
+    "| Normalized mean rank | — | 0.960757 | Absolute rank reliability fails; block 95% CI is [0.951620, 0.969164] |",
+    "| Member-semivariogram relative error, lag 1 | — | 1.147 | Spatial/physical preservation fails |",
+    "| Overall no-compensation gate | — | false | Independent primary is rejected |",
+    "The single frozen independent primary is presented as a\nnegative generalization result",
 )
 FROZEN_EVALUATION_ANCHORS = (
     "Status: AUTHORIZED_ACTIVE_PENDING_COMPACT_RESULT",

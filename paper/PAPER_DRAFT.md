@@ -566,13 +566,23 @@ ensemble sizes, regions or observation systems remains unverified.
 The circular block intervals are an honest post-hoc temporal sensitivity, not
 a predeclared acceptance gate.
 
+| Independent primary diagnostic | Raw ensemble | Frozen candidate | Decision |
+|---|---:|---:|---|
+| Fair CRPS | 0.232585 | 0.211849 | Improves, but cannot compensate for failed mandatory families |
+| Normalized mean rank | — | 0.960757 | Absolute rank reliability fails; block 95% CI is [0.951620, 0.969164] |
+| Member-semivariogram relative error, lag 1 | — | 1.147 | Spatial/physical preservation fails |
+| Member-semivariogram relative error, lag 2 | — | 1.058 | Spatial/physical preservation fails |
+| Member-semivariogram relative error, lag 4 | — | 1.031 | Spatial/physical preservation fails |
+| Overall no-compensation gate | — | false | Independent primary is rejected |
+
 The earlier spread-only compact-table contract contains 40 corrected case rows
 without corresponding raw case-level fields. The later joint-audit contract is
 long-form and contains `target_date` and `method` for 160 rows, including raw
 and corrected methods; a trusted server-side paired analysis has now completed.
 The intervals above come from its compact summary and are not reconstructed
-from aggregate means. Conditional and independent-period studies are not presented as
-contributions of this draft. The completed joint audit checks IIEE, ice
+from aggregate means. The single frozen independent primary is presented as a
+negative generalization result; broader conditional, multi-seed and cross-system
+studies are not presented as contributions of this draft. The completed joint audit checks IIEE, ice
 area/extent, edge geometry and variograms; its failed mandatory preservation
 criteria prevent a submission-readiness claim even though the aggregate
 marginal mechanism result is valid.
