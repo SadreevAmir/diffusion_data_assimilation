@@ -14,7 +14,9 @@ Scientific primary reconciliation: COMPLETE_NEGATIVE
 Autonomous publication work remaining: YES
 
 The frozen independent primary is now reconciled from the exact permitted CPU
-recovery. All 48 cases, 480 member records, signed identities, input/raw/truth
+truth-normalization recovery
+`external_2024_calendar_global_bias_confirm48_primary_retry2`; all superseded
+`retry1` metrics are excluded. All 48 cases, 480 member records, signed identities, input/raw/truth
 seals, hashes and candidate-before-truth ordering pass. The scientific decision
 is negative: `overall_eligible=false`. Proper scores, truth-relative boundary
 calibration and operational validity pass; absolute rank reliability and

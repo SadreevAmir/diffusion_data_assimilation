@@ -5,8 +5,10 @@ External primary evidence state: RECONCILED_NEGATIVE
 ## Reconciled independent primary handoff
 
 The permitted CPU recovery
-`external_2024_calendar_global_bias_confirm48_primary_retry1` reuses source
+`external_2024_calendar_global_bias_confirm48_primary_retry2` reuses source
 `external_2024_calendar_global_bias_raw48_primary_v1` without resampling. It
+applies only the reviewed deterministic inverse for truth normalization; the
+superseded `retry1` metrics are scientifically invalid and excluded. It
 completed 48 cases with ten members each. The compact metadata records primary
 contract digest `f2225da7a05cab53b14604e45bed840a0ec559aed20856ae8ef2dd72d915b8f8`
 and confirmatory-gate digest

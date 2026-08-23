@@ -109,7 +109,8 @@ EXTERNAL_PRIMARY_HANDOFF_ANCHORS = {
 }
 EXTERNAL_PRIMARY_RECONCILIATION_ANCHORS = (
     "Status: reconciled negative from the exact permitted recovery.",
-    "external_2024_calendar_global_bias_confirm48_primary_retry1",
+    "external_2024_calendar_global_bias_confirm48_primary_retry2",
+    "superseded `retry1` metrics are excluded",
     "external_2024_calendar_global_bias_raw48_primary_v1",
     "four compact artifacts",
     "480 member records",

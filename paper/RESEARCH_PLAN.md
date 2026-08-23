@@ -5,7 +5,9 @@ External primary evidence state: RECONCILED_NEGATIVE
 ## Primary evaluation closed without selection
 
 The single frozen independent primary has completed through the exact permitted
-CPU recovery. Its integrity and operational checks pass, but
+CPU truth-normalization recovery
+`external_2024_calendar_global_bias_confirm48_primary_retry2`; superseded
+`retry1` metrics are excluded. Its integrity and operational checks pass, but
 `overall_eligible=false`: proper-score and truth-relative boundary gains coexist
 with failed absolute rank reliability and failed member/local spatial criteria.
 The primary hypothesis is therefore rejected under the no-compensation rule.

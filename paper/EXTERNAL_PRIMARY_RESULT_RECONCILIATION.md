@@ -2,9 +2,10 @@
 
 Status: reconciled negative from the exact permitted recovery.
 
-The four compact artifacts from
-`external_2024_calendar_global_bias_confirm48_primary_retry1` were admitted as
-one payload. Identity, seals, hashes, 48/48 completeness, 480 member records,
+The four compact artifacts from the truth-normalization repair
+`external_2024_calendar_global_bias_confirm48_primary_retry2` were admitted as
+one payload. The superseded `retry1` metrics are excluded from every scientific
+claim. Identity, seals, hashes, 48/48 completeness, 480 member records,
 candidate-before-truth ordering and finiteness checks pass. The authoritative
 gate reports `overall_eligible=false`: absolute rank reliability and
 spatial/physical preservation fail. Proper-score, truth-relative boundary and
@@ -14,8 +15,8 @@ resubmission or another external evaluation.
 ## Admissible evidence unit
 
 Reconcile only the four compact artifacts produced by
-`external_2024_calendar_global_bias_confirm48_primary_v1` from the sealed raw
-stage `external_2024_calendar_global_bias_raw48_primary_v1`. Raw-stage
+`external_2024_calendar_global_bias_confirm48_primary_retry2` from the sealed
+raw stage `external_2024_calendar_global_bias_raw48_primary_v1`. Raw-stage
 completion, queue or progress metadata, a development gate, or a different
 confirmatory id is not a scientific substitute. Raw members and scoring truth
 remain server-side.

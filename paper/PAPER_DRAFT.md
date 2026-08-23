@@ -21,8 +21,11 @@ contract identities and controller preflight are recorded in
 
 ## Independent primary result
 
-The exact permitted recovery of the frozen confirmatory CPU stage completed all
-48 cases. The signed compact payload verifies the source identity, 48 raw and
+The exact permitted truth-normalization recovery
+`external_2024_calendar_global_bias_confirm48_primary_retry2` of the frozen
+confirmatory CPU stage completed all 48 cases. The superseded `retry1` metrics
+are excluded from all scientific interpretation. The signed compact payload
+verifies the source identity, 48 raw and
 48 truth hashes, all 480 member records, the pre-truth candidate seal, and
 formation of every candidate array before scoring truth was opened. The frozen
 `calendar_global_bias_mixture_v1_refit_all40` candidate is not jointly eligible:
