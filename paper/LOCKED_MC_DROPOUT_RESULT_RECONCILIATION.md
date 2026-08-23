@@ -1,6 +1,17 @@
 # Locked-MC-dropout compact-result reconciliation
 
-Status: pre-result, fail closed. This checklist records no scientific outcome.
+Status: NEGATIVE_DECISION_RECORDED_QUANTITATIVE_RECONCILIATION_PENDING
+
+The trusted controller has recorded candidate
+`locked_mc_dropout_p010_final_ema_ensemble` with
+`gate.overall_eligible=false`. That Boolean decision is sufficient to close the
+frozen mechanism and to activate its predeclared fallback, but it is not a
+complete publication evidence unit. The worktree does not contain the required
+raw/candidate proper scores, paired intervals, or explicit decisions for every
+mandatory family. Until those compact fields are reconciled together, the
+manuscript may report only the exact candidate identity, the negative overall
+decision, and the no-retuning consequence; it must not infer a failed family or
+a quantitative effect size.
 
 ## Admissible evidence unit
 
@@ -59,9 +70,10 @@ failed initial-noise or mask check, or disagreement between a family decision
 and its reported metric fails reconciliation. Do not infer a missing decision
 from an aggregate mean or merge fields from separate payloads.
 
-## Atomic publication update
+## Remaining atomic quantitative publication update
 
-After the payload passes the checks above, update all five files in one change:
+After the complete quantitative payload passes the checks above, the remaining
+instruction is to update all five files in one change:
 
 1. `PAPER_DRAFT.md`: report the frozen mechanism, raw/candidate proper scores,
    paired-date interval, every mandatory-family decision and no-compensation

@@ -1,6 +1,15 @@
 # Latent-temperature compact-result reconciliation
 
-Status: pre-result, fail closed. This checklist records no scientific outcome.
+Status: RECONCILED_NEGATIVE
+
+The admissible compact payload from `latent_temperature_1p30_gate_retry1`
+records `gate.overall_eligible=false`. Raw/candidate `analysis_fair_crps` is
+`0.0584905850`/`0.0631177443`, with paired delta `0.0046271592`, date-bootstrap
+95% interval `[0.0014355657,0.0075956683]`, and separately labelled four-case-
+block sensitivity interval `[-0.0005197500,0.0082640843]`. Raw/candidate
+`analysis_crps` is `0.0621082810`/`0.0684128432`. Reliability passes; proper-
+score, boundary and spatial/physical families fail. The frozen construction is
+therefore a negative mechanism result and no second temperature is admissible.
 
 ## Admissible evidence unit
 
@@ -35,9 +44,11 @@ failed provenance check or disagreement between a family decision and its
 reported metric fails reconciliation. Do not infer a missing decision from an
 aggregate mean and do not combine fields from retries or separate payloads.
 
-## Atomic publication update
+## Completed atomic publication update
 
-After the payload passes the checks above, update all four files in one change:
+The complete payload passed the checks above. The required instruction was to
+update all four files in one change; the following four publication files now
+represent that reconciled evidence state:
 
 1. `PAPER_DRAFT.md`: add the frozen mechanism, raw/candidate proper scores,
    paired-date interval, mandatory-family decisions and the no-compensation

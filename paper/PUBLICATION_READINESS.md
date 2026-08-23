@@ -164,6 +164,16 @@ That negative decision is the contractual prerequisite that activated the final
 cross-fitted iid calendar global-bias fallback; no dropout probability, layer
 set, mask construction or refresh rule was changed after the result.
 
+An independent evidence-unit audit found that the dedicated dropout
+reconciliation file still declared a pre-result state even though the exact
+candidate and negative overall decision had already been admitted elsewhere.
+It now distinguishes the controller-recorded Boolean decision from the still
+missing quantitative publication payload. Raw/candidate proper scores, paired
+intervals and explicit mandatory-family decisions are not present in this
+worktree, so no family-specific or effect-size claim is admitted for this
+mechanism. This is a publication-reconciliation blocker, not a reason to repeat
+sampling or to tune the frozen construction.
+
 This ordering does not waive the minimum publication tier. The negative latent-
 temperature result activated only the already predeclared locked-MC-dropout
 fallback, unchanged; it did not authorize another temperature or retrospective

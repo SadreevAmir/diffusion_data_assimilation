@@ -44,7 +44,10 @@ REQUIRED_FILES = (
     "deep_ensemble_reference.py",
 )
 LOCKED_DROPOUT_RECONCILIATION_ANCHORS = (
-    "Status: pre-result, fail closed. This checklist records no scientific outcome.",
+    "Status: NEGATIVE_DECISION_RECORDED_QUANTITATIVE_RECONCILIATION_PENDING",
+    "gate.overall_eligible=false",
+    "not a\ncomplete publication evidence unit",
+    "must not infer a failed family or\na quantitative effect size",
     "locked_mc_dropout_p010_gate_valid",
     "locked_mc_dropout_p010_sampling_valid",
     "locked_mc_dropout_p010_final_ema_ensemble",
@@ -68,7 +71,13 @@ LOCKED_DROPOUT_RECONCILIATION_ANCHORS = (
 )
 
 LATENT_RECONCILIATION_ANCHORS = (
-    "Status: pre-result, fail closed. This checklist records no scientific outcome.",
+    "Status: RECONCILED_NEGATIVE",
+    "gate.overall_eligible=false",
+    "`0.0584905850`/`0.0631177443`",
+    "`[0.0014355657,0.0075956683]`",
+    "`[-0.0005197500,0.0082640843]`",
+    "`0.0621082810`/`0.0684128432`",
+    "Reliability passes; proper-\nscore, boundary and spatial/physical families fail",
     "latent_temperature_1p30_gate_retry1",
     "latent_temperature_1p30_sampling_retry1",
     "integrity-checked, server-side recovery",
@@ -94,6 +103,8 @@ CURRENT_DECISION_ANCHORS = (
     "The result is negative: `overall_eligible=false`",
     "reliability\npasses, while proper-score, boundary and spatial/physical families fail",
     "exact frozen candidate\n`locked_mc_dropout_p010_final_ema_ensemble` with `overall_eligible=false`",
+    "controller-recorded Boolean decision from the still\nmissing quantitative publication payload",
+    "no family-specific or effect-size claim is admitted",
     "completed negative dropout result closes only this frozen candidate",
     "already predeclared locked-MC-dropout\nfallback, unchanged",
     "latent_temperature_1p30_gate_retry1",
