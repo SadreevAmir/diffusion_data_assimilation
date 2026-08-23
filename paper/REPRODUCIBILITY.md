@@ -44,6 +44,12 @@ The exact admission checklist is
 publication commit and runner digest, oracle parity, negative fixtures and a
 synthetic server dry run. Every checkbox is mandatory; an unchecked, failed or
 waived item is `NO_GO` and cannot support an experiment proposal.
+The same checklist now freezes the single controller-visible admission record:
+literal reviewed mode, reviewed publication commit, runner/contract/synthetic
+SHA-256 digests, exact test command and sentinel, a `PASS` decision-bearing
+directory validation, and an empty deviations list. Missing or placeholder
+fields cannot authorize a proposal; the mode must be copied literally and the
+digests must not be turned into runtime parameters.
 
 The frozen next mechanism is specified by `NEXT_RANK_COHERENT_CONTRACT.md`.
 Before trusted integration, its dependency-free executable review oracle is:

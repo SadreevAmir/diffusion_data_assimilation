@@ -85,6 +85,33 @@ controller exposes that exact reviewed mode.
   publication commit, runner digest, test command and test sentinel in the
   controller-visible implementation review.
 
+## Controller-visible admission record
+
+The implementation review is complete only when one controller-visible record
+contains every field below. String placeholders, nulls, omitted fields and a
+non-empty `deviations` list are `NO_GO`. Digests are lowercase SHA-256 values;
+`publication_commit` is the exact reviewed 40-hex commit; and
+`decision_bearing_validation` must be the literal success record from
+`validate_result_directory(path, decision_bearing=True)`.
+
+```json
+{
+  "reviewed_mode": "<implemented trusted mode>",
+  "publication_commit": "<40-hex reviewed commit>",
+  "runner_sha256": "<64-hex digest>",
+  "contract_sha256": "<64-hex digest>",
+  "synthetic_result_sha256": "<64-hex digest>",
+  "test_command": "<exact command>",
+  "test_sentinel": "<exact success sentinel>",
+  "decision_bearing_validation": "PASS",
+  "deviations": []
+}
+```
+
+The proposal must copy `reviewed_mode` literally and may use only the sole
+frozen `source_experiment` parameter. The publication commit, runner and
+contract digests are evidence for admission, never experiment parameters.
+
 ## Admission decision
 
 Any unchecked, failed, waived or not-applicable item is a hard `NO_GO` for an

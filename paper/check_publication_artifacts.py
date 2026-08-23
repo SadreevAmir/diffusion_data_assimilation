@@ -202,6 +202,11 @@ RANK_COHERENT_REVIEW_CHECKLIST_ANCHORS = (
     "overall_eligible",
     "server dry run on synthetic fixtures",
     "independent reviewer records no deviations",
+    "## Controller-visible admission record",
+    '"reviewed_mode": "<implemented trusted mode>"',
+    '"decision_bearing_validation": "PASS"',
+    '"deviations": []',
+    "must copy `reviewed_mode` literally",
     "hard `NO_GO`",
 )
 RANK_COHERENT_HANDOFF_ANCHORS = {

@@ -90,6 +90,14 @@ only a recorded independently reviewed implemented mode can make a proposal
 admissible. This is engineering readiness, not scientific evidence, so the
 publication status remains `NOT_READY`.
 
+The controller handoff now also has an exact fail-closed admission-record
+schema. It requires the literal reviewed mode, reviewed publication commit,
+runner/contract/synthetic SHA-256 digests, exact test command and sentinel,
+`decision_bearing_validation=PASS`, and an empty deviations list. Placeholders,
+missing fields or deviations remain `NO_GO`. This removes ambiguity from the
+next controller-to-proposal transition without asserting that the review or the
+scientific experiment has occurred; status remains `NOT_READY`.
+
 The rank-coherent handoff now includes an executable directory-level parity
 fixture and a frozen adapter replacement specification. The oracle validates all
 four compact files together, reconciles all 80 per-case metric rows with their
