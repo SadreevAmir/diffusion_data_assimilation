@@ -14,6 +14,8 @@ from collections.abc import Mapping, Sequence
 
 EXPECTED_CASES = 40
 EXPECTED_MEMBERS = 10
+FEATURE_COUNT = 6
+NEIGHBOR_COUNT = 10
 HOLDOUT_SIZE = 8
 PURGE = 3
 ALPHAS = (0.0, 0.5, 0.75, 1.0, 1.25)
@@ -46,6 +48,58 @@ def validate_runner_interface(
         raise ValueError("runner must expose only the frozen source_experiment")
     if artifact_policy != ARTIFACT_POLICY:
         raise ValueError("runner retrieval must remain summary_only")
+
+
+def select_forecast_analogs(
+    training_case_indices: Sequence[int],
+    training_features: Sequence[Sequence[float]],
+    heldout_features: Sequence[float],
+) -> tuple[int, ...]:
+    """Select ten analogs after training-only population standardization.
+
+    Inputs are forecast-only features.  Distances are computed with means and
+    population standard deviations derived exclusively from retained training
+    rows; equal distances are resolved by the ordered case index.
+    """
+    if len(training_case_indices) != len(training_features):
+        raise ValueError("training indices and feature rows must align")
+    if len(training_case_indices) < NEIGHBOR_COUNT:
+        raise ValueError("at least ten retained training cases are required")
+    if len(set(training_case_indices)) != len(training_case_indices):
+        raise ValueError("training case indices must be distinct")
+    if any(index < 0 or index >= EXPECTED_CASES for index in training_case_indices):
+        raise ValueError("training case index is outside the frozen envelope")
+    if len(heldout_features) != FEATURE_COUNT:
+        raise ValueError("held-out forecast must contain exactly six features")
+    if any(len(row) != FEATURE_COUNT for row in training_features):
+        raise ValueError("every training forecast must contain exactly six features")
+    values = [value for row in training_features for value in row]
+    if not all(math.isfinite(value) for value in (*values, *heldout_features)):
+        raise ValueError("forecast-only features must be finite")
+
+    means = tuple(
+        sum(row[column] for row in training_features) / len(training_features)
+        for column in range(FEATURE_COUNT)
+    )
+    standard_deviations = tuple(
+        math.sqrt(
+            sum((row[column] - means[column]) ** 2 for row in training_features)
+            / len(training_features)
+        )
+        for column in range(FEATURE_COUNT)
+    )
+    if any(not math.isfinite(scale) or scale == 0.0 for scale in standard_deviations):
+        raise ValueError("training population standard deviation must be positive and finite")
+
+    distances = []
+    for case_index, row in zip(training_case_indices, training_features):
+        squared_distance = sum(
+            ((row[column] - heldout_features[column]) / standard_deviations[column]) ** 2
+            for column in range(FEATURE_COUNT)
+        )
+        distances.append((squared_distance, case_index))
+    distances.sort()
+    return tuple(case_index for _, case_index in distances[:NEIGHBOR_COUNT])
 
 
 def select_rank_stratified_fields(
@@ -171,6 +225,32 @@ def _self_test() -> None:
     for holdout, training in folds:
         assert not set(holdout) & set(training)
         assert all(min(abs(case - held) for held in holdout) > PURGE for case in training)
+
+    training_indices = tuple(range(10, 22))
+    training_features = tuple(
+        tuple(float((case + 1) * (feature + 1)) for feature in range(FEATURE_COUNT))
+        for case in range(12)
+    )
+    analogs = select_forecast_analogs(
+        training_indices,
+        training_features,
+        tuple(5.5 * (feature + 1) for feature in range(FEATURE_COUNT)),
+    )
+    assert analogs[:2] == (14, 15)
+    assert len(analogs) == NEIGHBOR_COUNT and len(set(analogs)) == NEIGHBOR_COUNT
+    try:
+        select_forecast_analogs(
+            training_indices,
+            tuple(
+                tuple(float(case) if feature else 1.0 for feature in range(FEATURE_COUNT))
+                for case in range(12)
+            ),
+            (0.0,) * FEATURE_COUNT,
+        )
+    except ValueError as exc:
+        assert "standard deviation" in str(exc)
+    else:
+        raise AssertionError("zero-variance training feature did not fail closed")
 
     fields = [
         [[[1000 * case + 10 * member + row + col] for col in range(2)] for row in range(2)]
