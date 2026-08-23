@@ -21,6 +21,7 @@ REQUIRED_FILES = (
     "NEXT_BASELINE_CONTRACT.md",
     "NEXT_METHOD_CONTRACT.md",
     "NEXT_RANK_COHERENT_CONTRACT.md",
+    "RANK_COHERENT_RUNNER_REVIEW_CHECKLIST.md",
     "FROZEN_EVALUATION_HANDOFF.md",
     "AMENDED_PRIMARY_EVALUATION_CONTRACT.md",
     "check_publication_artifacts.py",
@@ -182,6 +183,20 @@ RANK_COHERENT_CONTRACT_ANCHORS = (
     "all five mandatory\nfamily flags are present as JSON booleans",
     "ten rank-target counts must each equal 40",
     "maximum mean error\nmust not exceed `1e-10`",
+)
+RANK_COHERENT_REVIEW_CHECKLIST_ANCHORS = (
+    "Status: REVIEW_CONTRACT_READY_NO_IMPLEMENTED_MODE",
+    "source_experiment=joint_full_condition_validation_2022",
+    "exact `valid`, 40-case, ten-member,\n  stride-five development envelope",
+    "non-circular three-case\n  purge",
+    "{0.0,0.5,0.75,1.0,1.25}",
+    "no_positive_feasible_alpha",
+    "maximum mean error",
+    "analysis_fair_crps",
+    "overall_eligible",
+    "server dry run on synthetic fixtures",
+    "independent reviewer records no deviations",
+    "hard `NO_GO`",
 )
 RANK_COHERENT_HANDOFF_ANCHORS = {
     "PUBLICATION_READINESS.md": (
@@ -680,6 +695,19 @@ def main() -> int:
         not missing_rank_coherent,
         "NEXT_RANK_COHERENT_CONTRACT.md is missing anchors: "
         + ", ".join(missing_rank_coherent),
+    )
+    rank_coherent_checklist = (
+        PAPER_DIR / "RANK_COHERENT_RUNNER_REVIEW_CHECKLIST.md"
+    ).read_text(encoding="utf-8")
+    missing_checklist = [
+        anchor
+        for anchor in RANK_COHERENT_REVIEW_CHECKLIST_ANCHORS
+        if anchor not in rank_coherent_checklist
+    ]
+    require(
+        not missing_checklist,
+        "RANK_COHERENT_RUNNER_REVIEW_CHECKLIST.md is missing anchors: "
+        + ", ".join(missing_checklist),
     )
     for name, anchors in RANK_COHERENT_HANDOFF_ANCHORS.items():
         document = (PAPER_DIR / name).read_text(encoding="utf-8")

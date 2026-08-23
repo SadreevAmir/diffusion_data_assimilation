@@ -48,6 +48,15 @@ prints the exact success sentinel. This is implementation evidence only:
 until a separately reviewed trusted mode executes the full server-side gate,
 the method remains untested and publication status remains `NOT_READY`.
 
+`RANK_COHERENT_RUNNER_REVIEW_CHECKLIST.md` now supplies the missing independent
+integration admission test. It traces the sole-parameter interface, provenance,
+fold/purge and tie parity, complete-field construction, frozen alpha selection,
+projection invariant, compact evidence, full gate, negative fixtures and a
+synthetic server dry run. Every item is mandatory and any waiver is `NO_GO`;
+only a recorded independently reviewed implemented mode can make a proposal
+admissible. This is engineering readiness, not scientific evidence, so the
+publication status remains `NOT_READY`.
+
 The frozen independent primary is now reconciled from the exact permitted CPU
 truth-normalization recovery
 `external_2024_calendar_global_bias_confirm48_primary_retry2`; all superseded

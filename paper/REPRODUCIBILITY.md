@@ -39,6 +39,12 @@ ensembles in the publication worktree.
 
 ## Rank-coherent runner review handoff
 
+The exact admission checklist is
+`paper/RANK_COHERENT_RUNNER_REVIEW_CHECKLIST.md`. It requires a recorded
+publication commit and runner digest, oracle parity, negative fixtures and a
+synthetic server dry run. Every checkbox is mandatory; an unchecked, failed or
+waived item is `NO_GO` and cannot support an experiment proposal.
+
 The frozen next mechanism is specified by `NEXT_RANK_COHERENT_CONTRACT.md`.
 Before trusted integration, its dependency-free executable review oracle is:
 

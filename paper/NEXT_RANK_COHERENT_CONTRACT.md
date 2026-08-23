@@ -137,3 +137,11 @@ tolerance, and the spatial family criteria must cover exactly those records.
 Finally, every mandatory family flag must equal the conjunction of its complete,
 non-empty boolean criterion map. Negative fixtures reject aggregate-delta,
 paired-mean, spatial-decision and family-gate contradictions.
+
+The independent implementation admission test is frozen in
+`RANK_COHERENT_RUNNER_REVIEW_CHECKLIST.md`. Every item is mandatory: it requires
+exact interface and provenance, leakage-safe deterministic parity, complete-field
+candidate construction, compact-schema and no-compensation-gate checks, negative
+fixtures, a synthetic server dry run and a recorded independent review. Any
+unchecked or waived item is `NO_GO`; the checklist does not create a mode or
+authorize a launch.
