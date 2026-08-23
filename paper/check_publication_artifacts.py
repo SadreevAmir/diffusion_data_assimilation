@@ -246,6 +246,8 @@ FIGURE_PATTERN = re.compile(r"!\[[^]]*\]\(([^)]+)\)")
 REFERENCE_PATTERN = re.compile(r"^(\d+)\. ", re.MULTILINE)
 CITATION_PATTERN = re.compile(r"\[([1-9]\d*(?:\s*,\s*[1-9]\d*)*)\]")
 CLAIM_PATTERN = re.compile(r"^\| C(\d+) \|", re.MULTILINE)
+TRACEABILITY_HEADING = "### Claim-ledger traceability\n"
+TRACEABILITY_PATTERN = re.compile(r"\bC(\d+)\b")
 FINAL_DIAGNOSTIC_ANCHORS = {
     "PAPER_DRAFT.md": (
         "0.055738",
@@ -856,6 +858,27 @@ def main() -> int:
         + ",".join(map(str, sorted(cited_references)))
         + "; listed="
         + ",".join(map(str, references)),
+    )
+
+    require(
+        TRACEABILITY_HEADING in manuscript,
+        "manuscript contains no claim-ledger traceability section",
+    )
+    traceability_section = manuscript.split(TRACEABILITY_HEADING, maxsplit=1)[1]
+    traceability_section = traceability_section.split("\n### ", maxsplit=1)[0]
+    traced_claim_ids = [
+        int(value) for value in TRACEABILITY_PATTERN.findall(traceability_section)
+    ]
+    require(
+        len(traced_claim_ids) == len(set(traced_claim_ids)),
+        "claim-ledger traceability contains duplicate claim IDs",
+    )
+    require(
+        set(traced_claim_ids) == set(claim_ids),
+        "claim-ledger traceability mismatch: traced="
+        + ",".join(map(str, sorted(traced_claim_ids)))
+        + "; ledger="
+        + ",".join(map(str, claim_ids)),
     )
 
     status_lines = re.findall(r"^Publication status: (\S+)$", readiness, re.MULTILINE)

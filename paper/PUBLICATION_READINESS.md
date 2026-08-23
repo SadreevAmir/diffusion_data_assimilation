@@ -13,6 +13,15 @@ Controller readiness: NOT_READY
 Scientific primary reconciliation: COMPLETE_NEGATIVE
 Autonomous publication work remaining: YES
 
+The independent manuscript-to-ledger audit found that the ledger declared
+itself normative, but the manuscript contained no executable claim-level
+traceability map. `PAPER_DRAFT.md` now maps every empirical and scope section to
+all 39 ledger rows, including rejected and unknown claims, and the unified
+checker fails on a missing, duplicated or untraced claim ID. This prevents a
+later edit from silently promoting an unsupported statement while leaving the
+ledger unchanged. It improves publication auditability but does not remove the
+scientific blockers below.
+
 The next autonomous mechanism is now frozen in
 `NEXT_RANK_COHERENT_CONTRACT.md`. It transports complete member-anomaly fields
 selected by purged forecast-only analogs, targets case-level rank dispersion,

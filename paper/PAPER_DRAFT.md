@@ -579,6 +579,23 @@ marginal mechanism result is valid.
 
 ## Data and code availability
 
+### Claim-ledger traceability
+
+The claim ledger is the normative boundary for every empirical or scope claim
+in this draft. The following map is intentionally explicit so that a manuscript
+revision cannot silently promote a rejected or unknown claim.
+
+| Manuscript content | Claim-ledger rows |
+|---|---|
+| Model, conditioning and strict-comparison setup | C1, C2 |
+| Preliminary guidance and affine-logit results | C3, C4, C5, C6, C7 |
+| Global-spread mechanism, uncertainty and joint audit | C8, C11, C12, C13, C14, C15, C16, C18, C19, C20 |
+| Publication scope and unsupported generalization claims | C9, C10, C17 |
+| Boundary-aware and mean-preserving postprocessors | C21, C22, C23, C24, C25, C26, C27, C28, C29 |
+| Structure-preserving and ensemble-diversity mechanisms | C30, C31, C32, C33, C34 |
+| Model-space, amended-policy and final development evidence | C35, C36, C37, C38 |
+| Independent primary result | C39 |
+
 ### Final frozen development fallback
 
 The last predeclared development fallback mixed raw and calendar-conditioned
