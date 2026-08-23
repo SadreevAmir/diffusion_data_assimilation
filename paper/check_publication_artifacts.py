@@ -19,6 +19,7 @@ REQUIRED_FILES = (
     "PUBLICATION_READINESS.md",
     "NEXT_BASELINE_CONTRACT.md",
     "NEXT_METHOD_CONTRACT.md",
+    "NEXT_RANK_COHERENT_CONTRACT.md",
     "FROZEN_EVALUATION_HANDOFF.md",
     "AMENDED_PRIMARY_EVALUATION_CONTRACT.md",
     "check_publication_artifacts.py",
@@ -163,6 +164,18 @@ AMENDED_PRIMARY_ANCHORS = {
     ),
 }
 PYTHON_FILES = tuple(name for name in REQUIRED_FILES if name.endswith(".py"))
+RANK_COHERENT_CONTRACT_ANCHORS = (
+    "Status: DESIGN_FROZEN_NO_RUNNER",
+    "purged rank-targeted coherent anomaly transport",
+    "five\n  contiguous eight-case holdouts",
+    "non-circular three-case purge",
+    "{0.0,0.5,0.75,1.0,1.25}",
+    "no_positive_feasible_alpha=true",
+    "overall_eligible=true",
+    "source_experiment=joint_full_condition_validation_2022",
+    "summary_only",
+    "no currently\nimplemented trusted mode implements it",
+)
 FIGURE_PATTERN = re.compile(r"!\[[^]]*\]\(([^)]+)\)")
 REFERENCE_PATTERN = re.compile(r"^(\d+)\. ", re.MULTILINE)
 CITATION_PATTERN = re.compile(r"\[([1-9]\d*(?:\s*,\s*[1-9]\d*)*)\]")
@@ -603,6 +616,20 @@ def main() -> int:
         not missing_next_method,
         "NEXT_METHOD_CONTRACT.md is missing anchors: "
         + ", ".join(missing_next_method),
+    )
+
+    rank_coherent_contract = (
+        PAPER_DIR / "NEXT_RANK_COHERENT_CONTRACT.md"
+    ).read_text(encoding="utf-8")
+    missing_rank_coherent = [
+        anchor
+        for anchor in RANK_COHERENT_CONTRACT_ANCHORS
+        if anchor not in rank_coherent_contract
+    ]
+    require(
+        not missing_rank_coherent,
+        "NEXT_RANK_COHERENT_CONTRACT.md is missing anchors: "
+        + ", ".join(missing_rank_coherent),
     )
 
     for name, anchors in ANALOG_RESULT_ANCHORS.items():

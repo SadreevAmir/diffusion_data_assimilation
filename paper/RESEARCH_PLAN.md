@@ -2,6 +2,15 @@
 
 External primary evidence state: RECONCILED_NEGATIVE
 
+## Frozen next development mechanism
+
+`NEXT_RANK_COHERENT_CONTRACT.md` freezes the next mechanistically distinct
+development test. It targets case-level rank dispersion by transporting whole
+member-anomaly fields from purged forecast-only analogs, with training-only
+amplitude feasibility and the unchanged no-compensation gate. It has no trusted
+runner or scientific result yet; it neither reopens the completed independent
+evaluation nor permits tuning of the closed postprocessors.
+
 ## Primary evaluation closed without selection
 
 The single frozen independent primary has completed through the exact permitted

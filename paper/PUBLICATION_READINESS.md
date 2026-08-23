@@ -13,6 +13,14 @@ Controller readiness: NOT_READY
 Scientific primary reconciliation: COMPLETE_NEGATIVE
 Autonomous publication work remaining: YES
 
+The next autonomous mechanism is now frozen in
+`NEXT_RANK_COHERENT_CONTRACT.md`. It transports complete member-anomaly fields
+selected by purged forecast-only analogs, targets case-level rank dispersion,
+uses training-only feasibility, and retains the unchanged no-compensation gate.
+It is not yet a scientific result and has no implemented trusted mode; the
+contract explicitly prevents pixelwise marginal tuning or reopening the closed
+independent evaluation.
+
 The frozen independent primary is now reconciled from the exact permitted CPU
 truth-normalization recovery
 `external_2024_calendar_global_bias_confirm48_primary_retry2`; all superseded
