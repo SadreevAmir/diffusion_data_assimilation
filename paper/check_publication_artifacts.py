@@ -22,6 +22,7 @@ REQUIRED_FILES = (
     "NEXT_METHOD_CONTRACT.md",
     "NEXT_RANK_COHERENT_CONTRACT.md",
     "RANK_COHERENT_RUNNER_REVIEW_CHECKLIST.md",
+    "RANK_COHERENT_CONTROLLER_HANDOFF.md",
     "FROZEN_EVALUATION_HANDOFF.md",
     "AMENDED_PRIMARY_EVALUATION_CONTRACT.md",
     "check_publication_artifacts.py",
@@ -30,6 +31,8 @@ REQUIRED_FILES = (
     "make_joint_gate_figure.py",
     "analog_residual_reference.py",
     "rank_coherent_reference.py",
+    "rank_coherent_runner_prototype.py",
+    "test_rank_coherent_runner_prototype.py",
     "NEXT_GENERATIVE_METHOD_CONTRACT.md",
     "LATENT_TEMPERATURE_RESULT_RECONCILIATION.md",
     "LOCKED_MC_DROPOUT_RESULT_RECONCILIATION.md",
@@ -199,6 +202,15 @@ RANK_COHERENT_REVIEW_CHECKLIST_ANCHORS = (
     "hard `NO_GO`",
 )
 RANK_COHERENT_HANDOFF_ANCHORS = {
+    "RANK_COHERENT_CONTROLLER_HANDOFF.md": (
+        "b6b9b709c587d79625d0237b15c3e36f4e3404eef37ba0bbbe850875be95d86c",
+        "fbda1c1dee61f80ebb4b37562364c34be3268aa6c0c2e87b2d222d9e95b888e6",
+        "--source-experiment joint_full_condition_validation_2022",
+        "exactly `run_status.json`,\n`aggregate_case_mean_metrics.json`, `per_case_metrics.csv`, and `metadata.json`",
+        "`metadata.decision_bearing=false`",
+        "replace only the prototype gate\nadapter and interval sensitivity",
+        "python3 -m unittest -v paper/test_rank_coherent_runner_prototype.py",
+    ),
     "PUBLICATION_READINESS.md": (
         "rank_coherent_reference.py",
         "exact `valid`, 40-case, ten-member, stride-five development\nenvelope",
@@ -532,6 +544,23 @@ def main() -> int:
         and rank_oracle.stdout.strip() == "rank-coherent reference checks: PASS",
         "rank-coherent executable oracle failed: "
         + (rank_oracle.stderr.strip() or rank_oracle.stdout.strip() or "no output"),
+    )
+
+    rank_runner_suite = subprocess.run(
+        [sys.executable, "-m", "unittest", "paper/test_rank_coherent_runner_prototype.py"],
+        cwd=PAPER_DIR.parent,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    require(
+        rank_runner_suite.returncode == 0,
+        "rank-coherent runner synthetic suite failed: "
+        + (
+            rank_runner_suite.stderr.strip()
+            or rank_runner_suite.stdout.strip()
+            or "no output"
+        ),
     )
 
     manuscript = (PAPER_DIR / "PAPER_DRAFT.md").read_text(encoding="utf-8")

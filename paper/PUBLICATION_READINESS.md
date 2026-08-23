@@ -48,6 +48,19 @@ prints the exact success sentinel. This is implementation evidence only:
 until a separately reviewed trusted mode executes the full server-side gate,
 the method remains untested and publication status remains `NOT_READY`.
 
+The 2026-08-23 publication-readiness re-audit found that this new executable
+handoff was still outside the unified fail-closed checker. The checker now
+requires the prototype runner, its synthetic suite, and the exact controller
+handoff; parses both Python files; executes all five synthetic tests; executes
+the independent rank-coherent oracle; and verifies immutable handoff anchors,
+including the recorded runner/test digests, sole scientific argument, four-file
+compact output contract, and non-decision-bearing boundary. The unified audit
+now covers 26 required files and fails if the handoff is removed, syntactically
+damaged, behaviorally broken, or narratively loosened. This closes a concrete
+reproducibility gap but does not change scientific readiness: the prototype
+still cannot produce decision-bearing evidence without the separately reviewed
+trusted full-gate integration.
+
 `RANK_COHERENT_RUNNER_REVIEW_CHECKLIST.md` now supplies the missing independent
 integration admission test. It traces the sole-parameter interface, provenance,
 fold/purge and tie parity, complete-field construction, frozen alpha selection,
