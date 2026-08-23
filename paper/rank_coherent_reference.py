@@ -25,6 +25,13 @@ DATASET_SPLIT = "valid"
 START_DATE = "2022-01-01"
 END_DATE = "2022-07-15"
 CASE_STRIDE = 5
+MANDATORY_GATE_FAMILIES = (
+    "proper_score",
+    "finite_ensemble_reliability",
+    "boundary",
+    "spatial_physical",
+    "operational",
+)
 
 
 def _field_shape_and_finiteness(
@@ -103,6 +110,18 @@ def validate_run_envelope(
     )
     if observed != expected:
         raise ValueError("runner must use the exact frozen development envelope")
+
+
+def validate_compact_gate(gate: Mapping[str, object]) -> None:
+    """Require a complete, boolean and logically consistent joint gate."""
+    expected = {*MANDATORY_GATE_FAMILIES, "overall_eligible"}
+    if set(gate) != expected:
+        raise ValueError("compact gate must contain every mandatory family exactly once")
+    if any(type(gate[name]) is not bool for name in expected):
+        raise ValueError("compact gate flags must be JSON booleans")
+    conjunction = all(gate[name] for name in MANDATORY_GATE_FAMILIES)
+    if gate["overall_eligible"] is not conjunction:
+        raise ValueError("overall_eligible must equal the mandatory-family conjunction")
 
 
 def select_forecast_analogs(
@@ -347,6 +366,21 @@ def _self_test() -> None:
             assert "exact frozen" in str(exc)
         else:
             raise AssertionError("modified run envelope did not fail closed")
+
+    passing_gate = {name: True for name in MANDATORY_GATE_FAMILIES}
+    passing_gate["overall_eligible"] = True
+    validate_compact_gate(passing_gate)
+    for malformed_gate in (
+        {name: True for name in MANDATORY_GATE_FAMILIES},
+        {**passing_gate, "boundary": 1},
+        {**passing_gate, "spatial_physical": False},
+    ):
+        try:
+            validate_compact_gate(malformed_gate)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("incomplete or inconsistent compact gate did not fail closed")
 
     folds = purged_folds()
     assert len(folds) == 5

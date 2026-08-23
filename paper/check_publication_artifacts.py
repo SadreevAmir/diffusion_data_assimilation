@@ -179,6 +179,7 @@ RANK_COHERENT_CONTRACT_ANCHORS = (
     "no currently\nimplemented trusted mode implements it",
     "rank_coherent_reference.py",
     "exact `valid`, 40-case, ten-member, stride-five\ndevelopment envelope",
+    "all five mandatory\nfamily flags are present as JSON booleans",
 )
 RANK_COHERENT_HANDOFF_ANCHORS = {
     "PUBLICATION_READINESS.md": (
@@ -186,6 +187,7 @@ RANK_COHERENT_HANDOFF_ANCHORS = {
         "exact `valid`, 40-case, ten-member, stride-five development\nenvelope",
         "implementation evidence only",
         "publication status remains `NOT_READY`",
+        "missing or non-boolean mandatory gate families",
     ),
     "REPRODUCIBILITY.md": (
         "## Rank-coherent runner review handoff",
@@ -193,6 +195,7 @@ RANK_COHERENT_HANDOFF_ANCHORS = {
         "bounded\nprojection mean error above `1e-10`",
         "exact `valid`, 40-case, ten-member,\nstride-five development envelope",
         "not scientific evidence or an implemented mode",
+        "overall_eligible` value different from their conjunction",
     ),
 }
 FIGURE_PATTERN = re.compile(r"!\[[^]]*\]\(([^)]+)\)")

@@ -109,6 +109,9 @@ development envelope before construction. It checks physical bounds and the
 `1e-10` raw-mean invariant at every pixel, and
 fails closed on non-finite, empty, ragged or spatially incompatible complete
 anomaly fields, normalized truth ranks outside `[0,1]`, or an alpha outside the
-frozen set. It reads no project data and is not an
+frozen set. The oracle also admits a compact gate only when all five mandatory
+family flags are present as JSON booleans and `overall_eligible` is exactly their
+conjunction, preventing a partial or internally inconsistent result from being
+treated as decision-bearing evidence. It reads no project data and is not an
 experiment entry point; a trusted server implementation and independent review
 remain required before this method can be proposed.

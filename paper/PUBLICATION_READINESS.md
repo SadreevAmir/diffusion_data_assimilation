@@ -28,7 +28,9 @@ ordering, the exact `valid`, 40-case, ten-member, stride-five development
 envelope, finite shape-compatible complete-field rank pairing, bounded normalized
 truth ranks, frozen alpha selection, sole runner
 parameter, full spatial candidate construction, physical bounds and the `1e-10`
-per-pixel capped-simplex mean invariant on synthetic inputs. The publication
+per-pixel capped-simplex mean invariant on synthetic inputs. It now also rejects
+missing or non-boolean mandatory gate families and any `overall_eligible` value
+that is not their exact conjunction. The publication
 audit requires, parses and executes this oracle, and fails closed unless it
 prints the exact success sentinel. This is implementation evidence only:
 until a separately reviewed trusted mode executes the full server-side gate,
