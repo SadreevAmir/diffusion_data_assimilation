@@ -33,6 +33,9 @@ REQUIRED_FILES = (
     "rank_coherent_reference.py",
     "rank_coherent_runner_prototype.py",
     "test_rank_coherent_runner_prototype.py",
+    "rank_coherent_adapter_parity.py",
+    "test_rank_coherent_adapter_parity.py",
+    "RANK_COHERENT_ADAPTER_SPEC.md",
     "NEXT_GENERATIVE_METHOD_CONTRACT.md",
     "LATENT_TEMPERATURE_RESULT_RECONCILIATION.md",
     "LOCKED_MC_DROPOUT_RESULT_RECONCILIATION.md",
@@ -561,6 +564,16 @@ def main() -> int:
             or rank_runner_suite.stdout.strip()
             or "no output"
         ),
+    )
+
+    rank_adapter_suite = subprocess.run(
+        [sys.executable, "-m", "unittest", "paper/test_rank_coherent_adapter_parity.py"],
+        cwd=PAPER_DIR.parent, check=False, capture_output=True, text=True,
+    )
+    require(
+        rank_adapter_suite.returncode == 0,
+        "rank-coherent adapter parity suite failed: "
+        + (rank_adapter_suite.stderr.strip() or rank_adapter_suite.stdout.strip() or "no output"),
     )
 
     manuscript = (PAPER_DIR / "PAPER_DRAFT.md").read_text(encoding="utf-8")

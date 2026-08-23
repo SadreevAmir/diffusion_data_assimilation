@@ -70,6 +70,14 @@ only a recorded independently reviewed implemented mode can make a proposal
 admissible. This is engineering readiness, not scientific evidence, so the
 publication status remains `NOT_READY`.
 
+The rank-coherent handoff now includes an executable directory-level parity
+fixture and a frozen adapter replacement specification. The oracle validates all
+four compact files together, reconciles all 80 per-case metric rows with their
+aggregate means, and fails on status/gate, schema, envelope or decision-bearing
+role drift. This closes the local adapter-parity preparation task, but it remains
+implementation evidence only: no separately reviewed controller mode exists,
+so no experiment is proposed and publication status remains `NOT_READY`.
+
 The frozen independent primary is now reconciled from the exact permitted CPU
 truth-normalization recovery
 `external_2024_calendar_global_bias_confirm48_primary_retry2`; all superseded

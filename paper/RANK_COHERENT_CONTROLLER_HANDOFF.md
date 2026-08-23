@@ -73,10 +73,17 @@ schema must remain unchanged. A parity fixture must verify the complete compact
 handoff with `validate_compact_handoff`; until then this prototype cannot support
 an experiment proposal or scientific claim.
 
+The exact replacement boundary and executable directory-level parity oracle are
+frozen in `paper/RANK_COHERENT_ADAPTER_SPEC.md` and
+`paper/rank_coherent_adapter_parity.py`. The trusted synthetic dry run must pass
+`validate_result_directory(path, decision_bearing=True)`; the local prototype
+must pass the same oracle with `decision_bearing=False`.
+
 ## Focused verification
 
 ```sh
 python3 -m unittest -v paper/test_rank_coherent_runner_prototype.py
+python3 -m unittest -v paper/test_rank_coherent_adapter_parity.py
 python3 paper/rank_coherent_reference.py
 PYTHONPYCACHEPREFIX=/tmp/rank_coherent_pycache python3 -m py_compile \
   paper/rank_coherent_runner_prototype.py \
