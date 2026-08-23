@@ -13,6 +13,17 @@ Controller readiness: NOT_READY
 Scientific primary reconciliation: COMPLETE_NEGATIVE
 Autonomous publication work remaining: YES
 
+The 2026-08-23 independent publication-readiness rerun completed the unified
+fail-closed audit and the focused rank-coherent handoff suites against the
+current worktree. The audit passed with 29 required files, two figures, six
+references and all 39 claim-ledger rows traced; the five prototype tests and
+the 13-test adapter-parity suite also passed. `git diff --check` found no
+whitespace errors. This confirms internal consistency and executable handoff
+integrity, but it does not create decision-bearing scientific evidence. The
+status therefore remains `NOT_READY`: the rank-coherent construction still
+lacks a separately reviewed literal trusted mode and the minimum-tier
+scientific blockers below remain unchanged.
+
 The 2026-08-23 independent table audit found one stale scope sentence after the
 reconciled primary had been added: the evidence section still said that no
 independent-period study was presented as a contribution. The manuscript now
