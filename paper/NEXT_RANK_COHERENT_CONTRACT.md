@@ -112,6 +112,16 @@ anomaly fields, normalized truth ranks outside `[0,1]`, or an alpha outside the
 frozen set. The oracle also admits a compact gate only when all five mandatory
 family flags are present as JSON booleans and `overall_eligible` is exactly their
 conjunction, preventing a partial or internally inconsistent result from being
-treated as decision-bearing evidence. It reads no project data and is not an
+treated as decision-bearing evidence. The same oracle now validates the complete
+structural compact handoff: exactly five ordered frozen fold selections with no
+extra fields, exact holdout and purged training indices, `selected_alpha` from
+the frozen set, and a boolean `no_positive_feasible_alpha` equal to the decision
+`selected_alpha == 0.0`. The ten rank-target counts must each equal 40, proving
+that every order-statistic target was used once per held-out case. Projection
+diagnostics admit exactly the changed-member fraction, lower/upper cap masses,
+maximum mean error, and pre/post member-semivariogram distortion; all values must
+be finite and non-negative, fractions must lie in `[0,1]`, and maximum mean error
+must not exceed `1e-10`. Missing, extra, non-finite or contradictory structural
+evidence therefore cannot become decision-bearing. It reads no project data and is not an
 experiment entry point; a trusted server implementation and independent review
 remain required before this method can be proposed.

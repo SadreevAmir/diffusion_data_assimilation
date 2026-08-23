@@ -32,6 +32,21 @@ MANDATORY_GATE_FAMILIES = (
     "spatial_physical",
     "operational",
 )
+FOLD_SELECTION_KEYS = (
+    "fold_index",
+    "holdout_case_indices",
+    "training_case_indices",
+    "selected_alpha",
+    "no_positive_feasible_alpha",
+)
+PROJECTION_DIAGNOSTIC_KEYS = (
+    "changed_member_fraction",
+    "lower_cap_mass",
+    "upper_cap_mass",
+    "maximum_mean_error",
+    "member_semivariogram_distortion_pre",
+    "member_semivariogram_distortion_post",
+)
 
 
 def _field_shape_and_finiteness(
@@ -122,6 +137,67 @@ def validate_compact_gate(gate: Mapping[str, object]) -> None:
     conjunction = all(gate[name] for name in MANDATORY_GATE_FAMILIES)
     if gate["overall_eligible"] is not conjunction:
         raise ValueError("overall_eligible must equal the mandatory-family conjunction")
+
+
+def validate_fold_selections(folds: Sequence[Mapping[str, object]]) -> None:
+    """Require complete frozen folds and logically consistent alpha decisions."""
+    expected_folds = purged_folds()
+    if len(folds) != len(expected_folds):
+        raise ValueError("compact fold selections must contain exactly five folds")
+    for position, (record, (holdout, training)) in enumerate(zip(folds, expected_folds)):
+        if set(record) != set(FOLD_SELECTION_KEYS):
+            raise ValueError("compact fold selection has missing or extra fields")
+        if type(record["fold_index"]) is not int or record["fold_index"] != position:
+            raise ValueError("compact fold indices must be ordered integers 0..4")
+        if tuple(record["holdout_case_indices"]) != holdout:
+            raise ValueError("compact holdout cases must match the frozen folds")
+        if tuple(record["training_case_indices"]) != training:
+            raise ValueError("compact training cases must match the frozen purge")
+        alpha = record["selected_alpha"]
+        no_positive = record["no_positive_feasible_alpha"]
+        if type(alpha) not in (int, float) or type(alpha) is bool or alpha not in ALPHAS:
+            raise ValueError("selected_alpha must be a number from the frozen set")
+        if type(no_positive) is not bool:
+            raise ValueError("no_positive_feasible_alpha must be a JSON boolean")
+        if no_positive is not (alpha == 0.0):
+            raise ValueError("no_positive_feasible_alpha must agree with selected_alpha")
+
+
+def validate_rank_target_balance(balance: Sequence[object]) -> None:
+    """Require every order-statistic target exactly once per held-out case."""
+    if len(balance) != EXPECTED_MEMBERS:
+        raise ValueError("rank-target balance must contain ten counts")
+    if any(type(count) is not int or count != EXPECTED_CASES for count in balance):
+        raise ValueError("every rank target must be used once in each held-out case")
+
+
+def validate_projection_diagnostics(diagnostics: Mapping[str, object]) -> None:
+    """Require finite, bounded projection accounting and the frozen mean invariant."""
+    if set(diagnostics) != set(PROJECTION_DIAGNOSTIC_KEYS):
+        raise ValueError("projection diagnostics have missing or extra fields")
+    for name, value in diagnostics.items():
+        if type(value) not in (int, float) or type(value) is bool or not math.isfinite(value):
+            raise ValueError("projection diagnostics must be finite JSON numbers")
+        if value < 0.0:
+            raise ValueError("projection diagnostics must be non-negative")
+        if name in {"changed_member_fraction", "lower_cap_mass", "upper_cap_mass"} and value > 1.0:
+            raise ValueError("projection fractions and masses must lie in [0,1]")
+    if diagnostics["maximum_mean_error"] > 1e-10:
+        raise ValueError("projection diagnostics violate the frozen mean invariant")
+
+
+def validate_compact_handoff(payload: Mapping[str, object]) -> None:
+    """Validate the decision-bearing structural subset of the compact result."""
+    expected = {"gate", "fold_selections", "rank_target_balance", "projection_diagnostics"}
+    if set(payload) != expected:
+        raise ValueError("compact handoff has missing or extra structural sections")
+    for name in expected:
+        if name != "rank_target_balance" and not isinstance(payload[name], Mapping if name != "fold_selections" else Sequence):
+            raise ValueError("compact handoff section has the wrong container type")
+    validate_compact_gate(payload["gate"])
+    validate_fold_selections(payload["fold_selections"])
+    validate_rank_target_balance(payload["rank_target_balance"])
+    validate_projection_diagnostics(payload["projection_diagnostics"])
 
 
 def select_forecast_analogs(
@@ -388,6 +464,60 @@ def _self_test() -> None:
     for holdout, training in folds:
         assert not set(holdout) & set(training)
         assert all(min(abs(case - held) for held in holdout) > PURGE for case in training)
+
+    fold_records = tuple(
+        {
+            "fold_index": index,
+            "holdout_case_indices": holdout,
+            "training_case_indices": training,
+            "selected_alpha": 0.0 if index == 0 else 1.0,
+            "no_positive_feasible_alpha": index == 0,
+        }
+        for index, (holdout, training) in enumerate(folds)
+    )
+    projection_diagnostics = {
+        "changed_member_fraction": 0.2,
+        "lower_cap_mass": 0.01,
+        "upper_cap_mass": 0.02,
+        "maximum_mean_error": 5e-12,
+        "member_semivariogram_distortion_pre": 0.03,
+        "member_semivariogram_distortion_post": 0.04,
+    }
+    compact_handoff = {
+        "gate": passing_gate,
+        "fold_selections": fold_records,
+        "rank_target_balance": (EXPECTED_CASES,) * EXPECTED_MEMBERS,
+        "projection_diagnostics": projection_diagnostics,
+    }
+    validate_compact_handoff(compact_handoff)
+    malformed_handoffs = (
+        {**compact_handoff, "fold_selections": fold_records[:-1]},
+        {
+            **compact_handoff,
+            "fold_selections": (
+                {**fold_records[0], "no_positive_feasible_alpha": False},
+                *fold_records[1:],
+            ),
+        },
+        {
+            **compact_handoff,
+            "rank_target_balance": (EXPECTED_CASES - 1,) + (EXPECTED_CASES,) * 9,
+        },
+        {
+            **compact_handoff,
+            "projection_diagnostics": {
+                **projection_diagnostics,
+                "maximum_mean_error": 1.1e-10,
+            },
+        },
+    )
+    for malformed in malformed_handoffs:
+        try:
+            validate_compact_handoff(malformed)
+        except (TypeError, ValueError):
+            pass
+        else:
+            raise AssertionError("malformed compact handoff did not fail closed")
 
     training_indices = tuple(range(10, 22))
     training_features = tuple(

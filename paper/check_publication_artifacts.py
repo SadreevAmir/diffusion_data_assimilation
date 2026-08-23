@@ -180,6 +180,8 @@ RANK_COHERENT_CONTRACT_ANCHORS = (
     "rank_coherent_reference.py",
     "exact `valid`, 40-case, ten-member, stride-five\ndevelopment envelope",
     "all five mandatory\nfamily flags are present as JSON booleans",
+    "ten rank-target counts must each equal 40",
+    "maximum mean error\nmust not exceed `1e-10`",
 )
 RANK_COHERENT_HANDOFF_ANCHORS = {
     "PUBLICATION_READINESS.md": (
@@ -188,6 +190,8 @@ RANK_COHERENT_HANDOFF_ANCHORS = {
         "implementation evidence only",
         "publication status remains `NOT_READY`",
         "missing or non-boolean mandatory gate families",
+        "rank-target counts\nother than ten uses of 40",
+        "maximum projection mean error\nabove `1e-10`",
     ),
     "REPRODUCIBILITY.md": (
         "## Rank-coherent runner review handoff",
@@ -196,6 +200,9 @@ RANK_COHERENT_HANDOFF_ANCHORS = {
         "exact `valid`, 40-case, ten-member,\nstride-five development envelope",
         "not scientific evidence or an implemented mode",
         "overall_eligible` value different from their conjunction",
+        "exact alpha/boolean consistency\nfor `no_positive_feasible_alpha`",
+        "rank-target counts each equal to 40",
+        "Negative fixtures exercise incomplete folds",
     ),
 }
 FIGURE_PATTERN = re.compile(r"!\[[^]]*\]\(([^)]+)\)")

@@ -55,7 +55,14 @@ empty, ragged, non-scalar, non-finite or shape-incompatible complete fields,
 a changed alpha set, an alpha outside that set, escaped physical bounds, and bounded
 projection mean error above `1e-10` at every pixel. It also rejects a compact
 gate that omits any mandatory family, uses non-boolean family flags, or reports
-an `overall_eligible` value different from their conjunction. Its synthetic identity checks ensure that
+an `overall_eligible` value different from their conjunction. The structural
+compact validator additionally requires exactly five ordered fold records with
+the frozen holdout and purged training indices, exact alpha/boolean consistency
+for `no_positive_feasible_alpha`, ten rank-target counts each equal to 40, and
+exact projection diagnostics. It rejects missing or extra fields, non-finite or
+negative values, fractions outside `[0,1]`, and maximum mean error above `1e-10`.
+Negative fixtures exercise incomplete folds, a contradictory zero-alpha flag,
+rank-target imbalance and projection-invariant failure. Its synthetic identity checks ensure that
 complete anomaly fields, rather than independently shuffled pixel values, are
 selected after training-only standardization and deterministic forecast-distance
 ties, paired by the frozen date and member order statistics, and carried through
