@@ -27,6 +27,7 @@ REQUIRED_FILES = (
     "make_case_level_artifacts.py",
     "make_joint_gate_figure.py",
     "analog_residual_reference.py",
+    "rank_coherent_reference.py",
     "NEXT_GENERATIVE_METHOD_CONTRACT.md",
     "LATENT_TEMPERATURE_RESULT_RECONCILIATION.md",
     "LOCKED_MC_DROPOUT_RESULT_RECONCILIATION.md",
@@ -175,7 +176,21 @@ RANK_COHERENT_CONTRACT_ANCHORS = (
     "source_experiment=joint_full_condition_validation_2022",
     "summary_only",
     "no currently\nimplemented trusted mode implements it",
+    "rank_coherent_reference.py",
 )
+RANK_COHERENT_HANDOFF_ANCHORS = {
+    "PUBLICATION_READINESS.md": (
+        "rank_coherent_reference.py",
+        "implementation evidence only",
+        "publication status remains `NOT_READY`",
+    ),
+    "REPRODUCIBILITY.md": (
+        "## Rank-coherent runner review handoff",
+        "python3 paper/rank_coherent_reference.py",
+        "bounded\nprojection mean error above `1e-10`",
+        "not scientific evidence or an implemented mode",
+    ),
+}
 FIGURE_PATTERN = re.compile(r"!\[[^]]*\]\(([^)]+)\)")
 REFERENCE_PATTERN = re.compile(r"^(\d+)\. ", re.MULTILINE)
 CITATION_PATTERN = re.compile(r"\[([1-9]\d*(?:\s*,\s*[1-9]\d*)*)\]")
@@ -631,6 +646,14 @@ def main() -> int:
         "NEXT_RANK_COHERENT_CONTRACT.md is missing anchors: "
         + ", ".join(missing_rank_coherent),
     )
+    for name, anchors in RANK_COHERENT_HANDOFF_ANCHORS.items():
+        document = (PAPER_DIR / name).read_text(encoding="utf-8")
+        missing_anchors = [anchor for anchor in anchors if anchor not in document]
+        require(
+            not missing_anchors,
+            f"{name} is missing rank-coherent handoff anchors: "
+            + ", ".join(missing_anchors),
+        )
 
     for name, anchors in ANALOG_RESULT_ANCHORS.items():
         document = (PAPER_DIR / name).read_text(encoding="utf-8")

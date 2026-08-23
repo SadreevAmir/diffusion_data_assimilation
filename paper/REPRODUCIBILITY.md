@@ -37,6 +37,23 @@ This handoff covers the 40-case development-period mechanism analysis and the
 completed fixed-contract joint calibration audit. Neither requires raw
 ensembles in the publication worktree.
 
+## Rank-coherent runner review handoff
+
+The frozen next mechanism is specified by `NEXT_RANK_COHERENT_CONTRACT.md`.
+Before trusted integration, its dependency-free executable review oracle is:
+
+```bash
+python3 paper/rank_coherent_reference.py
+```
+
+The oracle reads no data and cannot launch an experiment. It fails closed on
+fold/purge drift, extra runtime parameters, incomplete ten-date or ten-member
+inputs, non-finite ordering quantities, a changed alpha set, and bounded
+projection mean error above `1e-10`. Its synthetic identity checks ensure that
+complete anomaly fields, rather than independently shuffled pixel values, are
+paired by the frozen date and member order statistics. Passing this check is a
+runner-review prerequisite, not scientific evidence or an implemented mode.
+
 ## Frozen inputs and procedure
 
 - Analysis unit: date-level case.
