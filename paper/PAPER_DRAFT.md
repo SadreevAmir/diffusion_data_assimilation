@@ -2,7 +2,7 @@
 
 ## Amended primary decision policy
 
-External primary evidence state: PENDING_ATOMIC_RECONCILIATION
+External primary evidence state: RECONCILED_NEGATIVE
 
 All completed gates in this draft are development evidence. None of their
 historical `overall_eligible` values is final primary success. The frozen
@@ -13,10 +13,32 @@ encoding diagnostics but are not boundary acceptance criteria. The exact
 contract identities and controller preflight are recorded in
 `AMENDED_PRIMARY_EVALUATION_CONTRACT.md`.
 
-> Validation-mechanism draft, not a submission-ready paper. See
+> Validation-mechanism draft with a reconciled negative independent primary.
+> See
 > `CLAIM_LEDGER.md` and `PUBLICATION_READINESS.md` for provenance, minimum-tier
-> blockers and limitations. This document does not report an independent
-> generalization result.
+> blockers and limitations. This document reports an independent falsification
+> of the frozen calibration claim, not a successful calibrated ensemble.
+
+## Independent primary result
+
+The exact permitted recovery of the frozen confirmatory CPU stage completed all
+48 cases. The signed compact payload verifies the source identity, 48 raw and
+48 truth hashes, all 480 member records, the pre-truth candidate seal, and
+formation of every candidate array before scoring truth was opened. The frozen
+`calendar_global_bias_mixture_v1_refit_all40` candidate is not jointly eligible:
+`overall_eligible=false`. Proper scores, truth-relative boundary calibration and
+operational validity pass, but absolute rank reliability and spatial/physical
+preservation fail.
+
+The candidate improves fair CRPS from `0.232585` to `0.211849` (paired delta
+`-0.0207364`, date-bootstrap 95% CI `[-0.0226941,-0.0188402]`; four-case-block
+sensitivity `[-0.0219023,-0.0195641]`) and mean RMSE from `0.313941` to
+`0.299920`. Those gains do not repair severe underdispersion: normalized mean
+rank is `0.960757`, with block 95% CI `[0.951620,0.969164]`, far from `0.5`.
+Local variogram scores worsen at lags 1 and 2, and member-mean semivariogram
+relative errors are `1.147`, `1.058`, and `1.031`, all above the frozen `0.20`
+tolerance. Under the no-compensation rule this independently rejects the frozen
+calibration claim; no retuning or additional external evaluation follows.
 
 ## Abstract
 

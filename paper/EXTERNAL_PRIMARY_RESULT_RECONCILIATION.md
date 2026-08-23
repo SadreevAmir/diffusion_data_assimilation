@@ -1,6 +1,15 @@
 # External-primary compact-result reconciliation
 
-Status: pre-result, fail closed. This checklist records no scientific outcome.
+Status: reconciled negative from the exact permitted recovery.
+
+The four compact artifacts from
+`external_2024_calendar_global_bias_confirm48_primary_retry1` were admitted as
+one payload. Identity, seals, hashes, 48/48 completeness, 480 member records,
+candidate-before-truth ordering and finiteness checks pass. The authoritative
+gate reports `overall_eligible=false`: absolute rank reliability and
+spatial/physical preservation fail. Proper-score, truth-relative boundary and
+operational families pass. This closes the frozen primary without retuning,
+resubmission or another external evaluation.
 
 ## Admissible evidence unit
 

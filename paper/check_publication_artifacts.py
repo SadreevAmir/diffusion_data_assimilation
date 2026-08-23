@@ -74,7 +74,10 @@ LATENT_RECONCILIATION_ANCHORS = (
     "do not change\nthe temperature",
 )
 CURRENT_DECISION_ANCHORS = (
-    "Required scientific blockers: reconciliation of the active frozen external\nprimary;",
+    "Required scientific blockers: an eligible spatially preserving calibration and\nthe remaining minimum-tier comparisons",
+    "Controller readiness: NOT_READY",
+    "Scientific primary reconciliation: COMPLETE_NEGATIVE",
+    "normalized mean rank is\n`0.960757`",
     "The package is not waiting on clean-checkpoint training.",
     "single frozen latent-temperature construction at scale `1.30`",
     "complete compact payload from `latent_temperature_1p30_gate_retry1` has\nbeen reconciled",
@@ -90,44 +93,32 @@ CURRENT_DECISION_ANCHORS = (
 )
 EXTERNAL_PRIMARY_HANDOFF_ANCHORS = {
     "PUBLICATION_READINESS.md": (
-        "## Frozen external-primary result handoff",
+        "External primary evidence state: RECONCILED_NEGATIVE",
         "external_2024_calendar_global_bias_raw48_primary_v1",
-        "external_2024_calendar_global_bias_confirm48_primary_v1",
-        "Publication status remains\n`NOT_READY` until its four compact artifacts are reconciled",
-        "formation of the\ncomplete candidate before scoring truth is opened",
-        "proper-score, finite-ensemble reliability, boundary,\nspatial/physical and operational families",
-        "claim ledger reserves C39",
-        "already active, is independent of\ndevelopment-gate outcomes",
-        "No second external evaluation is authorized",
+        "All 48 cases, 480 member records",
+        "`overall_eligible=false`",
+        "absolute rank reliability and\nspatial/physical preservation fail",
+        "No resubmission, retuning or\nsecond external evaluation is admissible",
     ),
     "CLAIM_LEDGER.md": (
         "| C39 | The frozen calendar global-bias primary generalizes",
-        "No scientific outcome is inferred from stage status",
-        "Accept only four compact artifacts",
-        "do not resubmit or retune",
+        "Rejected by the reconciled independent primary",
+        "`overall_eligible=false`",
+        "do not resubmit, retune or open another external evaluation",
     ),
 }
 EXTERNAL_PRIMARY_RECONCILIATION_ANCHORS = (
-    "Status: pre-result, fail closed. This checklist records no scientific outcome.",
-    "external_2024_calendar_global_bias_confirm48_primary_v1",
+    "Status: reconciled negative from the exact permitted recovery.",
+    "external_2024_calendar_global_bias_confirm48_primary_retry1",
     "external_2024_calendar_global_bias_raw48_primary_v1",
     "four compact artifacts",
-    "both exact amended-contract digests",
-    "input, raw-member and truth-bundle seal checks",
-    "complete candidate was formed\n  before scoring truth was opened",
-    "exactly 48 attempted and completed cases",
-    "ten finite members per case",
-    "no_compensation_across_families=true",
-    "gate.overall_eligible",
-    "proper-score, finite-ensemble\n  reliability, boundary, spatial/physical and operational family",
-    "q={0,.15,.90,.95,.99}",
-    "update all five files in one\nchange",
-    "resolve C39",
-    "python3 paper/check_publication_artifacts.py",
-    "do not resubmit, retune or\nopen another external evaluation",
+    "480 member records",
+    "candidate-before-truth ordering",
+    "`overall_eligible=false`",
+    "without retuning,\nresubmission or another external evaluation",
 )
 EXTERNAL_PRIMARY_STATE_MARKER = (
-    "External primary evidence state: PENDING_ATOMIC_RECONCILIATION"
+    "External primary evidence state: RECONCILED_NEGATIVE"
 )
 EXTERNAL_PRIMARY_STATE_FILES = (
     "PAPER_DRAFT.md",
@@ -729,8 +720,8 @@ def main() -> int:
     else:
         require(blockers != "none", "not-ready status requires explicit scientific blockers")
         require(
-            "Status: AUTHORIZED_ACTIVE_PENDING_COMPACT_RESULT" in frozen_handoff,
-            "not-ready status requires the active handoff awaiting compact result",
+            "Scientific primary reconciliation: COMPLETE_NEGATIVE" in readiness,
+            "not-ready status requires an explicit reconciled primary decision",
         )
 
     print(

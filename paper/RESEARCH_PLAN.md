@@ -1,6 +1,18 @@
 # Research plan: reliable finite generative ensembles
 
-External primary evidence state: PENDING_ATOMIC_RECONCILIATION
+External primary evidence state: RECONCILED_NEGATIVE
+
+## Primary evaluation closed without selection
+
+The single frozen independent primary has completed through the exact permitted
+CPU recovery. Its integrity and operational checks pass, but
+`overall_eligible=false`: proper-score and truth-relative boundary gains coexist
+with failed absolute rank reliability and failed member/local spatial criteria.
+The primary hypothesis is therefore rejected under the no-compensation rule.
+The candidate will not be retuned, resubmitted or replaced by another external
+evaluation. The remaining paper is a negative mechanism and evaluation-protocol
+paper unless a future, separately predeclared research campaign develops a new
+method without reusing this opened primary for selection.
 
 ## Research question
 

@@ -1,14 +1,27 @@
 # Publication readiness audit
 
-Audit date: 2026-08-17
+Audit date: 2026-08-23
 
 Publication status: NOT_READY
 
-Required scientific blockers: reconciliation of the active frozen external
-primary; an eligible spatially preserving calibration and the remaining
-minimum-tier comparisons
+Required scientific blockers: an eligible spatially preserving calibration and
+the remaining minimum-tier comparisons
 
-External primary evidence state: PENDING_ATOMIC_RECONCILIATION
+External primary evidence state: RECONCILED_NEGATIVE
+
+Controller readiness: NOT_READY
+Scientific primary reconciliation: COMPLETE_NEGATIVE
+Autonomous publication work remaining: YES
+
+The frozen independent primary is now reconciled from the exact permitted CPU
+recovery. All 48 cases, 480 member records, signed identities, input/raw/truth
+seals, hashes and candidate-before-truth ordering pass. The scientific decision
+is negative: `overall_eligible=false`. Proper scores, truth-relative boundary
+calibration and operational validity pass; absolute rank reliability and
+spatial/physical preservation fail. In particular, normalized mean rank is
+`0.960757` (block 95% CI `[0.951620,0.969164]`) and the three member-semivariogram
+relative errors are `1.147`, `1.058`, and `1.031`. No resubmission, retuning or
+second external evaluation is admissible.
 
 The success definition has been amended fail-closed in
 `AMENDED_PRIMARY_EVALUATION_CONTRACT.md`. A good randomized rank histogram is

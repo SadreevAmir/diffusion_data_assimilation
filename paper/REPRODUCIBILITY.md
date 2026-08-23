@@ -1,6 +1,25 @@
 # Reproducibility handoff for the frozen mechanism result
 
-External primary evidence state: PENDING_ATOMIC_RECONCILIATION
+External primary evidence state: RECONCILED_NEGATIVE
+
+## Reconciled independent primary handoff
+
+The permitted CPU recovery
+`external_2024_calendar_global_bias_confirm48_primary_retry1` reuses source
+`external_2024_calendar_global_bias_raw48_primary_v1` without resampling. It
+completed 48 cases with ten members each. The compact metadata records primary
+contract digest `f2225da7a05cab53b14604e45bed840a0ec559aed20856ae8ef2dd72d915b8f8`
+and confirmatory-gate digest
+`57e8dd1859c4ac9a144be68904450926a6098b08a3b58a35e3d7dcc6a5bb9185`.
+All 48 raw hashes, 48 truth hashes and 480 member records were verified before
+array loading; all 48 candidate arrays were hash-sealed before truth was opened.
+The candidate manifest digest is
+`55221b8cd165e6adcbb07be403f5e84ea5eb9a0a708ab31e79947ad07f8a5f67`.
+All metrics are finite, no network or raw-array retrieval was used, and the
+boundary masks equal raw. The authoritative no-compensation decision is
+`overall_eligible=false`: absolute rank reliability and spatial/physical
+preservation fail, while proper scores, truth-relative boundary calibration and
+operational validity pass. These compact anchors support rejection only.
 
 ## Amended primary gate provenance
 
