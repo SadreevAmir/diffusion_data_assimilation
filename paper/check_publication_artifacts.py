@@ -69,6 +69,7 @@ REQUIRED_FILES = (
     "REPRODUCIBILITY.md",
     "RESEARCH_PLAN.md",
     "PUBLICATION_READINESS.md",
+    "MINIMUM_TIER_COMPARISON_AUDIT.md",
     "NEXT_BASELINE_CONTRACT.md",
     "NEXT_METHOD_CONTRACT.md",
     "NEXT_RANK_COHERENT_CONTRACT.md",
@@ -361,6 +362,22 @@ EMPIRICAL_CLAIM_IDS = set(range(3, 9)) | set(range(11, 40))
 EMPIRICAL_TRACEABILITY_ROW = re.compile(
     r"^\| (?P<claims>C\d+(?:, C\d+)*) \| "
     r"(?P<presentation>[^|]+) \| `(?P<source>[^`]+)` \| (?P<role>[^|]+) \|$",
+    re.MULTILINE,
+)
+MINIMUM_TIER_COMPARISONS = {
+    "Raw ensemble": "PRESENT",
+    "Physical-space bias/spread scaling": "PRESENT_NEGATIVE",
+    "Naive affine-logit scaling": "PRESENT_NEGATIVE",
+    "Zero/one-inflated Beta or EMOS-like SIC postprocessing": "PRESENT_NEGATIVE",
+    "Isotonic/quantile mapping": "PRESENT_NEGATIVE",
+    "Conformal intervals": "MISSING",
+    "ECC-Q/ECC-T or rank-preserving reconstruction": "PRESENT_PARTIAL_NEGATIVE",
+    "Deterministic background and 3D-Var": "PRESENT_DEVELOPMENT_ONLY",
+    "Probabilistic DA baseline such as EnKF/LETKF": "MISSING",
+}
+MINIMUM_TIER_ROW = re.compile(
+    r"^\| (?P<comparison>[^|]+) \| (?P<presentation>[^|]+) \| "
+    r"`(?P<source>[^`]+)` \| (?P<status>[A-Z_]+) \|$",
     re.MULTILINE,
 )
 FINAL_DIAGNOSTIC_ANCHORS = {
@@ -716,6 +733,43 @@ def validate_empirical_traceability(manuscript: str, paper_dir: Path) -> None:
     )
 
 
+def validate_minimum_tier_comparisons(paper_dir: Path) -> None:
+    """Require a complete, fail-closed map of the baseline tier."""
+    audit = (paper_dir / "MINIMUM_TIER_COMPARISON_AUDIT.md").read_text(
+        encoding="utf-8"
+    )
+    rows = list(MINIMUM_TIER_ROW.finditer(audit))
+    require(
+        len(rows) == len(MINIMUM_TIER_COMPARISONS),
+        "minimum-tier audit has an incomplete or duplicate comparison map",
+    )
+    observed: dict[str, str] = {}
+    for row in rows:
+        comparison = row["comparison"].strip()
+        require(
+            comparison not in observed,
+            f"minimum-tier audit duplicates comparison: {comparison}",
+        )
+        observed[comparison] = row["status"]
+        require(
+            "Section " in row["presentation"] or "Figure " in row["presentation"],
+            f"minimum-tier comparison lacks a manuscript anchor: {comparison}",
+        )
+        source = (paper_dir / row["source"]).resolve()
+        require(
+            source.is_relative_to(paper_dir.resolve()) and source.is_file(),
+            f"minimum-tier compact source is missing or escapes paper/: {comparison}",
+        )
+    require(
+        observed == MINIMUM_TIER_COMPARISONS,
+        "minimum-tier evidence-status map differs from the frozen required set",
+    )
+    require(
+        audit.count("| MISSING |") == 2,
+        "minimum-tier audit must retain exactly the two evidenced missing families",
+    )
+
+
 def main() -> int:
     missing = [name for name in REQUIRED_FILES if not (PAPER_DIR / name).is_file()]
     require(not missing, f"missing required publication files: {', '.join(missing)}")
@@ -814,6 +868,7 @@ def main() -> int:
     manuscript = (PAPER_DIR / "PAPER_DRAFT.md").read_text(encoding="utf-8")
     claim_ledger = (PAPER_DIR / "CLAIM_LEDGER.md").read_text(encoding="utf-8")
     readiness = (PAPER_DIR / "PUBLICATION_READINESS.md").read_text(encoding="utf-8")
+    validate_minimum_tier_comparisons(PAPER_DIR)
     manuscript_tables = validate_markdown_tables(manuscript, "PAPER_DRAFT.md")
     ledger_tables = validate_markdown_tables(claim_ledger, "CLAIM_LEDGER.md")
     require(manuscript_tables >= 8, "manuscript is missing required evidence tables")

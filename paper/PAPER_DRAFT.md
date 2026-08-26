@@ -256,6 +256,12 @@ spatial/physical families decisively. This single failed construction does not
 exhaust strong SIC distributional, conformal or probabilistic-DA baselines, so
 the minimum strong domain/SciML baseline tier remains incomplete.
 
+The fail-closed comparison inventory in `MINIMUM_TIER_COMPARISON_AUDIT.md`
+maps all nine required baseline families to this manuscript and a compact
+publication source. It identifies exactly two absent families: conformal
+intervals and a probabilistic DA comparator. The deterministic background and
+3D-Var comparison remains development-only rather than an independent result.
+
 We additionally evaluate the frozen cross-fitted scales followed by an exact
 capped-simplex projection of each ten-member pixel distribution. The projection
 preserves the raw ensemble mean while enforcing bounded members and preserving

@@ -13,6 +13,16 @@ Controller readiness: NOT_READY
 Scientific primary reconciliation: COMPLETE_NEGATIVE
 Autonomous publication work remaining: YES
 
+The 2026-08-27 minimum-tier comparison audit now maps all nine required baseline
+families to a concrete manuscript presentation and an existing compact
+publication source. The unified checker requires the exact family/status map,
+rejects duplicate or missing rows, verifies every source stays inside `paper/`,
+and retains exactly two explicit `MISSING` families: conformal intervals and a
+probabilistic DA comparator. It separately labels the deterministic comparison
+as development-only. This makes the remaining baseline blocker exact and
+fail-closed, but supplies neither missing experiment nor eligible calibration;
+publication status remains `NOT_READY`.
+
 The 2026-08-27 empirical-traceability negative-fixture audit now exercises the
 production validator directly. Four focused tests accept the current map and
 independently reject missing empirical-claim coverage, a presentation without a
@@ -97,7 +107,7 @@ mode or change `NOT_READY`.
 
 The 2026-08-26 independent publication-readiness rerun completed the unified
 fail-closed audit and the focused rank-coherent handoff suites against the
-current worktree. The audit passed with 34 required files, two figures, six
+current worktree. The audit passed with 35 required files, two figures, six
 references and all 39 claim-ledger rows traced; the five prototype tests and
 the 13-test adapter-parity suite also passed. `git diff --check` found no
 whitespace errors. This confirms internal consistency and executable handoff
