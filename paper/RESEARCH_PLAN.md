@@ -241,11 +241,14 @@ Multivariate and physical:
   four coverage diagnostics. State residual 95% undercoverage.
 - Report the bounded RMSE change only with the clipping caveat; the transformation
   is mean-preserving before clipping.
-- Freeze CFG, calibrator family, grids, metrics, ensemble size and random seeds
-  before opening test-2023.
-- Publication checkpoint is retrained on the corrected disjoint split, ideally
-  with at least three training seeds.
-- The final 200-day test is run once after explicit approval.
+- Keep CFG, calibrator families, grids, metrics, ensemble size and random seeds
+  frozen after the single completed independent primary; its negative result
+  cannot be used to select, retune or resubmit a replacement candidate.
+- Clean-checkpoint multi-seed retraining is an archived months-long route, not
+  an active publication dependency or a fast fallback.
+- No second independent evaluation is authorized in the current campaign; a
+  positive generalization claim would require a separately predeclared future
+  campaign that does not reuse the opened primary for selection.
 
 ## Publication tiers
 

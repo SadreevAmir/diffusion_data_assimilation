@@ -206,6 +206,13 @@ EXTERNAL_PRIMARY_STATE_FILES = (
     "RESEARCH_PLAN.md",
     "PUBLICATION_READINESS.md",
 )
+RESEARCH_PLAN_CLOSED_PRIMARY_ANCHORS = (
+    "frozen after the single completed independent primary",
+    "cannot be used to select, retune or resubmit a replacement candidate",
+    "archived months-long route, not\n  an active publication dependency or a fast fallback",
+    "No second independent evaluation is authorized in the current campaign",
+    "does not reuse the opened primary for selection",
+)
 REPRODUCIBILITY_SECTION_ORDER = (
     "## Frozen latent-temperature recovery handoff",
     "## Locked-MC-dropout wrapper recovery handoff",
@@ -802,6 +809,18 @@ def main() -> int:
             document.count(EXTERNAL_PRIMARY_STATE_MARKER) == 1,
             f"{name} must contain exactly one pending external-primary state marker",
         )
+
+    research_plan = (PAPER_DIR / "RESEARCH_PLAN.md").read_text(encoding="utf-8")
+    missing_closed_primary_anchors = [
+        anchor
+        for anchor in RESEARCH_PLAN_CLOSED_PRIMARY_ANCHORS
+        if anchor not in research_plan
+    ]
+    require(
+        not missing_closed_primary_anchors,
+        "research plan reopens the completed independent-primary policy: "
+        + ", ".join(missing_closed_primary_anchors),
+    )
 
     stale_readiness = [
         anchor for anchor in STALE_READINESS_ANCHORS if anchor in readiness
