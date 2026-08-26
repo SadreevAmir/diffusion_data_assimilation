@@ -14,6 +14,31 @@ from pathlib import Path
 
 PAPER_DIR = Path(__file__).resolve().parent
 
+REQUIRED_REGRESSION_SUITES = (
+    "paper.test_rank_coherent_runner_prototype",
+    "paper.test_rank_coherent_adapter_parity",
+    "paper.test_validate_rank_coherent_admission",
+    "paper.test_publication_immutable_identities",
+    "paper.test_publication_empirical_traceability",
+    "paper.test_minimum_tier_comparison_audit",
+)
+REGRESSION_COMMAND = re.compile(
+    r"python3 -m unittest -v \\\n(?P<body>(?:  paper\.[a-z0-9_]+(?: \\\n|\n))+)",
+)
+
+
+def validate_documented_regression_suites(text: str) -> None:
+    """Require the handoff command to match the executable suite contract exactly."""
+    matches = list(REGRESSION_COMMAND.finditer(text))
+    require(len(matches) == 1, "reproducibility must document one regression command")
+    observed = tuple(
+        re.findall(r"^  (paper\.[a-z0-9_]+)", matches[0]["body"], re.MULTILINE)
+    )
+    require(
+        observed == REQUIRED_REGRESSION_SUITES,
+        "documented regression suites differ from the required executable set",
+    )
+
 
 def validate_markdown_tables(text: str, filename: str) -> int:
     """Fail closed on malformed pipe tables that can silently misrender."""
@@ -793,75 +818,21 @@ def main() -> int:
         + (rank_oracle.stderr.strip() or rank_oracle.stdout.strip() or "no output"),
     )
 
-    rank_runner_suite = subprocess.run(
-        [sys.executable, "-m", "unittest", "paper/test_rank_coherent_runner_prototype.py"],
+    reproducibility = (PAPER_DIR / "REPRODUCIBILITY.md").read_text(encoding="utf-8")
+    validate_documented_regression_suites(reproducibility)
+    regression_suite = subprocess.run(
+        [sys.executable, "-m", "unittest", *REQUIRED_REGRESSION_SUITES],
         cwd=PAPER_DIR.parent,
         check=False,
         capture_output=True,
         text=True,
     )
     require(
-        rank_runner_suite.returncode == 0,
-        "rank-coherent runner synthetic suite failed: "
+        regression_suite.returncode == 0,
+        "required publication regression suites failed: "
         + (
-            rank_runner_suite.stderr.strip()
-            or rank_runner_suite.stdout.strip()
-            or "no output"
-        ),
-    )
-
-    rank_adapter_suite = subprocess.run(
-        [sys.executable, "-m", "unittest", "paper/test_rank_coherent_adapter_parity.py"],
-        cwd=PAPER_DIR.parent, check=False, capture_output=True, text=True,
-    )
-    require(
-        rank_adapter_suite.returncode == 0,
-        "rank-coherent adapter parity suite failed: "
-        + (rank_adapter_suite.stderr.strip() or rank_adapter_suite.stdout.strip() or "no output"),
-    )
-
-    admission_suite = subprocess.run(
-        [sys.executable, "-m", "unittest", "paper/test_validate_rank_coherent_admission.py"],
-        cwd=PAPER_DIR.parent, check=False, capture_output=True, text=True,
-    )
-    require(
-        admission_suite.returncode == 0,
-        "rank-coherent admission CLI suite failed: "
-        + (admission_suite.stderr.strip() or admission_suite.stdout.strip() or "no output"),
-    )
-
-    immutable_identity_suite = subprocess.run(
-        [sys.executable, "-m", "unittest", "paper/test_publication_immutable_identities.py"],
-        cwd=PAPER_DIR.parent, check=False, capture_output=True, text=True,
-    )
-    require(
-        immutable_identity_suite.returncode == 0,
-        "publication immutable-identity suite failed: "
-        + (
-            immutable_identity_suite.stderr.strip()
-            or immutable_identity_suite.stdout.strip()
-            or "no output"
-        ),
-    )
-
-    empirical_traceability_suite = subprocess.run(
-        [
-            sys.executable,
-            "-m",
-            "unittest",
-            "paper/test_publication_empirical_traceability.py",
-        ],
-        cwd=PAPER_DIR.parent,
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    require(
-        empirical_traceability_suite.returncode == 0,
-        "publication empirical-traceability suite failed: "
-        + (
-            empirical_traceability_suite.stderr.strip()
-            or empirical_traceability_suite.stdout.strip()
+            regression_suite.stderr.strip()
+            or regression_suite.stdout.strip()
             or "no output"
         ),
     )

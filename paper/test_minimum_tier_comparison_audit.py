@@ -10,6 +10,8 @@ from pathlib import Path
 from paper.check_publication_artifacts import (
     MINIMUM_TIER_ROW,
     PAPER_DIR,
+    REQUIRED_REGRESSION_SUITES,
+    validate_documented_regression_suites,
     validate_minimum_tier_comparisons,
 )
 
@@ -17,6 +19,9 @@ from paper.check_publication_artifacts import (
 class MinimumTierComparisonAuditTests(unittest.TestCase):
     def setUp(self) -> None:
         self.audit = (PAPER_DIR / "MINIMUM_TIER_COMPARISON_AUDIT.md").read_text(
+            encoding="utf-8"
+        )
+        self.reproducibility = (PAPER_DIR / "REPRODUCIBILITY.md").read_text(
             encoding="utf-8"
         )
 
@@ -60,6 +65,33 @@ class MinimumTierComparisonAuditTests(unittest.TestCase):
         source = first_row["source"]
         mutated = self.audit.replace(f"`{source}`", f"`../{source}`", 1)
         self.assert_fixture_fails(mutated, "source is missing or escapes paper")
+
+    def test_documented_regression_suites_match_executable_contract(self) -> None:
+        validate_documented_regression_suites(self.reproducibility)
+
+    def test_documented_regression_suite_omission_fails_closed(self) -> None:
+        suite = REQUIRED_REGRESSION_SUITES[-1]
+        mutated = self.reproducibility.replace(f"  {suite}\n", "", 1)
+        with self.assertRaisesRegex(ValueError, "differ from the required"):
+            validate_documented_regression_suites(mutated)
+
+    def test_documented_regression_suite_addition_fails_closed(self) -> None:
+        suite = REQUIRED_REGRESSION_SUITES[-1]
+        mutated = self.reproducibility.replace(
+            f"  {suite}\n", f"  paper.test_unreviewed_suite \\\n  {suite}\n", 1
+        )
+        with self.assertRaisesRegex(ValueError, "differ from the required"):
+            validate_documented_regression_suites(mutated)
+
+    def test_documented_regression_suite_reordering_fails_closed(self) -> None:
+        first, second = REQUIRED_REGRESSION_SUITES[:2]
+        mutated = self.reproducibility.replace(
+            f"  {first} \\\n  {second} \\\n",
+            f"  {second} \\\n  {first} \\\n",
+            1,
+        )
+        with self.assertRaisesRegex(ValueError, "differ from the required"):
+            validate_documented_regression_suites(mutated)
 
 
 if __name__ == "__main__":
