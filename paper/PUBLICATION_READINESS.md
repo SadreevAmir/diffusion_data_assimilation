@@ -13,6 +13,16 @@ Controller readiness: NOT_READY
 Scientific primary reconciliation: COMPLETE_NEGATIVE
 Autonomous publication work remaining: YES
 
+The 2026-08-27 claim-status consistency audit derives every `Unknown` and
+`Rejected` row directly from the normative claim ledger. The unified checker
+now requires every unknown claim to remain in the unsupported-scope row and
+outside the empirical evidence table, while every rejected claim must have a
+decision-bearing manuscript presentation with an explicit negative
+interpretation. Three negative fixtures reject promotion of an unknown claim,
+loss of a rejected claim and neutralization of its decision language. This
+closes the declared cross-artifact consistency gap without adding scientific
+evidence; status remains `NOT_READY`.
+
 The 2026-08-27 limitation-traceability audit maps all eight distinct Section 7
 limitations to exact claim-ledger rows. The two genuine evidence absences point
 to the existing `Unknown` records C9 and C10 rather than being promoted to

@@ -490,7 +490,8 @@ python3 -m unittest -v \
   paper.test_minimum_tier_comparison_audit \
   paper.test_publication_figure_generators \
   paper.test_publication_reference_traceability \
-  paper.test_publication_limitation_traceability
+  paper.test_publication_limitation_traceability \
+  paper.test_publication_claim_status_consistency
 python3 paper/check_publication_artifacts.py
 ```
 

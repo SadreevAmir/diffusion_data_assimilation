@@ -24,6 +24,7 @@ REQUIRED_REGRESSION_SUITES = (
     "paper.test_publication_figure_generators",
     "paper.test_publication_reference_traceability",
     "paper.test_publication_limitation_traceability",
+    "paper.test_publication_claim_status_consistency",
 )
 REGRESSION_COMMAND = re.compile(
     r"python3 -m unittest -v \\\n(?P<body>(?:  paper\.[a-z0-9_]+(?: \\\n|\n))+)",
@@ -128,6 +129,7 @@ REQUIRED_FILES = (
     "REFERENCE_TRACEABILITY.md",
     "test_publication_limitation_traceability.py",
     "LIMITATION_TRACEABILITY.md",
+    "test_publication_claim_status_consistency.py",
     "RANK_COHERENT_ADAPTER_SPEC.md",
     "NEXT_GENERATIVE_METHOD_CONTRACT.md",
     "LATENT_TEMPERATURE_RESULT_RECONCILIATION.md",
@@ -198,6 +200,52 @@ def validate_limitation_traceability(
                 f"{absence_id} is not an Unknown evidence record",
             )
     require("cover the complete limitation inventory in Section 7" in traceability, "limitation audit lacks a completeness boundary")
+
+
+def validate_claim_status_consistency(manuscript: str, claim_ledger: str) -> None:
+    """Keep every unknown or rejected ledger row aligned with manuscript maps."""
+    statuses: dict[str, str] = {}
+    for line in claim_ledger.splitlines():
+        match = re.match(r"\| (C[1-9][0-9]*) \| [^|]+ \| ([^|]+) \|", line)
+        if match:
+            statuses[match.group(1)] = match.group(2).strip()
+
+    unknown = {claim_id for claim_id, status in statuses.items() if status.startswith("Unknown")}
+    rejected = {claim_id for claim_id, status in statuses.items() if status.startswith("Rejected")}
+    require(unknown, "claim ledger has no explicit Unknown records")
+    require(rejected, "claim ledger has no explicit Rejected records")
+
+    scope_match = re.search(
+        r"\| Publication scope and unsupported generalization claims \| (?P<ids>[^|]+) \|",
+        manuscript,
+    )
+    require(scope_match is not None, "manuscript lacks the unsupported-claim scope row")
+    scope_ids = set(re.findall(r"C[1-9][0-9]*", scope_match.group("ids")))
+    require(unknown <= scope_ids, "Unknown claim is missing from the manuscript scope row")
+
+    empirical_match = re.search(
+        r"^### Empirical evidence traceability\n(?P<body>.*?)^### Final frozen development fallback",
+        manuscript,
+        re.MULTILINE | re.DOTALL,
+    )
+    require(empirical_match is not None, "manuscript empirical traceability section is missing")
+    empirical_rows: dict[str, str] = {}
+    for line in empirical_match.group("body").splitlines():
+        cells = [cell.strip() for cell in line.strip("|").split("|")]
+        if len(cells) != 4 or not re.fullmatch(r"C[1-9][0-9]*(?:, C[1-9][0-9]*)*", cells[0]):
+            continue
+        for claim_id in re.findall(r"C[1-9][0-9]*", cells[0]):
+            require(claim_id not in empirical_rows, f"duplicate empirical status mapping: {claim_id}")
+            empirical_rows[claim_id] = " ".join(cells[1:]).lower()
+
+    require(not unknown & set(empirical_rows), "Unknown claim was promoted into the empirical evidence table")
+    require(not rejected - set(empirical_rows), "Rejected claim is missing from the empirical evidence table")
+    decision_terms = ("negative", "reject", "fail", "insufficient", "decision rule")
+    weak_rows = {
+        claim_id for claim_id in rejected
+        if not any(term in empirical_rows[claim_id] for term in decision_terms)
+    }
+    require(not weak_rows, "Rejected claim lacks an explicit negative decision interpretation")
 
 
 def validate_reference_traceability(text: str) -> None:
@@ -1082,6 +1130,7 @@ def main() -> int:
         encoding="utf-8"
     )
     validate_limitation_traceability(manuscript, claim_ledger, limitation_traceability)
+    validate_claim_status_consistency(manuscript, claim_ledger)
     validate_minimum_tier_comparisons(PAPER_DIR)
     missing_outcome_anchors = [
         anchor
