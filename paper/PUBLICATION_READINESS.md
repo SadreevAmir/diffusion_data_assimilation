@@ -1,6 +1,6 @@
 # Publication readiness audit
 
-Audit date: 2026-08-26
+Audit date: 2026-08-27
 
 Publication status: NOT_READY
 
@@ -12,6 +12,15 @@ External primary evidence state: RECONCILED_NEGATIVE
 Controller readiness: NOT_READY
 Scientific primary reconciliation: COMPLETE_NEGATIVE
 Autonomous publication work remaining: YES
+
+The 2026-08-27 negative-fixture audit now proves the immutable-identity boundary
+fail-closed rather than relying only on a successful current-tree check. A
+focused suite mutates each of the four frozen runner, prototype-test, oracle and
+contract files independently and requires the unified checker to reject every
+single mismatch; it separately rejects a handoff table that documents the wrong
+digest. The unified publication audit executes this suite on every run. This
+closes the remaining local provenance-test gap but creates neither a reviewed
+trusted mode nor a scientific result, so publication status remains `NOT_READY`.
 
 The 2026-08-26 immutable-identity audit found that the controller handoff still
 recorded a stale SHA-256 for `rank_coherent_reference.py` after the admission
@@ -69,7 +78,7 @@ mode or change `NOT_READY`.
 
 The 2026-08-26 independent publication-readiness rerun completed the unified
 fail-closed audit and the focused rank-coherent handoff suites against the
-current worktree. The audit passed with 32 required files, two figures, six
+current worktree. The audit passed with 33 required files, two figures, six
 references and all 39 claim-ledger rows traced; the five prototype tests and
 the 13-test adapter-parity suite also passed. `git diff --check` found no
 whitespace errors. This confirms internal consistency and executable handoff

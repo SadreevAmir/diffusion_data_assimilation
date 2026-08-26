@@ -89,6 +89,7 @@ REQUIRED_FILES = (
     "test_rank_coherent_adapter_parity.py",
     "validate_rank_coherent_admission.py",
     "test_validate_rank_coherent_admission.py",
+    "test_publication_immutable_identities.py",
     "RANK_COHERENT_ADAPTER_SPEC.md",
     "NEXT_GENERATIVE_METHOD_CONTRACT.md",
     "LATENT_TEMPERATURE_RESULT_RECONCILIATION.md",
@@ -647,6 +648,24 @@ def require(condition: bool, message: str) -> None:
         raise ValueError(message)
 
 
+def validate_rank_coherent_immutable_identities(
+    paper_dir: Path, handoff_text: str
+) -> None:
+    """Verify both file content and the documented immutable identity table."""
+    for name, expected_digest in RANK_COHERENT_IMMUTABLE_DIGESTS.items():
+        actual_digest = hashlib.sha256((paper_dir / name).read_bytes()).hexdigest()
+        require(
+            actual_digest == expected_digest,
+            f"{name} immutable digest mismatch: "
+            f"expected {expected_digest}, got {actual_digest}",
+        )
+        require(
+            f"| `paper/{name}` | `{expected_digest}` |" in handoff_text,
+            "RANK_COHERENT_CONTROLLER_HANDOFF.md does not record "
+            f"the verified digest for {name}",
+        )
+
+
 def main() -> int:
     missing = [name for name in REQUIRED_FILES if not (PAPER_DIR / name).is_file()]
     require(not missing, f"missing required publication files: {', '.join(missing)}")
@@ -704,6 +723,20 @@ def main() -> int:
         admission_suite.returncode == 0,
         "rank-coherent admission CLI suite failed: "
         + (admission_suite.stderr.strip() or admission_suite.stdout.strip() or "no output"),
+    )
+
+    immutable_identity_suite = subprocess.run(
+        [sys.executable, "-m", "unittest", "paper/test_publication_immutable_identities.py"],
+        cwd=PAPER_DIR.parent, check=False, capture_output=True, text=True,
+    )
+    require(
+        immutable_identity_suite.returncode == 0,
+        "publication immutable-identity suite failed: "
+        + (
+            immutable_identity_suite.stderr.strip()
+            or immutable_identity_suite.stdout.strip()
+            or "no output"
+        ),
     )
 
     manuscript = (PAPER_DIR / "PAPER_DRAFT.md").read_text(encoding="utf-8")
@@ -957,18 +990,7 @@ def main() -> int:
     rank_coherent_handoff = (
         PAPER_DIR / "RANK_COHERENT_CONTROLLER_HANDOFF.md"
     ).read_text(encoding="utf-8")
-    for name, expected_digest in RANK_COHERENT_IMMUTABLE_DIGESTS.items():
-        actual_digest = hashlib.sha256((PAPER_DIR / name).read_bytes()).hexdigest()
-        require(
-            actual_digest == expected_digest,
-            f"{name} immutable digest mismatch: "
-            f"expected {expected_digest}, got {actual_digest}",
-        )
-        require(
-            f"| `paper/{name}` | `{expected_digest}` |" in rank_coherent_handoff,
-            f"RANK_COHERENT_CONTROLLER_HANDOFF.md does not record "
-            f"the verified digest for {name}",
-        )
+    validate_rank_coherent_immutable_identities(PAPER_DIR, rank_coherent_handoff)
 
     for name, anchors in ANALOG_RESULT_ANCHORS.items():
         document = (PAPER_DIR / name).read_text(encoding="utf-8")
