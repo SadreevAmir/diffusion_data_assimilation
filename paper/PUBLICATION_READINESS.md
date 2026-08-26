@@ -13,6 +13,15 @@ Controller readiness: NOT_READY
 Scientific primary reconciliation: COMPLETE_NEGATIVE
 Autonomous publication work remaining: YES
 
+The 2026-08-27 conformal-baseline design audit freezes the fastest outstanding
+minimum-tier comparison in `NEXT_CONFORMAL_BASELINE_CONTRACT.md`. It uses five
+contiguous purged folds, the raw ten-member sea-ice-area range, the exact
+finite-sample split-conformal quantile and pre-result coverage/width stop-go
+criteria. The unified checker fails if these anchors or the explicit
+`FROZEN_NOT_EXECUTABLE` boundary are weakened. Because no admitted trusted mode
+implements this literal contract, the conformal row remains `MISSING` and no
+experiment is proposed under an invented identifier.
+
 The 2026-08-27 minimum-tier comparison audit now maps all nine required baseline
 families to a concrete manuscript presentation and an existing compact
 publication source. The unified checker requires the exact family/status map,
@@ -107,7 +116,7 @@ mode or change `NOT_READY`.
 
 The 2026-08-26 independent publication-readiness rerun completed the unified
 fail-closed audit and the focused rank-coherent handoff suites against the
-current worktree. The audit passed with 36 required files, two figures, six
+current worktree. The audit passed with 37 required files, two figures, six
 references and all 39 claim-ledger rows traced; the five prototype tests and
 the 13-test adapter-parity suite also passed. `git diff --check` found no
 whitespace errors. This confirms internal consistency and executable handoff

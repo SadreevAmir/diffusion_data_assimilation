@@ -446,6 +446,13 @@ remain external inputs.
 
 The publication package itself has a local fail-closed integrity audit:
 
+`NEXT_CONFORMAL_BASELINE_CONTRACT.md` freezes the outstanding conformal
+comparison as a purged split-conformal date-level sea-ice-area interval. The
+integrity audit requires its nonconformity score, finite-sample quantile,
+numeric coverage/width decision and explicit non-executable status. This is a
+pre-result contract only: it neither changes the `MISSING` evidence status nor
+authorizes an unimplemented trusted mode.
+
 ```bash
 python3 -m unittest -v \
   paper.test_rank_coherent_runner_prototype \

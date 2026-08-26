@@ -24,3 +24,10 @@ families: conformal intervals and a probabilistic DA comparator. The available
 deterministic comparison is development-only and cannot be promoted into an
 independent comparison. These gaps are distinct from the missing eligible
 calibration candidate.
+
+The exact next conformal comparison is now pre-result frozen in
+`NEXT_CONFORMAL_BASELINE_CONTRACT.md`: a purged, five-fold split-conformal
+member-range interval for date-level sea-ice area with immutable coverage and
+width criteria. Its status remains `MISSING` until a separately reviewed
+trusted runner executes the literal contract; the document is not numerical
+evidence and no unimplemented mode may be proposed for it.

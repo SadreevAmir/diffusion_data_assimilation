@@ -36,6 +36,10 @@ class MinimumTierComparisonAuditTests(unittest.TestCase):
             target = fixture_dir / source
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes((PAPER_DIR / source).read_bytes())
+        conformal_contract = "NEXT_CONFORMAL_BASELINE_CONTRACT.md"
+        (fixture_dir / conformal_contract).write_bytes(
+            (PAPER_DIR / conformal_contract).read_bytes()
+        )
         return temporary
 
     def assert_fixture_fails(self, audit: str, message: str) -> None:
@@ -45,6 +49,19 @@ class MinimumTierComparisonAuditTests(unittest.TestCase):
 
     def test_current_comparison_map_passes(self) -> None:
         validate_minimum_tier_comparisons(PAPER_DIR)
+
+    def test_weakened_conformal_stop_go_fails_closed(self) -> None:
+        with self.make_fixture(self.audit) as temporary:
+            fixture_dir = Path(temporary)
+            source = PAPER_DIR / "NEXT_CONFORMAL_BASELINE_CONTRACT.md"
+            target = fixture_dir / source.name
+            contract = source.read_text(encoding="utf-8")
+            target.write_text(
+                contract.replace("coverage of at least `0.85`", "improved coverage"),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(ValueError, "contract is incomplete or weakened"):
+                validate_minimum_tier_comparisons(fixture_dir)
 
     def test_missing_required_row_fails_closed(self) -> None:
         first_row = MINIMUM_TIER_ROW.search(self.audit)

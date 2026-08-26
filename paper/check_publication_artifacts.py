@@ -95,6 +95,7 @@ REQUIRED_FILES = (
     "RESEARCH_PLAN.md",
     "PUBLICATION_READINESS.md",
     "MINIMUM_TIER_COMPARISON_AUDIT.md",
+    "NEXT_CONFORMAL_BASELINE_CONTRACT.md",
     "NEXT_BASELINE_CONTRACT.md",
     "NEXT_METHOD_CONTRACT.md",
     "NEXT_RANK_COHERENT_CONTRACT.md",
@@ -876,6 +877,21 @@ def validate_minimum_tier_comparisons(paper_dir: Path) -> None:
     require(
         audit.count("| MISSING |") == 2,
         "minimum-tier audit must retain exactly the two evidenced missing families",
+    )
+    conformal_contract = (
+        paper_dir / "NEXT_CONFORMAL_BASELINE_CONTRACT.md"
+    ).read_text(encoding="utf-8")
+    conformal_anchors = (
+        "Status: `FROZEN_NOT_EXECUTABLE`",
+        "`s = max(L - y, y - U, 0)`",
+        "`ceil((n + 1) * 0.90)`",
+        "coverage of at least `0.85`",
+        "no more than `1.50` times the raw mean width",
+        "No currently admitted trusted mode implements this contract",
+    )
+    require(
+        all(anchor in conformal_contract for anchor in conformal_anchors),
+        "frozen conformal baseline contract is incomplete or weakened",
     )
 
 
