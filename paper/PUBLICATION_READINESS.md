@@ -13,6 +13,14 @@ Controller readiness: NOT_READY
 Scientific primary reconciliation: COMPLETE_NEGATIVE
 Autonomous publication work remaining: YES
 
+The 2026-08-26 immutable-identity audit found that the controller handoff still
+recorded a stale SHA-256 for `rank_coherent_reference.py` after the admission
+validator was added. The handoff now records the current digest, and the unified
+publication checker computes and verifies all four frozen runner, test, oracle
+and contract digests and requires the same values in the handoff table. This
+closes a concrete reviewed-mode provenance risk but does not create an admitted
+mode or scientific result; publication status remains `NOT_READY`.
+
 The 2026-08-26 mechanism-table audit added a single family-level matrix for the
 late frozen mechanisms that support the manuscript's central failure-map claim.
 It distinguishes complete family passes from partial metric improvements and

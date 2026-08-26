@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import ast
+import hashlib
 import re
 import subprocess
 import sys
@@ -336,6 +337,16 @@ RANK_COHERENT_HANDOFF_ANCHORS = {
         "member-spatial pass flag that violates its frozen\ntolerance",
         "exact member-spatial-to-gate linkage",
     ),
+}
+RANK_COHERENT_IMMUTABLE_DIGESTS = {
+    "rank_coherent_runner_prototype.py":
+        "b6b9b709c587d79625d0237b15c3e36f4e3404eef37ba0bbbe850875be95d86c",
+    "test_rank_coherent_runner_prototype.py":
+        "fbda1c1dee61f80ebb4b37562364c34be3268aa6c0c2e87b2d222d9e95b888e6",
+    "rank_coherent_reference.py":
+        "0401cf197ff78f31f28b03f9f2e6e3e742d760c31254a410188d55da6d7df5f7",
+    "NEXT_RANK_COHERENT_CONTRACT.md":
+        "1489a68f914131c6b6ad545a413903f366d28f8570e8e40cc674db77282197d1",
 }
 FIGURE_PATTERN = re.compile(r"!\[[^]]*\]\(([^)]+)\)")
 REFERENCE_PATTERN = re.compile(r"^(\d+)\. ", re.MULTILINE)
@@ -941,6 +952,22 @@ def main() -> int:
             not missing_anchors,
             f"{name} is missing rank-coherent handoff anchors: "
             + ", ".join(missing_anchors),
+        )
+
+    rank_coherent_handoff = (
+        PAPER_DIR / "RANK_COHERENT_CONTROLLER_HANDOFF.md"
+    ).read_text(encoding="utf-8")
+    for name, expected_digest in RANK_COHERENT_IMMUTABLE_DIGESTS.items():
+        actual_digest = hashlib.sha256((PAPER_DIR / name).read_bytes()).hexdigest()
+        require(
+            actual_digest == expected_digest,
+            f"{name} immutable digest mismatch: "
+            f"expected {expected_digest}, got {actual_digest}",
+        )
+        require(
+            f"| `paper/{name}` | `{expected_digest}` |" in rank_coherent_handoff,
+            f"RANK_COHERENT_CONTROLLER_HANDOFF.md does not record "
+            f"the verified digest for {name}",
         )
 
     for name, anchors in ANALOG_RESULT_ANCHORS.items():
