@@ -13,6 +13,14 @@ Controller readiness: NOT_READY
 Scientific primary reconciliation: COMPLETE_NEGATIVE
 Autonomous publication work remaining: YES
 
+The 2026-08-27 limitation-traceability audit maps all eight distinct Section 7
+limitations to exact claim-ledger rows. The two genuine evidence absences point
+to the existing `Unknown` records C9 and C10 rather than being promoted to
+results. `LIMITATION_TRACEABILITY.md` is now required by the unified checker,
+and three negative fixtures reject a missing limitation, a changed claim mapping
+or a missing evidence-absence status. This closes the declared limitation-audit
+gap without changing any scientific result; status remains `NOT_READY`.
+
 The 2026-08-27 reference-traceability audit independently checked all six
 bibliography records against primary publisher or conference metadata and maps
 each item to one scope-limited manuscript statement in
@@ -147,7 +155,7 @@ mode or change `NOT_READY`.
 
 The 2026-08-26 independent publication-readiness rerun completed the unified
 fail-closed audit and the focused rank-coherent handoff suites against the
-current worktree. The audit passed with 41 required files, two figures, six
+current worktree. The audit passed with 43 required files, two figures, six
 references and all 39 claim-ledger rows traced; the five prototype tests and
 the 13-test adapter-parity suite also passed. `git diff --check` found no
 whitespace errors. This confirms internal consistency and executable handoff

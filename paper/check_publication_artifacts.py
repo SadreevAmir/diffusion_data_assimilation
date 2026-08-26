@@ -23,6 +23,7 @@ REQUIRED_REGRESSION_SUITES = (
     "paper.test_minimum_tier_comparison_audit",
     "paper.test_publication_figure_generators",
     "paper.test_publication_reference_traceability",
+    "paper.test_publication_limitation_traceability",
 )
 REGRESSION_COMMAND = re.compile(
     r"python3 -m unittest -v \\\n(?P<body>(?:  paper\.[a-z0-9_]+(?: \\\n|\n))+)",
@@ -125,6 +126,8 @@ REQUIRED_FILES = (
     "test_publication_figure_generators.py",
     "test_publication_reference_traceability.py",
     "REFERENCE_TRACEABILITY.md",
+    "test_publication_limitation_traceability.py",
+    "LIMITATION_TRACEABILITY.md",
     "RANK_COHERENT_ADAPTER_SPEC.md",
     "NEXT_GENERATIVE_METHOD_CONTRACT.md",
     "LATENT_TEMPERATURE_RESULT_RECONCILIATION.md",
@@ -142,6 +145,59 @@ REFERENCE_TRACEABILITY_ROWS = {
     5: ("10.1214/13-STS443", "ECC-Q"),
     6: ("10.1002/2015GL067232", "IIEE"),
 }
+
+LIMITATION_TRACEABILITY_ROWS = {
+    "L1": ("one legacy checkpoint, one sampling seed, ten members and 40 development dates", ("C11", "C35"), None),
+    "L2": ("not an independent temporal generalization estimate", ("C3", "C15"), None),
+    "L3": ("not direct satellite SIC retrievals", ("C2",), None),
+    "L4": ("does not establish casewise or fieldwise coverage", ("C13",), None),
+    "L5": ("Clipping complicates bounded mean comparisons", ("C12", "C19"), None),
+    "L6": ("residual upper-tail undercoverage remains", ("C13", "C27"), None),
+    "L7": ("No independent comparison with 3D-Var is claimed", ("C9", "C17"), "C9"),
+    "L8": ("Generalization across checkpoints, seeds, ensemble sizes, regions or observation systems remains unverified", ("C10",), "C10"),
+}
+
+
+def validate_limitation_traceability(
+    manuscript: str, claim_ledger: str, traceability: str
+) -> None:
+    """Require complete Section 7 coverage and exact claim-ledger support."""
+    match = re.search(
+        r"^## 7\. Limitations\n(?P<body>.*?)^## 8\.", manuscript, re.MULTILINE | re.DOTALL
+    )
+    require(match is not None, "manuscript limitation section is missing")
+    limitation_section = match.group("body")
+    normalized_limitation_section = re.sub(r"\s+", " ", limitation_section)
+    rows: dict[str, tuple[str, tuple[str, ...], str]] = {}
+    for line in traceability.splitlines():
+        row = re.fullmatch(
+            r"\| (L[1-9][0-9]*) \| `([^`]+)` \| ([^|]+) \| ([^|]+) \|", line
+        )
+        if not row:
+            continue
+        limitation_id = row.group(1)
+        require(limitation_id not in rows, f"duplicate limitation row: {limitation_id}")
+        claim_ids = tuple(re.findall(r"`(C[1-9][0-9]*)`", row.group(3)))
+        rows[limitation_id] = (row.group(2), claim_ids, row.group(4))
+    require(set(rows) == set(LIMITATION_TRACEABILITY_ROWS), "limitation traceability must cover exactly L1--L8")
+    for limitation_id, (anchor, claim_ids, absence_id) in LIMITATION_TRACEABILITY_ROWS.items():
+        observed_anchor, observed_claim_ids, support_kind = rows[limitation_id]
+        require(observed_anchor == anchor, f"{limitation_id} anchor mismatch")
+        require(
+            anchor in normalized_limitation_section,
+            f"{limitation_id} is absent from Section 7",
+        )
+        require(observed_claim_ids == claim_ids, f"{limitation_id} claim mapping mismatch")
+        for claim_id in claim_ids:
+            require(f"| {claim_id} |" in claim_ledger, f"{limitation_id} references missing {claim_id}")
+        if absence_id:
+            require(f"`{absence_id}` is `Unknown`" in support_kind, f"{limitation_id} lacks an explicit evidence-absence record")
+            ledger_row = next((line for line in claim_ledger.splitlines() if line.startswith(f"| {absence_id} |")), "")
+            require(
+                "| Unknown" in ledger_row,
+                f"{absence_id} is not an Unknown evidence record",
+            )
+    require("cover the complete limitation inventory in Section 7" in traceability, "limitation audit lacks a completeness boundary")
 
 
 def validate_reference_traceability(text: str) -> None:
@@ -1022,6 +1078,10 @@ def main() -> int:
         encoding="utf-8"
     )
     validate_reference_traceability(reference_traceability)
+    limitation_traceability = (PAPER_DIR / "LIMITATION_TRACEABILITY.md").read_text(
+        encoding="utf-8"
+    )
+    validate_limitation_traceability(manuscript, claim_ledger, limitation_traceability)
     validate_minimum_tier_comparisons(PAPER_DIR)
     missing_outcome_anchors = [
         anchor
