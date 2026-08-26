@@ -13,6 +13,15 @@ Controller readiness: NOT_READY
 Scientific primary reconciliation: COMPLETE_NEGATIVE
 Autonomous publication work remaining: YES
 
+The 2026-08-26 table-integrity audit made the publication checker fail closed
+on malformed Markdown evidence tables. It now verifies header/separator widths,
+non-empty headers and body cells, constant row widths, non-empty bodies, at
+least eight manuscript tables and exactly one normative claim-ledger table.
+This guards the rendered evidence and claim map against silent column drift.
+It is a publication-quality improvement only: it does not create a trusted
+rank-coherent mode, recover missing quantitative dropout fields or change
+`NOT_READY`.
+
 The 2026-08-26 scope audit corrected one stale pre-primary sentence in the
 manuscript. The contribution section had said that independent evaluation was
 outside the present claim even though the reconciled negative independent

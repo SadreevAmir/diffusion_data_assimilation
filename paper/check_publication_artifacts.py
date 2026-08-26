@@ -12,6 +12,56 @@ from pathlib import Path
 
 
 PAPER_DIR = Path(__file__).resolve().parent
+
+
+def validate_markdown_tables(text: str, filename: str) -> int:
+    """Fail closed on malformed pipe tables that can silently misrender."""
+    lines = text.splitlines()
+    table_count = 0
+    index = 0
+    while index < len(lines) - 1:
+        header = lines[index]
+        separator = lines[index + 1]
+        if not (header.startswith("|") and separator.startswith("|")):
+            index += 1
+            continue
+
+        header_cells = [cell.strip() for cell in header.strip("|").split("|")]
+        separator_cells = [cell.strip() for cell in separator.strip("|").split("|")]
+        if not separator_cells or not all(
+            re.fullmatch(r":?-{3,}:?", cell) for cell in separator_cells
+        ):
+            index += 1
+            continue
+
+        require(
+            len(header_cells) == len(separator_cells),
+            f"{filename} table header/separator width mismatch at line {index + 1}",
+        )
+        require(
+            all(header_cells),
+            f"{filename} table has an empty header cell at line {index + 1}",
+        )
+        table_count += 1
+        index += 2
+        row_count = 0
+        while index < len(lines) and lines[index].startswith("|"):
+            row_cells = [cell.strip() for cell in lines[index].strip("|").split("|")]
+            require(
+                len(row_cells) == len(header_cells),
+                f"{filename} table row width mismatch at line {index + 1}",
+            )
+            require(
+                all(row_cells),
+                f"{filename} table has an empty body cell at line {index + 1}",
+            )
+            row_count += 1
+            index += 1
+        require(
+            row_count > 0,
+            f"{filename} table has no body rows at line {index + 1}",
+        )
+    return table_count
 REQUIRED_FILES = (
     "PAPER_DRAFT.md",
     "CLAIM_LEDGER.md",
@@ -639,6 +689,10 @@ def main() -> int:
     manuscript = (PAPER_DIR / "PAPER_DRAFT.md").read_text(encoding="utf-8")
     claim_ledger = (PAPER_DIR / "CLAIM_LEDGER.md").read_text(encoding="utf-8")
     readiness = (PAPER_DIR / "PUBLICATION_READINESS.md").read_text(encoding="utf-8")
+    manuscript_tables = validate_markdown_tables(manuscript, "PAPER_DRAFT.md")
+    ledger_tables = validate_markdown_tables(claim_ledger, "CLAIM_LEDGER.md")
+    require(manuscript_tables >= 8, "manuscript is missing required evidence tables")
+    require(ledger_tables == 1, "claim ledger must contain exactly one normative table")
     frozen_handoff = (PAPER_DIR / "FROZEN_EVALUATION_HANDOFF.md").read_text(
         encoding="utf-8"
     )
