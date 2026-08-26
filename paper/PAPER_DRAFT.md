@@ -279,6 +279,11 @@ calibration eligibility remain logically independent. The thresholds, folds and
 failure interpretations in the two frozen contracts are unchanged by this
 matrix, and neither result may compensate for a failed proper-score, reliability,
 boundary, spatial/physical or operational family of a calibration candidate.
+The deterministic comparison is not a third absent family: it is present only as
+development evidence and remains insufficient for the main comparison table.
+Thus closing both `MISSING` rows would complete those exact baseline-family
+results without upgrading the deterministic evidence or selecting a calibrated
+ensemble.
 
 We additionally evaluate the frozen cross-fitted scales followed by an exact
 capped-simplex projection of each ten-member pixel distribution. The projection

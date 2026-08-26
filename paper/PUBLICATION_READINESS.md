@@ -317,8 +317,8 @@ temperature result activated only the already predeclared locked-MC-dropout
 fallback, unchanged; it did not authorize another temperature or retrospective
 tuning. The completed negative dropout result closes only this frozen candidate.
 The subsequently completed primary supplies independent negative evidence for
-one frozen candidate, but not an eligible calibration or the missing independent
-deterministic and broader baseline comparisons.
+one frozen candidate, but not an eligible calibration, a publication-grade
+independent deterministic comparison or the missing broader baseline comparisons.
 
 ## Independent package re-audit
 
@@ -329,8 +329,9 @@ baseline-inventory statements: the claim ledger still described the evidence
 as if only the hurdle-isotonic/ECC-Q comparator had completed, and the research
 plan still marked zero/one-inflated Beta or EMOS-like postprocessing as missing.
 Both now record the completed, rejected ZOIB-EMOS/ECC-Q result while retaining
-the genuinely missing conformal, probabilistic-DA and independent deterministic
-comparisons. The checker now requires these corrected inventory anchors.
+the genuinely missing conformal and probabilistic-DA comparisons and the
+insufficient development-only deterministic comparison. The checker now requires
+these corrected inventory anchors.
 
 A subsequent independent integrity pass also closed a reproducibility hole in
 the checker itself. The audit now requires all four publication generators,
@@ -422,6 +423,14 @@ parametric boundary-aware route without post-hoc tuning; it does not supply an
 eligible calibrated ensemble.
 
 ## Minimum-tier gap audit
+
+The claim-level consistency audit distinguishes evidence absence from evidence
+strength. Exactly two baseline-family result rows are `MISSING`: conformal and
+probabilistic DA. The deterministic row is `PRESENT_DEVELOPMENT_ONLY`, so it is
+not a third missing family, but it still blocks the main comparison table because
+no independent frozen deterministic comparison is claimed. Closing either of
+the two missing rows cannot upgrade that deterministic evidence or make a
+learned-joint calibration eligible.
 
 | Required element | Current evidence | Readiness consequence |
 |---|---|---|

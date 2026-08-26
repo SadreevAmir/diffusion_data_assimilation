@@ -208,6 +208,23 @@ MINIMUM_TIER_OUTCOME_MATRIX_ANCHORS = (
     "minimum-tier row closure and learned-joint\ncalibration eligibility remain logically independent",
     "`COMPARATOR_INVALID` or an invalid conformal execution leaves the\ncorresponding evidence row `MISSING`",
 )
+MINIMUM_TIER_CLAIM_CONSISTENCY_ANCHORS = {
+    "PAPER_DRAFT.md": (
+        "The deterministic comparison is not a third absent family",
+        "without upgrading the deterministic evidence or selecting a calibrated\nensemble",
+    ),
+    "CLAIM_LEDGER.md": (
+        "conformal and probabilistic-DA families remain absent; the deterministic comparison is present only as development evidence",
+    ),
+    "PUBLICATION_READINESS.md": (
+        "Exactly two baseline-family result rows are `MISSING`",
+        "The deterministic row is `PRESENT_DEVELOPMENT_ONLY`",
+    ),
+    "REPRODUCIBILITY.md": (
+        "conformal and probabilistic DA are the only `MISSING` result rows",
+        "deterministic comparison is `PRESENT_DEVELOPMENT_ONLY`",
+    ),
+}
 EXTERNAL_PRIMARY_HANDOFF_ANCHORS = {
     "PUBLICATION_READINESS.md": (
         "External primary evidence state: RECONCILED_NEGATIVE",
@@ -983,6 +1000,23 @@ def main() -> int:
         and "baseline-row closure is invariantly separate from learned-joint\ncalibration eligibility"
         in reproducibility,
         "publication handoff does not preserve the pre-result outcome interpretation",
+    )
+    claim_consistency_documents = {
+        "PAPER_DRAFT.md": manuscript,
+        "CLAIM_LEDGER.md": claim_ledger,
+        "PUBLICATION_READINESS.md": readiness,
+        "REPRODUCIBILITY.md": reproducibility,
+    }
+    missing_claim_consistency_anchors = [
+        f"{filename}: {anchor}"
+        for filename, anchors in MINIMUM_TIER_CLAIM_CONSISTENCY_ANCHORS.items()
+        for anchor in anchors
+        if anchor not in claim_consistency_documents[filename]
+    ]
+    require(
+        not missing_claim_consistency_anchors,
+        "minimum-tier claim-level consistency boundary is incomplete: "
+        + ", ".join(missing_claim_consistency_anchors),
     )
     manuscript_tables = validate_markdown_tables(manuscript, "PAPER_DRAFT.md")
     ledger_tables = validate_markdown_tables(claim_ledger, "CLAIM_LEDGER.md")

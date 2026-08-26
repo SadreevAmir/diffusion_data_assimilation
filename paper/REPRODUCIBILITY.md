@@ -469,6 +469,11 @@ no-compensation gate family. The unified audit requires these interpretation
 anchors so future result insertion cannot silently promote comparison
 completeness into calibration success.
 
+The cross-document claim audit also preserves the evidence-strength distinction:
+conformal and probabilistic DA are the only `MISSING` result rows, whereas the
+deterministic comparison is `PRESENT_DEVELOPMENT_ONLY`. It remains a blocker for
+the main comparison table without being misreported as a third absent family.
+
 ```bash
 python3 -m unittest -v \
   paper.test_rank_coherent_runner_prototype \

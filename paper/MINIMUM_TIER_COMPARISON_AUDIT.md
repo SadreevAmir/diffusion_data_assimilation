@@ -25,6 +25,14 @@ deterministic comparison is development-only and cannot be promoted into an
 independent comparison. These gaps are distinct from the missing eligible
 calibration candidate.
 
+Claim-level audit: the two `MISSING` rows are the only absent baseline-family
+results. `PRESENT_DEVELOPMENT_ONLY` is deliberately not absence: it records an
+existing deterministic comparison whose evidence strength is insufficient for
+the main comparison table. Therefore the manuscript conclusion may say that an
+independent deterministic comparison remains required, but must not count it as
+a third missing family. Baseline-row closure remains independent of every
+learned-joint no-compensation gate decision.
+
 The exact next conformal comparison is now pre-result frozen in
 `NEXT_CONFORMAL_BASELINE_CONTRACT.md`: a purged, five-fold split-conformal
 member-range interval for date-level sea-ice area with immutable coverage and

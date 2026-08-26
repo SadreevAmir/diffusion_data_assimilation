@@ -8,6 +8,7 @@ import unittest
 from pathlib import Path
 
 from paper.check_publication_artifacts import (
+    MINIMUM_TIER_CLAIM_CONSISTENCY_ANCHORS,
     MINIMUM_TIER_ROW,
     PAPER_DIR,
     REQUIRED_REGRESSION_SUITES,
@@ -149,6 +150,22 @@ class MinimumTierComparisonAuditTests(unittest.TestCase):
         )
         with self.assertRaisesRegex(ValueError, "differ from the required"):
             validate_documented_regression_suites(mutated)
+
+    def test_claim_consistency_contract_covers_all_publication_surfaces(self) -> None:
+        self.assertEqual(
+            set(MINIMUM_TIER_CLAIM_CONSISTENCY_ANCHORS),
+            {
+                "PAPER_DRAFT.md",
+                "CLAIM_LEDGER.md",
+                "PUBLICATION_READINESS.md",
+                "REPRODUCIBILITY.md",
+            },
+        )
+        for filename, anchors in MINIMUM_TIER_CLAIM_CONSISTENCY_ANCHORS.items():
+            text = (PAPER_DIR / filename).read_text(encoding="utf-8")
+            self.assertTrue(anchors)
+            for anchor in anchors:
+                self.assertIn(anchor, text)
 
 
 if __name__ == "__main__":
