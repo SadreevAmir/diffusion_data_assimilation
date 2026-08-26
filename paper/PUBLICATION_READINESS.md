@@ -107,7 +107,7 @@ mode or change `NOT_READY`.
 
 The 2026-08-26 independent publication-readiness rerun completed the unified
 fail-closed audit and the focused rank-coherent handoff suites against the
-current worktree. The audit passed with 35 required files, two figures, six
+current worktree. The audit passed with 36 required files, two figures, six
 references and all 39 claim-ledger rows traced; the five prototype tests and
 the 13-test adapter-parity suite also passed. `git diff --check` found no
 whitespace errors. This confirms internal consistency and executable handoff

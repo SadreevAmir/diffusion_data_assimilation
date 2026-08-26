@@ -92,6 +92,7 @@ REQUIRED_FILES = (
     "test_validate_rank_coherent_admission.py",
     "test_publication_immutable_identities.py",
     "test_publication_empirical_traceability.py",
+    "test_minimum_tier_comparison_audit.py",
     "RANK_COHERENT_ADAPTER_SPEC.md",
     "NEXT_GENERATIVE_METHOD_CONTRACT.md",
     "LATENT_TEMPERATURE_RESULT_RECONCILIATION.md",
