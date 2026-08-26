@@ -90,6 +90,7 @@ REQUIRED_FILES = (
     "validate_rank_coherent_admission.py",
     "test_validate_rank_coherent_admission.py",
     "test_publication_immutable_identities.py",
+    "test_publication_empirical_traceability.py",
     "RANK_COHERENT_ADAPTER_SPEC.md",
     "NEXT_GENERATIVE_METHOD_CONTRACT.md",
     "LATENT_TEMPERATURE_RESULT_RECONCILIATION.md",
@@ -673,6 +674,48 @@ def validate_rank_coherent_immutable_identities(
         )
 
 
+def validate_empirical_traceability(manuscript: str, paper_dir: Path) -> None:
+    """Fail closed when empirical claims lose presentation or compact evidence."""
+    require(
+        EMPIRICAL_TRACEABILITY_HEADING in manuscript,
+        "manuscript contains no empirical evidence traceability section",
+    )
+    empirical_section = manuscript.split(
+        EMPIRICAL_TRACEABILITY_HEADING, maxsplit=1
+    )[1].split("\n### ", maxsplit=1)[0]
+    empirical_rows = list(EMPIRICAL_TRACEABILITY_ROW.finditer(empirical_section))
+    require(empirical_rows, "empirical evidence traceability contains no rows")
+    empirical_claim_ids: list[int] = []
+    for row in empirical_rows:
+        row_claim_ids = [
+            int(value) for value in TRACEABILITY_PATTERN.findall(row["claims"])
+        ]
+        empirical_claim_ids.extend(row_claim_ids)
+        presentation = row["presentation"].strip()
+        require(
+            "Section " in presentation or "Figure " in presentation,
+            "empirical traceability row has no concrete manuscript presentation: "
+            + row["claims"],
+        )
+        source = (paper_dir / row["source"]).resolve()
+        require(
+            source.is_relative_to(paper_dir.resolve()) and source.is_file(),
+            "empirical traceability source is missing or escapes paper/: "
+            + row["source"],
+        )
+    require(
+        len(empirical_claim_ids) == len(set(empirical_claim_ids)),
+        "empirical evidence traceability contains duplicate claim IDs",
+    )
+    require(
+        set(empirical_claim_ids) == EMPIRICAL_CLAIM_IDS,
+        "empirical evidence traceability mismatch: traced="
+        + ",".join(map(str, sorted(empirical_claim_ids)))
+        + " expected="
+        + ",".join(map(str, sorted(EMPIRICAL_CLAIM_IDS))),
+    )
+
+
 def main() -> int:
     missing = [name for name in REQUIRED_FILES if not (PAPER_DIR / name).is_file()]
     require(not missing, f"missing required publication files: {', '.join(missing)}")
@@ -742,6 +785,28 @@ def main() -> int:
         + (
             immutable_identity_suite.stderr.strip()
             or immutable_identity_suite.stdout.strip()
+            or "no output"
+        ),
+    )
+
+    empirical_traceability_suite = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "unittest",
+            "paper/test_publication_empirical_traceability.py",
+        ],
+        cwd=PAPER_DIR.parent,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    require(
+        empirical_traceability_suite.returncode == 0,
+        "publication empirical-traceability suite failed: "
+        + (
+            empirical_traceability_suite.stderr.strip()
+            or empirical_traceability_suite.stdout.strip()
             or "no output"
         ),
     )
@@ -1118,42 +1183,7 @@ def main() -> int:
         + ",".join(map(str, claim_ids)),
     )
 
-    require(
-        EMPIRICAL_TRACEABILITY_HEADING in manuscript,
-        "manuscript contains no empirical evidence traceability section",
-    )
-    empirical_section = manuscript.split(
-        EMPIRICAL_TRACEABILITY_HEADING, maxsplit=1
-    )[1].split("\n### ", maxsplit=1)[0]
-    empirical_rows = list(EMPIRICAL_TRACEABILITY_ROW.finditer(empirical_section))
-    require(empirical_rows, "empirical evidence traceability contains no rows")
-    empirical_claim_ids: list[int] = []
-    for row in empirical_rows:
-        row_claim_ids = [int(value) for value in TRACEABILITY_PATTERN.findall(row["claims"])]
-        empirical_claim_ids.extend(row_claim_ids)
-        presentation = row["presentation"].strip()
-        require(
-            "Section " in presentation or "Figure " in presentation,
-            "empirical traceability row has no concrete manuscript presentation: "
-            + row["claims"],
-        )
-        source = (PAPER_DIR / row["source"]).resolve()
-        require(
-            source.is_relative_to(PAPER_DIR) and source.is_file(),
-            "empirical traceability source is missing or escapes paper/: "
-            + row["source"],
-        )
-    require(
-        len(empirical_claim_ids) == len(set(empirical_claim_ids)),
-        "empirical evidence traceability contains duplicate claim IDs",
-    )
-    require(
-        set(empirical_claim_ids) == EMPIRICAL_CLAIM_IDS,
-        "empirical evidence traceability mismatch: traced="
-        + ",".join(map(str, sorted(empirical_claim_ids)))
-        + " expected="
-        + ",".join(map(str, sorted(EMPIRICAL_CLAIM_IDS))),
-    )
+    validate_empirical_traceability(manuscript, PAPER_DIR)
 
     status_lines = re.findall(r"^Publication status: (\S+)$", readiness, re.MULTILINE)
     blocker_lines = re.findall(

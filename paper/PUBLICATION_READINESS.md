@@ -13,6 +13,15 @@ Controller readiness: NOT_READY
 Scientific primary reconciliation: COMPLETE_NEGATIVE
 Autonomous publication work remaining: YES
 
+The 2026-08-27 empirical-traceability negative-fixture audit now exercises the
+production validator directly. Four focused tests accept the current map and
+independently reject missing empirical-claim coverage, a presentation without a
+named section or figure, and a compact-source path that escapes `paper/`. The
+unified checker requires and executes this suite, so its fail-closed guarantee
+is regression-tested rather than inferred from the successful current tree.
+This closes a reproducibility gap but creates neither a scientific result nor
+an admitted trusted mode, so publication status remains `NOT_READY`.
+
 The 2026-08-27 empirical-traceability audit now links every empirical claim row
 to both a concrete manuscript table, figure or named results paragraph and an
 existing compact publication source. The unified checker requires exact,
@@ -88,7 +97,7 @@ mode or change `NOT_READY`.
 
 The 2026-08-26 independent publication-readiness rerun completed the unified
 fail-closed audit and the focused rank-coherent handoff suites against the
-current worktree. The audit passed with 33 required files, two figures, six
+current worktree. The audit passed with 34 required files, two figures, six
 references and all 39 claim-ledger rows traced; the five prototype tests and
 the 13-test adapter-parity suite also passed. `git diff --check` found no
 whitespace errors. This confirms internal consistency and executable handoff
