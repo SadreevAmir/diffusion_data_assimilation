@@ -6,7 +6,7 @@
 |---|---|
 | `paper/rank_coherent_runner_prototype.py` | `b6b9b709c587d79625d0237b15c3e36f4e3404eef37ba0bbbe850875be95d86c` |
 | `paper/test_rank_coherent_runner_prototype.py` | `fbda1c1dee61f80ebb4b37562364c34be3268aa6c0c2e87b2d222d9e95b888e6` |
-| `paper/rank_coherent_reference.py` | `0401cf197ff78f31f28b03f9f2e6e3e742d760c31254a410188d55da6d7df5f7` |
+| `paper/rank_coherent_reference.py` | `d25095af94eb9e93c20e8495f9584c6f1d954c24dfa0a8b72ef65c51aeb1a170` |
 | `paper/NEXT_RANK_COHERENT_CONTRACT.md` | `1489a68f914131c6b6ad545a413903f366d28f8570e8e40cc674db77282197d1` |
 
 Recompute before review with:
@@ -95,8 +95,9 @@ python3 paper/validate_rank_coherent_admission.py /path/to/admission.json
 
 Success prints exactly `reviewed_mode=<literal reviewed mode>`. Invalid JSON,
 a non-object top level, missing or extra fields, placeholders, malformed
-identities, a non-`PASS` decision or any deviation fails closed and prints no
-proposal-ready mode.
+identities, a `contract_sha256` that differs from the frozen local contract,
+a non-`PASS` decision or any deviation fails closed and prints no proposal-ready
+mode.
 
 ## Focused verification
 

@@ -8,9 +8,11 @@ executable for an independent trusted-runner review.
 
 from __future__ import annotations
 
+import hashlib
 import math
 import re
 from collections.abc import Mapping, Sequence
+from pathlib import Path
 
 
 EXPECTED_CASES = 40
@@ -73,6 +75,12 @@ ADMISSION_RECORD_KEYS = (
     "synthetic_result_sha256", "test_command", "test_sentinel",
     "decision_bearing_validation", "deviations",
 )
+FROZEN_CONTRACT_PATH = Path(__file__).with_name("NEXT_RANK_COHERENT_CONTRACT.md")
+
+
+def frozen_contract_sha256() -> str:
+    """Return the digest of the contract bytes reviewed with this oracle."""
+    return hashlib.sha256(FROZEN_CONTRACT_PATH.read_bytes()).hexdigest()
 
 
 def validate_admission_record(record: Mapping[str, object]) -> str:
@@ -88,6 +96,8 @@ def validate_admission_record(record: Mapping[str, object]) -> str:
     for key in ("runner_sha256", "contract_sha256", "synthetic_result_sha256"):
         if not re.fullmatch(r"[0-9a-f]{64}", str(record[key])):
             raise ValueError(f"{key} must be lowercase SHA-256")
+    if record["contract_sha256"] != frozen_contract_sha256():
+        raise ValueError("contract_sha256 must match the frozen local contract")
     if record["decision_bearing_validation"] != "PASS":
         raise ValueError("decision_bearing_validation must be PASS")
     if record["deviations"] != []:
@@ -862,7 +872,7 @@ def _self_test() -> None:
         "reviewed_mode": "validation_reviewed_rank_coherent",
         "publication_commit": "a" * 40,
         "runner_sha256": "b" * 64,
-        "contract_sha256": "c" * 64,
+        "contract_sha256": frozen_contract_sha256(),
         "synthetic_result_sha256": "d" * 64,
         "test_command": "python3 trusted_test.py",
         "test_sentinel": "trusted rank-coherent adapter: PASS",

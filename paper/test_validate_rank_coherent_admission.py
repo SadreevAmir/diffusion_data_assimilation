@@ -10,6 +10,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from paper.rank_coherent_reference import frozen_contract_sha256
 from paper.validate_rank_coherent_admission import load_and_validate
 
 
@@ -22,7 +23,7 @@ def valid_record() -> dict[str, object]:
         "reviewed_mode": "validation_reviewed_rank_coherent",
         "publication_commit": "a" * 40,
         "runner_sha256": "b" * 64,
-        "contract_sha256": "c" * 64,
+        "contract_sha256": frozen_contract_sha256(),
         "synthetic_result_sha256": "d" * 64,
         "test_command": "python3 trusted_test.py",
         "test_sentinel": "trusted rank-coherent adapter: PASS",
@@ -59,6 +60,13 @@ class AdmissionCliTests(unittest.TestCase):
             record["deviations"] = ["waiver"]
             with self.assertRaisesRegex(ValueError, "empty list"):
                 load_and_validate(self.write_record(directory, record))
+
+    def test_well_formed_but_unbound_contract_digest_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            record = valid_record()
+            record["contract_sha256"] = "c" * 64
+            with self.assertRaisesRegex(ValueError, "frozen local contract"):
+                load_and_validate(self.write_record(Path(temporary), record))
 
 
 if __name__ == "__main__":

@@ -373,7 +373,7 @@ RANK_COHERENT_IMMUTABLE_DIGESTS = {
     "test_rank_coherent_runner_prototype.py":
         "fbda1c1dee61f80ebb4b37562364c34be3268aa6c0c2e87b2d222d9e95b888e6",
     "rank_coherent_reference.py":
-        "0401cf197ff78f31f28b03f9f2e6e3e742d760c31254a410188d55da6d7df5f7",
+        "d25095af94eb9e93c20e8495f9584c6f1d954c24dfa0a8b72ef65c51aeb1a170",
     "NEXT_RANK_COHERENT_CONTRACT.md":
         "1489a68f914131c6b6ad545a413903f366d28f8570e8e40cc674db77282197d1",
 }
