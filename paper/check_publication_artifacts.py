@@ -236,6 +236,24 @@ EXTERNAL_PRIMARY_STATE_FILES = (
     "RESEARCH_PLAN.md",
     "PUBLICATION_READINESS.md",
 )
+EXTERNAL_PRIMARY_DECISION_FILES = (
+    "PAPER_DRAFT.md",
+    "CLAIM_LEDGER.md",
+    "REPRODUCIBILITY.md",
+)
+EXTERNAL_PRIMARY_DECISION_ANCHORS = (
+    "external_2024_calendar_global_bias_confirm48_primary_retry2",
+    "overall_eligible=false",
+    "0.05541808434196047",
+    "0.061833300537408264",
+    "0.23610946912844127",
+    "0.225",
+    "absolute rank reliability",
+)
+INVALID_EXTERNAL_PRIMARY_CLAIMS = (
+    "88 percent upper-rank-bin",
+    "88% upper-rank-bin",
+)
 RESEARCH_PLAN_CLOSED_PRIMARY_ANCHORS = (
     "frozen after the single completed independent primary",
     "cannot be used to select, retune or resubmit a replacement candidate",
@@ -728,6 +746,33 @@ def require(condition: bool, message: str) -> None:
         raise ValueError(message)
 
 
+def validate_external_primary_consistency(documents: dict[str, str]) -> None:
+    """Keep decision-bearing external claims complete and reject invalid legacy text."""
+    for name in EXTERNAL_PRIMARY_DECISION_FILES:
+        require(name in documents, f"missing external-primary document: {name}")
+        normalized = " ".join(documents[name].split()).lower()
+        missing = [
+            anchor
+            for anchor in EXTERNAL_PRIMARY_DECISION_ANCHORS
+            if anchor.lower() not in normalized
+        ]
+        require(
+            not missing,
+            f"{name} is missing external-primary decision anchors: "
+            + ", ".join(missing),
+        )
+        invalid = [
+            claim
+            for claim in INVALID_EXTERNAL_PRIMARY_CLAIMS
+            if claim.lower() in normalized
+        ]
+        require(
+            not invalid,
+            f"{name} inherits invalid external-primary claims: "
+            + ", ".join(invalid),
+        )
+
+
 def validate_rank_coherent_immutable_identities(
     paper_dir: Path, handoff_text: str
 ) -> None:
@@ -971,6 +1016,14 @@ def main() -> int:
             f"{name} is missing frozen external-primary handoff anchors: "
             + ", ".join(missing_anchors),
         )
+
+    validate_external_primary_consistency(
+        {
+            "PAPER_DRAFT.md": manuscript,
+            "CLAIM_LEDGER.md": claim_ledger,
+            "REPRODUCIBILITY.md": reproducibility,
+        }
+    )
 
     external_reconciliation = (
         PAPER_DIR / "EXTERNAL_PRIMARY_RESULT_RECONCILIATION.md"

@@ -5,7 +5,11 @@ from __future__ import annotations
 
 import unittest
 
-from paper.check_publication_artifacts import PAPER_DIR, validate_empirical_traceability
+from paper.check_publication_artifacts import (
+    PAPER_DIR,
+    validate_empirical_traceability,
+    validate_external_primary_consistency,
+)
 
 
 class EmpiricalTraceabilityTests(unittest.TestCase):
@@ -41,6 +45,33 @@ class EmpiricalTraceabilityTests(unittest.TestCase):
         )
         with self.assertRaisesRegex(ValueError, "source is missing or escapes paper"):
             validate_empirical_traceability(mutated, PAPER_DIR)
+
+
+class ExternalPrimaryConsistencyTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.documents = {
+            name: (PAPER_DIR / name).read_text(encoding="utf-8")
+            for name in (
+                "PAPER_DRAFT.md",
+                "CLAIM_LEDGER.md",
+                "REPRODUCIBILITY.md",
+            )
+        }
+
+    def test_current_external_primary_claims_pass(self) -> None:
+        validate_external_primary_consistency(self.documents)
+
+    def test_missing_absolute_rank_anchor_fails_closed(self) -> None:
+        self.documents["CLAIM_LEDGER.md"] = self.documents["CLAIM_LEDGER.md"].replace(
+            "absolute rank reliability", "relative reliability"
+        )
+        with self.assertRaisesRegex(ValueError, "decision anchors"):
+            validate_external_primary_consistency(self.documents)
+
+    def test_invalid_legacy_rank_claim_fails_closed(self) -> None:
+        self.documents["PAPER_DRAFT.md"] += "\n88 percent upper-rank-bin\n"
+        with self.assertRaisesRegex(ValueError, "invalid external-primary claims"):
+            validate_external_primary_consistency(self.documents)
 
 
 if __name__ == "__main__":
