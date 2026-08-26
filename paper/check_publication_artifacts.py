@@ -364,6 +364,26 @@ MINIMUM_TIER_CLAIM_CONSISTENCY_ANCHORS = {
         "deterministic comparison is `PRESENT_DEVELOPMENT_ONLY`",
     ),
 }
+READINESS_BLOCKERS = {
+    "Eligible spatially preserving calibration": (
+        "RESEARCH_PLAN.md",
+        "MISSING_ELIGIBLE_RESULT",
+    ),
+    "Conformal intervals": ("MINIMUM_TIER_COMPARISON_AUDIT.md", "MISSING"),
+    "Probabilistic DA baseline such as EnKF/LETKF": (
+        "MINIMUM_TIER_COMPARISON_AUDIT.md",
+        "MISSING",
+    ),
+    "Independent-strength deterministic background and 3D-Var": (
+        "MINIMUM_TIER_COMPARISON_AUDIT.md",
+        "PRESENT_DEVELOPMENT_ONLY",
+    ),
+}
+READINESS_BLOCKER_ROW = re.compile(
+    r"^\| (?P<blocker>[^|]+?) \| `(?P<source>[^`]+)` \| "
+    r"(?P<status>[A-Z_]+) \| (?P<closure>[^|]*?) \|$",
+    re.MULTILINE,
+)
 EXTERNAL_PRIMARY_HANDOFF_ANCHORS = {
     "PUBLICATION_READINESS.md": (
         "External primary evidence state: RECONCILED_NEGATIVE",
@@ -1187,6 +1207,42 @@ def validate_minimum_tier_key_claims(manuscript: str, paper_dir: Path) -> None:
         )
 
 
+def validate_readiness_blockers(readiness: str, paper_dir: Path) -> None:
+    """Derive every NOT_READY blocker from normative evidence inventories."""
+    rows = list(READINESS_BLOCKER_ROW.finditer(readiness))
+    observed = {
+        row["blocker"].strip(): (row["source"], row["status"])
+        for row in rows
+    }
+    require(
+        len(rows) == len(observed) == len(READINESS_BLOCKERS),
+        "readiness blocker matrix is incomplete or contains duplicates",
+    )
+    require(
+        observed == READINESS_BLOCKERS,
+        "readiness blocker matrix differs from the normative blocker set",
+    )
+    require(
+        all(row["closure"].strip() for row in rows),
+        "readiness blocker lacks an exact closure condition",
+    )
+    audit = (paper_dir / "MINIMUM_TIER_COMPARISON_AUDIT.md").read_text(
+        encoding="utf-8"
+    )
+    tier_states = {
+        row["comparison"].strip(): row["status"]
+        for row in MINIMUM_TIER_ROW.finditer(audit)
+    }
+    require(
+        tier_states.get("Conformal intervals") == observed["Conformal intervals"][1]
+        and tier_states.get("Probabilistic DA baseline such as EnKF/LETKF")
+        == observed["Probabilistic DA baseline such as EnKF/LETKF"][1]
+        and tier_states.get("Deterministic background and 3D-Var")
+        == observed["Independent-strength deterministic background and 3D-Var"][1],
+        "readiness blockers do not match minimum-tier evidence states",
+    )
+
+
 def main() -> int:
     missing = [name for name in REQUIRED_FILES if not (PAPER_DIR / name).is_file()]
     require(not missing, f"missing required publication files: {', '.join(missing)}")
@@ -1231,6 +1287,7 @@ def main() -> int:
     manuscript = (PAPER_DIR / "PAPER_DRAFT.md").read_text(encoding="utf-8")
     claim_ledger = (PAPER_DIR / "CLAIM_LEDGER.md").read_text(encoding="utf-8")
     readiness = (PAPER_DIR / "PUBLICATION_READINESS.md").read_text(encoding="utf-8")
+    validate_readiness_blockers(readiness, PAPER_DIR)
     reference_traceability = (PAPER_DIR / "REFERENCE_TRACEABILITY.md").read_text(
         encoding="utf-8"
     )

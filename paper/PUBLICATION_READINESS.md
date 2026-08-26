@@ -13,6 +13,20 @@ Controller readiness: NOT_READY
 Scientific primary reconciliation: COMPLETE_NEGATIVE
 Autonomous publication work remaining: YES
 
+## Decision-bearing readiness blocker matrix
+
+This table is normative for the current `NOT_READY` decision. Its evidence
+states are derived from the minimum-tier audit rather than editorial judgment;
+none of the four rows may be silently removed or treated as compensating for
+another row.
+
+| Required blocker | Normative source | Current evidence state | Exact closure condition |
+|---|---|---|---|
+| Eligible spatially preserving calibration | `RESEARCH_PLAN.md` | MISSING_ELIGIBLE_RESULT | One frozen candidate passes every mandatory no-compensation gate family |
+| Conformal intervals | `MINIMUM_TIER_COMPARISON_AUDIT.md` | MISSING | The corresponding normative comparison row becomes decision-bearing after valid trusted execution |
+| Probabilistic DA baseline such as EnKF/LETKF | `MINIMUM_TIER_COMPARISON_AUDIT.md` | MISSING | The corresponding normative comparison row becomes decision-bearing after valid trusted execution |
+| Independent-strength deterministic background and 3D-Var | `MINIMUM_TIER_COMPARISON_AUDIT.md` | PRESENT_DEVELOPMENT_ONLY | A frozen common-information comparison supplies evidence at the manuscript's required independent strength |
+
 The 2026-08-27 key-claim audit now derives the two `MISSING` baseline families
 from `MINIMUM_TIER_COMPARISON_AUDIT.md` and requires both to remain explicit in
 Abstract, Contributions and Conclusion. The manuscript now contains a dedicated

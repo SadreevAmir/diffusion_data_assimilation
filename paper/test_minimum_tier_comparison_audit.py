@@ -11,10 +11,12 @@ from paper.check_publication_artifacts import (
     MINIMUM_TIER_CLAIM_CONSISTENCY_ANCHORS,
     MINIMUM_TIER_ROW,
     PAPER_DIR,
+    READINESS_BLOCKER_ROW,
     REQUIRED_REGRESSION_SUITES,
     validate_documented_regression_suites,
     validate_minimum_tier_key_claims,
     validate_minimum_tier_comparisons,
+    validate_readiness_blockers,
 )
 
 
@@ -27,6 +29,9 @@ class MinimumTierComparisonAuditTests(unittest.TestCase):
             encoding="utf-8"
         )
         self.manuscript = (PAPER_DIR / "PAPER_DRAFT.md").read_text(encoding="utf-8")
+        self.readiness = (PAPER_DIR / "PUBLICATION_READINESS.md").read_text(
+            encoding="utf-8"
+        )
 
     def make_fixture(self, audit: str) -> tempfile.TemporaryDirectory[str]:
         temporary = tempfile.TemporaryDirectory()
@@ -171,6 +176,37 @@ class MinimumTierComparisonAuditTests(unittest.TestCase):
 
     def test_key_claims_name_both_missing_families(self) -> None:
         validate_minimum_tier_key_claims(self.manuscript, PAPER_DIR)
+
+    def test_readiness_blockers_match_normative_evidence(self) -> None:
+        validate_readiness_blockers(self.readiness, PAPER_DIR)
+
+    def test_readiness_cannot_drop_blocker(self) -> None:
+        row = READINESS_BLOCKER_ROW.search(self.readiness)
+        self.assertIsNotNone(row)
+        assert row is not None
+        mutated = self.readiness[: row.start()] + self.readiness[row.end() :]
+        with self.assertRaisesRegex(ValueError, "matrix is incomplete"):
+            validate_readiness_blockers(mutated, PAPER_DIR)
+
+    def test_readiness_cannot_promote_missing_evidence(self) -> None:
+        mutated = self.readiness.replace(
+            "| Conformal intervals | `MINIMUM_TIER_COMPARISON_AUDIT.md` | MISSING |",
+            "| Conformal intervals | `MINIMUM_TIER_COMPARISON_AUDIT.md` | PRESENT |",
+            1,
+        )
+        self.assertNotEqual(mutated, self.readiness)
+        with self.assertRaisesRegex(ValueError, "normative blocker set"):
+            validate_readiness_blockers(mutated, PAPER_DIR)
+
+    def test_readiness_blocker_requires_closure_condition(self) -> None:
+        mutated = self.readiness.replace(
+            "| Eligible spatially preserving calibration | `RESEARCH_PLAN.md` | MISSING_ELIGIBLE_RESULT | One frozen candidate passes every mandatory no-compensation gate family |",
+            "| Eligible spatially preserving calibration | `RESEARCH_PLAN.md` | MISSING_ELIGIBLE_RESULT |  |",
+            1,
+        )
+        self.assertNotEqual(mutated, self.readiness)
+        with self.assertRaisesRegex(ValueError, "exact closure condition"):
+            validate_readiness_blockers(mutated, PAPER_DIR)
 
     def test_abstract_cannot_omit_missing_family(self) -> None:
         start = self.manuscript.index("## Abstract")
