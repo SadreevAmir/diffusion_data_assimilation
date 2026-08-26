@@ -401,6 +401,35 @@ MINIMUM_TIER_COMPARISONS = {
     "Deterministic background and 3D-Var": "PRESENT_DEVELOPMENT_ONLY",
     "Probabilistic DA baseline such as EnKF/LETKF": "MISSING",
 }
+MINIMUM_TIER_EVIDENCE_CONTRACT = {
+    "Raw ensemble": (
+        "REPRODUCIBILITY.md",
+        "compares raw with all three fixed candidates",
+    ),
+    "Physical-space bias/spread scaling": (
+        "REPRODUCIBILITY.md",
+        "completed fixed-contract joint calibration audit",
+    ),
+    "Naive affine-logit scaling": ("CLAIM_LEDGER.md", "| C7 |"),
+    "Zero/one-inflated Beta or EMOS-like SIC postprocessing": (
+        "REPRODUCIBILITY.md",
+        "## Frozen ZOIB-EMOS/ECC-Q handoff",
+    ),
+    "Isotonic/quantile mapping": (
+        "REPRODUCIBILITY.md",
+        "fixed purged hurdle-isotonic/ECC-Q audit",
+    ),
+    "Conformal intervals": ("RESEARCH_PLAN.md", "- conformal intervals;"),
+    "ECC-Q/ECC-T or rank-preserving reconstruction": (
+        "REPRODUCIBILITY.md",
+        "deterministic ECC-Q reconstruction",
+    ),
+    "Deterministic background and 3D-Var": ("CLAIM_LEDGER.md", "| C4 |"),
+    "Probabilistic DA baseline such as EnKF/LETKF": (
+        "RESEARCH_PLAN.md",
+        "- probabilistic DA baseline such as EnKF/LETKF",
+    ),
+}
 MINIMUM_TIER_ROW = re.compile(
     r"^\| (?P<comparison>[^|]+) \| (?P<presentation>[^|]+) \| "
     r"`(?P<source>[^`]+)` \| (?P<status>[A-Z_]+) \|$",
@@ -785,6 +814,15 @@ def validate_minimum_tier_comparisons(paper_dir: Path) -> None:
         require(
             source.is_relative_to(paper_dir.resolve()) and source.is_file(),
             f"minimum-tier compact source is missing or escapes paper/: {comparison}",
+        )
+        expected_source, evidence_anchor = MINIMUM_TIER_EVIDENCE_CONTRACT[comparison]
+        require(
+            row["source"] == expected_source,
+            f"minimum-tier compact source differs from evidence contract: {comparison}",
+        )
+        require(
+            evidence_anchor in source.read_text(encoding="utf-8"),
+            f"minimum-tier compact source lacks evidence anchor: {comparison}",
         )
     require(
         observed == MINIMUM_TIER_COMPARISONS,

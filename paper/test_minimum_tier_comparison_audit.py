@@ -66,6 +66,25 @@ class MinimumTierComparisonAuditTests(unittest.TestCase):
         mutated = self.audit.replace(f"`{source}`", f"`../{source}`", 1)
         self.assert_fixture_fails(mutated, "source is missing or escapes paper")
 
+    def test_changed_compact_source_fails_closed(self) -> None:
+        mutated = self.audit.replace(
+            "| `CLAIM_LEDGER.md` | PRESENT_NEGATIVE |",
+            "| `REPRODUCIBILITY.md` | PRESENT_NEGATIVE |",
+            1,
+        )
+        self.assertNotEqual(mutated, self.audit)
+        self.assert_fixture_fails(mutated, "source differs from evidence contract")
+
+    def test_missing_source_evidence_anchor_fails_closed(self) -> None:
+        with self.make_fixture(self.audit) as temporary:
+            fixture_dir = Path(temporary)
+            ledger = fixture_dir / "CLAIM_LEDGER.md"
+            mutated = ledger.read_text(encoding="utf-8").replace("| C7 |", "| X7 |", 1)
+            self.assertNotEqual(mutated, ledger.read_text(encoding="utf-8"))
+            ledger.write_text(mutated, encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "lacks evidence anchor"):
+                validate_minimum_tier_comparisons(fixture_dir)
+
     def test_documented_regression_suites_match_executable_contract(self) -> None:
         validate_documented_regression_suites(self.reproducibility)
 
