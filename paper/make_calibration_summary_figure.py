@@ -35,9 +35,12 @@ def load_summary(path: Path) -> dict[str, float]:
     result: dict[str, float] = {}
     for key in required:
         value = float(row[key])
-        if not math.isfinite(value):
-            raise ValueError(f"non-finite value for {key}")
+        if not math.isfinite(value) or value < 0:
+            raise ValueError(f"invalid value for {key}")
         result[key] = value
+    for _, corrected, raw, _ in METRICS:
+        if result[corrected] == 0 and result[raw] == 0:
+            raise ValueError(f"undefined zero scale for {corrected} and {raw}")
     return result
 
 

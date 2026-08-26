@@ -13,6 +13,15 @@ Controller readiness: NOT_READY
 Scientific primary reconciliation: COMPLETE_NEGATIVE
 Autonomous publication work remaining: YES
 
+The 2026-08-27 figure-generator audit found that finite compact inputs could
+still reach undefined rendering paths: jointly zero calibration values produced
+a zero plotting scale, and a zero raw joint-gate metric produced an undefined
+ratio. Both generators now reject those inputs explicitly, reject negative
+metrics consistently, and have deterministic compact-fixture regression tests.
+The unified checker requires and executes that suite. This closes a concrete
+figure-reproducibility gap but adds no scientific result, so publication status
+remains `NOT_READY`.
+
 The 2026-08-27 pre-result interpretation audit now freezes in `PAPER_DRAFT.md`
 all four valid joint outcomes of the two outstanding minimum-tier contracts.
 Each conformal and probabilistic-DA result closes only its exact evidence row;
@@ -126,7 +135,7 @@ mode or change `NOT_READY`.
 
 The 2026-08-26 independent publication-readiness rerun completed the unified
 fail-closed audit and the focused rank-coherent handoff suites against the
-current worktree. The audit passed with 38 required files, two figures, six
+current worktree. The audit passed with 39 required files, two figures, six
 references and all 39 claim-ledger rows traced; the five prototype tests and
 the 13-test adapter-parity suite also passed. `git diff --check` found no
 whitespace errors. This confirms internal consistency and executable handoff

@@ -21,6 +21,7 @@ REQUIRED_REGRESSION_SUITES = (
     "paper.test_publication_immutable_identities",
     "paper.test_publication_empirical_traceability",
     "paper.test_minimum_tier_comparison_audit",
+    "paper.test_publication_figure_generators",
 )
 REGRESSION_COMMAND = re.compile(
     r"python3 -m unittest -v \\\n(?P<body>(?:  paper\.[a-z0-9_]+(?: \\\n|\n))+)",
@@ -120,6 +121,7 @@ REQUIRED_FILES = (
     "test_publication_immutable_identities.py",
     "test_publication_empirical_traceability.py",
     "test_minimum_tier_comparison_audit.py",
+    "test_publication_figure_generators.py",
     "RANK_COHERENT_ADAPTER_SPEC.md",
     "NEXT_GENERATIVE_METHOD_CONTRACT.md",
     "LATENT_TEMPERATURE_RESULT_RECONCILIATION.md",

@@ -39,6 +39,8 @@ def load_summary(path: Path) -> tuple[dict[str, float], dict[str, float]]:
             value = float(row[key])
             if not math.isfinite(value) or value < 0:
                 raise ValueError(f"invalid value for {key}")
+        if float(raw[key]) == 0:
+            raise ValueError(f"raw denominator must be positive for {key}")
     return raw, candidate
 
 

@@ -440,6 +440,12 @@ It reports candidate/raw ratios and fixed per-metric limits; it does not form a
 composite score or recompute the gate. The checked-in SVG is a compact rendering
 of the trusted summary and can be regenerated only after these checks pass.
 
+Both figure generators are covered by the required publication regression
+suite. The tests exercise deterministic rendering from compact fixtures and
+fail-closed rejection of negative metrics, a jointly zero plotting scale and a
+zero raw denominator. This prevents malformed but finite compact input from
+producing a misleading or undefined checked-in SVG.
+
 The compact CSV and aggregate JSON retain their trusted manifests outside the
 paper narrative. Venue metadata, author statements and data-release decisions
 remain external inputs.
@@ -481,7 +487,8 @@ python3 -m unittest -v \
   paper.test_validate_rank_coherent_admission \
   paper.test_publication_immutable_identities \
   paper.test_publication_empirical_traceability \
-  paper.test_minimum_tier_comparison_audit
+  paper.test_minimum_tier_comparison_audit \
+  paper.test_publication_figure_generators
 python3 paper/check_publication_artifacts.py
 ```
 
