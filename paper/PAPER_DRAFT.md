@@ -262,6 +262,24 @@ publication source. It identifies exactly two absent families: conformal
 intervals and a probabilistic DA comparator. The deterministic background and
 3D-Var comparison remains development-only rather than an independent result.
 
+The interpretation of the two frozen missing-family contracts is fixed before
+either result exists. The matrix below applies only when both executions are
+valid; `COMPARATOR_INVALID` or an invalid conformal execution leaves the
+corresponding evidence row `MISSING` rather than creating a scientific result.
+
+| Conformal decision | Probabilistic-DA decision | Predeclared publication interpretation |
+|---|---|---|
+| `CONFORMAL_USEFUL` | `PROBABILISTIC_DA_USEFUL` | Both missing minimum-tier rows close as useful baselines; this strengthens comparison completeness but does not make any learned-joint calibration eligible. |
+| `CONFORMAL_USEFUL` | `PROBABILISTIC_DA_NEGATIVE` | The field-functional interval row closes positively and the exact small-ensemble LETKF contract closes negatively; neither outcome changes the learned-joint no-compensation gate. |
+| `CONFORMAL_NEGATIVE` | `PROBABILISTIC_DA_USEFUL` | The exact conformal interval closes negatively and LETKF closes as a useful probabilistic comparator; LETKF success is not evidence that generated members are calibrated. |
+| `CONFORMAL_NEGATIVE` | `PROBABILISTIC_DA_NEGATIVE` | Both exact mechanisms close as negative baselines; the paper gains a complete falsification record for these contracts, not evidence against either broader method family. |
+
+Across all four valid outcomes, minimum-tier row closure and learned-joint
+calibration eligibility remain logically independent. The thresholds, folds and
+failure interpretations in the two frozen contracts are unchanged by this
+matrix, and neither result may compensate for a failed proper-score, reliability,
+boundary, spatial/physical or operational family of a calibration candidate.
+
 We additionally evaluate the frozen cross-fitted scales followed by an exact
 capped-simplex projection of each ten-member pixel distribution. The projection
 preserves the raw ensemble mean while enforcing bounded members and preserving

@@ -460,6 +460,15 @@ set, leakage-safe fold selection and the numerical fair-CRPS, absolute-rank and
 3D-Var-relative RMSE decision. It is also a pre-result contract only: it leaves
 the evidence status `MISSING` and does not authorize an unimplemented mode.
 
+`PAPER_DRAFT.md` also freezes the joint four-outcome interpretation of these two
+contracts. Every valid positive/negative combination closes each exact evidence
+row on its own terms, while invalid execution leaves that row `MISSING`.
+Crucially, baseline-row closure is invariantly separate from learned-joint
+calibration eligibility; neither baseline outcome can compensate for a failed
+no-compensation gate family. The unified audit requires these interpretation
+anchors so future result insertion cannot silently promote comparison
+completeness into calibration success.
+
 ```bash
 python3 -m unittest -v \
   paper.test_rank_coherent_runner_prototype \

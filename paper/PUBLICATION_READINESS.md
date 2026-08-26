@@ -13,6 +13,16 @@ Controller readiness: NOT_READY
 Scientific primary reconciliation: COMPLETE_NEGATIVE
 Autonomous publication work remaining: YES
 
+The 2026-08-27 pre-result interpretation audit now freezes in `PAPER_DRAFT.md`
+all four valid joint outcomes of the two outstanding minimum-tier contracts.
+Each conformal and probabilistic-DA result closes only its exact evidence row;
+invalid execution leaves that row `MISSING`, and no combination can establish
+learned-joint calibration eligibility or compensate for a failed gate family.
+`REPRODUCIBILITY.md` records the same logical boundary and the unified checker
+requires the decision labels, all four combinations and the non-compensation
+interpretation. This prevents post-hoc narrative promotion but supplies neither
+missing result, so publication status remains `NOT_READY`.
+
 The 2026-08-27 conformal-baseline design audit freezes the fastest outstanding
 minimum-tier comparison in `NEXT_CONFORMAL_BASELINE_CONTRACT.md`. It uses five
 contiguous purged folds, the raw ten-member sea-ice-area range, the exact

@@ -199,6 +199,15 @@ CURRENT_DECISION_ANCHORS = (
     "locked-MC-dropout chain is complete and negative",
     "activates the already frozen iid calendar\nglobal-bias fallback",
 )
+MINIMUM_TIER_OUTCOME_MATRIX_ANCHORS = (
+    "The interpretation of the two frozen missing-family contracts is fixed before",
+    "`CONFORMAL_USEFUL` | `PROBABILISTIC_DA_USEFUL`",
+    "`CONFORMAL_USEFUL` | `PROBABILISTIC_DA_NEGATIVE`",
+    "`CONFORMAL_NEGATIVE` | `PROBABILISTIC_DA_USEFUL`",
+    "`CONFORMAL_NEGATIVE` | `PROBABILISTIC_DA_NEGATIVE`",
+    "minimum-tier row closure and learned-joint\ncalibration eligibility remain logically independent",
+    "`COMPARATOR_INVALID` or an invalid conformal execution leaves the\ncorresponding evidence row `MISSING`",
+)
 EXTERNAL_PRIMARY_HANDOFF_ANCHORS = {
     "PUBLICATION_READINESS.md": (
         "External primary evidence state: RECONCILED_NEGATIVE",
@@ -958,6 +967,23 @@ def main() -> int:
     claim_ledger = (PAPER_DIR / "CLAIM_LEDGER.md").read_text(encoding="utf-8")
     readiness = (PAPER_DIR / "PUBLICATION_READINESS.md").read_text(encoding="utf-8")
     validate_minimum_tier_comparisons(PAPER_DIR)
+    missing_outcome_anchors = [
+        anchor
+        for anchor in MINIMUM_TIER_OUTCOME_MATRIX_ANCHORS
+        if anchor not in manuscript
+    ]
+    require(
+        not missing_outcome_anchors,
+        "manuscript minimum-tier outcome matrix is incomplete: "
+        + ", ".join(missing_outcome_anchors),
+    )
+    require(
+        "all four valid joint outcomes of the two outstanding minimum-tier contracts"
+        in readiness
+        and "baseline-row closure is invariantly separate from learned-joint\ncalibration eligibility"
+        in reproducibility,
+        "publication handoff does not preserve the pre-result outcome interpretation",
+    )
     manuscript_tables = validate_markdown_tables(manuscript, "PAPER_DRAFT.md")
     ledger_tables = validate_markdown_tables(claim_ledger, "CLAIM_LEDGER.md")
     require(manuscript_tables >= 8, "manuscript is missing required evidence tables")
