@@ -575,6 +575,23 @@ EMPIRICAL_TRACEABILITY_ROW = re.compile(
     r"(?P<presentation>[^|]+) \| `(?P<source>[^`]+)` \| (?P<role>[^|]+) \|$",
     re.MULTILINE,
 )
+DECISION_PRESENTATION_HEADING = "### Decision-bearing presentation audit\n"
+DECISION_PRESENTATION_ROWS = {
+    "global-spread": ("Frozen-mechanism table; paired-diagnostic table; Figure 1", "Negative", "Date and four-date-block intervals"),
+    "hurdle-IDR/ECC-Q": ("Purged hurdle-IDR/ECC-Q table", "Negative", "Date interval reported in source"),
+    "projected-spread": ("Projected-spread table; Figure 2", "Negative", "Date and four-date-block intervals"),
+    "open-logit": ("Open-logit table", "Negative", "Not decision-critical"),
+    "ZOIB-EMOS/ECC-Q": ("ZOIB-EMOS/ECC-Q table", "Negative", "Frozen paired intervals in source"),
+    "later-mechanism-family": ("Later-mechanism family matrix", "Negative", "Claim-specific intervals where decision-bearing"),
+    "amended-primary-policy": ("Amended primary decision policy", "Normative rejection rule", "Not applicable"),
+    "locked-MC-dropout": ("Later-mechanism family matrix", "Negative overall only", "Unavailable; no effect-size claim"),
+    "independent-primary": ("Independent-primary table", "Negative", "Not required for observed 48-case census"),
+}
+DECISION_PRESENTATION_ROW = re.compile(
+    r"^\| `(?P<unit>[^`]+)` \| (?P<presentation>[^|]+) \| "
+    r"(?P<decision>[^|]+) \| (?P<uncertainty>[^|]+) \|$",
+    re.MULTILINE,
+)
 MINIMUM_TIER_COMPARISONS = {
     "Raw ensemble": "PRESENT",
     "Physical-space bias/spread scaling": "PRESENT_NEGATIVE",
@@ -998,6 +1015,61 @@ def validate_empirical_traceability(manuscript: str, paper_dir: Path) -> None:
         + " expected="
         + ",".join(map(str, sorted(EMPIRICAL_CLAIM_IDS))),
     )
+
+    require(
+        DECISION_PRESENTATION_HEADING in manuscript,
+        "manuscript contains no decision-bearing presentation audit",
+    )
+    decision_section = manuscript.split(
+        DECISION_PRESENTATION_HEADING, maxsplit=1
+    )[1].split("\n### ", maxsplit=1)[0]
+    observed: dict[str, tuple[str, str, str]] = {}
+    for row in DECISION_PRESENTATION_ROW.finditer(decision_section):
+        unit = row["unit"]
+        require(unit not in observed, f"duplicate decision presentation unit: {unit}")
+        observed[unit] = tuple(
+            row[name].strip() for name in ("presentation", "decision", "uncertainty")
+        )
+    require(
+        observed == DECISION_PRESENTATION_ROWS,
+        "decision-bearing presentation audit mismatch",
+    )
+
+    presentation_anchors = {
+        "Frozen-mechanism table": "| Diagnostic | Raw ensemble | Cross-fitted correction |",
+        "paired-diagnostic table": "| Paired diagnostic | Mean delta (corrected - raw) |",
+        "Figure 1": "**Figure 1.** Aggregate validation diagnostics",
+        "Purged hurdle-IDR/ECC-Q table": "| Purged hurdle-IDR/ECC-Q diagnostic |",
+        "Projected-spread table": "| Mean-preserving projected-spread diagnostic |",
+        "Figure 2": "**Figure 2.** Exact mean-preserving projected spread",
+        "Open-logit table": "| Mean-preserving open-logit diagnostic |",
+        "ZOIB-EMOS/ECC-Q table": "| ZOIB-EMOS/ECC-Q diagnostic |",
+        "Later-mechanism family matrix": "| Later frozen mechanism | Proper score |",
+        "Amended primary decision policy": "## Amended primary decision policy",
+        "Independent-primary table": "| Independent primary diagnostic |",
+    }
+    named_presentations = " ".join(value[0] for value in observed.values())
+    for name, anchor in presentation_anchors.items():
+        if name in named_presentations:
+            require(anchor in manuscript, f"decision presentation object is missing: {name}")
+
+    negative_units = {
+        unit for unit, (_, decision, _) in observed.items()
+        if decision.startswith("Negative")
+    }
+    require(
+        negative_units == {
+            "global-spread", "hurdle-IDR/ECC-Q", "projected-spread",
+            "open-logit", "ZOIB-EMOS/ECC-Q", "later-mechanism-family",
+            "locked-MC-dropout", "independent-primary",
+        },
+        "decision-bearing audit does not preserve every negative result",
+    )
+    for unit in ("global-spread", "projected-spread"):
+        require(
+            "Date and four-date-block intervals" in observed[unit][2],
+            f"mandatory paired uncertainty is missing for {unit}",
+        )
 
 
 def validate_minimum_tier_comparisons(paper_dir: Path) -> None:

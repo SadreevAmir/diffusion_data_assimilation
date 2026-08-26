@@ -46,6 +46,33 @@ class EmpiricalTraceabilityTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "source is missing or escapes paper"):
             validate_empirical_traceability(mutated, PAPER_DIR)
 
+    def test_missing_decision_presentation_object_fails_closed(self) -> None:
+        mutated = self.manuscript.replace(
+            "**Figure 2.** Exact mean-preserving projected spread",
+            "**Illustration 2.** Exact mean-preserving projected spread",
+            1,
+        )
+        with self.assertRaisesRegex(ValueError, "presentation object is missing"):
+            validate_empirical_traceability(mutated, PAPER_DIR)
+
+    def test_negative_result_cannot_be_promoted(self) -> None:
+        mutated = self.manuscript.replace(
+            "| `open-logit` | Open-logit table | Negative |",
+            "| `open-logit` | Open-logit table | Positive |",
+            1,
+        )
+        with self.assertRaisesRegex(ValueError, "presentation audit mismatch"):
+            validate_empirical_traceability(mutated, PAPER_DIR)
+
+    def test_mandatory_uncertainty_cannot_disappear(self) -> None:
+        mutated = self.manuscript.replace(
+            "| `projected-spread` | Projected-spread table; Figure 2 | Negative | Date and four-date-block intervals |",
+            "| `projected-spread` | Projected-spread table; Figure 2 | Negative | Not decision-critical |",
+            1,
+        )
+        with self.assertRaisesRegex(ValueError, "presentation audit mismatch"):
+            validate_empirical_traceability(mutated, PAPER_DIR)
+
 
 class ExternalPrimaryConsistencyTests(unittest.TestCase):
     def setUp(self) -> None:

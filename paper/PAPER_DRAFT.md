@@ -678,6 +678,26 @@ presentation object or compact source disappears.
 | C38 | Section 8 later-mechanism family matrix | `LOCKED_MC_DROPOUT_RESULT_RECONCILIATION.md` | Overall rejection only; no unsupported family effect sizes |
 | C39 | Independent primary result section and Section 8 independent-primary table | `EXTERNAL_PRIMARY_RESULT_RECONCILIATION.md` | Reconciled negative independent primary with superseded metrics excluded |
 
+### Decision-bearing presentation audit
+
+This compact matrix is the fail-closed inventory of presentation objects that
+carry a scientific decision. “Not decision-critical” means that the common gate
+decision does not depend on an unreported sampling interval; it does not mean
+that uncertainty is absent from the underlying compact source. The locked
+MC-dropout row deliberately preserves the narrower evidence boundary.
+
+| Evidence unit | Manuscript presentation | Decision shown | Uncertainty shown or bounded |
+|---|---|---|---|
+| `global-spread` | Frozen-mechanism table; paired-diagnostic table; Figure 1 | Negative | Date and four-date-block intervals |
+| `hurdle-IDR/ECC-Q` | Purged hurdle-IDR/ECC-Q table | Negative | Date interval reported in source |
+| `projected-spread` | Projected-spread table; Figure 2 | Negative | Date and four-date-block intervals |
+| `open-logit` | Open-logit table | Negative | Not decision-critical |
+| `ZOIB-EMOS/ECC-Q` | ZOIB-EMOS/ECC-Q table | Negative | Frozen paired intervals in source |
+| `later-mechanism-family` | Later-mechanism family matrix | Negative | Claim-specific intervals where decision-bearing |
+| `amended-primary-policy` | Amended primary decision policy | Normative rejection rule | Not applicable |
+| `locked-MC-dropout` | Later-mechanism family matrix | Negative overall only | Unavailable; no effect-size claim |
+| `independent-primary` | Independent-primary table | Negative | Not required for observed 48-case census |
+
 ### Final frozen development fallback
 
 The last predeclared development fallback mixed raw and calendar-conditioned
