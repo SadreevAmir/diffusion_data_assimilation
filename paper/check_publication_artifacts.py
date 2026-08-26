@@ -626,6 +626,11 @@ def main() -> int:
     )
     reproducibility = (PAPER_DIR / "REPRODUCIBILITY.md").read_text(encoding="utf-8")
 
+    require(
+        f"audit passed with {len(REQUIRED_FILES)} required files" in readiness,
+        "publication readiness has a stale required-file count",
+    )
+
     section_positions = [
         reproducibility.find(heading) for heading in REPRODUCIBILITY_SECTION_ORDER
     ]

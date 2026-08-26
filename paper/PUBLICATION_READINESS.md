@@ -1,6 +1,6 @@
 # Publication readiness audit
 
-Audit date: 2026-08-23
+Audit date: 2026-08-26
 
 Publication status: NOT_READY
 
@@ -23,9 +23,9 @@ requirements. This is pre-result design evidence only, is activated solely by a
 negative completed whole-field transport gate, and does not create a trusted
 mode or change `NOT_READY`.
 
-The 2026-08-23 independent publication-readiness rerun completed the unified
+The 2026-08-26 independent publication-readiness rerun completed the unified
 fail-closed audit and the focused rank-coherent handoff suites against the
-current worktree. The audit passed with 29 required files, two figures, six
+current worktree. The audit passed with 30 required files, two figures, six
 references and all 39 claim-ledger rows traced; the five prototype tests and
 the 13-test adapter-parity suite also passed. `git diff --check` found no
 whitespace errors. This confirms internal consistency and executable handoff
