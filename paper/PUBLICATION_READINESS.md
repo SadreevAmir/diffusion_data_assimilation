@@ -13,6 +13,14 @@ Controller readiness: NOT_READY
 Scientific primary reconciliation: COMPLETE_NEGATIVE
 Autonomous publication work remaining: YES
 
+The 2026-08-26 mechanism-table audit added a single family-level matrix for the
+late frozen mechanisms that support the manuscript's central failure-map claim.
+It distinguishes complete family passes from partial metric improvements and
+marks the locked-MC-dropout families `NR`, because only its trusted overall
+Boolean is present locally. This makes the negative comparison auditable without
+inventing unavailable effect sizes or failure causes. It improves manuscript
+traceability but does not change `NOT_READY` or remove any scientific blocker.
+
 The 2026-08-26 table-integrity audit made the publication checker fail closed
 on malformed Markdown evidence tables. It now verifies header/separator widths,
 non-empty headers and body cells, constant row widths, non-empty bodies, at

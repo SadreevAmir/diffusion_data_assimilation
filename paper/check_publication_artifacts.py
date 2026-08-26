@@ -462,6 +462,8 @@ ANALOG_RESULT_ANCHORS = {
         "0.107720",
         "0.753021",
         "fields therefore improve ranks and attainable coverage but transfer unsafe",
+        "| Later frozen mechanism | Proper score | Reliability | Boundary | Spatial/physical | Operational | Overall |",
+        "| Locked MC dropout | NR | NR | NR | NR | NR | Fail |",
     ),
     "CLAIM_LEDGER.md": (
         "| C31 |",

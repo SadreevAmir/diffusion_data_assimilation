@@ -555,6 +555,23 @@ ensemble sizes, regions or observation systems remains unverified.
 | Mean IIEE | 0.079600 | 0.087190 | Spatial/physical family fails |
 | Edge disagreement | 0.035129 | 0.040165 | Spatial/physical family fails |
 
+The later mechanism tests are summarized at family level below. A pass means
+that the complete frozen family passed; it is not a partial improvement or a
+composite score. `NR` means that the quantitative compact family payload is not
+available in this worktree, so the controller-recorded overall rejection is not
+expanded into unsupported family-specific claims.
+
+| Later frozen mechanism | Proper score | Reliability | Boundary | Spatial/physical | Operational | Overall |
+|---|---:|---:|---:|---:|---:|---:|
+| Topology-preserving stratified transport | Fail | Fail | Pass | Pass | Pass | Fail |
+| Purged analog-residual dressing | Fail | Pass | Fail | Fail | Pass | Fail |
+| Guidance mixture | Fail | Fail | Fail | Fail | Pass | Fail |
+| Coherent member offset | Fail | Fail | Pass | Pass | Pass | Fail |
+| Slack-limited coherent offset | Fail | Fail | Pass | Pass | Pass | Fail |
+| Latent temperature 1.30 | Fail | Pass | Fail | Fail | Pass | Fail |
+| Locked MC dropout | NR | NR | NR | NR | NR | Fail |
+| IID calendar global-bias mixture | Fail | Pass | Pass | Pass | Pass | Fail |
+
 | Paired diagnostic | Mean delta (corrected - raw) | Date-bootstrap 95% CI | Four-date-block 95% CI |
 |---|---:|---:|---:|
 | Fair CRPS | -0.002801 | [-0.004132, -0.001354] | [-0.005026, -0.000290] |
