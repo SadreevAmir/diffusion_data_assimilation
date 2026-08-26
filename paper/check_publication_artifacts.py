@@ -298,6 +298,10 @@ FINAL_DIAGNOSTIC_ANCHORS = {
         "0.0719362",
         "No post-hoc tuning follows.",
         "| C38 | The frozen locked-MC-dropout candidate",
+        "Rejected by the controller-recorded gate decision",
+        "The complete quantitative compact payload is not present in this worktree",
+        "so no failed family or effect size is claimed",
+        "see `LOCKED_MC_DROPOUT_RESULT_RECONCILIATION.md`",
         "contractual prerequisite for the subsequently completed iid calendar global-bias fallback",
     ),
     "REPRODUCIBILITY.md": (
