@@ -13,6 +13,7 @@ from paper.check_publication_artifacts import (
     PAPER_DIR,
     REQUIRED_REGRESSION_SUITES,
     validate_documented_regression_suites,
+    validate_minimum_tier_key_claims,
     validate_minimum_tier_comparisons,
 )
 
@@ -25,6 +26,7 @@ class MinimumTierComparisonAuditTests(unittest.TestCase):
         self.reproducibility = (PAPER_DIR / "REPRODUCIBILITY.md").read_text(
             encoding="utf-8"
         )
+        self.manuscript = (PAPER_DIR / "PAPER_DRAFT.md").read_text(encoding="utf-8")
 
     def make_fixture(self, audit: str) -> tempfile.TemporaryDirectory[str]:
         temporary = tempfile.TemporaryDirectory()
@@ -166,6 +168,36 @@ class MinimumTierComparisonAuditTests(unittest.TestCase):
             self.assertTrue(anchors)
             for anchor in anchors:
                 self.assertIn(anchor, text)
+
+    def test_key_claims_name_both_missing_families(self) -> None:
+        validate_minimum_tier_key_claims(self.manuscript, PAPER_DIR)
+
+    def test_abstract_cannot_omit_missing_family(self) -> None:
+        start = self.manuscript.index("## Abstract")
+        end = self.manuscript.index("## 1.", start)
+        section = self.manuscript[start:end]
+        mutated_section = section.replace("Conformal intervals", "Planned intervals", 1)
+        self.assertNotEqual(mutated_section, section)
+        mutated = self.manuscript[:start] + mutated_section + self.manuscript[end:]
+        with self.assertRaisesRegex(ValueError, "Abstract omits missing family"):
+            validate_minimum_tier_key_claims(mutated, PAPER_DIR)
+
+    def test_contributions_cannot_promote_minimum_tier(self) -> None:
+        start = self.manuscript.index("### Contributions supported by the present evidence")
+        end = self.manuscript.index("## 2.", start)
+        section = self.manuscript[start:end]
+        mutated_section = section.replace(
+            "Conformal intervals", "The baseline inventory", 1
+        ).replace("remain\nmissing", "is complete", 1)
+        self.assertNotEqual(mutated_section, section)
+        mutated = self.manuscript[:start] + mutated_section + self.manuscript[end:]
+        with self.assertRaisesRegex(ValueError, "Contributions omits missing family"):
+            validate_minimum_tier_key_claims(mutated, PAPER_DIR)
+
+    def test_conclusion_is_required(self) -> None:
+        mutated = self.manuscript.replace("## 9. Conclusion", "## Closing remarks", 1)
+        with self.assertRaisesRegex(ValueError, "Conclusion section is missing"):
+            validate_minimum_tier_key_claims(mutated, PAPER_DIR)
 
 
 if __name__ == "__main__":

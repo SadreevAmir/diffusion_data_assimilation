@@ -13,6 +13,14 @@ Controller readiness: NOT_READY
 Scientific primary reconciliation: COMPLETE_NEGATIVE
 Autonomous publication work remaining: YES
 
+The 2026-08-27 key-claim audit now derives the two `MISSING` baseline families
+from `MINIMUM_TIER_COMPARISON_AUDIT.md` and requires both to remain explicit in
+Abstract, Contributions and Conclusion. The manuscript now contains a dedicated
+Conclusion with the same non-compensation boundary. Four focused fixtures accept
+the current text and reject omission from Abstract, promotion in Contributions,
+or removal of Conclusion. This closes an editorial fail-closed gap without
+creating either missing result; status remains `NOT_READY`.
+
 The 2026-08-27 claim-status consistency audit derives every `Unknown` and
 `Rejected` row directly from the normative claim ledger. The unified checker
 now requires every unknown claim to remain in the unsupported-scope row and
@@ -165,7 +173,7 @@ mode or change `NOT_READY`.
 
 The 2026-08-26 independent publication-readiness rerun completed the unified
 fail-closed audit and the focused rank-coherent handoff suites against the
-current worktree. The audit passed with 43 required files, two figures, six
+current worktree. The audit passed with 44 required files, two figures, six
 references and all 39 claim-ledger rows traced; the five prototype tests and
 the 13-test adapter-parity suite also passed. `git diff --check` found no
 whitespace errors. This confirms internal consistency and executable handoff

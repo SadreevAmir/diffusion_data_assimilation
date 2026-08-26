@@ -75,7 +75,8 @@ spatial structure, whereas topology- and boundary-preserving constructions
 select an inactive correction. The contribution is therefore an auditable
 failure map and a fail-closed evaluation protocol, not a successful calibrated
 ensemble, an independent generalization claim or superiority to a deterministic
-method.
+method. Conformal intervals and the probabilistic DA baseline such as EnKF/LETKF
+remain missing, so the minimum strong domain/SciML baseline tier remains incomplete.
 
 ## 1. Introduction
 
@@ -143,6 +144,10 @@ The present validation study contributes:
    member offsets, with and without projection, select the null action. Together
    these are mechanism falsifications under one no-compensation gate, not a
    claim that all calibration families have been exhausted.
+
+Conformal intervals and the probabilistic DA baseline such as EnKF/LETKF remain
+missing. Consequently, the minimum strong domain/SciML baseline tier remains
+incomplete; the contributions above must not be read as baseline-complete.
 
 The methods and gates were frozen from validation evidence. The completed
 independent primary supplies a negative falsification for one frozen candidate,
@@ -697,6 +702,17 @@ The manuscript reports only compact validation summaries. Raw ensembles remain
 outside the publication worktree. The frozen transform, scale grid, fold sizes,
 selected scales, scoring conventions and reconciliation values are documented
 in `REPRODUCIBILITY.md`; release location and licensing require author approval.
+
+## 9. Conclusion
+
+The evidence supports a narrow negative result: multiple frozen mechanisms can
+improve selected reliability diagnostics, but none satisfies the joint
+no-compensation calibration gate. The single independent primary is likewise
+negative, so the paper does not claim a calibrated learned-joint ensemble or
+independent superiority. Conformal intervals and the probabilistic DA baseline
+such as EnKF/LETKF remain missing; therefore the minimum strong domain/SciML
+baseline tier remains incomplete. These two absent comparisons are separate
+from calibration eligibility and cannot compensate for any failed gate family.
 
 ## Ethics and competing interests
 

@@ -1078,6 +1078,43 @@ def validate_minimum_tier_comparisons(paper_dir: Path) -> None:
     )
 
 
+def validate_minimum_tier_key_claims(manuscript: str, paper_dir: Path) -> None:
+    """Keep missing baseline families explicit in decision-bearing sections."""
+    audit = (paper_dir / "MINIMUM_TIER_COMPARISON_AUDIT.md").read_text(
+        encoding="utf-8"
+    )
+    missing_families = {
+        row["comparison"].strip().lower()
+        for row in MINIMUM_TIER_ROW.finditer(audit)
+        if row["status"] == "MISSING"
+    }
+    require(
+        len(missing_families) == 2,
+        "key-claim audit requires exactly two normative missing families",
+    )
+    section_patterns = {
+        "Abstract": r"^## Abstract\n(?P<body>.*?)^## 1\.",
+        "Contributions": (
+            r"^### Contributions supported by the present evidence\n"
+            r"(?P<body>.*?)^## 2\."
+        ),
+        "Conclusion": r"^## 9\. Conclusion\n(?P<body>.*?)^## Ethics",
+    }
+    for section, pattern in section_patterns.items():
+        match = re.search(pattern, manuscript, re.MULTILINE | re.DOTALL)
+        require(match is not None, f"manuscript {section} section is missing")
+        normalized = " ".join(match.group("body").split()).lower()
+        for family in missing_families:
+            require(
+                family in normalized,
+                f"manuscript {section} omits missing family: {family}",
+            )
+        require(
+            "remain missing" in normalized and "baseline tier remains incomplete" in normalized,
+            f"manuscript {section} promotes the incomplete minimum tier",
+        )
+
+
 def main() -> int:
     missing = [name for name in REQUIRED_FILES if not (PAPER_DIR / name).is_file()]
     require(not missing, f"missing required publication files: {', '.join(missing)}")
@@ -1132,6 +1169,7 @@ def main() -> int:
     validate_limitation_traceability(manuscript, claim_ledger, limitation_traceability)
     validate_claim_status_consistency(manuscript, claim_ledger)
     validate_minimum_tier_comparisons(PAPER_DIR)
+    validate_minimum_tier_key_claims(manuscript, PAPER_DIR)
     missing_outcome_anchors = [
         anchor
         for anchor in MINIMUM_TIER_OUTCOME_MATRIX_ANCHORS
