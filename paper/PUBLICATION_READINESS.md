@@ -22,6 +22,16 @@ It is a publication-quality improvement only: it does not create a trusted
 rank-coherent mode, recover missing quantitative dropout fields or change
 `NOT_READY`.
 
+The 2026-08-26 blocker-inventory audit corrected a stale minimum-tier row that
+still described independent evaluation as absent. The single frozen independent
+primary is complete and negative for its candidate; it does not establish
+successful generalization of an eligible calibration. The remaining blockers
+are therefore an eligible development calibration, broader independent
+comparison coverage and the exact deterministic comparison, not absence of the
+already reconciled primary. The unified checker now rejects the superseded row
+and requires this distinction. This consistency repair does not change
+`NOT_READY`.
+
 The 2026-08-26 scope audit corrected one stale pre-primary sentence in the
 manuscript. The contribution section had said that independent evaluation was
 outside the present claim even though the reconciled negative independent
@@ -342,7 +352,7 @@ eligible calibrated ensemble.
 
 | Required element | Current evidence | Readiness consequence |
 |---|---|---|
-| Clean checkpoint and frozen independent evaluation | One legacy checkpoint and reused development dates | Blocking; method may be frozen, but the generalization claim is not tested |
+| Checkpoint and independent generalization evidence | One legacy checkpoint plus one completed frozen independent primary that is negative for its candidate | Blocking for a successful generalization claim: the completed primary falsifies one candidate but does not establish an eligible calibration or broader checkpoint/seed robustness |
 | Exact deterministic comparison | Background and learned-joint aggregate RMSE/IIEE are available; no independent frozen comparison is claimed | Blocking for the main comparison table |
 | Correct finite-ensemble diagnostics | Fair and ordinary CRPS, spread-skill, four coverage diagnostics and center invariance are reported | Satisfied for the narrow mechanism claim |
 | Strong SIC calibration baselines | Raw, affine-logit, global spread, purged hurdle-isotonic/ECC-Q, exact mean-preserving projected spread, open-logit desaturation and frozen ZOIB-EMOS/ECC-Q are evaluated; all postprocessors fail at least one mandatory family | The predeclared zero/one-inflated parametric gap is resolved as a strong negative control; no candidate satisfies the common gate, and conformal or probabilistic-DA comparisons remain absent |

@@ -715,6 +715,23 @@ def main() -> int:
         not in manuscript,
         "manuscript retains the stale pre-primary scope statement",
     )
+    require(
+        "| Checkpoint and independent generalization evidence | One legacy "
+        "checkpoint plus one completed frozen independent primary that is "
+        "negative for its candidate | Blocking for a successful "
+        "generalization claim: the completed primary falsifies one candidate "
+        "but does not establish an eligible calibration or broader "
+        "checkpoint/seed robustness |"
+        in readiness,
+        "publication readiness does not reconcile the completed negative "
+        "primary with the remaining generalization blocker",
+    )
+    require(
+        "| Clean checkpoint and frozen independent evaluation | One legacy "
+        "checkpoint and reused development dates |"
+        not in readiness,
+        "publication readiness retains the stale pre-primary minimum-tier row",
+    )
 
     section_positions = [
         reproducibility.find(heading) for heading in REPRODUCIBILITY_SECTION_ORDER
