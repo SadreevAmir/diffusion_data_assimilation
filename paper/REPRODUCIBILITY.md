@@ -488,7 +488,8 @@ python3 -m unittest -v \
   paper.test_publication_immutable_identities \
   paper.test_publication_empirical_traceability \
   paper.test_minimum_tier_comparison_audit \
-  paper.test_publication_figure_generators
+  paper.test_publication_figure_generators \
+  paper.test_publication_reference_traceability
 python3 paper/check_publication_artifacts.py
 ```
 

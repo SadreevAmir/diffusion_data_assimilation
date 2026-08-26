@@ -79,9 +79,9 @@ method.
 
 ## 1. Introduction
 
-Diffusion models, flow matching and stochastic interpolants have made it
-possible to sample high-dimensional conditional distributions at useful
-spatial resolutions [1,2]. In data assimilation, this offers a compelling
+Diffusion models and flow matching have made it possible to sample
+high-dimensional distributions [1,2]. In data assimilation, conditional
+generators offer a compelling
 alternative
 to a single optimized analysis: the output can be an ensemble that represents
 multiple states compatible with a physical background and sparse observations.
@@ -198,9 +198,9 @@ not used in conditioning, provides a sparse track-imitation diagnostic.
 
 For `M` generated members, the empirical ensemble CRPS and the fair score for
 an underlying sampling distribution use different pairwise normalizations. The
-latter removes the self-pair finite-sample bias [3] and is required when ensemble
-sizes differ or when dispersion is interpreted as a property of the underlying
-generator.
+latter removes the self-pair finite-sample bias [3]. We use it when dispersion
+is interpreted as a property of the underlying generator and report the
+ordinary empirical-ensemble score alongside it.
 
 Likewise, order-statistic intervals from a small exchangeable ensemble have
 discrete attainable coverage. With `M=10`, even the member range has expected

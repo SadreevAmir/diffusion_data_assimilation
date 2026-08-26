@@ -22,6 +22,7 @@ REQUIRED_REGRESSION_SUITES = (
     "paper.test_publication_empirical_traceability",
     "paper.test_minimum_tier_comparison_audit",
     "paper.test_publication_figure_generators",
+    "paper.test_publication_reference_traceability",
 )
 REGRESSION_COMMAND = re.compile(
     r"python3 -m unittest -v \\\n(?P<body>(?:  paper\.[a-z0-9_]+(?: \\\n|\n))+)",
@@ -122,6 +123,8 @@ REQUIRED_FILES = (
     "test_publication_empirical_traceability.py",
     "test_minimum_tier_comparison_audit.py",
     "test_publication_figure_generators.py",
+    "test_publication_reference_traceability.py",
+    "REFERENCE_TRACEABILITY.md",
     "RANK_COHERENT_ADAPTER_SPEC.md",
     "NEXT_GENERATIVE_METHOD_CONTRACT.md",
     "LATENT_TEMPERATURE_RESULT_RECONCILIATION.md",
@@ -130,6 +133,36 @@ REQUIRED_FILES = (
     "guidance_mixture_reference.py",
     "deep_ensemble_reference.py",
 )
+
+REFERENCE_TRACEABILITY_ROWS = {
+    1: ("10.48550/arXiv.2006.11239", "diffusion probabilistic models"),
+    2: ("10.48550/arXiv.2210.02747", "Flow Matching"),
+    3: ("10.1002/qj.2270", "fair ensemble scores"),
+    4: ("10.1198/016214506000001437", "proper scoring rule"),
+    5: ("10.1214/13-STS443", "ECC-Q"),
+    6: ("10.1002/2015GL067232", "IIEE"),
+}
+
+
+def validate_reference_traceability(text: str) -> None:
+    """Require one exact, support-limited traceability row per bibliography item."""
+    rows: dict[int, tuple[str, str]] = {}
+    for line in text.splitlines():
+        match = re.fullmatch(
+            r"\| ([1-9][0-9]*) \| `([^`]+)` \| ([^|]+) \| ([^|]+) \|", line
+        )
+        if match:
+            number = int(match.group(1))
+            require(number not in rows, f"duplicate reference traceability row: {number}")
+            rows[number] = (match.group(2), match.group(3) + match.group(4))
+    require(set(rows) == set(REFERENCE_TRACEABILITY_ROWS),
+            "reference traceability must cover exactly references 1--6")
+    for number, (identity, statement_anchor) in REFERENCE_TRACEABILITY_ROWS.items():
+        observed_identity, prose = rows[number]
+        require(observed_identity == identity, f"reference {number} identity mismatch")
+        require(statement_anchor in prose, f"reference {number} support mapping mismatch")
+    require("does not support project-specific empirical values" in text,
+            "reference audit lacks an explicit empirical-claim boundary")
 LOCKED_DROPOUT_RECONCILIATION_ANCHORS = (
     "Status: NEGATIVE_DECISION_RECORDED_QUANTITATIVE_RECONCILIATION_PENDING",
     "gate.overall_eligible=false",
@@ -985,6 +1018,10 @@ def main() -> int:
     manuscript = (PAPER_DIR / "PAPER_DRAFT.md").read_text(encoding="utf-8")
     claim_ledger = (PAPER_DIR / "CLAIM_LEDGER.md").read_text(encoding="utf-8")
     readiness = (PAPER_DIR / "PUBLICATION_READINESS.md").read_text(encoding="utf-8")
+    reference_traceability = (PAPER_DIR / "REFERENCE_TRACEABILITY.md").read_text(
+        encoding="utf-8"
+    )
+    validate_reference_traceability(reference_traceability)
     validate_minimum_tier_comparisons(PAPER_DIR)
     missing_outcome_anchors = [
         anchor

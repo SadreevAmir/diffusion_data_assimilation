@@ -13,6 +13,18 @@ Controller readiness: NOT_READY
 Scientific primary reconciliation: COMPLETE_NEGATIVE
 Autonomous publication work remaining: YES
 
+The 2026-08-27 reference-traceability audit independently checked all six
+bibliography records against primary publisher or conference metadata and maps
+each item to one scope-limited manuscript statement in
+`REFERENCE_TRACEABILITY.md`. It found two overextensions and corrected them:
+references 1--2 no longer implicitly source stochastic interpolants or the
+project's spatial resolution, and the fair-score sentence no longer presents a
+study-design choice as a universal requirement. Four negative regression
+fixtures now reject a missing row, changed identity or missing empirical-claim
+boundary. The unified checker requires the artifact and suite. This closes the
+declared bibliographic gap without changing any empirical result; status remains
+`NOT_READY`.
+
 The 2026-08-27 figure-generator audit found that finite compact inputs could
 still reach undefined rendering paths: jointly zero calibration values produced
 a zero plotting scale, and a zero raw joint-gate metric produced an undefined
@@ -135,7 +147,7 @@ mode or change `NOT_READY`.
 
 The 2026-08-26 independent publication-readiness rerun completed the unified
 fail-closed audit and the focused rank-coherent handoff suites against the
-current worktree. The audit passed with 39 required files, two figures, six
+current worktree. The audit passed with 41 required files, two figures, six
 references and all 39 claim-ledger rows traced; the five prototype tests and
 the 13-test adapter-parity suite also passed. `git diff --check` found no
 whitespace errors. This confirms internal consistency and executable handoff
