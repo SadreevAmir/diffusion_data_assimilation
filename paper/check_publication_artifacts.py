@@ -96,6 +96,7 @@ REQUIRED_FILES = (
     "PUBLICATION_READINESS.md",
     "MINIMUM_TIER_COMPARISON_AUDIT.md",
     "NEXT_CONFORMAL_BASELINE_CONTRACT.md",
+    "NEXT_PROBABILISTIC_DA_COMPARISON_CONTRACT.md",
     "NEXT_BASELINE_CONTRACT.md",
     "NEXT_METHOD_CONTRACT.md",
     "NEXT_RANK_COHERENT_CONTRACT.md",
@@ -892,6 +893,23 @@ def validate_minimum_tier_comparisons(paper_dir: Path) -> None:
     require(
         all(anchor in conformal_contract for anchor in conformal_anchors),
         "frozen conformal baseline contract is incomplete or weakened",
+    )
+    probabilistic_contract = (
+        paper_dir / "NEXT_PROBABILISTIC_DA_COMPARISON_CONTRACT.md"
+    ).read_text(encoding="utf-8")
+    probabilistic_anchors = (
+        "Status: `FROZEN_NOT_EXECUTABLE`",
+        "observation-operator output must be\n  hash-identical",
+        "`radius_km in {50,100,200,400}`",
+        "`inflation in {1.00,1.05,1.10,1.20}`",
+        "LETKF fair CRPS is no more than `1.10` times raw",
+        "LETKF passes the frozen absolute randomized-rank uniformity criterion",
+        "LETKF ensemble-mean RMSE is no more than `1.02` times 3D-Var RMSE",
+        "No currently\nadmitted trusted mode implements this contract",
+    )
+    require(
+        all(anchor in probabilistic_contract for anchor in probabilistic_anchors),
+        "frozen probabilistic DA comparison contract is incomplete or weakened",
     )
 
 

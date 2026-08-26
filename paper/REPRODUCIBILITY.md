@@ -453,6 +453,13 @@ numeric coverage/width decision and explicit non-executable status. This is a
 pre-result contract only: it neither changes the `MISSING` evidence status nor
 authorizes an unimplemented trusted mode.
 
+`NEXT_PROBABILISTIC_DA_COMPARISON_CONTRACT.md` freezes the other outstanding
+minimum-tier family as a ten-member LETKF comparison. The integrity audit
+requires hash-identical observation inputs, the fixed localization/inflation
+set, leakage-safe fold selection and the numerical fair-CRPS, absolute-rank and
+3D-Var-relative RMSE decision. It is also a pre-result contract only: it leaves
+the evidence status `MISSING` and does not authorize an unimplemented mode.
+
 ```bash
 python3 -m unittest -v \
   paper.test_rank_coherent_runner_prototype \

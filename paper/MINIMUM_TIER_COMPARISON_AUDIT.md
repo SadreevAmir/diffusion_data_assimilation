@@ -31,3 +31,11 @@ member-range interval for date-level sea-ice area with immutable coverage and
 width criteria. Its status remains `MISSING` until a separately reviewed
 trusted runner executes the literal contract; the document is not numerical
 evidence and no unimplemented mode may be proposed for it.
+
+The exact probabilistic DA comparison is likewise pre-result frozen in
+`NEXT_PROBABILISTIC_DA_COMPARISON_CONTRACT.md`: a ten-member LETKF with
+hash-identical observations, five contiguous purged holdouts, a fixed
+localization/inflation set, training-only fair-CRPS selection and joint
+fair-CRPS/rank/RMSE usefulness criteria. Its status remains `MISSING` until a
+separately reviewed trusted runner executes the literal contract. Invalid
+common-information or leakage checks cannot close the row.

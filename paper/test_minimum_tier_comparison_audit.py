@@ -40,6 +40,10 @@ class MinimumTierComparisonAuditTests(unittest.TestCase):
         (fixture_dir / conformal_contract).write_bytes(
             (PAPER_DIR / conformal_contract).read_bytes()
         )
+        probabilistic_contract = "NEXT_PROBABILISTIC_DA_COMPARISON_CONTRACT.md"
+        (fixture_dir / probabilistic_contract).write_bytes(
+            (PAPER_DIR / probabilistic_contract).read_bytes()
+        )
         return temporary
 
     def assert_fixture_fails(self, audit: str, message: str) -> None:
@@ -69,6 +73,23 @@ class MinimumTierComparisonAuditTests(unittest.TestCase):
         assert first_row is not None
         mutated = self.audit[: first_row.start()] + self.audit[first_row.end() :]
         self.assert_fixture_fails(mutated, "incomplete or duplicate comparison map")
+
+    def test_weakened_probabilistic_da_stop_go_fails_closed(self) -> None:
+        with self.make_fixture(self.audit) as temporary:
+            fixture_dir = Path(temporary)
+            source = PAPER_DIR / "NEXT_PROBABILISTIC_DA_COMPARISON_CONTRACT.md"
+            target = fixture_dir / source.name
+            contract = source.read_text(encoding="utf-8")
+            target.write_text(
+                contract.replace(
+                    "no more than `1.10` times raw", "competitive with raw"
+                ),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(
+                ValueError, "probabilistic DA comparison contract is incomplete or weakened"
+            ):
+                validate_minimum_tier_comparisons(fixture_dir)
 
     def test_changed_evidence_status_fails_closed(self) -> None:
         mutated = self.audit.replace("| PRESENT |", "| PRESENT_NEGATIVE |", 1)
