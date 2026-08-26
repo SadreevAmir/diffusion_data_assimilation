@@ -9,6 +9,7 @@ executable for an independent trusted-runner review.
 from __future__ import annotations
 
 import math
+import re
 from collections.abc import Mapping, Sequence
 
 
@@ -67,6 +68,31 @@ MEMBER_SPATIAL_RECORD_KEYS = (
     "maximum_allowed_absolute_delta",
     "passed",
 )
+ADMISSION_RECORD_KEYS = (
+    "reviewed_mode", "publication_commit", "runner_sha256", "contract_sha256",
+    "synthetic_result_sha256", "test_command", "test_sentinel",
+    "decision_bearing_validation", "deviations",
+)
+
+
+def validate_admission_record(record: Mapping[str, object]) -> str:
+    """Validate the exact controller-to-proposal admission record."""
+    if set(record) != set(ADMISSION_RECORD_KEYS):
+        raise ValueError("admission record keys must be exact")
+    for key in ("reviewed_mode", "test_command", "test_sentinel"):
+        value = record[key]
+        if not isinstance(value, str) or not value.strip() or "<" in value or ">" in value:
+            raise ValueError(f"{key} must be a non-placeholder string")
+    if not re.fullmatch(r"[0-9a-f]{40}", str(record["publication_commit"])):
+        raise ValueError("publication_commit must be lowercase 40-hex")
+    for key in ("runner_sha256", "contract_sha256", "synthetic_result_sha256"):
+        if not re.fullmatch(r"[0-9a-f]{64}", str(record[key])):
+            raise ValueError(f"{key} must be lowercase SHA-256")
+    if record["decision_bearing_validation"] != "PASS":
+        raise ValueError("decision_bearing_validation must be PASS")
+    if record["deviations"] != []:
+        raise ValueError("deviations must be an empty list")
+    return str(record["reviewed_mode"])
 
 
 def _field_shape_and_finiteness(
@@ -832,6 +858,26 @@ def _self_test() -> None:
         {alpha: alpha == 0.0 for alpha in ALPHAS},
     ) == (0.0, True)
     validate_runner_interface({"source_experiment": SOURCE_EXPERIMENT}, ARTIFACT_POLICY)
+    admission = {
+        "reviewed_mode": "validation_reviewed_rank_coherent",
+        "publication_commit": "a" * 40,
+        "runner_sha256": "b" * 64,
+        "contract_sha256": "c" * 64,
+        "synthetic_result_sha256": "d" * 64,
+        "test_command": "python3 trusted_test.py",
+        "test_sentinel": "trusted rank-coherent adapter: PASS",
+        "decision_bearing_validation": "PASS",
+        "deviations": [],
+    }
+    assert validate_admission_record(admission) == admission["reviewed_mode"]
+    for key, bad_value in (("reviewed_mode", "<mode>"), ("publication_commit", "A" * 40), ("runner_sha256", "b" * 63), ("decision_bearing_validation", "FAIL"), ("deviations", ["waiver"])):
+        invalid = dict(admission); invalid[key] = bad_value
+        try:
+            validate_admission_record(invalid)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError(f"invalid admission field {key} did not fail closed")
     try:
         validate_runner_interface(
             {"source_experiment": SOURCE_EXPERIMENT, "alpha": 1.0},

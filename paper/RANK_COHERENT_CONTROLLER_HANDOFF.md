@@ -79,6 +79,13 @@ frozen in `paper/RANK_COHERENT_ADAPTER_SPEC.md` and
 `validate_result_directory(path, decision_bearing=True)`; the local prototype
 must pass the same oracle with `decision_bearing=False`.
 
+The controller-visible admission record is also executable rather than
+narrative-only: `validate_admission_record` in `rank_coherent_reference.py`
+requires the exact field set, a literal non-placeholder reviewed mode, lowercase
+40/64-hex identities, non-empty test command and sentinel,
+`decision_bearing_validation=PASS`, and an empty deviations list. It returns
+only the reviewed mode that a proposal may copy literally.
+
 ## Focused verification
 
 ```sh

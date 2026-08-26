@@ -119,6 +119,12 @@ missing fields or deviations remain `NO_GO`. This removes ambiguity from the
 next controller-to-proposal transition without asserting that the review or the
 scientific experiment has occurred; status remains `NOT_READY`.
 
+That admission schema is now enforced by `validate_admission_record` in the
+dependency-free oracle. Its self-test accepts one structurally complete record
+and rejects a placeholder mode, malformed identities, a failed decision-bearing
+validation and any deviation. This does not assert that a controller record
+currently exists.
+
 The rank-coherent handoff now includes an executable directory-level parity
 fixture and a frozen adapter replacement specification. The oracle validates all
 four compact files together, reconciles all 80 per-case metric rows with their
