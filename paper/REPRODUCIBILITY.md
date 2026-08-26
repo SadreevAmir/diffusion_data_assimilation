@@ -447,10 +447,19 @@ remain external inputs.
 The publication package itself has a local fail-closed integrity audit:
 
 ```bash
+python3 -m unittest -v \
+  paper.test_rank_coherent_runner_prototype \
+  paper.test_rank_coherent_adapter_parity \
+  paper.test_validate_rank_coherent_admission \
+  paper.test_publication_immutable_identities \
+  paper.test_publication_empirical_traceability \
+  paper.test_minimum_tier_comparison_audit
 python3 paper/check_publication_artifacts.py
 ```
 
-It requires the manuscript, claim ledger, research plan, reproducibility handoff
+The first command explicitly runs every publication regression suite; adding a
+new required suite therefore also requires updating this documented list. The
+second command requires the manuscript, claim ledger, research plan, reproducibility handoff
 and readiness audit. It also requires `FROZEN_EVALUATION_HANDOFF.md`, which
 fixes the external preflight inputs, no-retuning rule, no-compensation decision
 contract and compact return package without authorizing the locked run. The
