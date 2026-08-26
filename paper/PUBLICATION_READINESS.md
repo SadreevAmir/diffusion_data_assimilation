@@ -493,8 +493,9 @@ complete candidate before scoring truth is opened, `overall_eligible=true`, and
 explicit passes for proper-score, finite-ensemble reliability, boundary,
 spatial/physical and operational families. Failure of any integrity check or
 mandatory family is a negative primary result; no development result may
-compensate for it. The claim ledger reserves C39 for this decision and records
-no outcome before the compact payload arrives.
+compensate for it. Claim C39 now records the reconciled negative decision from
+the sole admissible compact payload; it cannot be reverted to a pending outcome
+or strengthened into a positive generalization claim.
 
 The preflight for this boundary is now explicit in
 `paper/FROZEN_EVALUATION_HANDOFF.md`. It requires controller-attested immutable

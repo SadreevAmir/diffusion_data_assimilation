@@ -107,6 +107,8 @@ CURRENT_DECISION_ANCHORS = (
     "controller-recorded Boolean decision from the still\nmissing quantitative publication payload",
     "no family-specific or effect-size claim is admitted",
     "completed negative dropout result closes only this frozen candidate",
+    "Claim C39 now records the reconciled negative decision from\nthe sole admissible compact payload",
+    "cannot be reverted to a pending outcome\nor strengthened into a positive generalization claim",
     "already predeclared locked-MC-dropout\nfallback, unchanged",
     "latent_temperature_1p30_gate_retry1",
     "dependent unchanged CPU gate is\ncomplete and reconciled as the negative result above",
