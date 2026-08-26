@@ -13,6 +13,15 @@ Controller readiness: NOT_READY
 Scientific primary reconciliation: COMPLETE_NEGATIVE
 Autonomous publication work remaining: YES
 
+The 2026-08-26 scope audit corrected one stale pre-primary sentence in the
+manuscript. The contribution section had said that independent evaluation was
+outside the present claim even though the reconciled negative independent
+primary is now a central result. It now distinguishes that completed
+falsification of one frozen candidate from the still unsupported claim of
+successful independent generalization. The unified checker requires the new
+scope statement and rejects the superseded wording. This removes an internal
+contradiction but does not change `NOT_READY` or any scientific gate.
+
 The idle-state audit also froze a contingent method in
 `NEXT_RAW_MEMBER_REWEIGHTING_CONTRACT.md` rather than waiting for integration of
 the first rank-coherent runner. It tests probability-mass error among unchanged

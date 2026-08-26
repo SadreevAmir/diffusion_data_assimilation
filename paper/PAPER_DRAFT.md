@@ -144,11 +144,12 @@ The present validation study contributes:
    these are mechanism falsifications under one no-compensation gate, not a
    claim that all calibration families have been exhausted.
 
-The methods and gates are frozen from validation evidence. Independent
-evaluation, multi-seed training and broader generalization remain outside the
-present claim. These negative constructions do not exhaust the strong
-distributional, conformal or probabilistic-DA baseline families required for a
-submission-ready comparison.
+The methods and gates were frozen from validation evidence. The completed
+independent primary supplies a negative falsification for one frozen candidate,
+not successful independent generalization; multi-seed training and broader
+generalization remain outside the present claim. These negative constructions
+do not exhaust the strong distributional, conformal or probabilistic-DA
+baseline families required for a submission-ready comparison.
 
 A frozen model-space diagnostic multiplied every initial latent by `1.30`
 before the unchanged ODE solve. It improved all finite-ensemble reliability

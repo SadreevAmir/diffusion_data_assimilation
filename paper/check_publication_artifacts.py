@@ -634,6 +634,19 @@ def main() -> int:
         f"audit passed with {len(REQUIRED_FILES)} required files" in readiness,
         "publication readiness has a stale required-file count",
     )
+    require(
+        "The completed\nindependent primary supplies a negative falsification "
+        "for one frozen candidate,\nnot successful independent generalization"
+        in manuscript,
+        "manuscript scope does not distinguish the completed negative primary "
+        "from successful generalization",
+    )
+    require(
+        "Independent\nevaluation, multi-seed training and broader "
+        "generalization remain outside the\npresent claim"
+        not in manuscript,
+        "manuscript retains the stale pre-primary scope statement",
+    )
 
     section_positions = [
         reproducibility.find(heading) for heading in REPRODUCIBILITY_SECTION_ORDER
