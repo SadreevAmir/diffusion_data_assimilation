@@ -27,6 +27,21 @@ another row.
 | Probabilistic DA baseline such as EnKF/LETKF | `MINIMUM_TIER_COMPARISON_AUDIT.md` | MISSING | The corresponding normative comparison row becomes decision-bearing after valid trusted execution |
 | Independent-strength deterministic background and 3D-Var | `MINIMUM_TIER_COMPARISON_AUDIT.md` | PRESENT_DEVELOPMENT_ONLY | A frozen common-information comparison supplies evidence at the manuscript's required independent strength |
 
+## Unique cross-artifact closure routes
+
+Each blocker has exactly one frozen contract and one insertion route into the
+manuscript and normative claim ledger. A valid negative result may close a
+baseline-family evidence row where its contract says so, but cannot close the
+eligible-calibration row. An invalid execution closes nothing. These routes do
+not authorize an unimplemented mode or another independent evaluation.
+
+| Required blocker | Frozen contract | Manuscript target | Claim-ledger target |
+|---|---|---|---|
+| Eligible spatially preserving calibration | `NEXT_RANK_COHERENT_CONTRACT.md` | PAPER_DRAFT.md:Section 6 mechanism result and no-compensation decision | CLAIM_LEDGER.md:new decision-bearing calibration claim |
+| Conformal intervals | `NEXT_CONFORMAL_BASELINE_CONTRACT.md` | PAPER_DRAFT.md:Section 3 frozen outcome matrix | CLAIM_LEDGER.md:C17 plus a decision-bearing conformal claim |
+| Probabilistic DA baseline such as EnKF/LETKF | `NEXT_PROBABILISTIC_DA_COMPARISON_CONTRACT.md` | PAPER_DRAFT.md:Section 3 frozen outcome matrix | CLAIM_LEDGER.md:C17 plus a decision-bearing probabilistic-DA claim |
+| Independent-strength deterministic background and 3D-Var | `FROZEN_EVALUATION_HANDOFF.md` | PAPER_DRAFT.md:Section 3 common-information comparison | CLAIM_LEDGER.md:C9 and C17 evidence-strength transition |
+
 The 2026-08-27 key-claim audit now derives the two `MISSING` baseline families
 from `MINIMUM_TIER_COMPARISON_AUDIT.md` and requires both to remain explicit in
 Abstract, Contributions and Conclusion. The manuscript now contains a dedicated

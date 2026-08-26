@@ -12,6 +12,7 @@ from paper.check_publication_artifacts import (
     MINIMUM_TIER_ROW,
     PAPER_DIR,
     READINESS_BLOCKER_ROW,
+    READINESS_CLOSURE_ROUTE_ROW,
     REQUIRED_REGRESSION_SUITES,
     validate_documented_regression_suites,
     validate_minimum_tier_key_claims,
@@ -206,6 +207,34 @@ class MinimumTierComparisonAuditTests(unittest.TestCase):
         )
         self.assertNotEqual(mutated, self.readiness)
         with self.assertRaisesRegex(ValueError, "exact closure condition"):
+            validate_readiness_blockers(mutated, PAPER_DIR)
+
+    def test_readiness_cannot_drop_closure_route(self) -> None:
+        row = READINESS_CLOSURE_ROUTE_ROW.search(self.readiness)
+        self.assertIsNotNone(row)
+        assert row is not None
+        mutated = self.readiness[: row.start()] + self.readiness[row.end() :]
+        with self.assertRaisesRegex(ValueError, "closure-route matrix is incomplete"):
+            validate_readiness_blockers(mutated, PAPER_DIR)
+
+    def test_readiness_cannot_duplicate_closure_contract(self) -> None:
+        mutated = self.readiness.replace(
+            "`NEXT_CONFORMAL_BASELINE_CONTRACT.md` | PAPER_DRAFT.md:Section 3 frozen outcome matrix",
+            "`NEXT_RANK_COHERENT_CONTRACT.md` | PAPER_DRAFT.md:Section 3 frozen outcome matrix",
+            1,
+        )
+        self.assertNotEqual(mutated, self.readiness)
+        with self.assertRaisesRegex(ValueError, "closure routes differ"):
+            validate_readiness_blockers(mutated, PAPER_DIR)
+
+    def test_readiness_cannot_redirect_claim_ledger_route(self) -> None:
+        mutated = self.readiness.replace(
+            "CLAIM_LEDGER.md:C17 plus a decision-bearing conformal claim",
+            "CLAIM_LEDGER.md:C17 only",
+            1,
+        )
+        self.assertNotEqual(mutated, self.readiness)
+        with self.assertRaisesRegex(ValueError, "closure routes differ"):
             validate_readiness_blockers(mutated, PAPER_DIR)
 
     def test_abstract_cannot_omit_missing_family(self) -> None:

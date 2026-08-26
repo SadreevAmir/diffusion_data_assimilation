@@ -380,8 +380,44 @@ READINESS_BLOCKERS = {
     ),
 }
 READINESS_BLOCKER_ROW = re.compile(
-    r"^\| (?P<blocker>[^|]+?) \| `(?P<source>[^`]+)` \| "
+    r"^\| (?P<blocker>[^|]+?) \| `(?P<source>RESEARCH_PLAN\.md|MINIMUM_TIER_COMPARISON_AUDIT\.md)` \| "
     r"(?P<status>[A-Z_]+) \| (?P<closure>[^|]*?) \|$",
+    re.MULTILINE,
+)
+READINESS_CLOSURE_ROUTES = {
+    "Eligible spatially preserving calibration": (
+        "NEXT_RANK_COHERENT_CONTRACT.md",
+        "PAPER_DRAFT.md:Section 6 mechanism result and no-compensation decision",
+        "CLAIM_LEDGER.md:new decision-bearing calibration claim",
+    ),
+    "Conformal intervals": (
+        "NEXT_CONFORMAL_BASELINE_CONTRACT.md",
+        "PAPER_DRAFT.md:Section 3 frozen outcome matrix",
+        "CLAIM_LEDGER.md:C17 plus a decision-bearing conformal claim",
+    ),
+    "Probabilistic DA baseline such as EnKF/LETKF": (
+        "NEXT_PROBABILISTIC_DA_COMPARISON_CONTRACT.md",
+        "PAPER_DRAFT.md:Section 3 frozen outcome matrix",
+        "CLAIM_LEDGER.md:C17 plus a decision-bearing probabilistic-DA claim",
+    ),
+    "Independent-strength deterministic background and 3D-Var": (
+        "FROZEN_EVALUATION_HANDOFF.md",
+        "PAPER_DRAFT.md:Section 3 common-information comparison",
+        "CLAIM_LEDGER.md:C9 and C17 evidence-strength transition",
+    ),
+}
+READINESS_CLOSURE_FILE_ANCHORS = {
+    "Eligible spatially preserving calibration": ("## 6.", "| ID | Claim | Status |"),
+    "Conformal intervals": ("## 3.", "| C17 |"),
+    "Probabilistic DA baseline such as EnKF/LETKF": ("## 3.", "| C17 |"),
+    "Independent-strength deterministic background and 3D-Var": (
+        "## 3.",
+        "| C9 |",
+    ),
+}
+READINESS_CLOSURE_ROUTE_ROW = re.compile(
+    r"^\| (?P<blocker>[^|]+?) \| `(?P<contract>(?:NEXT_[A-Z_]+_CONTRACT|FROZEN_EVALUATION_HANDOFF)\.md)` \| "
+    r"(?P<manuscript>[^|]+?) \| (?P<ledger>[^|]+?) \|$",
     re.MULTILINE,
 )
 EXTERNAL_PRIMARY_HANDOFF_ANCHORS = {
@@ -1241,6 +1277,36 @@ def validate_readiness_blockers(readiness: str, paper_dir: Path) -> None:
         == observed["Independent-strength deterministic background and 3D-Var"][1],
         "readiness blockers do not match minimum-tier evidence states",
     )
+    route_rows = list(READINESS_CLOSURE_ROUTE_ROW.finditer(readiness))
+    routes = {
+        row["blocker"].strip(): (
+            row["contract"],
+            row["manuscript"].strip(),
+            row["ledger"].strip(),
+        )
+        for row in route_rows
+    }
+    require(
+        len(route_rows) == len(routes) == len(READINESS_CLOSURE_ROUTES),
+        "readiness closure-route matrix is incomplete or contains duplicates",
+    )
+    require(
+        routes == READINESS_CLOSURE_ROUTES,
+        "readiness closure routes differ from the frozen cross-artifact contract",
+    )
+    require(
+        len({route[0] for route in routes.values()}) == len(routes),
+        "readiness blockers do not have unique frozen contracts",
+    )
+    manuscript = (paper_dir / "PAPER_DRAFT.md").read_text(encoding="utf-8")
+    ledger = (paper_dir / "CLAIM_LEDGER.md").read_text(encoding="utf-8")
+    for blocker, (contract, manuscript_target, ledger_target) in routes.items():
+        require((paper_dir / contract).is_file(), f"closure contract is missing: {contract}")
+        require(manuscript_target.startswith("PAPER_DRAFT.md:"), "invalid manuscript closure target")
+        require(ledger_target.startswith("CLAIM_LEDGER.md:"), "invalid claim-ledger closure target")
+        manuscript_anchor, ledger_anchor = READINESS_CLOSURE_FILE_ANCHORS[blocker]
+        require(manuscript_anchor in manuscript, "manuscript closure target is missing")
+        require(ledger_anchor in ledger, "claim-ledger closure target is missing")
 
 
 def main() -> int:
