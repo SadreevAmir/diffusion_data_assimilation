@@ -34,7 +34,7 @@ mode or change `NOT_READY`.
 
 The 2026-08-26 independent publication-readiness rerun completed the unified
 fail-closed audit and the focused rank-coherent handoff suites against the
-current worktree. The audit passed with 30 required files, two figures, six
+current worktree. The audit passed with 32 required files, two figures, six
 references and all 39 claim-ledger rows traced; the five prototype tests and
 the 13-test adapter-parity suite also passed. `git diff --check` found no
 whitespace errors. This confirms internal consistency and executable handoff
@@ -133,6 +133,15 @@ dependency-free oracle. Its self-test accepts one structurally complete record
 and rejects a placeholder mode, malformed identities, a failed decision-bearing
 validation and any deviation. This does not assert that a controller record
 currently exists.
+
+The explicit file boundary is now executable through
+`validate_rank_coherent_admission.py`: it reads only the path supplied by the
+controller, requires a JSON object, delegates the exact schema decision to the
+same oracle and emits only `reviewed_mode=<literal reviewed mode>` on success.
+Focused tests cover both the literal-mode success path and fail-closed rejection
+of a non-object record or any deviation. No controller-visible admission record
+is present in this worktree, so this closes handoff ambiguity but neither admits
+an experiment nor changes `NOT_READY`.
 
 The rank-coherent handoff now includes an executable directory-level parity
 fixture and a frozen adapter replacement specification. The oracle validates all

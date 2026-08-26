@@ -86,11 +86,24 @@ requires the exact field set, a literal non-placeholder reviewed mode, lowercase
 `decision_bearing_validation=PASS`, and an empty deviations list. It returns
 only the reviewed mode that a proposal may copy literally.
 
+Validate the explicit controller-visible JSON file without copying fields by
+hand:
+
+```sh
+python3 paper/validate_rank_coherent_admission.py /path/to/admission.json
+```
+
+Success prints exactly `reviewed_mode=<literal reviewed mode>`. Invalid JSON,
+a non-object top level, missing or extra fields, placeholders, malformed
+identities, a non-`PASS` decision or any deviation fails closed and prints no
+proposal-ready mode.
+
 ## Focused verification
 
 ```sh
 python3 -m unittest -v paper/test_rank_coherent_runner_prototype.py
 python3 -m unittest -v paper/test_rank_coherent_adapter_parity.py
+python3 -m unittest -v paper/test_validate_rank_coherent_admission.py
 python3 paper/rank_coherent_reference.py
 PYTHONPYCACHEPREFIX=/tmp/rank_coherent_pycache python3 -m py_compile \
   paper/rank_coherent_runner_prototype.py \
