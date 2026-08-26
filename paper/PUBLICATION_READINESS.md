@@ -13,6 +13,16 @@ Controller readiness: NOT_READY
 Scientific primary reconciliation: COMPLETE_NEGATIVE
 Autonomous publication work remaining: YES
 
+The 2026-08-27 empirical-traceability audit now links every empirical claim row
+to both a concrete manuscript table, figure or named results paragraph and an
+existing compact publication source. The unified checker requires exact,
+duplicate-free coverage of C3--C8 and C11--C39, requires a concrete presentation
+anchor in every row, and rejects sources that are missing or escape `paper/`.
+This prevents an editorial revision from retaining a numerical or decision
+claim after its presentation or compact evidence unit has disappeared. It does
+not add a scientific result or an admitted trusted mode, so status remains
+`NOT_READY`.
+
 The 2026-08-27 negative-fixture audit now proves the immutable-identity boundary
 fail-closed rather than relying only on a successful current-tree check. A
 focused suite mutates each of the four frozen runner, prototype-test, oracle and

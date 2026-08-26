@@ -622,6 +622,28 @@ revision cannot silently promote a rejected or unknown claim.
 | Model-space, amended-policy and final development evidence | C35, C36, C37, C38 |
 | Independent primary result | C39 |
 
+### Empirical evidence traceability
+
+The map below adds the two links that the claim-ledger map alone does not
+encode: the exact manuscript presentation and the compact publication source.
+It is deliberately grouped by evidence unit rather than by conclusion. A claim
+cannot be retained merely because its prose remains plausible if either its
+presentation object or compact source disappears.
+
+| Empirical claim rows | Manuscript presentation | Compact publication source | Evidence role |
+|---|---|---|---|
+| C3, C4, C5, C6, C7 | Section 6 preliminary-guidance and affine-logit paragraphs | `REPRODUCIBILITY.md` | Preliminary development effects and explicit negative calibration diagnosis |
+| C8, C11, C12, C13, C14, C15, C16, C18, C19, C20 | Section 8 frozen-mechanism and paired-diagnostic tables; Figure 1 | `REPRODUCIBILITY.md` | Global-spread mechanism, paired uncertainty and joint-gate rejection |
+| C17 | Section 5 baseline inventory and Section 8 later-mechanism family matrix | `RESEARCH_PLAN.md` | Minimum-tier baseline sufficiency remains rejected rather than narrowed editorially |
+| C21, C22 | Section 8 purged hurdle-IDR/ECC-Q table | `REPRODUCIBILITY.md` | Nonparametric boundary/rank repair and spatial/proper-score failure |
+| C23, C24, C25 | Section 8 projected-spread table; Figure 2 | `REPRODUCIBILITY.md` | Exact mean-preservation ablation and no-compensation rejection |
+| C26, C27 | Section 8 open-logit table | `REPRODUCIBILITY.md` | Hard-cap ablation and residual boundary/member-spatial failure |
+| C28, C29 | Section 8 ZOIB-EMOS/ECC-Q table | `REPRODUCIBILITY.md` | Parametric boundary-atom comparator and joint-gate rejection |
+| C30, C31, C32, C33, C34, C35, C37 | Section 8 later-mechanism family matrix | `REPRODUCIBILITY.md` | Family-level frozen mechanism failure map |
+| C36 | Section Amended primary decision policy | `AMENDED_PRIMARY_EVALUATION_CONTRACT.md` | Normative absolute-rank and truth-relative boundary decision rule |
+| C38 | Section 8 later-mechanism family matrix | `LOCKED_MC_DROPOUT_RESULT_RECONCILIATION.md` | Overall rejection only; no unsupported family effect sizes |
+| C39 | Independent primary result section and Section 8 independent-primary table | `EXTERNAL_PRIMARY_RESULT_RECONCILIATION.md` | Reconciled negative independent primary with superseded metrics excluded |
+
 ### Final frozen development fallback
 
 The last predeclared development fallback mixed raw and calendar-conditioned

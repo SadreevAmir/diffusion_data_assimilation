@@ -355,6 +355,13 @@ CITATION_PATTERN = re.compile(r"\[([1-9]\d*(?:\s*,\s*[1-9]\d*)*)\]")
 CLAIM_PATTERN = re.compile(r"^\| C(\d+) \|", re.MULTILINE)
 TRACEABILITY_HEADING = "### Claim-ledger traceability\n"
 TRACEABILITY_PATTERN = re.compile(r"\bC(\d+)\b")
+EMPIRICAL_TRACEABILITY_HEADING = "### Empirical evidence traceability\n"
+EMPIRICAL_CLAIM_IDS = set(range(3, 9)) | set(range(11, 40))
+EMPIRICAL_TRACEABILITY_ROW = re.compile(
+    r"^\| (?P<claims>C\d+(?:, C\d+)*) \| "
+    r"(?P<presentation>[^|]+) \| `(?P<source>[^`]+)` \| (?P<role>[^|]+) \|$",
+    re.MULTILINE,
+)
 FINAL_DIAGNOSTIC_ANCHORS = {
     "PAPER_DRAFT.md": (
         "0.055738",
@@ -1109,6 +1116,43 @@ def main() -> int:
         + ",".join(map(str, sorted(traced_claim_ids)))
         + "; ledger="
         + ",".join(map(str, claim_ids)),
+    )
+
+    require(
+        EMPIRICAL_TRACEABILITY_HEADING in manuscript,
+        "manuscript contains no empirical evidence traceability section",
+    )
+    empirical_section = manuscript.split(
+        EMPIRICAL_TRACEABILITY_HEADING, maxsplit=1
+    )[1].split("\n### ", maxsplit=1)[0]
+    empirical_rows = list(EMPIRICAL_TRACEABILITY_ROW.finditer(empirical_section))
+    require(empirical_rows, "empirical evidence traceability contains no rows")
+    empirical_claim_ids: list[int] = []
+    for row in empirical_rows:
+        row_claim_ids = [int(value) for value in TRACEABILITY_PATTERN.findall(row["claims"])]
+        empirical_claim_ids.extend(row_claim_ids)
+        presentation = row["presentation"].strip()
+        require(
+            "Section " in presentation or "Figure " in presentation,
+            "empirical traceability row has no concrete manuscript presentation: "
+            + row["claims"],
+        )
+        source = (PAPER_DIR / row["source"]).resolve()
+        require(
+            source.is_relative_to(PAPER_DIR) and source.is_file(),
+            "empirical traceability source is missing or escapes paper/: "
+            + row["source"],
+        )
+    require(
+        len(empirical_claim_ids) == len(set(empirical_claim_ids)),
+        "empirical evidence traceability contains duplicate claim IDs",
+    )
+    require(
+        set(empirical_claim_ids) == EMPIRICAL_CLAIM_IDS,
+        "empirical evidence traceability mismatch: traced="
+        + ",".join(map(str, sorted(empirical_claim_ids)))
+        + " expected="
+        + ",".join(map(str, sorted(EMPIRICAL_CLAIM_IDS))),
     )
 
     status_lines = re.findall(r"^Publication status: (\S+)$", readiness, re.MULTILINE)
