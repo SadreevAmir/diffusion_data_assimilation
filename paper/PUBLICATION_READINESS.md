@@ -15,9 +15,9 @@ Autonomous publication work remaining: YES
 
 ## Current independent audit snapshot
 
-The 2026-08-27 independent rerun against the current worktree passed with 66
-required files, two parseable linked figures, eight traceable references and 39
-contiguous claim-ledger records. The immutable rank-coherent package separately
+The current audit passed with 69 required files, two parseable linked figures,
+eight traceable references and 39 contiguous claim-ledger records. The
+immutable rank-coherent package separately
 passed its 13-file manifest check and all 26 focused prototype, adapter-parity,
 combined-admission and manifest fixtures. These current counts supersede the
 smaller historical inventory counts recorded later in this chronology; those
@@ -28,6 +28,14 @@ This rerun confirms local integrity only. The rank-coherent contract still has
 no literal reviewed trusted mode, and the conformal and probabilistic-DA
 contracts remain frozen but non-executable. No decision-bearing scientific row
 therefore changes, and publication status remains `NOT_READY`.
+
+The same audit found that the newly executable conformal oracle, CPU runner
+prototype and synthetic suite were not yet members of the mandatory publication
+inventory or the documented regression command. All three source artifacts and
+the suite are now required by the unified checker. This makes deletion or
+synthetic-parity drift fail closed, but it is runner-parity evidence only: no
+literal trusted mode has been admitted, no conformal result exists and the
+corresponding minimum-tier row remains `MISSING`.
 
 ## Decision-bearing readiness blocker matrix
 

@@ -15,6 +15,7 @@ from pathlib import Path
 PAPER_DIR = Path(__file__).resolve().parent
 
 REQUIRED_REGRESSION_SUITES = (
+    "paper.test_conformal_area_runner_prototype",
     "paper.test_rank_coherent_runner_prototype",
     "paper.test_rank_coherent_adapter_parity",
     "paper.test_validate_rank_coherent_admission",
@@ -177,6 +178,9 @@ REQUIRED_FILES = (
     "PUBLICATION_READINESS.md",
     "MINIMUM_TIER_COMPARISON_AUDIT.md",
     "NEXT_CONFORMAL_BASELINE_CONTRACT.md",
+    "conformal_area_reference.py",
+    "conformal_area_runner_prototype.py",
+    "test_conformal_area_runner_prototype.py",
     "NEXT_PROBABILISTIC_DA_COMPARISON_CONTRACT.md",
     "NEXT_BASELINE_CONTRACT.md",
     "NEXT_METHOD_CONTRACT.md",

@@ -568,6 +568,7 @@ system termination.
 
 ```bash
 python3 -m unittest -v \
+  paper.test_conformal_area_runner_prototype \
   paper.test_rank_coherent_runner_prototype \
   paper.test_rank_coherent_adapter_parity \
   paper.test_validate_rank_coherent_admission \
