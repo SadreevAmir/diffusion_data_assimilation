@@ -281,6 +281,56 @@ class MinimumTierComparisonAuditTests(unittest.TestCase):
         )
         validate_eligible_calibration_transition(*updated)
 
+    def test_eligible_calibration_manuscript_record_must_match_guard(self) -> None:
+        marker = "a" * 64
+        mismatched = "b" * 64
+        old = "| `eligible_calibration` | `MISSING_ELIGIBLE_RESULT` | `NONE` | `BLOCKED` |"
+        new = f"| `eligible_calibration` | `ELIGIBLE` | `{marker}` | `DECISION_BEARING` |"
+        updated = [
+            text.replace(old, new, 1)
+            for text in (self.manuscript, self.ledger, self.readiness, self.reproducibility)
+        ]
+        updated[0] += (
+            f"\nEligible calibration decision: `ELIGIBLE`; compact record: `{mismatched}`; "
+            "claim role: `DECISION_BEARING`.\n"
+        )
+        updated[2] = updated[2].replace(
+            "| Eligible spatially preserving calibration | `RESEARCH_PLAN.md` | MISSING_ELIGIBLE_RESULT |",
+            "| Eligible spatially preserving calibration | `RESEARCH_PLAN.md` | ELIGIBLE |",
+            1,
+        )
+        updated[3] += (
+            f"\nEligible calibration reproducibility identity: `{marker}`; "
+            "verification: `HASH_VERIFIED`.\n"
+        )
+        with self.assertRaisesRegex(ValueError, "manuscript claim"):
+            validate_eligible_calibration_transition(*updated)
+
+    def test_eligible_calibration_reproducibility_record_must_match_guard(self) -> None:
+        marker = "a" * 64
+        mismatched = "b" * 64
+        old = "| `eligible_calibration` | `MISSING_ELIGIBLE_RESULT` | `NONE` | `BLOCKED` |"
+        new = f"| `eligible_calibration` | `ELIGIBLE` | `{marker}` | `DECISION_BEARING` |"
+        updated = [
+            text.replace(old, new, 1)
+            for text in (self.manuscript, self.ledger, self.readiness, self.reproducibility)
+        ]
+        updated[0] += (
+            f"\nEligible calibration decision: `ELIGIBLE`; compact record: `{marker}`; "
+            "claim role: `DECISION_BEARING`.\n"
+        )
+        updated[2] = updated[2].replace(
+            "| Eligible spatially preserving calibration | `RESEARCH_PLAN.md` | MISSING_ELIGIBLE_RESULT |",
+            "| Eligible spatially preserving calibration | `RESEARCH_PLAN.md` | ELIGIBLE |",
+            1,
+        )
+        updated[3] += (
+            f"\nEligible calibration reproducibility identity: `{mismatched}`; "
+            "verification: `HASH_VERIFIED`.\n"
+        )
+        with self.assertRaisesRegex(ValueError, "reproducibility identity"):
+            validate_eligible_calibration_transition(*updated)
+
     def test_eligible_calibration_positive_guard_without_full_transition_fails(self) -> None:
         marker = "e" * 64
         old = "| `eligible_calibration` | `MISSING_ELIGIBLE_RESULT` | `NONE` | `BLOCKED` |"
