@@ -29,6 +29,17 @@ no literal reviewed trusted mode, and the conformal and probabilistic-DA
 contracts remain frozen but non-executable. No decision-bearing scientific row
 therefore changes, and publication status remains `NOT_READY`.
 
+The publication-readiness trigger was then independently repeated against this
+exact worktree state. The unified checker again passed with 71 required files,
+two parseable linked figures, eight traceable references and 39 contiguous
+claim-ledger records. A focused 61-test decision-surface suite covering
+conformal admission, claim-status consistency and the minimum-tier comparison
+audit also passed, and `git diff --check` reported no whitespace errors. This
+records the trigger-specific verification rather than relying on the earlier
+controller summary. It remains local integrity evidence only: none of the four
+normative blocker states changes, no experiment is authorized, and the status
+remains `NOT_READY`.
+
 The same audit found that the newly executable conformal oracle, CPU runner
 prototype and synthetic suite were not yet members of the mandatory publication
 inventory or the documented regression command. All three source artifacts and
