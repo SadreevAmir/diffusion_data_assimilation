@@ -56,6 +56,17 @@ proves that the false promotion fails closed. This strengthens the completion
 guard only; all four normative blockers remain open and status stays
 `NOT_READY`.
 
+The same independent trigger reran the decision-bearing handoff subset rather
+than relying only on the unified checker's aggregate success. All 29 focused
+tests covering the rank-coherent prototype, adapter parity, admission record,
+immutable manifest and contingent raw-member reweighting oracle passed. The
+negative paths include envelope and threshold drift, non-finite source data,
+compact-output disagreement, an unbound contract digest, manifest mutation and
+path traversal. This establishes a reproducible fail-closed local handoff at
+the frozen contract boundary; it does not assert that a trusted server mode has
+been admitted, does not authorize an experiment proposal and does not change
+`NOT_READY`.
+
 The independent rerun also found that the newly frozen raw-member reweighting
 oracle and its fail-closed tests were described by the contract but were not
 members of the required publication inventory or documented regression suite.
