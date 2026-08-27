@@ -553,6 +553,7 @@ python3 -m unittest -v \
   paper.test_rank_coherent_runner_prototype \
   paper.test_rank_coherent_adapter_parity \
   paper.test_validate_rank_coherent_admission \
+  paper.test_validate_rank_coherent_manifest \
   paper.test_publication_immutable_identities \
   paper.test_publication_empirical_traceability \
   paper.test_minimum_tier_comparison_audit \

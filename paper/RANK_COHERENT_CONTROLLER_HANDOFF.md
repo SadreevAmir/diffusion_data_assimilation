@@ -2,6 +2,22 @@
 
 ## Immutable files
 
+The executable package identity is
+`paper/rank_coherent_admission_manifest.json`. It covers the contract, runner
+prototype, reference/schema oracle, adapter specification and parity oracle,
+review checklist, admission CLI, and all three focused test modules. Validate
+the whole package before review with:
+
+```sh
+python3 paper/validate_rank_coherent_manifest.py
+```
+
+Success prints exactly
+`rank_coherent_admission_manifest=PASS files=10`; any missing, changed,
+malformed or path-traversing entry fails closed before a mode can be admitted.
+The table below retains the four construction identities for convenient manual
+comparison; the manifest is authoritative for the complete package.
+
 | File | SHA-256 |
 |---|---|
 | `paper/rank_coherent_runner_prototype.py` | `b6b9b709c587d79625d0237b15c3e36f4e3404eef37ba0bbbe850875be95d86c` |

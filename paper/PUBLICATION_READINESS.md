@@ -239,7 +239,7 @@ mode or change `NOT_READY`.
 
 The 2026-08-27 independent publication-readiness rerun completed the unified
 fail-closed audit and the full documented regression contract against the
-current worktree. The audit passed with 47 required files, two figures, six
+current worktree. The audit passed with 50 required files, two figures, six
 references and all 39 claim-ledger rows traced; all 92 regression tests passed.
 The compact-payload subset now explicitly rejects a wrong 160-row envelope,
 duplicate method/date identities, candidate substitution, duplicate full-region
@@ -317,6 +317,16 @@ damaged, behaviorally broken, or narratively loosened. This closes a concrete
 reproducibility gap but does not change scientific readiness: the prototype
 still cannot produce decision-bearing evidence without the separately reviewed
 trusted full-gate integration.
+
+The 2026-08-27 admission-package audit closed a remaining mixed-version review
+path. `rank_coherent_admission_manifest.json` now binds the frozen contract,
+runner prototype, reference/schema oracle, adapter specification and parity
+oracle, review checklist, admission CLI and all three focused suites by exact
+SHA-256. `validate_rank_coherent_manifest.py` rejects missing or changed files,
+schema drift and path traversal, and the unified checker requires and executes
+its regression suite. This strengthens implementation admission only; no
+trusted mode or decision-bearing scientific result exists, so status remains
+`NOT_READY`.
 
 `RANK_COHERENT_RUNNER_REVIEW_CHECKLIST.md` now supplies the missing independent
 integration admission test. It traces the sole-parameter interface, provenance,
