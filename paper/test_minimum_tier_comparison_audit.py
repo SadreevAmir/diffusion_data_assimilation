@@ -14,10 +14,12 @@ from paper.check_publication_artifacts import (
     READINESS_BLOCKER_ROW,
     READINESS_CLOSURE_ROUTE_ROW,
     REQUIRED_REGRESSION_SUITES,
+    SERVER_ONLY_COMMAND_INPUTS,
     validate_documented_regression_suites,
     validate_minimum_tier_key_claims,
     validate_minimum_tier_comparisons,
     validate_readiness_blockers,
+    validate_server_only_command_inputs,
 )
 
 
@@ -158,6 +160,38 @@ class MinimumTierComparisonAuditTests(unittest.TestCase):
         )
         with self.assertRaisesRegex(ValueError, "differ from the required"):
             validate_documented_regression_suites(mutated)
+
+    def test_server_only_command_inputs_match_exact_contract(self) -> None:
+        validate_server_only_command_inputs(self.reproducibility)
+
+    def test_server_only_command_omission_fails_closed(self) -> None:
+        command = next(iter(SERVER_ONLY_COMMAND_INPUTS))
+        line = next(
+            line
+            for line in self.reproducibility.splitlines(keepends=True)
+            if line.startswith(f"| `{command}` |")
+        )
+        mutated = self.reproducibility.replace(line, "", 1)
+        with self.assertRaisesRegex(ValueError, "matrix is incomplete"):
+            validate_server_only_command_inputs(mutated)
+
+    def test_external_input_command_cannot_be_local_oracle(self) -> None:
+        mutated = self.reproducibility.replace(
+            "| `calibration_summary_figure` | `SERVER_ONLY` |",
+            "| `calibration_summary_figure` | `LOCAL_ORACLE` |",
+            1,
+        )
+        self.assertNotEqual(mutated, self.reproducibility)
+        with self.assertRaisesRegex(ValueError, "class or compact-input schema"):
+            validate_server_only_command_inputs(mutated)
+
+    def test_server_only_input_schema_cannot_be_weakened(self) -> None:
+        mutated = self.reproducibility.replace(
+            "exactly 160 rows", "a finite number of rows", 1
+        )
+        self.assertNotEqual(mutated, self.reproducibility)
+        with self.assertRaisesRegex(ValueError, "class or compact-input schema"):
+            validate_server_only_command_inputs(mutated)
 
     def test_claim_consistency_contract_covers_all_publication_surfaces(self) -> None:
         self.assertEqual(

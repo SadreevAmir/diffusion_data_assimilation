@@ -446,6 +446,26 @@ fail-closed rejection of negative metrics, a jointly zero plotting scale and a
 zero raw denominator. This prevents malformed but finite compact input from
 producing a misleading or undefined checked-in SVG.
 
+### Execution boundary for documented commands
+
+The following matrix is normative. A command listed as `SERVER_ONLY` is not a
+clean-checkout oracle: its mandatory compact input is produced or retained by
+trusted server analysis and must satisfy the exact schema below before the
+command may run. No raw ensemble is an admissible substitute. Commands absent
+from this matrix must not be inferred to accept external compact inputs.
+
+| Command id | Execution class | Exact mandatory compact-input schema |
+|---|---|---|
+| `case_level_artifacts_long_form` | `SERVER_ONLY` | `per_case_metrics.csv`: exactly 160 rows; columns `target_date`, `fold`, `method` and the full proper-score, rank, boundary and spatial diagnostic family; unique ISO `target_date`/`method` pairs; exactly 40 dates and both exact raw/global-spread method labels on every date |
+| `calibration_summary_figure` | `SERVER_ONLY` | `aggregate_case_mean_metrics.json`: one-row JSON list; `num_cases == 40`; finite raw and corrected values for ordinary CRPS, fair CRPS, spread-skill ratio and all four interval diagnostics |
+| `joint_gate_figure` | `SERVER_ONLY` | `aggregate_case_mean_metrics.json`: exact reviewed candidate identifier; exactly two full-region method rows; 40 finite cases per method; finite gate metrics and Boolean `overall_eligible == false` |
+
+The data-free `python3 paper/rank_coherent_reference.py` command and the
+publication regression/integrity commands below are `LOCAL_ORACLE` operations:
+they require only versioned files in a clean checkout. This explicit separation
+prevents a server generator from being mistaken for an autonomously reproducible
+local check.
+
 The compact CSV and aggregate JSON retain their trusted manifests outside the
 paper narrative. Venue metadata, author statements and data-release decisions
 remain external inputs.

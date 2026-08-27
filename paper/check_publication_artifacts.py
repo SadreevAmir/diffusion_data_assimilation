@@ -29,6 +29,29 @@ REQUIRED_REGRESSION_SUITES = (
 REGRESSION_COMMAND = re.compile(
     r"python3 -m unittest -v \\\n(?P<body>(?:  paper\.[a-z0-9_]+(?: \\\n|\n))+)",
 )
+SERVER_ONLY_COMMAND_INPUTS = {
+    "case_level_artifacts_long_form": (
+        "per_case_metrics.csv`: exactly 160 rows; columns `target_date`, `fold`, "
+        "`method` and the full proper-score, rank, boundary and spatial diagnostic "
+        "family; unique ISO `target_date`/`method` pairs; exactly 40 dates and both "
+        "exact raw/global-spread method labels on every date"
+    ),
+    "calibration_summary_figure": (
+        "aggregate_case_mean_metrics.json`: one-row JSON list; `num_cases == 40`; "
+        "finite raw and corrected values for ordinary CRPS, fair CRPS, spread-skill "
+        "ratio and all four interval diagnostics"
+    ),
+    "joint_gate_figure": (
+        "aggregate_case_mean_metrics.json`: exact reviewed candidate identifier; "
+        "exactly two full-region method rows; 40 finite cases per method; finite "
+        "gate metrics and Boolean `overall_eligible == false`"
+    ),
+}
+SERVER_ONLY_COMMAND_ROW = re.compile(
+    r"^\| `(?P<command>[a-z0-9_]+)` \| `(?P<execution>[A-Z_]+)` \| "
+    r"`(?P<schema>[^\n]+?) \|$",
+    re.MULTILINE,
+)
 
 
 def validate_documented_regression_suites(text: str) -> None:
@@ -41,6 +64,31 @@ def validate_documented_regression_suites(text: str) -> None:
     require(
         observed == REQUIRED_REGRESSION_SUITES,
         "documented regression suites differ from the required executable set",
+    )
+
+
+def validate_server_only_command_inputs(text: str) -> None:
+    """Keep external compact-input generators separate from local oracles."""
+    rows = list(SERVER_ONLY_COMMAND_ROW.finditer(text))
+    observed = {
+        row["command"]: (row["execution"], row["schema"])
+        for row in rows
+    }
+    expected = {
+        command: ("SERVER_ONLY", schema)
+        for command, schema in SERVER_ONLY_COMMAND_INPUTS.items()
+    }
+    require(
+        len(rows) == len(observed) == len(expected),
+        "server-only command matrix is incomplete or contains duplicates",
+    )
+    require(
+        observed == expected,
+        "server-only command class or compact-input schema differs from contract",
+    )
+    require(
+        "rank_coherent_reference.py` command and the\npublication regression/integrity commands below are `LOCAL_ORACLE`" in text,
+        "local-oracle execution boundary is missing",
     )
 
 
@@ -1333,6 +1381,7 @@ def main() -> int:
 
     reproducibility = (PAPER_DIR / "REPRODUCIBILITY.md").read_text(encoding="utf-8")
     validate_documented_regression_suites(reproducibility)
+    validate_server_only_command_inputs(reproducibility)
     regression_suite = subprocess.run(
         [sys.executable, "-m", "unittest", *REQUIRED_REGRESSION_SUITES],
         cwd=PAPER_DIR.parent,
