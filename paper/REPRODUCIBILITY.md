@@ -562,6 +562,7 @@ python3 -m unittest -v \
   paper.test_publication_reference_traceability \
   paper.test_publication_limitation_traceability \
   paper.test_publication_claim_status_consistency \
+  paper.test_score_aware_reconciliation_consistency \
   paper.test_validate_server_only_manifest \
   paper.test_server_only_consumer_cli \
   paper.test_atomic_publish \

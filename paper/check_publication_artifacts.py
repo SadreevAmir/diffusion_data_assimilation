@@ -27,6 +27,7 @@ REQUIRED_REGRESSION_SUITES = (
     "paper.test_publication_reference_traceability",
     "paper.test_publication_limitation_traceability",
     "paper.test_publication_claim_status_consistency",
+    "paper.test_score_aware_reconciliation_consistency",
     "paper.test_validate_server_only_manifest",
     "paper.test_server_only_consumer_cli",
     "paper.test_atomic_publish",
@@ -218,6 +219,7 @@ REQUIRED_FILES = (
     "test_publication_limitation_traceability.py",
     "LIMITATION_TRACEABILITY.md",
     "test_publication_claim_status_consistency.py",
+    "test_score_aware_reconciliation_consistency.py",
     "RANK_COHERENT_ADAPTER_SPEC.md",
     "NEXT_GENERATIVE_METHOD_CONTRACT.md",
     "LATENT_TEMPERATURE_RESULT_RECONCILIATION.md",
@@ -595,6 +597,58 @@ SCORE_AWARE_RECONCILIATION_ANCHORS = (
     "compact_directory_sha256",
     "decision_bearing=True",
 )
+SCORE_AWARE_RESULT_MARKER = re.compile(
+    r"^SCORE_AWARE_RESULT: status=(?P<status>RECONCILED_(?:POSITIVE|NEGATIVE)); "
+    r"experiment_id=(?P<experiment_id>[a-z0-9_]{1,64}); "
+    r"candidate=(?P<candidate>[a-z0-9_]{1,64}); "
+    r"overall_eligible=(?P<eligible>true|false)$",
+    re.MULTILINE,
+)
+
+
+def validate_score_aware_reconciliation_consistency(
+    manuscript: str,
+    claim_ledger: str,
+    readiness: str,
+    reproducibility: str,
+    reconciliation: str,
+) -> None:
+    """Require one identical decision marker across all five publication files."""
+    documents = {
+        "PAPER_DRAFT.md": manuscript,
+        "CLAIM_LEDGER.md": claim_ledger,
+        "PUBLICATION_READINESS.md": readiness,
+        "REPRODUCIBILITY.md": reproducibility,
+        "SCORE_AWARE_RESULT_RECONCILIATION.md": reconciliation,
+    }
+    pre_result = "Status: PRE_RESULT_NO_TRUSTED_MODE" in reconciliation
+    matches = {
+        name: SCORE_AWARE_RESULT_MARKER.findall(text)
+        for name, text in documents.items()
+    }
+    if pre_result:
+        require(
+            not any(matches.values()),
+            "pre-result score-aware state contains a reconciled decision marker",
+        )
+        return
+
+    for name, found in matches.items():
+        require(
+            len(found) == 1,
+            f"{name} must contain exactly one score-aware result marker",
+        )
+    canonical = next(iter(matches.values()))[0]
+    require(
+        all(found[0] == canonical for found in matches.values()),
+        "score-aware result markers disagree across publication files",
+    )
+    status, _, _, eligible = canonical
+    require(
+        (status == "RECONCILED_POSITIVE" and eligible == "true")
+        or (status == "RECONCILED_NEGATIVE" and eligible == "false"),
+        "score-aware reconciliation branch contradicts overall_eligible",
+    )
 AMENDED_PRIMARY_ANCHORS = {
     "AMENDED_PRIMARY_EVALUATION_CONTRACT.md": (
         "DEPLOYED_AUDITED_PRIMARY_IN_FLIGHT",
@@ -1514,6 +1568,13 @@ def main() -> int:
     )
     validate_limitation_traceability(manuscript, claim_ledger, limitation_traceability)
     validate_claim_status_consistency(manuscript, claim_ledger)
+    validate_score_aware_reconciliation_consistency(
+        manuscript,
+        claim_ledger,
+        readiness,
+        reproducibility,
+        score_aware_reconciliation,
+    )
     validate_minimum_tier_comparisons(PAPER_DIR)
     validate_minimum_tier_key_claims(manuscript, PAPER_DIR)
     missing_outcome_anchors = [

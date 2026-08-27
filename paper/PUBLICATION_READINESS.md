@@ -31,7 +31,7 @@ another row.
 
 The publication-readiness trigger was independently rerun against the current
 worktree on 2026-08-27. The fail-closed command
-`python3 paper/check_publication_artifacts.py` audit passed with 60 required files,
+`python3 paper/check_publication_artifacts.py` audit passed with 61 required files,
 two parseable linked figures, eight traceable references and 39
 contiguous claim-ledger records. A separate unfinished-text scan found no
 `TODO`, `TBD`, `FIXME` or `PLACEHOLDER` marker in the Markdown publication

@@ -96,7 +96,10 @@ update is not publication-ready.
   `overall_eligible=false`.
 - The manuscript, claim ledger, readiness audit, reproducibility handoff and
   this file must name the same experiment, candidate and decision.
+- On reconciliation, each of those five files must contain exactly one identical
+  machine-readable line of the form `SCORE_AWARE_RESULT: status=RECONCILED_POSITIVE;
+  experiment_id=<id>; candidate=<id>; overall_eligible=true` or its negative
+  counterpart. The pre-result state must contain no such line.
 - Neither branch closes conformal, probabilistic-DA or deterministic-comparison
   evidence rows. Readiness is derived from the full blocker matrix, never from
   this result alone.
-
