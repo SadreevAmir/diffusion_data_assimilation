@@ -79,6 +79,7 @@ def validate_directory(directory: Path) -> None:
         "analysis_crps_delta",
     }
     ids: set[str] = set()
+    fold_counts = [0] * 5
     multiplicity_totals = [0] * MEMBERS
     ess_values: list[float] = []
     unique_values: list[int] = []
@@ -94,6 +95,7 @@ def validate_directory(directory: Path) -> None:
         ids.add(case_id)
         if not isinstance(case["fold"], int) or isinstance(case["fold"], bool) or not 0 <= case["fold"] < 5:
             raise ValueError("fold must be an integer from zero through four")
+        fold_counts[case["fold"]] += 1
         expected = select_raw_scenarios(case["predicted_risks"])
         for key in ("normalized_weights", "source_raw_member_indices", "source_multiplicities"):
             if case[key] != expected[key]:
@@ -114,6 +116,9 @@ def validate_directory(directory: Path) -> None:
             multiplicity_totals[member] += count
         ess_values.append(expected["effective_sample_size"])
         unique_values.append(expected["unique_selected_raw_members"])
+
+    if fold_counts != [8] * 5:
+        raise ValueError("fold allocation must contain exactly eight cases in each of five folds")
 
     aggregate = payload["aggregate"]
     aggregate_keys = {"schema_version", "num_cases", "source_multiplicity_totals", "mean_unique_selected_raw_members", "mean_effective_sample_size", "bitwise_copy_failures", "mask_invariant_failures", "all_invariants_pass"}

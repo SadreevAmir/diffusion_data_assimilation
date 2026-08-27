@@ -80,6 +80,12 @@ class CompactDirectoryTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "aggregate counts"):
             validate_directory(self.write(payloads))
 
+    def test_wrong_fold_allocation_fails_closed(self) -> None:
+        payloads = valid_payloads()
+        payloads["cases"]["cases"][0]["fold"] = 1
+        with self.assertRaisesRegex(ValueError, "exactly eight cases"):
+            validate_directory(self.write(payloads))
+
     def test_invariant_and_gate_disagreement_fail_closed(self) -> None:
         payloads = valid_payloads()
         payloads["cases"]["cases"][0]["bitwise_copy_pass"] = False
