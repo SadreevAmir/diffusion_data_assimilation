@@ -975,6 +975,46 @@ DECISION_PRESENTATION_ROWS = {
     "locked-MC-dropout": ("Later-mechanism family matrix", "Negative overall only", "Unavailable; no effect-size claim"),
     "independent-primary": ("Independent-primary table", "Negative", "Not required for observed 48-case census"),
 }
+DECISION_PRESENTATION_OBJECT_ANCHORS = {
+    "global-spread": (
+        "| Fair CRPS | 0.058491 | 0.055690 | 4.79% reduction; selection objective |",
+        "| Established-ice Brier score | 0.056973 | 0.058200 | 2.15% worse; fails the 1% boundary tolerance |",
+        "**Figure 1.** Aggregate validation diagnostics",
+    ),
+    "hurdle-IDR/ECC-Q": (
+        "| Fair CRPS | 0.058491 | 0.085581 | 46.3% worse; proper-score family fails |",
+        "| Mean IIEE | 0.079600 | 0.183385 | 130% worse; spatial/physical family fails |",
+    ),
+    "projected-spread": (
+        "| Fair CRPS | 0.058491 | 0.056300 | 3.75% better; date and block intervals exclude zero |",
+        "| Upper-cap mass | 0 | 0.167438 | Active-cap boundary failure remains |",
+        "**Figure 2.** Exact mean-preserving projected spread",
+    ),
+    "open-logit": (
+        "| Fair CRPS | 0.058491 | 0.055738 | 4.71% better; proper-score family passes |",
+        "| Established-ice Brier score | 0.056973 | 0.059107 | Worse beyond 1% tolerance; boundary family fails |",
+    ),
+    "ZOIB-EMOS/ECC-Q": (
+        "| Fair CRPS | 0.058491 | 0.058557 | No 3% improvement; proper-score family fails |",
+        "| Mean IIEE | 0.079600 | 0.087190 | Spatial/physical family fails |",
+    ),
+    "later-mechanism-family": (
+        "| Locked MC dropout | NR | NR | NR | NR | NR | Fail |",
+        "| IID calendar global-bias mixture | Fail | Pass | Pass | Pass | Pass | Fail |",
+    ),
+    "amended-primary-policy": (
+        "primary evaluation requires an absolutely good randomized rank histogram",
+        "relative rank\nimprovement alone is insufficient",
+    ),
+    "locked-MC-dropout": (
+        "| Locked MC dropout | NR | NR | NR | NR | NR | Fail |",
+        "controller-recorded overall rejection is not\nexpanded into unsupported family-specific claims",
+    ),
+    "independent-primary": (
+        "| Fair CRPS | 0.05541808434196047 | 0.061833300537408264 | Worsens; proper scores fail |",
+        "| Overall no-compensation gate | — | false | Independent primary is rejected |",
+    ),
+}
 DECISION_PRESENTATION_ROW = re.compile(
     r"^\| `(?P<unit>[^`]+)` \| (?P<presentation>[^|]+) \| "
     r"(?P<decision>[^|]+) \| (?P<uncertainty>[^|]+) \|$",
@@ -1422,6 +1462,17 @@ def validate_empirical_traceability(manuscript: str, paper_dir: Path) -> None:
         observed == DECISION_PRESENTATION_ROWS,
         "decision-bearing presentation audit mismatch",
     )
+    require(
+        set(DECISION_PRESENTATION_OBJECT_ANCHORS) == set(observed),
+        "decision presentation anchor contract does not cover every audited unit",
+    )
+    for unit, anchors in DECISION_PRESENTATION_OBJECT_ANCHORS.items():
+        missing = [anchor for anchor in anchors if anchor not in manuscript]
+        require(
+            not missing,
+            f"decision presentation object content mismatch for {unit}: "
+            + ", ".join(missing),
+        )
 
     presentation_anchors = {
         "Frozen-mechanism table": "| Diagnostic | Raw ensemble | Cross-fitted correction |",

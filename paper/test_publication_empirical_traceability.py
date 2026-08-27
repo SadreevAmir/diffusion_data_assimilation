@@ -52,7 +52,21 @@ class EmpiricalTraceabilityTests(unittest.TestCase):
             "**Illustration 2.** Exact mean-preserving projected spread",
             1,
         )
-        with self.assertRaisesRegex(ValueError, "presentation object is missing"):
+        with self.assertRaisesRegex(
+            ValueError, "decision presentation object content mismatch|presentation object is missing"
+        ):
+            validate_empirical_traceability(mutated, PAPER_DIR)
+
+    def test_substituted_decision_presentation_value_fails_closed(self) -> None:
+        mutated = self.manuscript.replace(
+            "| Fair CRPS | 0.058491 | 0.056300 | 3.75% better; date and block intervals exclude zero |",
+            "| Fair CRPS | 0.058491 | 0.056301 | 3.75% better; date and block intervals exclude zero |",
+            1,
+        )
+        self.assertNotEqual(mutated, self.manuscript)
+        with self.assertRaisesRegex(
+            ValueError, "decision presentation object content mismatch for projected-spread"
+        ):
             validate_empirical_traceability(mutated, PAPER_DIR)
 
     def test_negative_result_cannot_be_promoted(self) -> None:
