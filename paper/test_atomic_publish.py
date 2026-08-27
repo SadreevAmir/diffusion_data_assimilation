@@ -50,6 +50,57 @@ class AtomicPublishTests(unittest.TestCase):
             self.assertEqual(second.read_text(encoding="utf-8"), "old figure")
             self.assertEqual(sorted(directory.iterdir()), [second, first])
 
+    def test_second_final_replace_failure_rolls_back_both_destinations(self) -> None:
+        with tempfile.TemporaryDirectory() as directory_name:
+            directory = Path(directory_name)
+            first, second = directory / "summary.json", directory / "figure.svg"
+            first.write_text("old summary", encoding="utf-8")
+            second.write_text("old figure", encoding="utf-8")
+            real_replace = os.replace
+            calls = 0
+
+            def failing_replace(*args: object, **kwargs: object) -> None:
+                nonlocal calls
+                calls += 1
+                if calls == 4:
+                    raise OSError("simulated second final replace failure")
+                real_replace(*args, **kwargs)
+
+            with mock.patch(
+                "paper.atomic_publish.os.replace", side_effect=failing_replace
+            ):
+                with self.assertRaisesRegex(OSError, "second final replace"):
+                    publish_text_artifacts(((first, "new summary"), (second, "new figure")))
+
+            self.assertEqual(first.read_text(encoding="utf-8"), "old summary")
+            self.assertEqual(second.read_text(encoding="utf-8"), "old figure")
+            self.assertEqual(sorted(directory.iterdir()), [second, first])
+
+    def test_replace_failure_removes_new_destination_and_restores_existing_one(self) -> None:
+        with tempfile.TemporaryDirectory() as directory_name:
+            directory = Path(directory_name)
+            first, second = directory / "summary.json", directory / "figure.svg"
+            first.write_text("old summary", encoding="utf-8")
+            real_replace = os.replace
+            calls = 0
+
+            def failing_replace(*args: object, **kwargs: object) -> None:
+                nonlocal calls
+                calls += 1
+                if calls == 3:
+                    raise OSError("simulated new-target replace failure")
+                real_replace(*args, **kwargs)
+
+            with mock.patch(
+                "paper.atomic_publish.os.replace", side_effect=failing_replace
+            ):
+                with self.assertRaisesRegex(OSError, "new-target replace"):
+                    publish_text_artifacts(((first, "new summary"), (second, "new figure")))
+
+            self.assertEqual(first.read_text(encoding="utf-8"), "old summary")
+            self.assertFalse(second.exists())
+            self.assertEqual(list(directory.iterdir()), [first])
+
 
 if __name__ == "__main__":
     unittest.main()

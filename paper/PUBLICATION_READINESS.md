@@ -115,6 +115,17 @@ and no temporary files survive. This is an explicit prepare-stage guarantee,
 not a claim of a filesystem-wide transaction across multiple replacements, and
 it does not change the scientific `NOT_READY` status.
 
+The 2026-08-27 replacement-phase audit strengthens that helper with
+same-directory backups and reverse-order rollback. Fault injection at the
+second artifact's final replacement now proves that both prior targets are
+restored byte-for-byte; a separate mixed existing/new-target fixture proves
+that rollback also removes a target absent on entry. Both paths require that no
+temporary or backup file survives. The guarantee is explicitly limited to
+caught filesystem exceptions: no durable journal or recovery claim is made for
+abrupt process or operating-system termination. This closes the known
+replacement-phase consistency gap without changing any scientific result, so
+publication status remains `NOT_READY`.
+
 The 2026-08-27 pre-result interpretation audit now freezes in `PAPER_DRAFT.md`
 all four valid joint outcomes of the two outstanding minimum-tier contracts.
 Each conformal and probabilistic-DA result closes only its exact evidence row;

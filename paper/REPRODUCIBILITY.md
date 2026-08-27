@@ -536,6 +536,18 @@ conformal and probabilistic DA are the only `MISSING` result rows, whereas the
 deterministic comparison is `PRESENT_DEVELOPMENT_ONLY`. It remains a blocker for
 the main comparison table without being misreported as a third absent family.
 
+Generated text artifacts use a prepare-first, same-directory publication
+helper. Every temporary file is flushed and `fsync`-ed before publication. For
+multi-file outputs, each existing target is then moved to a same-directory
+backup immediately before replacement. If any final filesystem operation raises
+an exception, the helper walks the attempted targets in reverse, restores every
+pre-existing target and removes targets that did not exist on entry. Executable
+fault injection covers both an exception between the two final replacements and
+a mixed existing/new-target pair; it also requires removal of all `.tmp` and
+`.bak` files. This is deliberately an exception-rollback guarantee, not a
+journaled transaction or a claim of recovery after abrupt process or operating-
+system termination.
+
 ```bash
 python3 -m unittest -v \
   paper.test_rank_coherent_runner_prototype \
