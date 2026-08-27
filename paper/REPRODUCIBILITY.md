@@ -566,9 +566,27 @@ python3 -m unittest -v \
   paper.test_server_only_consumer_cli \
   paper.test_atomic_publish \
   paper.test_raw_member_reweighting_reference \
-  paper.test_score_aware_raw_reweighting_reference
+  paper.test_score_aware_raw_reweighting_reference \
+  paper.test_validate_score_aware_raw_reweighting_admission
 python3 paper/check_publication_artifacts.py
 ```
+
+Before any future literal score-aware mode can become decision-bearing, its
+reviewed runner and exact admission JSON must pass semantic parity with the
+frozen oracle:
+
+```bash
+python3 paper/validate_score_aware_raw_reweighting_admission.py \
+  ADMISSION.json TRUSTED_RUNNER.py
+```
+
+The validator binds the runner, frozen contract and independent reference by
+SHA-256, rejects any deviation, compares all frozen constants and callable API,
+exercises tie/extreme-risk systematic-selection fixtures, and compares the
+ridge fit and held-out predictions numerically.  Missing `numpy` is fail-closed
+for decision-bearing admission rather than a skipped parity claim.  Passing the
+local reference itself is only a validator self-test: admission still requires
+a controller-visible literal mode and the separately reviewed trusted runner.
 
 The first command explicitly runs every publication regression suite; adding a
 new required suite therefore also requires updating this documented list. The

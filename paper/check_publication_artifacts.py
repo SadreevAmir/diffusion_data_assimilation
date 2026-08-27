@@ -32,6 +32,7 @@ REQUIRED_REGRESSION_SUITES = (
     "paper.test_atomic_publish",
     "paper.test_raw_member_reweighting_reference",
     "paper.test_score_aware_raw_reweighting_reference",
+    "paper.test_validate_score_aware_raw_reweighting_admission",
 )
 REGRESSION_COMMAND = re.compile(
     r"python3 -m unittest -v \\\n(?P<body>(?:  paper\.[a-z0-9_]+(?: \\\n|\n))+)",
@@ -182,6 +183,8 @@ REQUIRED_FILES = (
     "NEXT_SCORE_AWARE_RAW_REWEIGHTING_CONTRACT.md",
     "score_aware_raw_reweighting_reference.py",
     "test_score_aware_raw_reweighting_reference.py",
+    "validate_score_aware_raw_reweighting_admission.py",
+    "test_validate_score_aware_raw_reweighting_admission.py",
     "RANK_COHERENT_RUNNER_REVIEW_CHECKLIST.md",
     "RANK_COHERENT_CONTROLLER_HANDOFF.md",
     "FROZEN_EVALUATION_HANDOFF.md",

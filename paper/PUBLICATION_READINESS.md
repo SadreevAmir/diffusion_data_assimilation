@@ -31,7 +31,7 @@ another row.
 
 The publication-readiness trigger was independently rerun against the current
 worktree on 2026-08-27. The fail-closed command
-`python3 paper/check_publication_artifacts.py` passed with exactly 55 required
+`python3 paper/check_publication_artifacts.py` passed with exactly 57 required
 files, two parseable linked figures, eight traceable references and 39
 contiguous claim-ledger records. A separate unfinished-text scan found no
 `TODO`, `TBD`, `FIXME` or `PLACEHOLDER` marker in the Markdown publication
@@ -319,7 +319,7 @@ mode or change `NOT_READY`.
 
 The 2026-08-27 independent publication-readiness rerun completed the unified
 fail-closed audit and the full documented regression contract against the
-current worktree. The audit passed with 55 required files, two figures, six
+current worktree. The audit passed with 57 required files, two figures, six
 references and all 39 claim-ledger rows traced; all 92 regression tests passed.
 The compact-payload subset now explicitly rejects a wrong 160-row envelope,
 duplicate method/date identities, candidate substitution, duplicate full-region
