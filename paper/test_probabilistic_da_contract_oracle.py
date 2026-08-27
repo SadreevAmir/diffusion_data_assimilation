@@ -23,6 +23,7 @@ def fixture():
     return {
         "contract_version": "probabilistic_da_letkf_v1", "source_experiment": "joint_full_condition_validation_2022",
         "artifact_policy": "summary_only", "case_count": 40, "ensemble_size": 10, "artifacts": list(EXPECTED_ARTIFACTS),
+        "artifact_hashes": {"probabilistic_da_summary.json": H, "probabilistic_da_per_case.csv": H},
         "observation_operator": {"name": "sealed_common_operator", "output_hashes": [{"case_index": i, "letkf": H, "learned_joint": H} for i in range(40)]},
         "localization": {"taper": "Gaspari-Cohn", "radii_km": list(RADII_KM)},
         "assimilation": {"filter": "LETKF", "variable": "physical_SIC", "square_root": "deterministic", "projection": "after_complete_analysis_update", "observation_error_source": "sealed_common_contract", "inflations": list(INFLATIONS)},

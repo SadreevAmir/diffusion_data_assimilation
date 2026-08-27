@@ -96,8 +96,14 @@ Contract availability or `COMPARATOR_INVALID` leaves the normative comparison ro
 ## Execution and compact evidence boundary
 
 All computation and analysis must run on the server. Retrieval is
-`summary_only`: one JSON decision summary, one forty-row case-metric CSV, and one
-compact JSON manifest containing hashes, fold selections and invariant checks.
+`summary_only`: one JSON decision summary, one 120-row case-metric CSV (forty
+cases for each of the three exact methods), and one compact JSON manifest
+containing SHA-256 hashes of the exact summary and CSV bytes, fold selections
+and invariant checks. `probabilistic_da_adapter_parity.py` loads exactly these
+three files, invokes `validate_manifest`, `validate_case_rows` and
+`evaluate_decision`, verifies both payload hashes, and rejects a claimed outcome
+that differs from the recomputed frozen label. No fourth admission artifact is
+permitted.
 No raw backgrounds, analyses, observations or truths are retrieved. No currently
 admitted trusted mode implements this contract, so it must not be proposed under
 an invented identifier. Admission requires a separately reviewed runner that

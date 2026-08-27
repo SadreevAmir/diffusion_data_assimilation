@@ -99,6 +99,7 @@ def validate_manifest(manifest: Any) -> None:
             "contract_version", "source_experiment", "artifact_policy", "case_count",
             "ensemble_size", "artifacts", "observation_operator", "localization",
             "assimilation", "background", "folds", "invariant_checks",
+            "artifact_hashes",
         },
         "manifest",
     )
@@ -106,6 +107,13 @@ def validate_manifest(manifest: Any) -> None:
         raise ValueError("contract or source identity mismatch")
     if manifest["artifact_policy"] != "summary_only" or tuple(manifest["artifacts"]) != EXPECTED_ARTIFACTS:
         raise ValueError("compact artifact boundary mismatch")
+    artifact_hashes = _exact_keys(
+        manifest["artifact_hashes"],
+        {"probabilistic_da_summary.json", "probabilistic_da_per_case.csv"},
+        "artifact_hashes",
+    )
+    for name, value in artifact_hashes.items():
+        _hash(value, f"{name} artifact hash")
     if manifest["case_count"] != 40 or manifest["ensemble_size"] != 10:
         raise ValueError("case/member envelope mismatch")
     operator = _exact_keys(manifest["observation_operator"], {"name", "output_hashes"}, "observation_operator")

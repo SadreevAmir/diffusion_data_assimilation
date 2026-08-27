@@ -13,6 +13,17 @@ Controller readiness: NOT_READY
 Scientific primary reconciliation: COMPLETE_NEGATIVE
 Autonomous publication work remaining: YES
 
+The latest reproducibility audit added the probabilistic-DA directory adapter
+and its negative fixtures to the mandatory publication inventory. The adapter
+requires exactly three compact files, verifies SHA-256 bindings for the summary
+and 120-row three-method case table, runs all three semantic oracle stages, and
+rejects a claimed decision label that differs from the recomputed outcome.
+Twelve focused oracle/adapter tests pass. This closes a local admission-parity
+gap only: no trusted mode has been admitted and the normative evidence row and
+publication status remain unchanged.
+The unified audit passed with 75 required files after this inventory expansion;
+earlier lower counts below are retained only as dated audit history.
+
 ## Current independent audit snapshot
 
 The current audit passed with 71 required files, two parseable linked figures,
