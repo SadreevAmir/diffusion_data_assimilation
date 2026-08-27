@@ -34,10 +34,13 @@ set, loss, temperature or external evaluation.
   weighted mean absolute error against that date's truth plus `0.25` times its
   spatially weighted squared error.  These coefficients and spatial weights are
   constants, not selectable hyperparameters.
-- Fit one ridge linear model per fold to the member targets using intercept and
-  the thirteen standardized predictors.  The ridge coefficient is exactly
-  `1.0`; solve by the deterministic SVD pseudoinverse with relative singular
-  cutoff `1e-12`.  Any non-finite coefficient or prediction fails operationally.
+- Fit one ridge linear model per fold to the member targets using an unpenalized
+  intercept and the thirteen standardized predictors.  The intercept is the
+  training-target mean.  Center the training targets and compute predictor
+  coefficients as `V diag(s/(s^2+1.0)) U^T y_centered`, using the deterministic
+  SVD of the standardized training design.  Set factors for singular values at
+  or below `1e-12 * s_max` to zero.  The ridge coefficient is exactly `1.0`.
+  Any non-finite coefficient or prediction fails operationally.
 
 ## Frozen probability construction
 
