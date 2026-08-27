@@ -1,16 +1,19 @@
 # Publication readiness audit
 
-The score-aware runner admission boundary now independently exercises the
-positional cross-fitting semantics that the compact validator expects.  The
-reference exposes the frozen forty-case, five-by-eight contiguous fold
-construction with non-circular purge three; admission compares exact held-out
-and retained-training identifiers under both canonical and deliberately
-permuted input order.  Negative runner fixtures prove that sorting identifiers
-or retaining one purged neighbor fails closed.  The focused score-aware suite
-passed 32 tests with two dependency-only skips, and the unified audit passed
-with 79 required files, two figures, eight references and 39 claims.  This is
-runner-parity evidence only: it neither creates a trusted mode nor supplies an
-eligible scientific result, so the readiness status remains unchanged.
+The score-aware runner admission boundary now independently exercises both the
+positional cross-fitting semantics and exact training-row construction that the
+compact validator expects. The reference exposes the frozen forty-case,
+five-by-eight contiguous folds with non-circular purge three and builds each
+retained `(case_id, member_index)` row from the exact thirteen forecast-only
+predictors and the fixed weighted MAE-plus-MSE target. Admission compares row
+identities, predictor values and targets for three separated folds. Negative
+runner fixtures prove that sorting identifiers, retaining a purged or held-out
+case, permuting member predictor columns or changing the target coefficient
+fails closed. The focused score-aware suite passed 48 tests with five
+dependency-only skips, and the unified audit passed with 79 required files, two
+figures, eight references and 39 claims. This is runner-parity evidence only:
+it neither creates a trusted mode nor supplies an eligible scientific result,
+so the readiness status remains unchanged.
 
 The probabilistic-DA downstream boundary now has an executable consumer:
 `reconcile_probabilistic_da_admission.py` accepts the combined admission JSON

@@ -122,12 +122,13 @@ def validate_semantic_parity(runner: Path) -> None:
     module = _load_runner(runner)
     for name in (
         "MEMBERS", "PREDICTORS", "RIDGE", "SVD_RELATIVE_CUTOFF",
-        "CASES", "HOLDOUT_SIZE", "PURGE",
+        "CASES", "HOLDOUT_SIZE", "PURGE", "ICE_THRESHOLD",
     ):
         if getattr(module, name, None) != getattr(reference, name):
             raise ValueError(f"runner constant {name} diverges from reference")
     for name in (
-        "build_purged_folds", "fit_fold_ridge", "predict_member_risks",
+        "build_purged_folds", "build_case_rows", "build_fold_training_rows",
+        "fit_fold_ridge", "predict_member_risks",
         "select_raw_scenarios",
     ):
         if not callable(getattr(module, name, None)):
@@ -157,6 +158,23 @@ def validate_semantic_parity(runner: Path) -> None:
     if reference.np is None:
         raise RuntimeError("numpy is required for decision-bearing ridge parity")
     np = reference.np
+    grids = {}
+    truths = {}
+    weights = {}
+    grid_rows, grid_columns = np.indices((6, 6))
+    for case_position, case_id in enumerate(CASE_ID_VECTORS[0]):
+        base = 0.1 + 0.005 * case_position + 0.01 * grid_rows + 0.007 * grid_columns
+        grids[case_id] = np.asarray([base + 0.003 * member for member in range(10)])
+        truths[case_id] = base + 0.012
+        weights[case_id] = 1.0 + 0.02 * grid_rows + 0.01 * grid_columns
+    for fold_index in (0, 2, 4):
+        expected_rows = reference.build_fold_training_rows(
+            CASE_ID_VECTORS[0], grids, truths, weights, fold_index
+        )
+        actual_rows = module.build_fold_training_rows(
+            CASE_ID_VECTORS[0], grids, truths, weights, fold_index
+        )
+        _assert_nested_close(actual_rows, expected_rows, f"training_rows[{fold_index}]")
     rows = 24
     design = np.asarray([[((i + 2) * (j + 3) % 29) / 7.0 + i * 0.01 for j in range(13)] for i in range(rows)])
     targets = np.asarray([0.2 + 0.03 * i + (i % 4) * 0.007 for i in range(rows)])

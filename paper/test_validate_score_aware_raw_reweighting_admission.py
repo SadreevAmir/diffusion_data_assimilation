@@ -83,6 +83,45 @@ class AdmissionTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, r"folds\[0\]"):
                 validate_semantic_parity(runner)
 
+    def test_predictor_column_order_divergence_fails_closed(self):
+        if reference.np is None:
+            self.skipTest("numpy is not installed in the minimal local environment")
+        source = REFERENCE.read_text(encoding="utf-8").replace(
+            "predictors.append(member_features + case_features)",
+            "predictors.append(member_features[::-1] + case_features)",
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            runner = Path(temporary) / "runner.py"
+            runner.write_text(source, encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "training_rows"):
+                validate_semantic_parity(runner)
+
+    def test_target_truth_coefficient_divergence_fails_closed(self):
+        if reference.np is None:
+            self.skipTest("numpy is not installed in the minimal local environment")
+        source = REFERENCE.read_text(encoding="utf-8").replace(
+            "+ 0.25 * _weighted_mean(error**2, weights)",
+            "+ 0.50 * _weighted_mean(error**2, weights)",
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            runner = Path(temporary) / "runner.py"
+            runner.write_text(source, encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "training_rows"):
+                validate_semantic_parity(runner)
+
+    def test_nonretained_training_row_divergence_fails_closed(self):
+        if reference.np is None:
+            self.skipTest("numpy is not installed in the minimal local environment")
+        source = REFERENCE.read_text(encoding="utf-8").replace(
+            'retained = folds[fold_index]["training_case_ids"]',
+            'retained = folds[fold_index]["training_case_ids"] + (folds[fold_index]["holdout_case_ids"][0],)',
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            runner = Path(temporary) / "runner.py"
+            runner.write_text(source, encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "training_rows"):
+                validate_semantic_parity(runner)
+
     def test_record_binds_all_three_artifacts_and_rejects_deviations(self):
         directory = self.compact_directory()
         good = record(REFERENCE, directory)

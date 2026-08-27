@@ -17,6 +17,7 @@ SVD_RELATIVE_CUTOFF = 1e-12
 CASES = 40
 HOLDOUT_SIZE = 8
 PURGE = 3
+ICE_THRESHOLD = 0.15
 
 
 def build_purged_folds(case_ids):
@@ -45,6 +46,110 @@ def build_purged_folds(case_ids):
             }
         )
     return tuple(folds)
+
+
+def _weighted_mean(values, weights):
+    values = np.asarray(values, dtype=float)
+    weights = np.asarray(weights, dtype=float)
+    if values.shape != weights.shape or values.ndim != 2:
+        raise ValueError("values and weights must be equally shaped grids")
+    if not np.isfinite(values).all() or not np.isfinite(weights).all() or np.any(weights < 0):
+        raise ValueError("values and weights must be finite with non-negative weights")
+    total = float(weights.sum())
+    if total <= 0:
+        raise ValueError("weights must have positive total")
+    return float(np.sum(values * weights) / total)
+
+
+def _weighted_semivariogram(field, weights, lag):
+    field = np.asarray(field, dtype=float)
+    weights = np.asarray(weights, dtype=float)
+    if field.shape != weights.shape or field.ndim != 2 or lag <= 0 or lag >= min(field.shape):
+        raise ValueError("semivariogram inputs must be equal grids and lag must fit")
+    increments = np.concatenate(
+        (
+            0.5 * (field[:, lag:] - field[:, :-lag]) ** 2,
+            0.5 * (field[lag:, :] - field[:-lag, :]) ** 2,
+        ),
+        axis=None,
+    )
+    pair_weights = np.concatenate(
+        (
+            0.5 * (weights[:, lag:] + weights[:, :-lag]),
+            0.5 * (weights[lag:, :] + weights[:-lag, :]),
+        ),
+        axis=None,
+    )
+    return _weighted_mean(increments.reshape(1, -1), pair_weights.reshape(1, -1))
+
+
+def build_case_rows(raw_members, truth, weights):
+    """Build exact ordered predictors and targets for all members of one case."""
+    if np is None:
+        raise RuntimeError("numpy is required for predictor construction")
+    members = np.asarray(raw_members, dtype=float)
+    truth = np.asarray(truth, dtype=float)
+    weights = np.asarray(weights, dtype=float)
+    if members.ndim != 3 or len(members) != MEMBERS or members.shape[1:] != truth.shape:
+        raise ValueError("raw_members must contain ten truth-shaped grids")
+    if truth.shape != weights.shape or truth.ndim != 2 or min(truth.shape) <= 4:
+        raise ValueError("truth and weights must be equal grids supporting lag four")
+    if not np.isfinite(members).all() or not np.isfinite(truth).all():
+        raise ValueError("members and truth must be finite")
+    raw_mean = members.mean(axis=0)
+    mean_value = _weighted_mean(raw_mean, weights)
+    case_features = (
+        mean_value,
+        _weighted_mean(raw_mean >= ICE_THRESHOLD, weights),
+        mean_value,
+        math.sqrt(_weighted_mean((raw_mean - mean_value) ** 2, weights)),
+        _weighted_semivariogram(raw_mean, weights, 1),
+        _weighted_semivariogram(raw_mean, weights, 4),
+    )
+    mean_area = _weighted_mean(raw_mean, weights)
+    predictors, targets = [], []
+    for member in members:
+        member_mean = _weighted_mean(member, weights)
+        member_features = (
+            member_mean,
+            _weighted_mean(member >= ICE_THRESHOLD, weights),
+            member_mean,
+            math.sqrt(_weighted_mean((member - member_mean) ** 2, weights)),
+            _weighted_semivariogram(member, weights, 1),
+            _weighted_semivariogram(member, weights, 4),
+            abs(member_mean - mean_area),
+        )
+        error = member - truth
+        predictors.append(member_features + case_features)
+        targets.append(
+            _weighted_mean(np.abs(error), weights)
+            + 0.25 * _weighted_mean(error**2, weights)
+        )
+    return {"predictors": np.asarray(predictors), "targets": np.asarray(targets)}
+
+
+def build_fold_training_rows(case_ids, raw_by_case, truth_by_case, weights_by_case, fold_index):
+    """Bind every training row to a retained case and raw-member index."""
+    folds = build_purged_folds(case_ids)
+    if isinstance(fold_index, bool) or not isinstance(fold_index, int) or not 0 <= fold_index < len(folds):
+        raise ValueError("fold_index must identify one frozen fold")
+    retained = folds[fold_index]["training_case_ids"]
+    row_case_ids, member_indices, predictors, targets = [], [], [], []
+    for case_id in retained:
+        try:
+            rows = build_case_rows(raw_by_case[case_id], truth_by_case[case_id], weights_by_case[case_id])
+        except KeyError as error:
+            raise ValueError(f"missing retained-case input: {case_id}") from error
+        row_case_ids.extend([case_id] * MEMBERS)
+        member_indices.extend(range(MEMBERS))
+        predictors.extend(rows["predictors"])
+        targets.extend(rows["targets"])
+    return {
+        "row_case_ids": tuple(row_case_ids),
+        "member_indices": tuple(member_indices),
+        "predictors": np.asarray(predictors),
+        "targets": np.asarray(targets),
+    }
 
 
 def _finite_matrix(values, *, columns, name):
