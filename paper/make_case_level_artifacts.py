@@ -17,6 +17,11 @@ import math
 import random
 from pathlib import Path
 
+if __package__:
+    from .validate_server_only_manifest import validate_manifest
+else:
+    from validate_server_only_manifest import validate_manifest
+
 
 METRICS = (
     "analysis_fair_crps",
@@ -38,6 +43,7 @@ LONG_FORM_METRICS = (
     "analysis_mean_variogram_lag_2_absolute_error",
 )
 EXPECTED_CASES = 40
+EXPECTED_LONG_FORM_EXPERIMENT = "joint_existing_ensemble_calibration_audit_valid"
 RECONCILIATION_TOLERANCE = 1e-10
 EXPECTED_CASE_MEANS = {
     "analysis_fair_crps": (0.05849058504420133, 0.055689673560032536),
@@ -372,6 +378,7 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=20220815)
     parser.add_argument("--date-column", required=True)
     parser.add_argument("--block-length", type=int, required=True)
+    parser.add_argument("--manifest", type=Path)
     args = parser.parse_args()
     if args.bootstrap_samples < 1_000:
         parser.error("--bootstrap-samples must be at least 1000")
@@ -382,6 +389,11 @@ def main() -> None:
     if args.long_form == (args.raw_csv is not None):
         parser.error("choose exactly one input layout: --long-form or --raw-csv")
     if args.long_form:
+        if args.manifest is None:
+            parser.error("--manifest is required for the server-only long-form input")
+        validate_manifest(
+            args.case_csv, args.manifest, EXPECTED_LONG_FORM_EXPERIMENT
+        )
         if args.block_length != 4:
             parser.error("the frozen long-form protocol requires --block-length 4")
         cases = read_long_form_cases(
@@ -397,6 +409,8 @@ def main() -> None:
         input_layout = "single_table_long"
         compared_methods = (args.raw_method, args.corrected_method)
     else:
+        if args.manifest is not None:
+            parser.error("--manifest is only valid with --long-form")
         assert args.raw_csv is not None
         cases = read_cases(args.case_csv, args.raw_csv, date_column=args.date_column)
         metric_names = METRICS

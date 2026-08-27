@@ -476,8 +476,10 @@ the right basename or schema but a different producer or absent hash binding is
 inadmissible. The compact CSV and aggregate JSON remain server-side; venue
 metadata, author statements and data-release decisions remain external inputs.
 
-Before any `SERVER_ONLY` consumer runs, the trusted handoff must materialize the
-relevant binding as `compact_manifest.json` and execute:
+Every `SERVER_ONLY` consumer requires the trusted handoff to materialize the
+relevant binding as `compact_manifest.json`. The consumer validates that sidecar
+inside its own process before parsing the payload, creating output directories
+or writing output files. The standalone equivalent is:
 
 ```bash
 python3 paper/validate_server_only_manifest.py \
@@ -492,7 +494,9 @@ exactly one entry mapping the requested artifact basename to its lowercase
 schema-specific consumer runs. A missing entry, extra artifact, producer
 substitution, malformed digest or digest mismatch fails closed. The mandatory
 regression suite includes fixtures for the valid contract, missing hash entry,
-digest mismatch and producer substitution.
+digest mismatch and producer substitution. End-to-end CLI fixtures additionally
+exercise all three consumers with bad manifests and bad payloads and require
+that no partial SVG or JSON remains.
 
 The publication package itself has a local fail-closed integrity audit:
 
@@ -537,7 +541,8 @@ python3 -m unittest -v \
   paper.test_publication_reference_traceability \
   paper.test_publication_limitation_traceability \
   paper.test_publication_claim_status_consistency \
-  paper.test_validate_server_only_manifest
+  paper.test_validate_server_only_manifest \
+  paper.test_server_only_consumer_cli
 python3 paper/check_publication_artifacts.py
 ```
 

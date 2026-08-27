@@ -9,8 +9,14 @@ import json
 import math
 from pathlib import Path
 
+if __package__:
+    from .validate_server_only_manifest import validate_manifest
+else:
+    from validate_server_only_manifest import validate_manifest
+
 
 METHOD = "crossfit_frozen_scale_mean_preserving_capped_simplex"
+EXPECTED_EXPERIMENT = "joint_existing_ensemble_mean_preserving_projected_spread_valid"
 METRICS = (
     ("Fair CRPS", "analysis_fair_crps", 0.97),
     ("Established-ice Brier", "established_ice_brier_score", 1.01),
@@ -83,7 +89,9 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("aggregate_json", type=Path)
     parser.add_argument("output_svg", type=Path)
+    parser.add_argument("--manifest", type=Path, required=True)
     args = parser.parse_args()
+    validate_manifest(args.aggregate_json, args.manifest, EXPECTED_EXPERIMENT)
     raw, candidate = load_summary(args.aggregate_json)
     args.output_svg.parent.mkdir(parents=True, exist_ok=True)
     args.output_svg.write_text(make_svg(raw, candidate), encoding="utf-8")

@@ -27,6 +27,7 @@ REQUIRED_REGRESSION_SUITES = (
     "paper.test_publication_limitation_traceability",
     "paper.test_publication_claim_status_consistency",
     "paper.test_validate_server_only_manifest",
+    "paper.test_server_only_consumer_cli",
 )
 REGRESSION_COMMAND = re.compile(
     r"python3 -m unittest -v \\\n(?P<body>(?:  paper\.[a-z0-9_]+(?: \\\n|\n))+)",

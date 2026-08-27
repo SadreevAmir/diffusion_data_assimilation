@@ -98,6 +98,14 @@ three principal provenance failures. This closes the executable sidecar gap but
 does not create a missing scientific result, so publication status remains
 `NOT_READY`.
 
+The 2026-08-27 end-to-end CLI audit removes the remaining bypass around that
+validator: each of the three `SERVER_ONLY` consumers now requires and validates
+its producer-bound manifest inside the consumer process before payload parsing,
+directory creation or output writes. Six negative paths cover a mismatched
+manifest and a schema-invalid payload for each consumer and require that no
+partial SVG or JSON remains. This closes an executable atomicity/provenance gap
+without adding scientific evidence, so publication status remains `NOT_READY`.
+
 The 2026-08-27 pre-result interpretation audit now freezes in `PAPER_DRAFT.md`
 all four valid joint outcomes of the two outstanding minimum-tier contracts.
 Each conformal and probabilistic-DA result closes only its exact evidence row;

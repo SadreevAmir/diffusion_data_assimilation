@@ -9,6 +9,11 @@ import json
 import math
 from pathlib import Path
 
+if __package__:
+    from .validate_server_only_manifest import validate_manifest
+else:
+    from validate_server_only_manifest import validate_manifest
+
 
 METRICS = (
     ("Fair CRPS", "analysis_fair_crps", "raw_analysis_fair_crps", "lower"),
@@ -19,6 +24,7 @@ METRICS = (
     ("90% interval diagnostic", "analysis_coverage_90", "raw_analysis_coverage_90", "target"),
     ("95% interval diagnostic", "analysis_coverage_95", "raw_analysis_coverage_95", "target"),
 )
+EXPECTED_EXPERIMENT = "joint_crossfit_spread_calibration_valid"
 
 
 def load_summary(path: Path) -> dict[str, float]:
@@ -84,7 +90,9 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("aggregate_json", type=Path)
     parser.add_argument("output_svg", type=Path)
+    parser.add_argument("--manifest", type=Path, required=True)
     args = parser.parse_args()
+    validate_manifest(args.aggregate_json, args.manifest, EXPECTED_EXPERIMENT)
     output = make_svg(load_summary(args.aggregate_json))
     args.output_svg.parent.mkdir(parents=True, exist_ok=True)
     args.output_svg.write_text(output, encoding="utf-8")
