@@ -81,6 +81,11 @@ outcome closes the minimum-tier evidence row; invalid execution leaves it
 failure rejects only this exact small-ensemble LETKF contract rather than the
 probabilistic DA family.
 
+## Publication-readiness closure binding
+
+Readiness closure requires a valid trusted execution and exactly one decision-bearing outcome: `PROBABILISTIC_DA_USEFUL` or `PROBABILISTIC_DA_NEGATIVE`.
+Contract availability or `COMPARATOR_INVALID` leaves the normative comparison row `MISSING`.
+
 ## Execution and compact evidence boundary
 
 All computation and analysis must run on the server. Retrieval is

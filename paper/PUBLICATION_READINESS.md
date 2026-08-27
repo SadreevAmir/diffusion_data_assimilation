@@ -40,6 +40,20 @@ independent-strength common-information evidence. This strengthens the local
 mapping from every remaining blocker to its verifiable closure artifact; it adds
 no scientific result and leaves status `NOT_READY`.
 
+The subsequent 2026-08-27 cross-artifact audit binds those same closure
+conditions to the literal stop/go semantics in `RESEARCH_PLAN.md`,
+`NEXT_CONFORMAL_BASELINE_CONTRACT.md`,
+`NEXT_PROBABILISTIC_DA_COMPARISON_CONTRACT.md` and
+`FROZEN_EVALUATION_HANDOFF.md`. The checker now fails closed if any required
+binding is absent or weakened. One parameterized negative test mutates each of
+the four artifacts independently, and a coverage test fixes the complete file
+set. The targeted suite passed 51 tests; the full documented regression
+contract passed 166 tests with two expected skips because `numpy` is absent in
+the minimal local environment. The unified audit again passed with 61 files,
+two figures, eight references and 39 claims. This is stronger consistency
+evidence, not a blocker closure or a new scientific result; status remains
+`NOT_READY`.
+
 ## Independent audit snapshot
 
 The publication-readiness trigger was independently rerun against the current

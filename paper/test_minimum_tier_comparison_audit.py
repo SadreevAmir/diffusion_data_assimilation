@@ -13,6 +13,7 @@ from paper.check_publication_artifacts import (
     PAPER_DIR,
     READINESS_BLOCKER_ROW,
     READINESS_CLOSURE_ROUTE_ROW,
+    READINESS_STOP_GO_CROSS_ARTIFACT_ANCHORS,
     REQUIRED_REGRESSION_SUITES,
     SERVER_ONLY_COMMAND_INPUTS,
     validate_documented_regression_suites,
@@ -59,6 +60,8 @@ class MinimumTierComparisonAuditTests(unittest.TestCase):
         (fixture_dir / probabilistic_contract).write_bytes(
             (PAPER_DIR / probabilistic_contract).read_bytes()
         )
+        for filename in ("RESEARCH_PLAN.md", "FROZEN_EVALUATION_HANDOFF.md"):
+            (fixture_dir / filename).write_bytes((PAPER_DIR / filename).read_bytes())
         return temporary
 
     def assert_fixture_fails(self, audit: str, message: str) -> None:
@@ -248,6 +251,35 @@ class MinimumTierComparisonAuditTests(unittest.TestCase):
 
     def test_readiness_blockers_match_normative_evidence(self) -> None:
         validate_readiness_blockers(self.readiness, PAPER_DIR)
+
+    def test_stop_go_closure_bindings_cover_all_normative_artifacts(self) -> None:
+        self.assertEqual(
+            set(READINESS_STOP_GO_CROSS_ARTIFACT_ANCHORS),
+            {
+                "RESEARCH_PLAN.md",
+                "NEXT_CONFORMAL_BASELINE_CONTRACT.md",
+                "NEXT_PROBABILISTIC_DA_COMPARISON_CONTRACT.md",
+                "FROZEN_EVALUATION_HANDOFF.md",
+            },
+        )
+
+    def test_each_weakened_stop_go_closure_binding_fails_closed(self) -> None:
+        for filename, anchors in READINESS_STOP_GO_CROSS_ARTIFACT_ANCHORS.items():
+            with self.subTest(filename=filename), self.make_fixture(self.audit) as temporary:
+                fixture_dir = Path(temporary)
+                target = fixture_dir / filename
+                text = target.read_text(encoding="utf-8")
+                anchor = anchors[0]
+                self.assertIn(anchor, text)
+                target.write_text(
+                    text.replace(anchor, "Weakened closure statement.", 1),
+                    encoding="utf-8",
+                )
+                with self.assertRaisesRegex(
+                    ValueError,
+                    "normative stop/go closure binding is incomplete or weakened",
+                ):
+                    validate_readiness_blockers(self.readiness, fixture_dir)
 
     def test_minimum_tier_evidence_guards_pass(self) -> None:
         validate_minimum_tier_evidence_guards(

@@ -57,6 +57,11 @@ overall eligibility. Failure closes the exact mechanism as a negative baseline
 and is interpreted as excessive width inflation or inadequate temporally
 blocked coverage, not as evidence against all conformal methods.
 
+## Publication-readiness closure binding
+
+Readiness closure requires a valid trusted execution and exactly one decision-bearing outcome: `CONFORMAL_USEFUL` or `CONFORMAL_NEGATIVE`.
+Contract availability, an incomplete run or an invalid execution leaves the normative comparison row `MISSING`.
+
 ## Execution boundary
 
 All computation and analysis must run on the server with `summary_only`

@@ -132,6 +132,13 @@ Failure of any mandatory family rejects a broad "well-calibrated ensemble"
 claim. A method may remain a named mechanism or negative baseline when its
 failure isolates a scientifically useful tradeoff.
 
+### Publication-readiness closure binding
+
+Publication-readiness closure is stricter than method availability: one frozen candidate must pass every mandatory no-compensation gate family.
+A conformal execution closes its comparison row only through the frozen `CONFORMAL_USEFUL` or `CONFORMAL_NEGATIVE` stop/go decision; an invalid execution leaves the row `MISSING`.
+A probabilistic-DA execution closes its comparison row only through the frozen `PROBABILISTIC_DA_USEFUL` or `PROBABILISTIC_DA_NEGATIVE` stop/go decision; `COMPARATOR_INVALID` leaves the row `MISSING`.
+The deterministic row closes at independent strength only after a frozen common-information comparison supplies that evidence; development-only documentation cannot close it.
+
 The amended primary decision is identified by the exact contract digests in
 `AMENDED_PRIMARY_EVALUATION_CONTRACT.md`. Earlier `overall_eligible` values are
 development evidence only and cannot establish final success.

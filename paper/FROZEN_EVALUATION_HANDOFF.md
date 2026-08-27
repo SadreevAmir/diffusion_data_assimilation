@@ -80,6 +80,11 @@ deploy/audit attestation are present and every recorded mandatory family is true
 otherwise
 the outcome is a negative confirmatory result and claims must be narrowed.
 
+## Publication-readiness closure binding
+
+Independent-strength deterministic closure requires a frozen common-information comparison with aligned comparator evidence; development-only documentation cannot close that row.
+Eligible-calibration closure requires one frozen candidate to pass every mandatory no-compensation family; no partial metric improvement can close that blocker.
+
 Before changing `Publication status`, update `PAPER_DRAFT.md`,
 `CLAIM_LEDGER.md`, `REPRODUCIBILITY.md`, `RESEARCH_PLAN.md` and
 `PUBLICATION_READINESS.md` from the same compact result, then run

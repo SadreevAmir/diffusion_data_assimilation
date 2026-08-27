@@ -490,6 +490,26 @@ READINESS_CLOSURE_CONDITIONS = {
         "manuscript's required independent strength"
     ),
 }
+READINESS_STOP_GO_CROSS_ARTIFACT_ANCHORS = {
+    "RESEARCH_PLAN.md": (
+        "Publication-readiness closure is stricter than method availability: one frozen candidate must pass every mandatory no-compensation gate family.",
+        "A conformal execution closes its comparison row only through the frozen `CONFORMAL_USEFUL` or `CONFORMAL_NEGATIVE` stop/go decision; an invalid execution leaves the row `MISSING`.",
+        "A probabilistic-DA execution closes its comparison row only through the frozen `PROBABILISTIC_DA_USEFUL` or `PROBABILISTIC_DA_NEGATIVE` stop/go decision; `COMPARATOR_INVALID` leaves the row `MISSING`.",
+        "The deterministic row closes at independent strength only after a frozen common-information comparison supplies that evidence; development-only documentation cannot close it.",
+    ),
+    "NEXT_CONFORMAL_BASELINE_CONTRACT.md": (
+        "Readiness closure requires a valid trusted execution and exactly one decision-bearing outcome: `CONFORMAL_USEFUL` or `CONFORMAL_NEGATIVE`.",
+        "Contract availability, an incomplete run or an invalid execution leaves the normative comparison row `MISSING`.",
+    ),
+    "NEXT_PROBABILISTIC_DA_COMPARISON_CONTRACT.md": (
+        "Readiness closure requires a valid trusted execution and exactly one decision-bearing outcome: `PROBABILISTIC_DA_USEFUL` or `PROBABILISTIC_DA_NEGATIVE`.",
+        "Contract availability or `COMPARATOR_INVALID` leaves the normative comparison row `MISSING`.",
+    ),
+    "FROZEN_EVALUATION_HANDOFF.md": (
+        "Independent-strength deterministic closure requires a frozen common-information comparison with aligned comparator evidence; development-only documentation cannot close that row.",
+        "Eligible-calibration closure requires one frozen candidate to pass every mandatory no-compensation family; no partial metric improvement can close that blocker.",
+    ),
+}
 READINESS_BLOCKER_ROW = re.compile(
     r"^\| (?P<blocker>[^|]+?) \| `(?P<source>RESEARCH_PLAN\.md|MINIMUM_TIER_COMPARISON_AUDIT\.md)` \| "
     r"(?P<status>[A-Z_]+) \| (?P<closure>[^|]*?) \|$",
@@ -1694,6 +1714,12 @@ def validate_readiness_blockers(readiness: str, paper_dir: Path) -> None:
         closure_conditions == READINESS_CLOSURE_CONDITIONS,
         "readiness blocker closure conditions differ from the normative contract",
     )
+    for filename, anchors in READINESS_STOP_GO_CROSS_ARTIFACT_ANCHORS.items():
+        text = (paper_dir / filename).read_text(encoding="utf-8")
+        require(
+            all(anchor in text for anchor in anchors),
+            f"normative stop/go closure binding is incomplete or weakened: {filename}",
+        )
     audit = (paper_dir / "MINIMUM_TIER_COMPARISON_AUDIT.md").read_text(
         encoding="utf-8"
     )
