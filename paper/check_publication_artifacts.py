@@ -25,6 +25,7 @@ REQUIRED_REGRESSION_SUITES = (
     "paper.test_publication_reference_traceability",
     "paper.test_publication_limitation_traceability",
     "paper.test_publication_claim_status_consistency",
+    "paper.test_validate_server_only_manifest",
 )
 REGRESSION_COMMAND = re.compile(
     r"python3 -m unittest -v \\\n(?P<body>(?:  paper\.[a-z0-9_]+(?: \\\n|\n))+)",
@@ -202,6 +203,8 @@ REQUIRED_FILES = (
     "EXTERNAL_PRIMARY_RESULT_RECONCILIATION.md",
     "guidance_mixture_reference.py",
     "deep_ensemble_reference.py",
+    "validate_server_only_manifest.py",
+    "test_validate_server_only_manifest.py",
 )
 
 REFERENCE_TRACEABILITY_ROWS = {

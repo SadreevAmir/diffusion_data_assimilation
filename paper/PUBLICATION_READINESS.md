@@ -89,6 +89,15 @@ The unified checker requires and executes that suite. This closes a concrete
 figure-reproducibility gap but adds no scientific result, so publication status
 remains `NOT_READY`.
 
+The 2026-08-27 executable-handoff audit adds a strict sidecar validator before
+every `SERVER_ONLY` compact consumer. It binds one exact producer experiment,
+one exact artifact basename and the artifact bytes through lowercase SHA-256;
+missing hash entries, digest mismatches, extra entries and producer substitution
+fail closed. Four regression fixtures exercise the accepted contract and the
+three principal provenance failures. This closes the executable sidecar gap but
+does not create a missing scientific result, so publication status remains
+`NOT_READY`.
+
 The 2026-08-27 pre-result interpretation audit now freezes in `PAPER_DRAFT.md`
 all four valid joint outcomes of the two outstanding minimum-tier contracts.
 Each conformal and probabilistic-DA result closes only its exact evidence row;
@@ -202,7 +211,7 @@ mode or change `NOT_READY`.
 
 The 2026-08-26 independent publication-readiness rerun completed the unified
 fail-closed audit and the focused rank-coherent handoff suites against the
-current worktree. The audit passed with 44 required files, two figures, six
+current worktree. The audit passed with 46 required files, two figures, six
 references and all 39 claim-ledger rows traced; the five prototype tests and
 the 13-test adapter-parity suite also passed. `git diff --check` found no
 whitespace errors. This confirms internal consistency and executable handoff

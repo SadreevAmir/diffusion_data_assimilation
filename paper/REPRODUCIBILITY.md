@@ -473,6 +473,24 @@ the right basename or schema but a different producer or absent hash binding is
 inadmissible. The compact CSV and aggregate JSON remain server-side; venue
 metadata, author statements and data-release decisions remain external inputs.
 
+Before any `SERVER_ONLY` consumer runs, the trusted handoff must materialize the
+relevant binding as `compact_manifest.json` and execute:
+
+```bash
+python3 paper/validate_server_only_manifest.py \
+  COMPACT_ARTIFACT compact_manifest.json EXPECTED_PRODUCER_EXPERIMENT
+```
+
+The sidecar is strict JSON with exactly `schema_version`, `experiment_id` and
+`artifacts`. `schema_version` is `server_only_compact_manifest_v1`;
+`experiment_id` must equal the matrix producer; and `artifacts` must contain
+exactly one entry mapping the requested artifact basename to its lowercase
+64-character SHA-256 digest. The validator hashes the artifact bytes before any
+schema-specific consumer runs. A missing entry, extra artifact, producer
+substitution, malformed digest or digest mismatch fails closed. The mandatory
+regression suite includes fixtures for the valid contract, missing hash entry,
+digest mismatch and producer substitution.
+
 The publication package itself has a local fail-closed integrity audit:
 
 `NEXT_CONFORMAL_BASELINE_CONTRACT.md` freezes the outstanding conformal
@@ -514,7 +532,8 @@ python3 -m unittest -v \
   paper.test_publication_figure_generators \
   paper.test_publication_reference_traceability \
   paper.test_publication_limitation_traceability \
-  paper.test_publication_claim_status_consistency
+  paper.test_publication_claim_status_consistency \
+  paper.test_validate_server_only_manifest
 python3 paper/check_publication_artifacts.py
 ```
 
