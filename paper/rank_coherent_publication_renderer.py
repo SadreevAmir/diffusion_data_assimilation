@@ -24,6 +24,12 @@ RESULT_BLOCK = re.compile(
     r"<!-- RANK_COHERENT_RENDERED_RESULT_END -->\n?",
     re.DOTALL,
 )
+PRE_RESULT_STATUS = "Status: PRE_RESULT_NO_TRUSTED_MODE"
+GUARD_ROW = re.compile(
+    r"^\| `eligible_calibration` \| `(?:MISSING_ELIGIBLE_RESULT|ELIGIBLE)` \| "
+    r"`(?:NONE|[0-9a-f]{64})` \| `(?:BLOCKED|DECISION_BEARING)` \|$",
+    re.MULTILINE,
+)
 
 
 def _load_object(path: Path) -> dict[str, object]:
@@ -92,7 +98,7 @@ def render_publication_documents(
     record_path: Path, compact_directory: Path,
 ) -> tuple[dict[Path, str], dict[str, object]]:
     """Return five full replacements derived only from re-admitted compact bytes."""
-    load_and_validate_combined(record_path, compact_directory)
+    admission = load_and_validate_combined(record_path, compact_directory)
     metadata = _load_object(compact_directory / "metadata.json")
     aggregate = _load_object(compact_directory / "aggregate_case_mean_metrics.json")
     experiment_id, candidate = _identity(metadata)
@@ -110,7 +116,49 @@ def render_publication_documents(
     if len(base_documents) != 5 or {path.name for path in base_documents} != required:
         raise ValueError("renderer requires exactly five publication surfaces")
     block = _result_block(marker, aggregate)
-    rendered = {path: RESULT_BLOCK.sub("\n", text).rstrip() + "\n" + block for path, text in base_documents.items()}
+    rendered = {}
+    for path, text in base_documents.items():
+        updated = RESULT_BLOCK.sub("\n", text)
+        if path == reconciliation_path:
+            if PRE_RESULT_STATUS not in updated:
+                raise ValueError("reconciliation surface omits the pre-result status")
+            status = "RECONCILED_POSITIVE" if overall else "RECONCILED_NEGATIVE"
+            updated = updated.replace(PRE_RESULT_STATUS, f"Status: {status}", 1)
+        if overall and path.name in {
+            "PAPER_DRAFT.md", "CLAIM_LEDGER.md", "REPRODUCIBILITY.md",
+            "PUBLICATION_READINESS.md",
+        }:
+            guard = (
+                "| `eligible_calibration` | `ELIGIBLE` | "
+                f"`{admission.admission_record_sha256}` | `DECISION_BEARING` |"
+            )
+            updated, count = GUARD_ROW.subn(guard, updated)
+            if count != 1:
+                raise ValueError(f"{path.name} omits one eligible-calibration guard")
+        if overall and path.name == "PAPER_DRAFT.md":
+            updated = updated.rstrip() + (
+                "\n\nEligible calibration decision: `ELIGIBLE`; compact record: "
+                f"`{admission.admission_record_sha256}`; claim role: `DECISION_BEARING`.\n"
+            )
+        if overall and path.name == "REPRODUCIBILITY.md":
+            updated = updated.rstrip() + (
+                "\n\nEligible calibration reproducibility identity: "
+                f"`{admission.admission_record_sha256}`; verification: `HASH_VERIFIED`.\n"
+            )
+        if overall and path.name == "PUBLICATION_READINESS.md":
+            updated = updated.replace(
+                "| Eligible spatially preserving calibration | `RESEARCH_PLAN.md` | "
+                "MISSING_ELIGIBLE_RESULT |",
+                "| Eligible spatially preserving calibration | `RESEARCH_PLAN.md` | ELIGIBLE |",
+                1,
+            )
+            updated = updated.replace(
+                "Required scientific blockers: an eligible spatially preserving calibration and\n"
+                "the remaining minimum-tier comparisons",
+                "Required scientific blockers: the remaining minimum-tier comparisons",
+                1,
+            )
+        rendered[path] = updated.rstrip() + "\n" + block
     return rendered, {
         "experiment_id": experiment_id, "candidate": candidate,
         "family_decisions": decisions, "overall_eligible": overall,
