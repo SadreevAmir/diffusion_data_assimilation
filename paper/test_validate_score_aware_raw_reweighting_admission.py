@@ -61,6 +61,28 @@ class AdmissionTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "selection"):
                 validate_semantic_parity(runner)
 
+    def test_case_identifier_reordering_divergence_fails_closed(self):
+        source = REFERENCE.read_text(encoding="utf-8").replace(
+            "identifiers = tuple(case_ids)",
+            "identifiers = tuple(sorted(case_ids))",
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            runner = Path(temporary) / "runner.py"
+            runner.write_text(source, encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, r"folds\[1\]"):
+                validate_semantic_parity(runner)
+
+    def test_purged_neighbor_in_training_divergence_fails_closed(self):
+        source = REFERENCE.read_text(encoding="utf-8").replace(
+            "excluded_start = max(0, start - PURGE)",
+            "excluded_start = max(0, start - PURGE + 1)",
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            runner = Path(temporary) / "runner.py"
+            runner.write_text(source, encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, r"folds\[0\]"):
+                validate_semantic_parity(runner)
+
     def test_record_binds_all_three_artifacts_and_rejects_deviations(self):
         directory = self.compact_directory()
         good = record(REFERENCE, directory)

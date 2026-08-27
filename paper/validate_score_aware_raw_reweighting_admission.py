@@ -38,6 +38,10 @@ SELECTION_VECTORS = (
     [0.0, 0.0, 1.0, 1.0, 2.0, 2.0, 3.0, 3.0, 4.0, 4.0],
     [1000.0, -1000.0, 50.0, -50.0, 3.0, 2.0, 1.0, 0.0, -1.0, -2.0],
 )
+CASE_ID_VECTORS = (
+    tuple(f"case-{index:02d}" for index in range(40)),
+    tuple(f"case-{index:02d}" for index in (1, 0, *range(2, 40))),
+)
 
 
 @dataclass(frozen=True)
@@ -116,12 +120,38 @@ def _assert_nested_close(actual, expected, label: str) -> None:
 
 def validate_semantic_parity(runner: Path) -> None:
     module = _load_runner(runner)
-    for name in ("MEMBERS", "PREDICTORS", "RIDGE", "SVD_RELATIVE_CUTOFF"):
+    for name in (
+        "MEMBERS", "PREDICTORS", "RIDGE", "SVD_RELATIVE_CUTOFF",
+        "CASES", "HOLDOUT_SIZE", "PURGE",
+    ):
         if getattr(module, name, None) != getattr(reference, name):
             raise ValueError(f"runner constant {name} diverges from reference")
-    for name in ("fit_fold_ridge", "predict_member_risks", "select_raw_scenarios"):
+    for name in (
+        "build_purged_folds", "fit_fold_ridge", "predict_member_risks",
+        "select_raw_scenarios",
+    ):
         if not callable(getattr(module, name, None)):
             raise ValueError(f"runner lacks callable {name}")
+    for index, case_ids in enumerate(CASE_ID_VECTORS):
+        expected_folds = []
+        for fold, start in enumerate(range(0, 40, 8)):
+            stop = start + 8
+            excluded_start = max(0, start - 3)
+            excluded_stop = min(40, stop + 3)
+            expected_folds.append(
+                {
+                    "fold": fold,
+                    "holdout_case_ids": case_ids[start:stop],
+                    "training_case_ids": tuple(
+                        case_id
+                        for position, case_id in enumerate(case_ids)
+                        if not excluded_start <= position < excluded_stop
+                    ),
+                }
+            )
+        _assert_nested_close(
+            module.build_purged_folds(case_ids), tuple(expected_folds), f"folds[{index}]"
+        )
     for index, risks in enumerate(SELECTION_VECTORS):
         _assert_nested_close(module.select_raw_scenarios(risks), reference.select_raw_scenarios(risks), f"selection[{index}]")
     if reference.np is None:

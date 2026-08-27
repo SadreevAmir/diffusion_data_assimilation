@@ -14,6 +14,37 @@ MEMBERS = 10
 PREDICTORS = 13
 RIDGE = 1.0
 SVD_RELATIVE_CUTOFF = 1e-12
+CASES = 40
+HOLDOUT_SIZE = 8
+PURGE = 3
+
+
+def build_purged_folds(case_ids):
+    """Bind positional contiguous holdouts and purge membership to exact identifiers."""
+    identifiers = tuple(case_ids)
+    if (
+        len(identifiers) != CASES
+        or any(not isinstance(case_id, str) or not case_id for case_id in identifiers)
+        or len(set(identifiers)) != CASES
+    ):
+        raise ValueError("case_ids must contain forty unique non-empty strings")
+    folds = []
+    for fold_index, start in enumerate(range(0, CASES, HOLDOUT_SIZE)):
+        stop = start + HOLDOUT_SIZE
+        excluded_start = max(0, start - PURGE)
+        excluded_stop = min(CASES, stop + PURGE)
+        folds.append(
+            {
+                "fold": fold_index,
+                "holdout_case_ids": identifiers[start:stop],
+                "training_case_ids": tuple(
+                    case_id
+                    for index, case_id in enumerate(identifiers)
+                    if not excluded_start <= index < excluded_stop
+                ),
+            }
+        )
+    return tuple(folds)
 
 
 def _finite_matrix(values, *, columns, name):

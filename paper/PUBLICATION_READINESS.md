@@ -1,5 +1,17 @@
 # Publication readiness audit
 
+The score-aware runner admission boundary now independently exercises the
+positional cross-fitting semantics that the compact validator expects.  The
+reference exposes the frozen forty-case, five-by-eight contiguous fold
+construction with non-circular purge three; admission compares exact held-out
+and retained-training identifiers under both canonical and deliberately
+permuted input order.  Negative runner fixtures prove that sorting identifiers
+or retaining one purged neighbor fails closed.  The focused score-aware suite
+passed 32 tests with two dependency-only skips, and the unified audit passed
+with 79 required files, two figures, eight references and 39 claims.  This is
+runner-parity evidence only: it neither creates a trusted mode nor supplies an
+eligible scientific result, so the readiness status remains unchanged.
+
 The probabilistic-DA downstream boundary now has an executable consumer:
 `reconcile_probabilistic_da_admission.py` accepts the combined admission JSON
 only alongside the controller-retained `compact_directory_sha256`. Regression
