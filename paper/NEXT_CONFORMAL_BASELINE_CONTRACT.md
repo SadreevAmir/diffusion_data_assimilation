@@ -75,4 +75,8 @@ frozen in `conformal_area_reference.py`,
 `test_conformal_area_runner_prototype.py`. They do not create controller
 admission: admission still requires an independently reviewed trusted runner,
 a literal mode identifier and a passing synthetic adapter check using this
-contract without deviations.
+contract without deviations. The controller-visible admission record must pass
+`validate_conformal_area_admission.py`: it binds the literal reviewed mode,
+publication commit, runner and synthetic-result hashes to the SHA-256 of this
+exact contract, requires `decision_bearing_validation=PASS`, and rejects any
+non-empty `deviations` list. A locally fabricated record is not review evidence.

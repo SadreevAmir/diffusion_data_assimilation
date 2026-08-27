@@ -2,13 +2,46 @@
 """Dependency-free oracle for the frozen block-conformal area baseline."""
 from __future__ import annotations
 import math
+import hashlib
+import re
 import statistics
 from collections.abc import Mapping, Sequence
+from pathlib import Path
 
 EXPECTED_CASES, EXPECTED_MEMBERS, HOLDOUT_SIZE, PURGE = 40, 10, 8, 3
 NOMINAL_COVERAGE, MIN_USEFUL_COVERAGE, MAX_WIDTH_RATIO = 0.90, 0.85, 1.50
 SOURCE_EXPERIMENT = "joint_full_condition_validation_2022"
 ARTIFACT_POLICY = "summary_only"
+ADMISSION_RECORD_KEYS = (
+    "reviewed_mode", "publication_commit", "runner_sha256", "contract_sha256",
+    "synthetic_result_sha256", "test_command", "test_sentinel",
+    "decision_bearing_validation", "deviations",
+)
+FROZEN_CONTRACT_PATH = Path(__file__).with_name("NEXT_CONFORMAL_BASELINE_CONTRACT.md")
+
+def frozen_contract_sha256() -> str:
+    return hashlib.sha256(FROZEN_CONTRACT_PATH.read_bytes()).hexdigest()
+
+def validate_admission_record(record: Mapping[str, object]) -> str:
+    """Admit only an exact independently reviewed literal runner contract."""
+    if set(record) != set(ADMISSION_RECORD_KEYS):
+        raise ValueError("admission record keys must be exact")
+    for key in ("reviewed_mode", "test_command", "test_sentinel"):
+        value = record[key]
+        if not isinstance(value, str) or not value.strip() or "<" in value or ">" in value:
+            raise ValueError(f"{key} must be a non-placeholder string")
+    if not re.fullmatch(r"[0-9a-f]{40}", str(record["publication_commit"])):
+        raise ValueError("publication_commit must be lowercase 40-hex")
+    for key in ("runner_sha256", "contract_sha256", "synthetic_result_sha256"):
+        if not re.fullmatch(r"[0-9a-f]{64}", str(record[key])):
+            raise ValueError(f"{key} must be lowercase SHA-256")
+    if record["contract_sha256"] != frozen_contract_sha256():
+        raise ValueError("contract_sha256 must match the frozen local contract")
+    if record["decision_bearing_validation"] != "PASS":
+        raise ValueError("decision_bearing_validation must be PASS")
+    if record["deviations"] != []:
+        raise ValueError("deviations must be an empty list")
+    return str(record["reviewed_mode"])
 
 def purged_folds():
     folds = []

@@ -15,7 +15,7 @@ Autonomous publication work remaining: YES
 
 ## Current independent audit snapshot
 
-The current audit passed with 69 required files, two parseable linked figures,
+The current audit passed with 71 required files, two parseable linked figures,
 eight traceable references and 39 contiguous claim-ledger records. The
 immutable rank-coherent package separately
 passed its 13-file manifest check and all 26 focused prototype, adapter-parity,
@@ -36,6 +36,14 @@ the suite are now required by the unified checker. This makes deletion or
 synthetic-parity drift fail closed, but it is runner-parity evidence only: no
 literal trusted mode has been admitted, no conformal result exists and the
 corresponding minimum-tier row remains `MISSING`.
+
+The conformal handoff now also has an explicit fail-closed admission-record
+boundary. The validator binds an independently supplied literal mode and trusted
+synthetic result to the exact frozen contract digest and rejects extra fields,
+placeholders, non-PASS validation or any deviation. Focused fixtures cover the
+valid record, contract substitution, non-object input and a non-empty deviation.
+This removes ambiguity from the next trusted review but does not manufacture a
+reviewed mode, authorize a proposal or change the `MISSING` evidence state.
 
 ## Decision-bearing readiness blocker matrix
 

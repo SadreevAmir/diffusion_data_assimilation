@@ -527,6 +527,15 @@ numeric coverage/width decision and explicit non-executable status. This is a
 pre-result contract only: it neither changes the `MISSING` evidence status nor
 authorizes an unimplemented trusted mode.
 
+The conformal admission boundary is executable and fail closed. An independent
+review must supply one controller-visible JSON record with the exact literal
+mode, publication commit, runner hash, contract hash, synthetic-result hash,
+test command and sentinel, `decision_bearing_validation=PASS`, and no deviations.
+`validate_conformal_area_admission.py` rejects missing or extra keys,
+placeholders, malformed identities, a substituted contract digest, any non-PASS
+decision or any deviation. This validator does not itself create review
+evidence or authorize a mode.
+
 `NEXT_PROBABILISTIC_DA_COMPARISON_CONTRACT.md` freezes the other outstanding
 minimum-tier family as a ten-member LETKF comparison. The integrity audit
 requires hash-identical observation inputs, the fixed localization/inflation
@@ -569,6 +578,7 @@ system termination.
 ```bash
 python3 -m unittest -v \
   paper.test_conformal_area_runner_prototype \
+  paper.test_validate_conformal_area_admission \
   paper.test_rank_coherent_runner_prototype \
   paper.test_rank_coherent_adapter_parity \
   paper.test_validate_rank_coherent_admission \
