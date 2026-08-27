@@ -182,7 +182,7 @@ class MinimumTierComparisonAuditTests(unittest.TestCase):
             1,
         )
         self.assertNotEqual(mutated, self.reproducibility)
-        with self.assertRaisesRegex(ValueError, "class or compact-input schema"):
+        with self.assertRaisesRegex(ValueError, "provenance or compact-input contract"):
             validate_server_only_command_inputs(mutated)
 
     def test_server_only_input_schema_cannot_be_weakened(self) -> None:
@@ -190,7 +190,37 @@ class MinimumTierComparisonAuditTests(unittest.TestCase):
             "exactly 160 rows", "a finite number of rows", 1
         )
         self.assertNotEqual(mutated, self.reproducibility)
-        with self.assertRaisesRegex(ValueError, "class or compact-input schema"):
+        with self.assertRaisesRegex(ValueError, "provenance or compact-input contract"):
+            validate_server_only_command_inputs(mutated)
+
+    def test_server_only_producer_cannot_be_substituted(self) -> None:
+        mutated = self.reproducibility.replace(
+            "| `joint_crossfit_spread_calibration_valid` |",
+            "| `joint_existing_ensemble_calibration_audit_valid` |",
+            1,
+        )
+        self.assertNotEqual(mutated, self.reproducibility)
+        with self.assertRaisesRegex(ValueError, "provenance or compact-input contract"):
+            validate_server_only_command_inputs(mutated)
+
+    def test_server_only_artifact_cannot_be_substituted(self) -> None:
+        mutated = self.reproducibility.replace(
+            "| `per_case_metrics.csv` | `per_case_metrics.csv`:",
+            "| `metadata.json` | `per_case_metrics.csv`:",
+            1,
+        )
+        self.assertNotEqual(mutated, self.reproducibility)
+        with self.assertRaisesRegex(ValueError, "provenance or compact-input contract"):
+            validate_server_only_command_inputs(mutated)
+
+    def test_server_only_manifest_identity_cannot_be_weakened(self) -> None:
+        mutated = self.reproducibility.replace(
+            "artifact manifest binds `per_case_metrics.csv` by SHA-256",
+            "artifact manifest may list `per_case_metrics.csv`",
+            1,
+        )
+        self.assertNotEqual(mutated, self.reproducibility)
+        with self.assertRaisesRegex(ValueError, "provenance or compact-input contract"):
             validate_server_only_command_inputs(mutated)
 
     def test_claim_consistency_contract_covers_all_publication_surfaces(self) -> None:

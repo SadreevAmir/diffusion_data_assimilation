@@ -31,25 +31,38 @@ REGRESSION_COMMAND = re.compile(
 )
 SERVER_ONLY_COMMAND_INPUTS = {
     "case_level_artifacts_long_form": (
+        "joint_existing_ensemble_calibration_audit_valid",
+        "per_case_metrics.csv",
         "per_case_metrics.csv`: exactly 160 rows; columns `target_date`, `fold`, "
         "`method` and the full proper-score, rank, boundary and spatial diagnostic "
         "family; unique ISO `target_date`/`method` pairs; exactly 40 dates and both "
-        "exact raw/global-spread method labels on every date"
+        "exact raw/global-spread method labels on every date",
+        "metadata.json`: `experiment_id == joint_existing_ensemble_calibration_audit_valid`; "
+        "artifact manifest binds `per_case_metrics.csv` by SHA-256"
     ),
     "calibration_summary_figure": (
+        "joint_crossfit_spread_calibration_valid",
+        "aggregate_case_mean_metrics.json",
         "aggregate_case_mean_metrics.json`: one-row JSON list; `num_cases == 40`; "
         "finite raw and corrected values for ordinary CRPS, fair CRPS, spread-skill "
-        "ratio and all four interval diagnostics"
+        "ratio and all four interval diagnostics",
+        "metadata.json`: `experiment_id == joint_crossfit_spread_calibration_valid`; "
+        "artifact manifest binds `aggregate_case_mean_metrics.json` by SHA-256"
     ),
     "joint_gate_figure": (
+        "joint_existing_ensemble_mean_preserving_projected_spread_valid",
+        "aggregate_case_mean_metrics.json",
         "aggregate_case_mean_metrics.json`: exact reviewed candidate identifier; "
         "exactly two full-region method rows; 40 finite cases per method; finite "
-        "gate metrics and Boolean `overall_eligible == false`"
+        "gate metrics and Boolean `overall_eligible == false`",
+        "metadata.json`: `experiment_id == joint_existing_ensemble_mean_preserving_projected_spread_valid`; "
+        "artifact manifest binds `aggregate_case_mean_metrics.json` by SHA-256"
     ),
 }
 SERVER_ONLY_COMMAND_ROW = re.compile(
     r"^\| `(?P<command>[a-z0-9_]+)` \| `(?P<execution>[A-Z_]+)` \| "
-    r"`(?P<schema>[^\n]+?) \|$",
+    r"`(?P<producer>[a-z0-9_]+)` \| `(?P<artifact>[a-z0-9_.]+)` \| "
+    r"`(?P<schema>[^\n]+?) \| `(?P<manifest>[^\n]+?) \|$",
     re.MULTILINE,
 )
 
@@ -71,12 +84,16 @@ def validate_server_only_command_inputs(text: str) -> None:
     """Keep external compact-input generators separate from local oracles."""
     rows = list(SERVER_ONLY_COMMAND_ROW.finditer(text))
     observed = {
-        row["command"]: (row["execution"], row["schema"])
+        row["command"]: (
+            row["execution"], row["producer"], row["artifact"],
+            row["schema"], row["manifest"],
+        )
         for row in rows
     }
     expected = {
-        command: ("SERVER_ONLY", schema)
-        for command, schema in SERVER_ONLY_COMMAND_INPUTS.items()
+        command: ("SERVER_ONLY", producer, artifact, schema, manifest)
+        for command, (producer, artifact, schema, manifest)
+        in SERVER_ONLY_COMMAND_INPUTS.items()
     }
     require(
         len(rows) == len(observed) == len(expected),
@@ -84,7 +101,7 @@ def validate_server_only_command_inputs(text: str) -> None:
     )
     require(
         observed == expected,
-        "server-only command class or compact-input schema differs from contract",
+        "server-only command provenance or compact-input contract differs from contract",
     )
     require(
         "rank_coherent_reference.py` command and the\npublication regression/integrity commands below are `LOCAL_ORACLE`" in text,
