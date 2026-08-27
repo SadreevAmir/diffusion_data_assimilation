@@ -47,3 +47,16 @@ localization/inflation set, training-only fair-CRPS selection and joint
 fair-CRPS/rank/RMSE usefulness criteria. Its status remains `MISSING` until a
 separately reviewed trusted runner executes the literal contract. Invalid
 common-information or leakage checks cannot close the row.
+
+## Decision-bearing evidence guard
+
+The rows below are normative and repeated verbatim on every publication surface
+that can close these routes. `NONE` means that no compact evidence record is
+admitted; while it remains present, only pre-result or development-only wording
+is allowed.
+
+| Route | Evidence status | Compact evidence record SHA-256 | Allowed presentation |
+|---|---|---|---|
+| `conformal` | `MISSING` | `NONE` | `PRE_RESULT_ONLY` |
+| `probabilistic_da` | `MISSING` | `NONE` | `PRE_RESULT_ONLY` |
+| `independent_deterministic` | `PRESENT_DEVELOPMENT_ONLY` | `NONE` | `DEVELOPMENT_ONLY` |

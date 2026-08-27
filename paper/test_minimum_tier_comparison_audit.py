@@ -17,6 +17,7 @@ from paper.check_publication_artifacts import (
     SERVER_ONLY_COMMAND_INPUTS,
     validate_documented_regression_suites,
     validate_minimum_tier_key_claims,
+    validate_minimum_tier_evidence_guards,
     validate_minimum_tier_comparisons,
     validate_publication_status,
     validate_readiness_blockers,
@@ -36,6 +37,7 @@ class MinimumTierComparisonAuditTests(unittest.TestCase):
         self.readiness = (PAPER_DIR / "PUBLICATION_READINESS.md").read_text(
             encoding="utf-8"
         )
+        self.ledger = (PAPER_DIR / "CLAIM_LEDGER.md").read_text(encoding="utf-8")
 
     def make_fixture(self, audit: str) -> tempfile.TemporaryDirectory[str]:
         temporary = tempfile.TemporaryDirectory()
@@ -245,6 +247,40 @@ class MinimumTierComparisonAuditTests(unittest.TestCase):
 
     def test_readiness_blockers_match_normative_evidence(self) -> None:
         validate_readiness_blockers(self.readiness, PAPER_DIR)
+
+    def test_minimum_tier_evidence_guards_pass(self) -> None:
+        validate_minimum_tier_evidence_guards(
+            self.manuscript, self.ledger, self.readiness, self.audit
+        )
+
+    def test_conformal_decision_without_compact_record_fails_closed(self) -> None:
+        mutated = self.manuscript + "\nThe result is `CONFORMAL_USEFUL`.\n"
+        with self.assertRaisesRegex(ValueError, "outside the pre-result matrix"):
+            validate_minimum_tier_evidence_guards(
+                mutated, self.ledger, self.readiness, self.audit
+            )
+
+    def test_probabilistic_da_decision_without_compact_record_fails_closed(self) -> None:
+        mutated = self.ledger.replace(
+            "| `probabilistic_da` | `MISSING` | `NONE` | `PRE_RESULT_ONLY` |",
+            "| `probabilistic_da` | `PROBABILISTIC_DA_USEFUL` | `NONE` | `RESULT` |",
+            1,
+        )
+        with self.assertRaisesRegex(ValueError, "without compact evidence"):
+            validate_minimum_tier_evidence_guards(
+                self.manuscript, mutated, self.readiness, self.audit
+            )
+
+    def test_deterministic_promotion_without_compact_record_fails_closed(self) -> None:
+        mutated = self.readiness.replace(
+            "| `independent_deterministic` | `PRESENT_DEVELOPMENT_ONLY` | `NONE` | `DEVELOPMENT_ONLY` |",
+            "| `independent_deterministic` | `PRESENT` | `NONE` | `RESULT` |",
+            1,
+        )
+        with self.assertRaisesRegex(ValueError, "without compact evidence"):
+            validate_minimum_tier_evidence_guards(
+                self.manuscript, self.ledger, mutated, self.audit
+            )
 
     def test_readiness_status_matches_open_blockers(self) -> None:
         frozen_handoff = (PAPER_DIR / "FROZEN_EVALUATION_HANDOFF.md").read_text(

@@ -299,6 +299,17 @@ Thus closing both `MISSING` rows would complete those exact baseline-family
 results without upgrading the deterministic evidence or selecting a calibrated
 ensemble.
 
+The decision-bearing closure guard is currently pre-result. A route cannot be
+promoted by prose: its compact evidence identity and status must change together
+and identically in the manuscript, claim ledger, readiness audit and normative
+minimum-tier audit.
+
+| Route | Evidence status | Compact evidence record SHA-256 | Allowed presentation |
+|---|---|---|---|
+| `conformal` | `MISSING` | `NONE` | `PRE_RESULT_ONLY` |
+| `probabilistic_da` | `MISSING` | `NONE` | `PRE_RESULT_ONLY` |
+| `independent_deterministic` | `PRESENT_DEVELOPMENT_ONLY` | `NONE` | `DEVELOPMENT_ONLY` |
+
 We additionally evaluate the frozen cross-fitted scales followed by an exact
 capped-simplex projection of each ten-member pixel distribution. The projection
 preserves the raw ensemble mean while enforcing bounded members and preserving

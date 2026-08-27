@@ -514,6 +514,62 @@ READINESS_CLOSURE_ROUTE_ROW = re.compile(
     r"(?P<manuscript>[^|]+?) \| (?P<ledger>[^|]+?) \|$",
     re.MULTILINE,
 )
+MINIMUM_TIER_EVIDENCE_GUARD_ROWS = {
+    "conformal": ("MISSING", "NONE", "PRE_RESULT_ONLY"),
+    "probabilistic_da": ("MISSING", "NONE", "PRE_RESULT_ONLY"),
+    "independent_deterministic": (
+        "PRESENT_DEVELOPMENT_ONLY", "NONE", "DEVELOPMENT_ONLY"
+    ),
+}
+MINIMUM_TIER_EVIDENCE_GUARD_ROW = re.compile(
+    r"^\| `(?P<route>conformal|probabilistic_da|independent_deterministic)` \| "
+    r"`(?P<status>[A-Z_]+)` \| `(?P<record>NONE|[0-9a-f]{64})` \| "
+    r"`(?P<presentation>[A-Z_]+)` \|$",
+    re.MULTILINE,
+)
+
+
+def validate_minimum_tier_evidence_guards(
+    manuscript: str, claim_ledger: str, readiness: str, audit: str
+) -> None:
+    """Forbid result language until every closure route names compact evidence."""
+    documents = {
+        "PAPER_DRAFT.md": manuscript,
+        "CLAIM_LEDGER.md": claim_ledger,
+        "PUBLICATION_READINESS.md": readiness,
+        "MINIMUM_TIER_COMPARISON_AUDIT.md": audit,
+    }
+    for filename, text in documents.items():
+        rows = list(MINIMUM_TIER_EVIDENCE_GUARD_ROW.finditer(text))
+        observed = {
+            row["route"]: (row["status"], row["record"], row["presentation"])
+            for row in rows
+        }
+        require(
+            len(rows) == len(observed) == len(MINIMUM_TIER_EVIDENCE_GUARD_ROWS),
+            f"{filename} minimum-tier evidence guard is incomplete or duplicated",
+        )
+        require(
+            observed == MINIMUM_TIER_EVIDENCE_GUARD_ROWS,
+            f"{filename} contains a decision-bearing minimum-tier claim without compact evidence",
+        )
+
+    matrix = re.search(
+        r"^\| Conformal decision \| Probabilistic-DA decision \|.*?"
+        r"(?=^Across all four valid outcomes)",
+        manuscript,
+        re.MULTILINE | re.DOTALL,
+    )
+    require(matrix is not None, "manuscript pre-result outcome matrix is missing")
+    outside_matrix = manuscript[: matrix.start()] + manuscript[matrix.end() :]
+    for label in (
+        "CONFORMAL_USEFUL", "CONFORMAL_NEGATIVE",
+        "PROBABILISTIC_DA_USEFUL", "PROBABILISTIC_DA_NEGATIVE",
+    ):
+        require(
+            label not in outside_matrix,
+            f"decision-bearing label {label} appears outside the pre-result matrix",
+        )
 EXTERNAL_PRIMARY_HANDOFF_ANCHORS = {
     "PUBLICATION_READINESS.md": (
         "External primary evidence state: RECONCILED_NEGATIVE",
@@ -1442,6 +1498,9 @@ def validate_readiness_blockers(readiness: str, paper_dir: Path) -> None:
     audit = (paper_dir / "MINIMUM_TIER_COMPARISON_AUDIT.md").read_text(
         encoding="utf-8"
     )
+    manuscript = (paper_dir / "PAPER_DRAFT.md").read_text(encoding="utf-8")
+    ledger = (paper_dir / "CLAIM_LEDGER.md").read_text(encoding="utf-8")
+    validate_minimum_tier_evidence_guards(manuscript, ledger, readiness, audit)
     tier_states = {
         row["comparison"].strip(): row["status"]
         for row in MINIMUM_TIER_ROW.finditer(audit)
@@ -1475,8 +1534,6 @@ def validate_readiness_blockers(readiness: str, paper_dir: Path) -> None:
         len({route[0] for route in routes.values()}) == len(routes),
         "readiness blockers do not have unique frozen contracts",
     )
-    manuscript = (paper_dir / "PAPER_DRAFT.md").read_text(encoding="utf-8")
-    ledger = (paper_dir / "CLAIM_LEDGER.md").read_text(encoding="utf-8")
     for blocker, (contract, manuscript_target, ledger_target) in routes.items():
         require((paper_dir / contract).is_file(), f"closure contract is missing: {contract}")
         require(manuscript_target.startswith("PAPER_DRAFT.md:"), "invalid manuscript closure target")
@@ -1635,7 +1692,7 @@ def main() -> int:
     manuscript_tables = validate_markdown_tables(manuscript, "PAPER_DRAFT.md")
     ledger_tables = validate_markdown_tables(claim_ledger, "CLAIM_LEDGER.md")
     require(manuscript_tables >= 8, "manuscript is missing required evidence tables")
-    require(ledger_tables == 1, "claim ledger must contain exactly one normative table")
+    require(ledger_tables == 2, "claim ledger must contain exactly two normative tables")
     frozen_handoff = (PAPER_DIR / "FROZEN_EVALUATION_HANDOFF.md").read_text(
         encoding="utf-8"
     )

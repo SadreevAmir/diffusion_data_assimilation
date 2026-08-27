@@ -54,6 +54,20 @@ External primary evidence state: RECONCILED_NEGATIVE
 
 ## Mandatory language discipline
 
+## Minimum-tier closure evidence guard
+
+These rows are not empirical claims. They prevent a result label or an
+independent-strength promotion from entering the ledger before the same compact
+evidence identity is admitted across all normative publication surfaces.
+
+| Route | Evidence status | Compact evidence record SHA-256 | Allowed presentation |
+|---|---|---|---|
+| `conformal` | `MISSING` | `NONE` | `PRE_RESULT_ONLY` |
+| `probabilistic_da` | `MISSING` | `NONE` | `PRE_RESULT_ONLY` |
+| `independent_deterministic` | `PRESENT_DEVELOPMENT_ONLY` | `NONE` | `DEVELOPMENT_ONLY` |
+
+## Mandatory language discipline
+
 - Say **model-to-model sparse-observation assimilation experiment**, not real-observation assimilation.
 - Say **empirical ensemble CRPS** until fair finite-ensemble CRPS is reported.
 - Say **nominal quantile interval diagnostic** for the current M=10 coverage values.

@@ -168,6 +168,29 @@ not authorize an unimplemented mode or another independent evaluation.
 | Probabilistic DA baseline such as EnKF/LETKF | `NEXT_PROBABILISTIC_DA_COMPARISON_CONTRACT.md` | PAPER_DRAFT.md:Section 3 frozen outcome matrix | CLAIM_LEDGER.md:C17 plus a decision-bearing probabilistic-DA claim |
 | Independent-strength deterministic background and 3D-Var | `FROZEN_EVALUATION_HANDOFF.md` | PAPER_DRAFT.md:Section 3 common-information comparison | CLAIM_LEDGER.md:C9 and C17 evidence-strength transition |
 
+## Minimum-tier decision-bearing evidence guard
+
+These three closure routes remain fail-closed until an identical compact record
+identity is admitted on every normative publication surface. `NONE` explicitly
+forbids a decision-bearing result claim or independent-strength promotion.
+
+| Route | Evidence status | Compact evidence record SHA-256 | Allowed presentation |
+|---|---|---|---|
+| `conformal` | `MISSING` | `NONE` | `PRE_RESULT_ONLY` |
+| `probabilistic_da` | `MISSING` | `NONE` | `PRE_RESULT_ONLY` |
+| `independent_deterministic` | `PRESENT_DEVELOPMENT_ONLY` | `NONE` | `DEVELOPMENT_ONLY` |
+
+The 2026-08-27 closure-route audit now makes those three rows executable
+publication guards rather than prose-only destinations. The checker requires
+the same status, compact-record identity and allowed presentation in the
+manuscript, claim ledger, readiness audit and normative minimum-tier audit. It
+also confines the four conformal/probabilistic-DA outcome labels to the explicit
+pre-result matrix. Three negative fixtures reject an unsupported conformal
+decision, an unsupported probabilistic-DA decision and an independent-strength
+promotion of the development-only deterministic comparison. The focused suite
+passes 41 tests; the unified audit still passes with 61 required files, two
+figures, eight references and 39 claims, and status remains `NOT_READY`.
+
 The 2026-08-27 key-claim audit now derives the two `MISSING` baseline families
 from `MINIMUM_TIER_COMPARISON_AUDIT.md` and requires both to remain explicit in
 Abstract, Contributions and Conclusion. The manuscript now contains a dedicated
