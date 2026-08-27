@@ -15,6 +15,8 @@ traceable only through the claim ledger and compact publication artifacts.
 | 4 | `10.1198/016214506000001437` | CRPS is a proper scoring rule for a predictive distribution | Does not imply that improvement in one proper score establishes calibration or permits compensation across gate families. |
 | 5 | `10.1214/13-STS443` | ECC-Q reconstructs multivariate ensembles by coupling calibrated univariate quantiles to the raw ensemble rank template | Does not establish that the project's hurdle or ZOIB marginals are calibrated, spatially safe or eligible. |
 | 6 | `10.1002/2015GL067232` | IIEE is the area where forecast and truth disagree on whether concentration exceeds 15% | Does not support this project's IIEE values, tolerances or causal interpretation. |
+| 7 | `10.1080/01621459.2017.1307116` | split conformal inference supplies a finite-sample marginal-coverage construction with a statistical-efficiency/computational tradeoff | Does not establish validity under this project's temporally purged folds or support its coverage and width thresholds. |
+| 8 | `10.1016/j.physd.2006.11.008` | LETKF is a local ensemble-transform construction for finite-ensemble data assimilation | Does not establish this project's background-ensemble identity, tuning fairness, numerical validity or comparative skill. |
 
 ## Independent metadata and statement audit
 
@@ -30,5 +32,8 @@ traceable only through the claim ledger and compact publication artifacts.
   Stochastic interpolants were mentioned in the same sentence but were not
   independently sourced; that separate family has therefore been removed from
   the citation statement.
+- References 7 and 8 define the two still-missing baseline method families.
+  They do not turn either frozen project-specific contract into an empirical
+  result and cannot change its `MISSING` evidence state.
 
 Audit decision: PASS_WITH_SCOPE_CORRECTION

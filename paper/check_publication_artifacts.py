@@ -222,6 +222,8 @@ REFERENCE_TRACEABILITY_ROWS = {
     4: ("10.1198/016214506000001437", "proper scoring rule"),
     5: ("10.1214/13-STS443", "ECC-Q"),
     6: ("10.1002/2015GL067232", "IIEE"),
+    7: ("10.1080/01621459.2017.1307116", "split conformal inference"),
+    8: ("10.1016/j.physd.2006.11.008", "LETKF"),
 }
 
 LIMITATION_TRACEABILITY_ROWS = {
@@ -336,7 +338,7 @@ def validate_reference_traceability(text: str) -> None:
             require(number not in rows, f"duplicate reference traceability row: {number}")
             rows[number] = (match.group(2), match.group(3) + match.group(4))
     require(set(rows) == set(REFERENCE_TRACEABILITY_ROWS),
-            "reference traceability must cover exactly references 1--6")
+            "reference traceability must cover exactly references 1--8")
     for number, (identity, statement_anchor) in REFERENCE_TRACEABILITY_ROWS.items():
         observed_identity, prose = rows[number]
         require(observed_identity == identity, f"reference {number} identity mismatch")

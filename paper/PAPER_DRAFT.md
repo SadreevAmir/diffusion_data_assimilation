@@ -220,6 +220,15 @@ for the ten-member ensemble rather than a literal continuous-distribution
 guarantee. CRPS is interpreted as a proper scoring rule for a predictive
 distribution [4].
 
+The two still-missing minimum-tier comparisons are methodologically distinct
+from member calibration. The frozen field-functional interval baseline uses
+split conformal inference, whose finite-sample marginal-coverage construction
+and computational tradeoff are established in [7]. The frozen probabilistic-DA
+comparator uses the local ensemble transform Kalman filter (LETKF) construction
+of [8]. These citations define the method families only: neither supplies a
+result for the present cases, and both evidence rows remain missing until valid
+trusted execution of their project-specific frozen contracts.
+
 ## 4. Cross-fitted global spread calibration
 
 For members `x_k` and their pointwise ensemble mean `x_bar`, the frozen method
@@ -759,3 +768,11 @@ competing-interest declarations before submission.
 6. Goessling, H. F., Tietsche, S., Day, J. J., Hawkins, E. & Jung, T.
    Predictability of the Arctic sea ice edge. *Geophysical Research Letters*
    **43**, 1642–1650 (2016). doi:10.1002/2015GL067232.
+7. Lei, J., G’Sell, M., Rinaldo, A., Tibshirani, R. J. & Wasserman, L.
+   Distribution-Free Predictive Inference for Regression. *Journal of the
+   American Statistical Association* **113**, 1094–1111 (2018).
+   doi:10.1080/01621459.2017.1307116.
+8. Hunt, B. R., Kostelich, E. J. & Szunyogh, I. Efficient Data Assimilation
+   for Spatiotemporal Chaos: A Local Ensemble Transform Kalman Filter.
+   *Physica D: Nonlinear Phenomena* **230**, 112–126 (2007).
+   doi:10.1016/j.physd.2006.11.008.

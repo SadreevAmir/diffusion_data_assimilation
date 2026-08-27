@@ -68,7 +68,7 @@ and three negative fixtures reject a missing limitation, a changed claim mapping
 or a missing evidence-absence status. This closes the declared limitation-audit
 gap without changing any scientific result; status remains `NOT_READY`.
 
-The 2026-08-27 reference-traceability audit independently checked all six
+The 2026-08-27 reference-traceability audit independently checked all eight
 bibliography records against primary publisher or conference metadata and maps
 each item to one scope-limited manuscript statement in
 `REFERENCE_TRACEABILITY.md`. It found two overextensions and corrected them:
@@ -79,6 +79,16 @@ fixtures now reject a missing row, changed identity or missing empirical-claim
 boundary. The unified checker requires the artifact and suite. This closes the
 declared bibliographic gap without changing any empirical result; status remains
 `NOT_READY`.
+
+The independent publication-readiness rerun found that the two frozen missing
+baseline contracts still lacked method-specific primary citations. The
+manuscript and contracts now cite the split-conformal construction of Lei et
+al. (2018) and the LETKF construction of Hunt et al. (2007), while
+`REFERENCE_TRACEABILITY.md` explicitly prevents either citation from being
+treated as project-specific evidence. The checker now requires all eight exact
+identities and support mappings, and a negative fixture removes the new LETKF
+row. This closes a concrete literature-traceability gap without supplying either
+missing baseline result or an eligible calibration; status remains `NOT_READY`.
 
 The 2026-08-27 figure-generator audit found that finite compact inputs could
 still reach undefined rendering paths: jointly zero calibration values produced

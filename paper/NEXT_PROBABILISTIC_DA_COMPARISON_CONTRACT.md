@@ -9,7 +9,10 @@ that a trusted runner or result exists. The comparator is a conventional LETKF,
 not a calibration of generated members and not a candidate for the learned-joint
 no-compensation gate. Its role is to test whether the learned-joint ensemble is
 competitive with an assimilation method that updates an explicit finite
-background ensemble under the same sparse observations.
+background ensemble under the same sparse observations. The LETKF method
+identity follows Hunt, Kostelich and Szunyogh (2007),
+doi:10.1016/j.physd.2006.11.008; that source does not establish the validity,
+skill or fairness of this project's common-information comparison.
 
 ## Common-information and case contract
 

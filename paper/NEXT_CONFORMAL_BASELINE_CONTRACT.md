@@ -9,7 +9,10 @@ claiming that a trusted runner or result exists. It is a field-functional
 interval baseline, not an ensemble postprocessor and not a candidate for the
 joint no-compensation calibration gate. Its sole claim is whether a
 leakage-safe split-conformal correction makes the learned-joint ensemble's
-date-level sea-ice-area interval useful.
+date-level sea-ice-area interval useful. The split-conformal method family and
+its finite-sample marginal-coverage role follow Lei et al. (2018),
+doi:10.1080/01621459.2017.1307116; that source does not validate this temporal
+purge, area functional or project-specific decision threshold.
 
 ## Inputs and immutable envelope
 

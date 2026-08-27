@@ -15,7 +15,7 @@ class ReferenceTraceabilityTests(unittest.TestCase):
 
     def test_missing_reference_fails(self) -> None:
         text = TRACEABILITY.read_text(encoding="utf-8")
-        text = "\n".join(line for line in text.splitlines() if not line.startswith("| 6 |"))
+        text = "\n".join(line for line in text.splitlines() if not line.startswith("| 8 |"))
         with self.assertRaises(ValueError):
             validate_reference_traceability(text)
 
