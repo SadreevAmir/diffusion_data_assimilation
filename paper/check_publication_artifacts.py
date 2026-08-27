@@ -962,6 +962,9 @@ RANK_COHERENT_HANDOFF_ANCHORS = {
         "`metadata.decision_bearing=false`",
         "replace only the prototype gate\nadapter and interval sensitivity",
         "python3 -m unittest -v paper/test_rank_coherent_runner_prototype.py",
+        "rank_coherent_admission_manifest=PASS files=13",
+        "any missing, extra, changed,\nmalformed or path-traversing entry fails closed",
+        "The frozen allowlist includes this handoff itself",
     ),
     "PUBLICATION_READINESS.md": (
         "rank_coherent_reference.py",
@@ -975,6 +978,8 @@ RANK_COHERENT_HANDOFF_ANCHORS = {
         "paired summaries that do not reconcile with the same aggregate metric set",
         "member-spatial decisions that do\nnot follow their frozen absolute tolerances",
         "family flags that differ from\ntheir complete criterion conjunctions",
+        "exact 13-file allowlist",
+        "missing or extra manifest entry",
     ),
     "REPRODUCIBILITY.md": (
         "## Rank-coherent runner review handoff",

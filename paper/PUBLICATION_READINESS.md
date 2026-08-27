@@ -533,6 +533,16 @@ its regression suite. This strengthens implementation admission only; no
 trusted mode or decision-bearing scientific result exists, so status remains
 `NOT_READY`.
 
+The subsequent independent packet audit found that a valid manifest could still
+enumerate an arbitrary non-empty subset and did not bind the controller handoff
+or the manifest validator and its tests. The validator now requires the
+exact 13-file allowlist, including the handoff, validator and negative fixtures; any
+missing or extra manifest entry fails before digest checks can be treated as a
+complete-package result. The handoff records the same count and fail-closed
+semantics, and the unified checker protects those statements. This closes a
+real mixed-package admission path but does not create a trusted mode or a
+scientific result; publication status remains `NOT_READY`.
+
 `RANK_COHERENT_RUNNER_REVIEW_CHECKLIST.md` now supplies the missing independent
 integration admission test. It traces the sole-parameter interface, provenance,
 fold/purge and tie parity, complete-field construction, frozen alpha selection,

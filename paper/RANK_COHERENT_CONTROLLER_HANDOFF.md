@@ -13,8 +13,11 @@ python3 paper/validate_rank_coherent_manifest.py
 ```
 
 Success prints exactly
-`rank_coherent_admission_manifest=PASS files=10`; any missing, changed,
+`rank_coherent_admission_manifest=PASS files=13`; any missing, extra, changed,
 malformed or path-traversing entry fails closed before a mode can be admitted.
+The frozen allowlist includes this handoff itself, so the narrative interface,
+compact filenames and admission command cannot drift outside the immutable
+package.
 The table below retains the four construction identities for convenient manual
 comparison; the manifest is authoritative for the complete package.
 
