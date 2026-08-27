@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+from datetime import date, timedelta
 import hashlib
 import json
 import math
@@ -16,6 +17,14 @@ except ImportError:
 
 
 EXPECTED_CASES = 40
+CASE_START = date(2022, 1, 1)
+CASE_STRIDE_DAYS = 5
+HOLDOUT_SIZE = 8
+PURGE_CASES = 3
+EXPECTED_CASE_IDS = tuple(
+    (CASE_START + timedelta(days=CASE_STRIDE_DAYS * index)).isoformat()
+    for index in range(EXPECTED_CASES)
+)
 FILES = {
     "cases": "case_selection.json",
     "aggregate": "aggregate_selection.json",
@@ -60,6 +69,19 @@ def _close(actual: object, expected: float, label: str) -> None:
         raise ValueError(f"{label} disagrees with recomputed value")
 
 
+def expected_training_case_ids(fold: int) -> list[str]:
+    """Return the exact retained cases for a contiguous holdout and non-circular purge."""
+    holdout_start = fold * HOLDOUT_SIZE
+    holdout_stop = holdout_start + HOLDOUT_SIZE
+    excluded_start = max(0, holdout_start - PURGE_CASES)
+    excluded_stop = min(EXPECTED_CASES, holdout_stop + PURGE_CASES)
+    return [
+        case_id
+        for index, case_id in enumerate(EXPECTED_CASE_IDS)
+        if not excluded_start <= index < excluded_stop
+    ]
+
+
 def validate_directory(directory: Path) -> None:
     payload = _load_exact(directory)
     cases_doc = payload["cases"]
@@ -72,7 +94,7 @@ def validate_directory(directory: Path) -> None:
         raise ValueError("case selection must contain exactly forty cases")
 
     expected_case_keys = {
-        "case_id", "fold", "predicted_risks", "normalized_weights",
+        "case_id", "fold", "training_case_ids", "predicted_risks", "normalized_weights",
         "source_raw_member_indices", "source_multiplicities",
         "unique_selected_raw_members", "effective_sample_size",
         "bitwise_copy_pass", "mask_invariants_pass", "analysis_fair_crps_delta",
@@ -93,8 +115,15 @@ def validate_directory(directory: Path) -> None:
         if not isinstance(case_id, str) or not case_id or case_id in ids:
             raise ValueError("case_id values must be unique non-empty strings")
         ids.add(case_id)
+        if case_id != EXPECTED_CASE_IDS[index]:
+            raise ValueError("case_id order must match the frozen stride-five case envelope")
         if not isinstance(case["fold"], int) or isinstance(case["fold"], bool) or not 0 <= case["fold"] < 5:
             raise ValueError("fold must be an integer from zero through four")
+        expected_fold = index // HOLDOUT_SIZE
+        if case["fold"] != expected_fold:
+            raise ValueError(f"{case_id}.fold disagrees with frozen contiguous holdout membership")
+        if case["training_case_ids"] != expected_training_case_ids(expected_fold):
+            raise ValueError(f"{case_id}.training_case_ids disagrees with frozen non-circular purge")
         fold_counts[case["fold"]] += 1
         expected = select_raw_scenarios(case["predicted_risks"])
         for key in ("normalized_weights", "source_raw_member_indices", "source_multiplicities"):

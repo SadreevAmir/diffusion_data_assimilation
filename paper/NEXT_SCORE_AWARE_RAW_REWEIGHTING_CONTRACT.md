@@ -22,6 +22,12 @@ set, loss, temperature or external evaluation.
 
 - Use the established forty ordered development cases, five contiguous
   eight-case holdouts and the non-circular three-case purge.
+- Identify the cases by their exact ISO dates from `2022-01-01` at five-day
+  stride.  Each per-case compact record carries the complete ordered
+  `training_case_ids` retained for its fold.  Admission independently derives
+  the contiguous holdout and excludes that holdout plus up to three neighboring
+  cases on either side without wrapping; any identifier, order, fold or retained
+  membership mismatch fails closed.
 - For every raw member compute exactly seven forecast-only member descriptors:
   spatially weighted ice area, extent at `0.15`, spatial mean, spatial standard
   deviation, semivariograms at lags 1 and 4, and absolute displacement of its
@@ -103,7 +109,8 @@ The four compact files are exactly `case_selection.json`,
 Before admission, the directory must pass
 `validate_score_aware_compact_outputs.py`: it independently recomputes weights,
 source multiplicities, unique-member counts and ESS from every case's recorded
-risks; reconciles all case totals with the aggregate; binds the operational
+risks; derives the exact case-to-fold and purged training membership; reconciles
+all case totals with the aggregate; binds the operational
 family to bitwise-copy and mask invariants; and requires `overall_eligible` to
 equal the conjunction of all five no-compensation families.  Extra files,
 schema drift or any cross-file disagreement fail closed.

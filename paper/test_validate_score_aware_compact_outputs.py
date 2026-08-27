@@ -5,10 +5,15 @@ from __future__ import annotations
 import json
 import tempfile
 import unittest
+from datetime import date, timedelta
 from pathlib import Path
 
 from paper.score_aware_raw_reweighting_reference import select_raw_scenarios
-from paper.validate_score_aware_compact_outputs import FILES, validate_directory
+from paper.validate_score_aware_compact_outputs import (
+    FILES,
+    expected_training_case_ids,
+    validate_directory,
+)
 
 
 def valid_payloads() -> dict[str, object]:
@@ -19,7 +24,9 @@ def valid_payloads() -> dict[str, object]:
         for member, count in enumerate(selection["source_multiplicities"]):
             totals[member] += count
         cases.append({
-            "case_id": f"case-{case_index:02d}", "fold": case_index // 8,
+            "case_id": (date(2022, 1, 1) + timedelta(days=5 * case_index)).isoformat(),
+            "fold": case_index // 8,
+            "training_case_ids": expected_training_case_ids(case_index // 8),
             "predicted_risks": selection["predicted_risks"],
             "normalized_weights": selection["normalized_weights"],
             "source_raw_member_indices": selection["source_raw_member_indices"],
@@ -83,7 +90,21 @@ class CompactDirectoryTests(unittest.TestCase):
     def test_wrong_fold_allocation_fails_closed(self) -> None:
         payloads = valid_payloads()
         payloads["cases"]["cases"][0]["fold"] = 1
-        with self.assertRaisesRegex(ValueError, "exactly eight cases"):
+        with self.assertRaisesRegex(ValueError, "contiguous holdout"):
+            validate_directory(self.write(payloads))
+
+    def test_case_to_fold_permutation_fails_closed(self) -> None:
+        payloads = valid_payloads()
+        cases = payloads["cases"]["cases"]
+        cases[0], cases[8] = cases[8], cases[0]
+        with self.assertRaisesRegex(ValueError, "case_id order"):
+            validate_directory(self.write(payloads))
+
+    def test_changed_purge_membership_fails_closed(self) -> None:
+        payloads = valid_payloads()
+        training = payloads["cases"]["cases"][8]["training_case_ids"]
+        training[0], training[-1] = training[-1], training[0]
+        with self.assertRaisesRegex(ValueError, "non-circular purge"):
             validate_directory(self.write(payloads))
 
     def test_invariant_and_gate_disagreement_fail_closed(self) -> None:
