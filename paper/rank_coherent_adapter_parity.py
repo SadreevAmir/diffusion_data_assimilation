@@ -3,9 +3,14 @@
 from __future__ import annotations
 import csv, json, math
 from pathlib import Path
-from rank_coherent_reference import (ARTIFACT_POLICY, CASE_STRIDE, DATASET_SPLIT,
-    END_DATE, EXPECTED_CASES, EXPECTED_MEMBERS, SOURCE_EXPERIMENT, START_DATE,
-    validate_compact_handoff)
+try:
+    from .rank_coherent_reference import (ARTIFACT_POLICY, CASE_STRIDE, DATASET_SPLIT,
+        END_DATE, EXPECTED_CASES, EXPECTED_MEMBERS, SOURCE_EXPERIMENT, START_DATE,
+        validate_compact_handoff)
+except ImportError:  # Direct script execution keeps the documented boundary stable.
+    from rank_coherent_reference import (ARTIFACT_POLICY, CASE_STRIDE, DATASET_SPLIT,
+        END_DATE, EXPECTED_CASES, EXPECTED_MEMBERS, SOURCE_EXPERIMENT, START_DATE,
+        validate_compact_handoff)
 
 OUTPUTS = {"run_status.json", "aggregate_case_mean_metrics.json", "per_case_metrics.csv", "metadata.json"}
 METRICS = ("analysis_fair_crps", "analysis_crps", "analysis_mean_rmse")

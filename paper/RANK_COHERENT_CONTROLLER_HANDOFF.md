@@ -105,18 +105,25 @@ requires the exact field set, a literal non-placeholder reviewed mode, lowercase
 `decision_bearing_validation=PASS`, and an empty deviations list. It returns
 only the reviewed mode that a proposal may copy literally.
 
-Validate the explicit controller-visible JSON file without copying fields by
-hand:
+Validate the explicit controller-visible JSON and the decision-bearing compact
+directory in one fail-closed operation, without copying fields by hand:
 
 ```sh
-python3 paper/validate_rank_coherent_admission.py /path/to/admission.json
+python3 paper/validate_rank_coherent_admission.py \
+  /path/to/admission.json /path/to/compact-directory
 ```
 
-Success prints exactly `reviewed_mode=<literal reviewed mode>`. Invalid JSON,
+Success prints one sorted JSON object containing `reviewed_mode`,
+`admission_record_sha256` and `compact_directory_sha256`. The directory digest
+length-frames the exact four frozen filenames and their bytes. The same process
+requires directory parity with `decision_bearing=True`, then rereads both inputs
+and fails if either changed before the identities are returned. Invalid JSON,
 a non-object top level, missing or extra fields, placeholders, malformed
 identities, a `contract_sha256` that differs from the frozen local contract,
 a non-`PASS` decision or any deviation fails closed and prints no proposal-ready
-mode.
+mode. A missing, extra, non-decision-bearing or internally inconsistent compact
+output, or a byte substitution after either input's initial check, also fails
+closed.
 
 ## Focused verification
 

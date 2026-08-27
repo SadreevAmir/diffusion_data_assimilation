@@ -193,6 +193,17 @@ reproducibility handoff gap only; it does not supply an eligible calibration or
 either missing minimum-tier comparison, so publication status remains
 `NOT_READY`.
 
+The rank-coherent path now closes the analogous time-of-check gap before a
+trusted mode can be proposed. Its admission CLI accepts both the exact
+controller-visible JSON and the decision-bearing four-file compact directory,
+applies the frozen record validator and directory oracle in one process, emits
+their SHA-256 identities with the literal `reviewed_mode`, and rereads both
+inputs before returning. Independent negative fixtures replace the compact
+directory bytes or admission JSON after the initial check and both fail closed.
+This is implementation-integrity evidence only: there is still no admitted
+literal mode or eligible result, so every scientific blocker and publication
+status remain unchanged.
+
 ## Unique cross-artifact closure routes
 
 Each blocker has exactly one frozen contract and one insertion route into the

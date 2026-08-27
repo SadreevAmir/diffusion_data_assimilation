@@ -54,6 +54,18 @@ directory validation, and an empty deviations list. Missing or placeholder
 fields cannot authorize a proposal; the mode must be copied literally and the
 digests must not be turned into runtime parameters.
 
+Rank-coherent admission is one combined operation rather than two sequential
+checks. `validate_rank_coherent_admission.py` accepts the exact admission JSON
+and decision-bearing compact directory, validates the literal mode and frozen
+record schema, applies full directory parity with `decision_bearing=True`, and
+returns SHA-256 identities for both exact inputs. Its directory digest
+length-frames the four frozen filenames and bytes; final byte rechecks reject a
+record or compact-output substitution during admission. The focused integration
+fixtures mutate each input after its initial check and require fail-closed
+rejection. These emitted identities are the only safe inputs to a later atomic
+publication reconciliation; separate successful checks do not authorize a
+proposal.
+
 The frozen next mechanism is specified by `NEXT_RANK_COHERENT_CONTRACT.md`.
 Before trusted integration, its dependency-free executable review oracle is:
 
