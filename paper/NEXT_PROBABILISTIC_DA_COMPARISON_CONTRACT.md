@@ -109,6 +109,16 @@ exact filenames and bytes of all three artifacts with length-delimited framing,
 runs the complete semantic adapter, and repeats the directory digest afterward.
 Any payload or directory-membership substitution during admission fails closed;
 the emitted JSON binds the recomputed outcome to the admitted directory SHA-256.
+The controller must retain that identity and use the downstream consumer:
+
+```bash
+python3 paper/validate_probabilistic_da_admission.py COMPACT_DIRECTORY > ADMISSION.json
+python3 paper/reconcile_probabilistic_da_admission.py \
+  ADMISSION.json EXPECTED_COMPACT_DIRECTORY_SHA256
+```
+
+The second command rejects an outcome without the exact expected
+`compact_directory_sha256`; an outcome string alone is never reconciled.
 No raw backgrounds, analyses, observations or truths are retrieved. No currently
 admitted trusted mode implements this contract, so it must not be proposed under
 an invented identifier. Admission requires a separately reviewed runner that

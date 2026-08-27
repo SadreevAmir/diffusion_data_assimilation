@@ -1,5 +1,13 @@
 # Publication readiness audit
 
+The probabilistic-DA downstream boundary now has an executable consumer:
+`reconcile_probabilistic_da_admission.py` accepts the combined admission JSON
+only alongside the controller-retained `compact_directory_sha256`. Regression
+fixtures prove that a decision-bearing outcome without that exact digest, or
+with a different digest, is rejected. This closes the local admission-to-
+reconciliation identity gap without changing the scientific evidence row or
+the not-ready status below.
+
 Audit date: 2026-08-27
 
 Publication status: NOT_READY
@@ -24,7 +32,7 @@ payload after semantic validation and rejects in-admission substitution of any
 payload or directory member. This closes a local admission-parity
 gap only: no trusted mode has been admitted and the normative evidence row and
 publication status remain unchanged.
-The unified audit passed with 77 required files after this inventory expansion;
+The unified audit passed with 79 required files after this inventory expansion;
 earlier lower counts below are retained only as dated audit history.
 
 ## Current independent audit snapshot

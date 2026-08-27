@@ -582,6 +582,7 @@ python3 -m unittest -v \
   paper.test_probabilistic_da_contract_oracle \
   paper.test_probabilistic_da_adapter_parity \
   paper.test_validate_probabilistic_da_admission \
+  paper.test_reconcile_probabilistic_da_admission \
   paper.test_rank_coherent_runner_prototype \
   paper.test_rank_coherent_adapter_parity \
   paper.test_validate_rank_coherent_admission \
@@ -668,6 +669,18 @@ and exact payload bytes to compute one `compact_directory_sha256`, validates
 semantic and cross-file parity in the same process, and recomputes the digest at
 the end.  Integration fixtures mutate a semantically valid file both before and
 after semantic admission; both substitutions fail closed.
+
+The controller-facing downstream invocation is:
+
+```bash
+python3 paper/validate_probabilistic_da_admission.py COMPACT_DIRECTORY > ADMISSION.json
+python3 paper/reconcile_probabilistic_da_admission.py \
+  ADMISSION.json EXPECTED_COMPACT_DIRECTORY_SHA256
+```
+
+The expected digest is the controller-retained identity of the bundle being
+reconciled. The consumer rejects an outcome without that exact identity and
+never reconstructs a decision from metrics.
 
 The first command explicitly runs every publication regression suite; adding a
 new required suite therefore also requires updating this documented list. The
