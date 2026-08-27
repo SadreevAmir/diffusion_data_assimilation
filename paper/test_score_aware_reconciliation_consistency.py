@@ -11,14 +11,22 @@ from paper.check_publication_artifacts import (
 )
 
 
+DIGEST = "0123456789abcdef" * 4
+FAMILIES_TRUE = (
+    "proper_score=true; reliability=true; boundary=true; "
+    "spatial_physical=true; operational=true"
+)
 POSITIVE = (
     "SCORE_AWARE_RESULT: status=RECONCILED_POSITIVE; "
     "experiment_id=score_aware_valid; candidate=score_aware_candidate; "
+    f"compact_directory_sha256={DIGEST}; {FAMILIES_TRUE}; "
     "overall_eligible=true"
 )
 NEGATIVE = (
     "SCORE_AWARE_RESULT: status=RECONCILED_NEGATIVE; "
     "experiment_id=score_aware_valid; candidate=score_aware_candidate; "
+    f"compact_directory_sha256={DIGEST}; proper_score=true; reliability=false; "
+    "boundary=true; spatial_physical=true; operational=true; "
     "overall_eligible=false"
 )
 
@@ -53,9 +61,23 @@ class ScoreAwareReconciliationConsistencyTests(unittest.TestCase):
                 POSITIVE, POSITIVE, NEGATIVE, POSITIVE, POSITIVE
             )
 
+    def test_cross_file_digest_substitution_fails_closed(self) -> None:
+        substituted = POSITIVE.replace(DIGEST, "f" * 64)
+        with self.assertRaisesRegex(ValueError, "markers disagree"):
+            validate_score_aware_reconciliation_consistency(
+                POSITIVE, POSITIVE, substituted, POSITIVE, POSITIVE
+            )
+
+    def test_cross_file_family_substitution_fails_closed(self) -> None:
+        substituted = NEGATIVE.replace("boundary=true", "boundary=false")
+        with self.assertRaisesRegex(ValueError, "markers disagree"):
+            validate_score_aware_reconciliation_consistency(
+                NEGATIVE, NEGATIVE, NEGATIVE, substituted, NEGATIVE
+            )
+
     def test_branch_boolean_contradiction_fails_closed(self) -> None:
         contradictory = POSITIVE.replace("overall_eligible=true", "overall_eligible=false")
-        with self.assertRaisesRegex(ValueError, "contradicts overall_eligible"):
+        with self.assertRaisesRegex(ValueError, "contradicts mandatory families"):
             validate_score_aware_reconciliation_consistency(*([contradictory] * 5))
 
     def test_pre_result_with_marker_fails_closed(self) -> None:

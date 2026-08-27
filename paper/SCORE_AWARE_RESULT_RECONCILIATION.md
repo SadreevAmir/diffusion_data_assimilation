@@ -98,8 +98,12 @@ update is not publication-ready.
   this file must name the same experiment, candidate and decision.
 - On reconciliation, each of those five files must contain exactly one identical
   machine-readable line of the form `SCORE_AWARE_RESULT: status=RECONCILED_POSITIVE;
-  experiment_id=<id>; candidate=<id>; overall_eligible=true` or its negative
-  counterpart. The pre-result state must contain no such line.
+  experiment_id=<id>; candidate=<id>;
+  compact_directory_sha256=<64-lowercase-hex>; proper_score=true;
+  reliability=true; boundary=true; spatial_physical=true; operational=true;
+  overall_eligible=true` or its negative counterpart with every authoritative
+  family Boolean copied literally. The pre-result state must contain no such
+  line.
 - Neither branch closes conformal, probabilistic-DA or deterministic-comparison
   evidence rows. Readiness is derived from the full blocker matrix, never from
   this result alone.

@@ -127,6 +127,16 @@ or authorization. This closes an autonomous result-transfer gap only: no
 literal trusted mode or scientific result exists, and all normative blockers
 remain open.
 
+The subsequent reconciliation audit strengthened that atomic marker from a
+decision label into an evidence-bound record. Every one of the five publication
+files must now repeat the same exact `compact_directory_sha256` and the literal
+Booleans for `proper_score`, `reliability`, `boundary`, `spatial_physical` and
+`operational`; `overall_eligible` must equal their conjunction and the selected
+branch must agree. Nine focused fixtures pass, including fail-closed rejection
+of a substituted digest and of a single substituted family decision. The full
+audit still passes with 61 required files, two figures, eight references and 39
+claims, and still derives `NOT_READY` from the unchanged blocker matrix.
+
 ## Unique cross-artifact closure routes
 
 Each blocker has exactly one frozen contract and one insertion route into the
