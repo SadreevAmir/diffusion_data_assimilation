@@ -97,6 +97,17 @@ coefficients, per-case risks and weights, source multiplicities, unique-member
 counts, effective sample sizes, copy/mask invariants and operational counts.
 No raw member, candidate or truth field is retrieved.
 
+The four compact files are exactly `case_selection.json`,
+`aggregate_selection.json`, `paired_uncertainty.json` and
+`gate_decision.json`.  Copy/mask invariant counts are carried in the aggregate.
+Before admission, the directory must pass
+`validate_score_aware_compact_outputs.py`: it independently recomputes weights,
+source multiplicities, unique-member counts and ESS from every case's recorded
+risks; reconciles all case totals with the aggregate; binds the operational
+family to bitwise-copy and mask invariants; and requires `overall_eligible` to
+equal the conjunction of all five no-compensation families.  Extra files,
+schema drift or any cross-file disagreement fail closed.
+
 There is intentionally no experiment proposal or invented mode identifier.
 Admission requires a literal trusted mode plus independent parity and fail-closed
 checks.  This document freezes the mechanism before either prerequisite result

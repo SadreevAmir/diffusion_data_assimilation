@@ -567,7 +567,8 @@ python3 -m unittest -v \
   paper.test_atomic_publish \
   paper.test_raw_member_reweighting_reference \
   paper.test_score_aware_raw_reweighting_reference \
-  paper.test_validate_score_aware_raw_reweighting_admission
+  paper.test_validate_score_aware_raw_reweighting_admission \
+  paper.test_validate_score_aware_compact_outputs
 python3 paper/check_publication_artifacts.py
 ```
 
@@ -587,6 +588,18 @@ ridge fit and held-out predictions numerically.  Missing `numpy` is fail-closed
 for decision-bearing admission rather than a skipped parity claim.  Passing the
 local reference itself is only a validator self-test: admission still requires
 a controller-visible literal mode and the separately reviewed trusted runner.
+
+The same admission must validate the exact four-file compact result directory:
+
+```bash
+python3 paper/validate_score_aware_compact_outputs.py COMPACT_DIRECTORY
+```
+
+This check recomputes every risk-derived weight, selection, multiplicity,
+unique-member count and ESS; reconciles aggregate copy/mask counts and paired-
+score point estimates; and requires the operational and overall gate decisions
+to agree with recorded invariants and all five mandatory families. It rejects
+extra files and does not read raw ensembles.
 
 The first command explicitly runs every publication regression suite; adding a
 new required suite therefore also requires updating this documented list. The

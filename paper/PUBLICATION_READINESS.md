@@ -31,8 +31,8 @@ another row.
 
 The publication-readiness trigger was independently rerun against the current
 worktree on 2026-08-27. The fail-closed command
-`python3 paper/check_publication_artifacts.py` passed with exactly 57 required
-files, two parseable linked figures, eight traceable references and 39
+`python3 paper/check_publication_artifacts.py` audit passed with 59 required files,
+two parseable linked figures, eight traceable references and 39
 contiguous claim-ledger records. A separate unfinished-text scan found no
 `TODO`, `TBD`, `FIXME` or `PLACEHOLDER` marker in the Markdown publication
 artifacts. The worktree was clean before this audit note was added.
@@ -96,6 +96,16 @@ risk ranges remain finite.  The suite and both source artifacts are now required
 by the unified publication checker.  This is an admission prerequisite only:
 there is still no literal trusted mode, no scientific result and no change to
 `NOT_READY`.
+
+The subsequent compact-output parity audit closes the remaining directory-level
+handoff gap for that contingent mechanism.  The new fail-closed validator
+requires exactly four compact files, recomputes each case's risk weights,
+systematic selections, multiplicities, unique-member count and ESS, reconciles
+copy/mask and paired-score aggregates, and binds `overall_eligible` to the
+conjunction of all five mandatory gate families.  Negative fixtures cover
+weight, ESS, aggregate, uncertainty, invariant, gate and extra-file drift.  This
+is still only an admission prerequisite: no literal trusted mode or scientific
+result exists, and publication status remains `NOT_READY`.
 
 ## Unique cross-artifact closure routes
 
