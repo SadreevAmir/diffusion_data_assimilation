@@ -16,6 +16,7 @@ from paper.validate_score_aware_raw_reweighting_admission import (
     validate_record,
     validate_semantic_parity,
 )
+from paper.check_publication_artifacts import validate_score_aware_reconciliation_consistency
 from paper.test_validate_score_aware_compact_outputs import CompactDirectoryTests, valid_payloads
 from paper.validate_score_aware_compact_outputs import directory_sha256
 
@@ -81,7 +82,51 @@ class AdmissionTests(unittest.TestCase):
                 with self.assertRaisesRegex(RuntimeError, "numpy is required"):
                     load_and_validate(path, REFERENCE, directory)
             else:
-                self.assertEqual(load_and_validate(path, REFERENCE, directory), record(REFERENCE, directory)["reviewed_mode"])
+                result = load_and_validate(path, REFERENCE, directory)
+                self.assertEqual(result.reviewed_mode, record(REFERENCE, directory)["reviewed_mode"])
+
+    def test_combined_admission_identity_drives_reconciled_marker(self):
+        directory = self.compact_directory()
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "admission.json"
+            path.write_text(json.dumps(record(REFERENCE, directory), sort_keys=True), encoding="utf-8")
+            with patch(
+                "paper.validate_score_aware_raw_reweighting_admission.validate_semantic_parity"
+            ):
+                result = load_and_validate(path, REFERENCE, directory)
+            self.assertEqual(result.admission_record_sha256, digest(path))
+            marker = (
+                "SCORE_AWARE_RESULT: status=RECONCILED_NEGATIVE; "
+                "experiment_id=score_aware_valid; candidate=score_aware_raw; "
+                f"admission_record_sha256={result.admission_record_sha256}; "
+                f"compact_directory_sha256={result.compact_directory_sha256}; "
+                "completed_cases=40; ensemble_size=10; proper_score=false; "
+                "reliability=true; boundary=true; spatial_physical=true; "
+                "operational=true; overall_eligible=false"
+            )
+            reconciliation = "Status: RECONCILED_NEGATIVE\n" + marker
+            validate_score_aware_reconciliation_consistency(
+                marker, marker, marker, marker, reconciliation
+            )
+
+    def test_admission_record_substitution_during_combined_admission_fails_closed(self):
+        directory = self.compact_directory()
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "admission.json"
+            frozen = record(REFERENCE, directory)
+            path.write_text(json.dumps(frozen), encoding="utf-8")
+
+            def mutate_record(_directory: Path) -> None:
+                path.write_text(json.dumps(frozen, indent=2), encoding="utf-8")
+
+            with patch(
+                "paper.validate_score_aware_raw_reweighting_admission.validate_directory",
+                side_effect=mutate_record,
+            ), patch(
+                "paper.validate_score_aware_raw_reweighting_admission.validate_semantic_parity"
+            ):
+                with self.assertRaisesRegex(ValueError, "admission record changed"):
+                    load_and_validate(path, REFERENCE, directory)
 
     def test_post_admission_file_substitution_fails_closed(self):
         directory = self.compact_directory()

@@ -140,6 +140,19 @@ admission identity, completed counts and a single family decision. The full
 audit still passes with 61 required files, two figures, eight references and 39
 claims, and still derives `NOT_READY` from the unchanged blocker matrix.
 
+The next end-to-end provenance audit removes the remaining manual identity
+transfer. Combined admission now emits the SHA-256 of the exact admission JSON
+and compact directory that survived the same fail-closed operation, and it
+rejects replacement of either input before returning. An integration fixture
+uses those emitted identities to construct the canonical reconciliation marker;
+a separate negative fixture substitutes the admission JSON during admission.
+The focused admission/reconciliation suite passes 26 tests, the unified audit
+again passes with 61 required files, two figures, eight references and 39
+claims, and `git diff --check` reports no whitespace errors. This closes a
+reproducibility handoff gap only; it does not supply an eligible calibration or
+either missing minimum-tier comparison, so publication status remains
+`NOT_READY`.
+
 ## Unique cross-artifact closure routes
 
 Each blocker has exactly one frozen contract and one insertion route into the

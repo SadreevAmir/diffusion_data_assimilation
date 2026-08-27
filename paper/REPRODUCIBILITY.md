@@ -583,6 +583,13 @@ also binds the SHA-256 identity of the exact admission JSON and requires the
 complete frozen 40-case, 10-member envelope; agreement on incomplete counts is
 rejected rather than treated as successful reconciliation.
 
+The combined admission command emits one sorted JSON object containing
+`reviewed_mode`, `admission_record_sha256` and `compact_directory_sha256`.
+Both digests are outputs of the same operation that performs semantic and
+compact-payload admission; the command rereads both inputs before returning and
+fails if either changed. The reconciliation marker must copy these emitted
+identities, not recompute or manually infer them in a later step.
+
 Before any future literal score-aware mode can become decision-bearing, its
 reviewed runner and exact admission JSON must pass semantic parity with the
 frozen oracle:

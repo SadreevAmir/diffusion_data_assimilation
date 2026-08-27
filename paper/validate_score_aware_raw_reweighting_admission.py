@@ -8,6 +8,7 @@ import hashlib
 import importlib.util
 import json
 import math
+from dataclasses import dataclass
 from pathlib import Path
 
 try:
@@ -37,6 +38,15 @@ SELECTION_VECTORS = (
     [0.0, 0.0, 1.0, 1.0, 2.0, 2.0, 3.0, 3.0, 4.0, 4.0],
     [1000.0, -1000.0, 50.0, -50.0, 3.0, 2.0, 1.0, 0.0, -1.0, -2.0],
 )
+
+
+@dataclass(frozen=True)
+class AdmissionResult:
+    """Identities produced by the same fail-closed operation that admits a run."""
+
+    reviewed_mode: str
+    admission_record_sha256: str
+    compact_directory_sha256: str
 
 
 def _sha256(path: Path) -> str:
@@ -127,15 +137,23 @@ def validate_semantic_parity(runner: Path) -> None:
     _assert_nested_close(module.predict_member_risks(actual_model, heldout), reference.predict_member_risks(expected_model, heldout), "prediction")
 
 
-def load_and_validate(record_path: Path, runner: Path, compact_directory: Path) -> str:
-    record = json.loads(record_path.read_text(encoding="utf-8"))
+def load_and_validate(record_path: Path, runner: Path, compact_directory: Path) -> AdmissionResult:
+    admitted_record_bytes = record_path.read_bytes()
+    record = json.loads(admitted_record_bytes.decode("utf-8"))
+    admitted_record_digest = hashlib.sha256(admitted_record_bytes).hexdigest()
     admitted_digest = directory_sha256(compact_directory)
     mode = validate_record(record, runner, compact_directory)
     validate_semantic_parity(runner)
     validate_directory(compact_directory)
     if directory_sha256(compact_directory) != admitted_digest:
         raise ValueError("compact directory changed during combined admission")
-    return mode
+    if record_path.read_bytes() != admitted_record_bytes:
+        raise ValueError("admission record changed during combined admission")
+    return AdmissionResult(
+        reviewed_mode=mode,
+        admission_record_sha256=admitted_record_digest,
+        compact_directory_sha256=admitted_digest,
+    )
 
 
 def main() -> None:
@@ -144,7 +162,8 @@ def main() -> None:
     parser.add_argument("runner", type=Path)
     parser.add_argument("compact_directory", type=Path)
     args = parser.parse_args()
-    print(f"reviewed_mode={load_and_validate(args.record, args.runner, args.compact_directory)}")
+    result = load_and_validate(args.record, args.runner, args.compact_directory)
+    print(json.dumps(result.__dict__, sort_keys=True))
 
 
 if __name__ == "__main__":
