@@ -96,3 +96,12 @@ There is intentionally no experiment proposal or invented mode identifier.
 This contingent contract is frozen before the first rank-coherent result; a
 reviewed trusted mode and parity checks remain ordinary autonomous engineering
 work if and only if the activation condition is met.
+
+The dependency-free oracle `raw_member_reweighting_reference.py` makes the
+ten-bin smoothing, endpoint handling, midpoint inverse-CDF selection,
+multiplicity accounting and effective-sample-size calculation executable
+without reading project data. Its focused tests prove the identity result for
+one analog rank in every bin, freeze the exact repeated-member selection for a
+maximally concentrated analog library, and reject incomplete, non-finite or
+out-of-range rank inputs. It is a construction oracle, not an experiment entry
+point or decision-bearing runner.
