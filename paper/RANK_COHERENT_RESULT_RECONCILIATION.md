@@ -24,6 +24,14 @@ admission and derivation itself, rejects an absent, duplicated or different line
 before writing, and uses prepare-first replacement with rollback across all five
 surfaces.
 
+`rank_coherent_publication_renderer.py` removes the remaining manual content
+transfer. It reruns combined admission, reads experiment/candidate identity from
+the admitted metadata, renders every aggregate effect size with both compact
+uncertainty intervals, and emits the five literal family decisions. A negative
+branch names every failed family and states that cross-family compensation and
+blocker closure are forbidden. The resulting complete replacements remain
+subject to `publish_reconciliation`; renderer output alone does not write files.
+
 ## Fail-closed consistency rules
 
 - `canonical_marker` invokes combined admission itself and constructs a marker

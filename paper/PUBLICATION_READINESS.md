@@ -218,6 +218,20 @@ trusted mode or scientific result; status remains `NOT_READY`.
 The expanded unified audit passed with 64 required files after the executable
 reconciliation fixtures were added.
 
+The compact-to-publication transition is now renderer-backed rather than
+caller-authored. After rerunning combined admission, the renderer extracts the
+compact-bound experiment and candidate identifiers, all aggregate effect sizes,
+both paired uncertainty intervals and the five literal family decisions. It
+creates complete replacements for all five reconciliation surfaces and, for a
+negative branch, names every failed family while explicitly preserving the
+blocker. Four focused fixtures cover successful rendering, a missing proper-score
+effect size, caller text that understates a failed family and an attempted
+negative-branch blocker closure. This closes a local result-transfer gap only;
+there is no new decision-bearing result and publication status remains
+`NOT_READY`.
+The unified audit passed with 66 required files, two figures, eight references
+and 39 claims after the renderer and its fixtures became mandatory.
+
 ## Unique cross-artifact closure routes
 
 Each blocker has exactly one frozen contract and one insertion route into the
