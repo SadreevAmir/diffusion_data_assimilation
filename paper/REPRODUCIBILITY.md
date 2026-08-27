@@ -578,18 +578,19 @@ frozen oracle:
 
 ```bash
 python3 paper/validate_score_aware_raw_reweighting_admission.py \
-  ADMISSION.json TRUSTED_RUNNER.py
+  ADMISSION.json TRUSTED_RUNNER.py COMPACT_DIRECTORY
 ```
 
-The validator binds the runner, frozen contract and independent reference by
-SHA-256, rejects any deviation, compares all frozen constants and callable API,
+The v2 validator binds the runner, frozen contract, independent reference and
+the exact four-file compact directory by SHA-256, rejects any deviation,
+compares all frozen constants and callable API,
 exercises tie/extreme-risk systematic-selection fixtures, and compares the
 ridge fit and held-out predictions numerically.  Missing `numpy` is fail-closed
 for decision-bearing admission rather than a skipped parity claim.  Passing the
 local reference itself is only a validator self-test: admission still requires
 a controller-visible literal mode and the separately reviewed trusted runner.
 
-The same admission must validate the exact four-file compact result directory:
+For diagnostic isolation, the directory parity component can also be run alone:
 
 ```bash
 python3 paper/validate_score_aware_compact_outputs.py COMPACT_DIRECTORY
@@ -600,6 +601,11 @@ unique-member count and ESS; reconciles aggregate copy/mask counts and paired-
 score point estimates; and requires the operational and overall gate decisions
 to agree with recorded invariants and all five mandatory families. It rejects
 extra files and does not read raw ensembles.
+The decision-bearing combined command additionally uses length-framed filenames
+and exact payload bytes to compute one `compact_directory_sha256`, validates
+semantic and cross-file parity in the same process, and recomputes the digest at
+the end.  Integration fixtures mutate a semantically valid file both before and
+after semantic admission; both substitutions fail closed.
 
 The first command explicitly runs every publication regression suite; adding a
 new required suite therefore also requires updating this documented list. The

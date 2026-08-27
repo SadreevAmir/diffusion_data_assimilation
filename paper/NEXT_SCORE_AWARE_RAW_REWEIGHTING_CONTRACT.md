@@ -108,6 +108,15 @@ family to bitwise-copy and mask invariants; and requires `overall_eligible` to
 equal the conjunction of all five no-compensation families.  Extra files,
 schema drift or any cross-file disagreement fail closed.
 
+The controller-visible admission record uses
+`score-aware-raw-reweighting-admission-v2` and contains one
+`compact_directory_sha256`.  That digest frames each lexicographically ordered
+filename, filename length, payload length and exact payload bytes, so it binds
+both the four-file membership and the filename-to-content mapping.  Combined
+admission validates the runner semantics and directory parity in one process,
+then recomputes the directory digest; a substitution before or during admission
+fails closed even when the replacement JSON is semantically valid.
+
 There is intentionally no experiment proposal or invented mode identifier.
 Admission requires a literal trusted mode plus independent parity and fail-closed
 checks.  This document freezes the mechanism before either prerequisite result

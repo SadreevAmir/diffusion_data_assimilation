@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
 from pathlib import Path
@@ -22,6 +23,22 @@ FILES = {
     "gate": "gate_decision.json",
 }
 FAMILIES = ("proper_score", "reliability", "boundary", "spatial_physical", "operational")
+
+
+def directory_sha256(directory: Path) -> str:
+    """Bind the exact four-file directory with an unambiguous byte framing."""
+    observed = {path.name for path in directory.iterdir() if path.is_file()}
+    if observed != set(FILES.values()):
+        raise ValueError("compact directory must contain exactly the four frozen files")
+    digest = hashlib.sha256()
+    for filename in sorted(FILES.values()):
+        name = filename.encode("utf-8")
+        payload = (directory / filename).read_bytes()
+        digest.update(len(name).to_bytes(4, "big"))
+        digest.update(name)
+        digest.update(len(payload).to_bytes(8, "big"))
+        digest.update(payload)
+    return digest.hexdigest()
 
 
 def _load_exact(directory: Path) -> dict[str, object]:

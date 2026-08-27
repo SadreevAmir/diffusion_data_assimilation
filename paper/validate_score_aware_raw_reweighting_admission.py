@@ -12,8 +12,10 @@ from pathlib import Path
 
 try:
     from . import score_aware_raw_reweighting_reference as reference
+    from .validate_score_aware_compact_outputs import directory_sha256, validate_directory
 except ImportError:  # Keep direct script execution stable.
     import score_aware_raw_reweighting_reference as reference
+    from validate_score_aware_compact_outputs import directory_sha256, validate_directory
 
 
 PAPER_DIR = Path(__file__).resolve().parent
@@ -26,6 +28,7 @@ REQUIRED_KEYS = {
     "runner_sha256",
     "contract_sha256",
     "reference_sha256",
+    "compact_directory_sha256",
     "decision_bearing_validation",
     "deviations",
 }
@@ -46,10 +49,10 @@ def _require_digest(value: object, name: str) -> str:
     return value
 
 
-def validate_record(record: object, runner: Path) -> str:
+def validate_record(record: object, runner: Path, compact_directory: Path) -> str:
     if not isinstance(record, dict) or set(record) != REQUIRED_KEYS:
         raise ValueError("admission record must be one exact-schema JSON object")
-    if record["schema_version"] != "score-aware-raw-reweighting-admission-v1":
+    if record["schema_version"] != "score-aware-raw-reweighting-admission-v2":
         raise ValueError("unsupported admission schema_version")
     mode = record["reviewed_mode"]
     if not isinstance(mode, str) or not mode.startswith("validation_") or not mode.strip():
@@ -65,6 +68,7 @@ def validate_record(record: object, runner: Path) -> str:
         "runner_sha256": _sha256(runner),
         "contract_sha256": _sha256(CONTRACT),
         "reference_sha256": _sha256(REFERENCE),
+        "compact_directory_sha256": directory_sha256(compact_directory),
     }
     for key, digest in expected.items():
         if _require_digest(record[key], key) != digest:
@@ -123,10 +127,14 @@ def validate_semantic_parity(runner: Path) -> None:
     _assert_nested_close(module.predict_member_risks(actual_model, heldout), reference.predict_member_risks(expected_model, heldout), "prediction")
 
 
-def load_and_validate(record_path: Path, runner: Path) -> str:
+def load_and_validate(record_path: Path, runner: Path, compact_directory: Path) -> str:
     record = json.loads(record_path.read_text(encoding="utf-8"))
-    mode = validate_record(record, runner)
+    admitted_digest = directory_sha256(compact_directory)
+    mode = validate_record(record, runner, compact_directory)
     validate_semantic_parity(runner)
+    validate_directory(compact_directory)
+    if directory_sha256(compact_directory) != admitted_digest:
+        raise ValueError("compact directory changed during combined admission")
     return mode
 
 
@@ -134,8 +142,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Fail-closed score-aware runner admission.")
     parser.add_argument("record", type=Path)
     parser.add_argument("runner", type=Path)
+    parser.add_argument("compact_directory", type=Path)
     args = parser.parse_args()
-    print(f"reviewed_mode={load_and_validate(args.record, args.runner)}")
+    print(f"reviewed_mode={load_and_validate(args.record, args.runner, args.compact_directory)}")
 
 
 if __name__ == "__main__":

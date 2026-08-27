@@ -107,6 +107,16 @@ weight, ESS, aggregate, uncertainty, invariant, gate and extra-file drift.  This
 is still only an admission prerequisite: no literal trusted mode or scientific
 result exists, and publication status remains `NOT_READY`.
 
+The integrated v2 admission audit closes the subsequent time-of-check gap.  A
+single length-framed SHA-256 now binds the exact names and bytes of all four
+compact files alongside the runner, frozen contract and independent reference.
+The combined validator performs semantic parity, full compact cross-file parity
+and a final digest recheck in one process.  Integration fixtures reject both a
+pre-admission semantically valid reserialization and substitution immediately
+after semantic admission.  This strengthens evidence admission only: a literal
+trusted mode and an eligible scientific result are still absent, so status
+remains `NOT_READY`.
+
 ## Unique cross-artifact closure routes
 
 Each blocker has exactly one frozen contract and one insertion route into the
