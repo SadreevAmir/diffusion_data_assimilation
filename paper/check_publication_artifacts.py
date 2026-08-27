@@ -1015,6 +1015,17 @@ DECISION_PRESENTATION_OBJECT_ANCHORS = {
         "| Overall no-compensation gate | — | false | Independent primary is rejected |",
     ),
 }
+DECISION_PRESENTATION_CLAIMS = {
+    "global-spread": frozenset({8, 11, 12, 13, 14, 15, 16, 18, 19, 20}),
+    "hurdle-IDR/ECC-Q": frozenset({21, 22}),
+    "projected-spread": frozenset({23, 24, 25}),
+    "open-logit": frozenset({26, 27}),
+    "ZOIB-EMOS/ECC-Q": frozenset({28, 29}),
+    "later-mechanism-family": frozenset({17, 30, 31, 32, 33, 34, 35, 37}),
+    "amended-primary-policy": frozenset({36}),
+    "locked-MC-dropout": frozenset({38}),
+    "independent-primary": frozenset({39}),
+}
 DECISION_PRESENTATION_ROW = re.compile(
     r"^\| `(?P<unit>[^`]+)` \| (?P<presentation>[^|]+) \| "
     r"(?P<decision>[^|]+) \| (?P<uncertainty>[^|]+) \|$",
@@ -1466,6 +1477,24 @@ def validate_empirical_traceability(manuscript: str, paper_dir: Path) -> None:
         set(DECISION_PRESENTATION_OBJECT_ANCHORS) == set(observed),
         "decision presentation anchor contract does not cover every audited unit",
     )
+    require(
+        set(DECISION_PRESENTATION_CLAIMS) == set(observed),
+        "decision presentation claim contract does not cover every audited unit",
+    )
+    claim_owners: dict[int, str] = {}
+    for unit, claim_ids in DECISION_PRESENTATION_CLAIMS.items():
+        require(claim_ids, f"decision presentation unit has no claim IDs: {unit}")
+        require(
+            claim_ids <= EMPIRICAL_CLAIM_IDS,
+            f"decision presentation unit contains unknown claim IDs: {unit}",
+        )
+        for claim_id in claim_ids:
+            require(
+                claim_id not in claim_owners,
+                f"decision presentation claim C{claim_id} is assigned to both "
+                f"{claim_owners.get(claim_id)} and {unit}",
+            )
+            claim_owners[claim_id] = unit
     for unit, anchors in DECISION_PRESENTATION_OBJECT_ANCHORS.items():
         missing = [anchor for anchor in anchors if anchor not in manuscript]
         require(

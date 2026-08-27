@@ -69,6 +69,19 @@ class EmpiricalTraceabilityTests(unittest.TestCase):
         ):
             validate_empirical_traceability(mutated, PAPER_DIR)
 
+    def test_substituted_later_mechanism_status_fails_closed(self) -> None:
+        mutated = self.manuscript.replace(
+            "| IID calendar global-bias mixture | Fail | Pass | Pass | Pass | Pass | Fail |",
+            "| IID calendar global-bias mixture | Fail | Pass | Pass | Pass | Pass | Pass |",
+            1,
+        )
+        self.assertNotEqual(mutated, self.manuscript)
+        with self.assertRaisesRegex(
+            ValueError,
+            "decision presentation object content mismatch for later-mechanism-family",
+        ):
+            validate_empirical_traceability(mutated, PAPER_DIR)
+
     def test_negative_result_cannot_be_promoted(self) -> None:
         mutated = self.manuscript.replace(
             "| `open-logit` | Open-logit table | Negative |",
