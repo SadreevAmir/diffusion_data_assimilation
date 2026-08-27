@@ -16,6 +16,24 @@ class RawMemberReweightingReferenceTest(unittest.TestCase):
         self.assertEqual(result["source_raw_member_indices"], [0] * 7 + [2, 5, 8])
         self.assertAlmostEqual(sum(result["analog_rank_probabilities"]), 1.0)
 
+    def test_rank_positions_resolve_through_mean_order_with_index_ties(self):
+        means = [0.8, 0.2, 0.2, 0.9, 0.5, 0.4, 0.7, 0.0, 1.0, 0.6]
+        result = construct_selection(
+            [(index + 0.5) / 10 for index in range(10)], means
+        )
+        self.assertEqual(result["selected_rank_positions"], list(range(10)))
+        self.assertEqual(
+            result["source_raw_member_indices"], [7, 1, 2, 5, 4, 9, 6, 0, 3, 8]
+        )
+        self.assertEqual(result["source_multiplicities"], [1] * 10)
+
+    def test_invalid_raw_member_means_fail_closed(self):
+        ranks = [(index + 0.5) / 10 for index in range(10)]
+        for means in ([0.5] * 9, [0.5] * 9 + [float("inf")], [0.5] * 9 + [True]):
+            with self.subTest(means=means):
+                with self.assertRaises(ValueError):
+                    construct_selection(ranks, means)
+
     def test_invalid_rank_fails_closed(self):
         for ranks in ([0.5] * 9, [0.5] * 9 + [float("nan")], [0.5] * 9 + [1.1]):
             with self.subTest(ranks=ranks):

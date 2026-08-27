@@ -74,14 +74,37 @@ def selection_diagnostics(positions):
     }
 
 
-def construct_selection(normalized_ranks):
+def rank_positions_to_member_indices(raw_member_case_means, positions):
+    """Resolve selected rank positions using the frozen mean/index ordering."""
+    means = list(raw_member_case_means)
+    if len(means) != RANKS:
+        raise ValueError("exactly ten raw-member case means are required")
+    checked_means = []
+    for value in means:
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise ValueError("raw-member case means must be numeric")
+        value = float(value)
+        if not math.isfinite(value):
+            raise ValueError("raw-member case means must be finite")
+        checked_means.append(value)
+    checked_positions = list(positions)
+    selection_diagnostics(checked_positions)
+    ordered_members = sorted(range(RANKS), key=lambda index: (checked_means[index], index))
+    return [ordered_members[position] for position in checked_positions]
+
+
+def construct_selection(normalized_ranks, raw_member_case_means=None):
     counts, probabilities = analog_rank_probabilities(normalized_ranks)
     positions = systematic_rank_positions(probabilities)
+    source_indices = positions
+    if raw_member_case_means is not None:
+        source_indices = rank_positions_to_member_indices(raw_member_case_means, positions)
     return {
         "analog_rank_bin_counts": counts,
         "analog_rank_probabilities": probabilities,
-        "source_raw_member_indices": positions,
-        **selection_diagnostics(positions),
+        "selected_rank_positions": positions,
+        "source_raw_member_indices": source_indices,
+        **selection_diagnostics(source_indices),
     }
 
 

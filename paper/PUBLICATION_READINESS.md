@@ -55,6 +55,16 @@ silently removed or drifting untested while the prose contract remains. The
 change strengthens a contingent trusted-runner handoff only; it supplies no
 decision-bearing result and leaves publication status `NOT_READY`.
 
+A subsequent executable parity audit found that this oracle stopped at selected
+rank positions and therefore did not encode the contract's final mapping through
+the held-out raw-member case-mean ordering. That distinction is decision-relevant
+when member order differs from mean order or case means tie. The oracle now
+performs the exact mean-then-member-index ordering, reports rank positions
+separately from source raw-member indices, rejects malformed or non-finite means,
+and tests a permuted ordering containing a tie. This closes a future trusted-
+runner parity gap only; it does not activate the contingent method or change
+`NOT_READY`.
+
 ## Unique cross-artifact closure routes
 
 Each blocker has exactly one frozen contract and one insertion route into the
