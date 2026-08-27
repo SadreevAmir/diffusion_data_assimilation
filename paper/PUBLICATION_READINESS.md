@@ -1,5 +1,19 @@
 # Publication readiness audit
 
+The dependency-limited score-aware boundary was rerun independently on
+2026-08-27 with the four documented reference, admission, compact-directory and
+reconciliation modules.  It ran 51 tests: 43 passed and eight were explicit
+NumPy-only skips.  Five skips are numerical reference-oracle fixtures; the
+other three are admission-divergence fixtures that exercise the same numerical
+training-row parity.  This distinction supersedes the ambiguous shorthand
+"five NumPy-dependent checks": five is the unresolved oracle count, while eight
+is the skip count for this complete four-module boundary.  The exact same
+worktree then passed the mandatory unified audit with 79 required files, two
+figures, eight references and 39 claims.  NumPy remains unavailable in the
+installed local runtime, so none of the eight skipped paths is represented as
+executed evidence.  All decision-bearing admission remains fail closed, and
+the scientific status stays `NOT_READY`.
+
 The independent predictor-construction audit now includes numerical oracle
 fixtures for every one of the thirteen ordered score-aware descriptors on a
 non-square, spatially weighted grid.  The oracle uses explicit scalar loops for
