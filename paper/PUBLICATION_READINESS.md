@@ -1,5 +1,20 @@
 # Publication readiness audit
 
+The independent predictor-construction audit now includes numerical oracle
+fixtures for every one of the thirteen ordered score-aware descriptors on a
+non-square, spatially weighted grid.  The oracle uses explicit scalar loops for
+weighted means and both directional semivariograms rather than the reference
+helpers.  Separate fixtures independently reconstruct the spatially weighted
+MAE-plus-0.25-MSE target and prove that changing held-out truth leaves all
+forecast-only predictors bitwise unchanged while changing the truth-derived
+targets.  In the minimal local runtime these three numerical fixtures are
+dependency-only skips because `numpy` is unavailable; the remaining focused
+score-aware suite passed 30 tests with eight total dependency-only skips.  The
+mandatory unified audit, which includes this module, passed with 79 required
+files, two figures, eight references and 39 claims.  The fixtures close a local
+test-design gap but do not create trusted scientific evidence, so publication
+status remains `NOT_READY`.
+
 The score-aware runner admission boundary now independently exercises both the
 positional cross-fitting semantics and exact training-row construction that the
 compact validator expects. The reference exposes the frozen forty-case,

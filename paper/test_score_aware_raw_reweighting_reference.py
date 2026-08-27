@@ -6,6 +6,7 @@ except ModuleNotFoundError:
     np = None
 
 from paper.score_aware_raw_reweighting_reference import (
+    build_case_rows,
     fit_fold_ridge,
     predict_member_risks,
     select_raw_scenarios,
@@ -20,6 +21,110 @@ class ScoreAwareRawReweightingReferenceTest(unittest.TestCase):
         columns = np.arange(1, 14, dtype=float)[None, :]
         self.design = np.sin(rows / columns) + rows * columns / 1000.0
         self.targets = 0.2 + self.design @ np.linspace(-0.1, 0.1, 13)
+
+    @staticmethod
+    def _manual_weighted_mean(field, weights):
+        numerator = sum(
+            float(field[row, column]) * float(weights[row, column])
+            for row in range(field.shape[0])
+            for column in range(field.shape[1])
+        )
+        return numerator / sum(float(value) for value in weights.flat)
+
+    @classmethod
+    def _manual_semivariogram(cls, field, weights, lag):
+        numerator = 0.0
+        denominator = 0.0
+        rows, columns = field.shape
+        for row in range(rows):
+            for column in range(columns - lag):
+                pair_weight = 0.5 * (
+                    float(weights[row, column]) + float(weights[row, column + lag])
+                )
+                increment = float(field[row, column + lag] - field[row, column])
+                numerator += pair_weight * 0.5 * increment**2
+                denominator += pair_weight
+        for row in range(rows - lag):
+            for column in range(columns):
+                pair_weight = 0.5 * (
+                    float(weights[row, column]) + float(weights[row + lag, column])
+                )
+                increment = float(field[row + lag, column] - field[row, column])
+                numerator += pair_weight * 0.5 * increment**2
+                denominator += pair_weight
+        return numerator / denominator
+
+    @classmethod
+    def _manual_descriptors(cls, field, weights):
+        mean = cls._manual_weighted_mean(field, weights)
+        variance = cls._manual_weighted_mean((field - mean) ** 2, weights)
+        return (
+            mean,
+            cls._manual_weighted_mean(field >= 0.15, weights),
+            mean,
+            variance**0.5,
+            cls._manual_semivariogram(field, weights, 1),
+            cls._manual_semivariogram(field, weights, 4),
+        )
+
+    def _asymmetric_case(self):
+        rows, columns = np.indices((5, 6), dtype=float)
+        weights = 1.0 + 0.7 * rows + 0.13 * columns + 0.03 * rows * columns
+        members = np.stack(
+            [
+                np.clip(
+                    0.025 * (index + 1)
+                    + 0.031 * rows**2
+                    + 0.019 * columns
+                    + 0.004 * (index + 1) * rows * columns,
+                    0.0,
+                    1.0,
+                )
+                for index in range(10)
+            ]
+        )
+        truth = np.clip(0.09 + 0.021 * rows + 0.047 * columns**1.5, 0.0, 1.0)
+        return members, truth, weights
+
+    def test_all_thirteen_predictors_match_independent_asymmetric_grid_oracle(self):
+        if np is None:
+            self.skipTest("numpy is not installed in the minimal local environment")
+        members, truth, weights = self._asymmetric_case()
+        actual = build_case_rows(members, truth, weights)["predictors"]
+        raw_mean = members.mean(axis=0)
+        case_descriptors = self._manual_descriptors(raw_mean, weights)
+        mean_area = self._manual_weighted_mean(raw_mean, weights)
+
+        for member_index, member in enumerate(members):
+            expected = self._manual_descriptors(member, weights) + (
+                abs(self._manual_weighted_mean(member, weights) - mean_area),
+            ) + case_descriptors
+            for column, value in enumerate(expected):
+                with self.subTest(member=member_index, predictor_column=column):
+                    self.assertAlmostEqual(actual[member_index, column], value, places=13)
+
+    def test_spatial_weight_target_matches_manual_oracle(self):
+        if np is None:
+            self.skipTest("numpy is not installed in the minimal local environment")
+        members, truth, weights = self._asymmetric_case()
+        actual = build_case_rows(members, truth, weights)["targets"]
+        for member_index, member in enumerate(members):
+            error = member - truth
+            expected = self._manual_weighted_mean(abs(error), weights) + 0.25 * self._manual_weighted_mean(
+                error**2, weights
+            )
+            with self.subTest(member=member_index):
+                self.assertAlmostEqual(actual[member_index], expected, places=13)
+
+    def test_forecast_predictors_are_invariant_to_heldout_truth(self):
+        if np is None:
+            self.skipTest("numpy is not installed in the minimal local environment")
+        members, truth, weights = self._asymmetric_case()
+        first = build_case_rows(members, truth, weights)
+        altered_truth = np.flipud(1.0 - truth)
+        second = build_case_rows(members, altered_truth, weights)
+        np.testing.assert_array_equal(first["predictors"], second["predictors"])
+        self.assertFalse(np.array_equal(first["targets"], second["targets"]))
 
     def test_fit_is_deterministic_and_intercept_is_unpenalized(self):
         if np is None:
