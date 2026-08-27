@@ -27,6 +27,25 @@ another row.
 | Probabilistic DA baseline such as EnKF/LETKF | `MINIMUM_TIER_COMPARISON_AUDIT.md` | MISSING | The corresponding normative comparison row becomes decision-bearing after valid trusted execution |
 | Independent-strength deterministic background and 3D-Var | `MINIMUM_TIER_COMPARISON_AUDIT.md` | PRESENT_DEVELOPMENT_ONLY | A frozen common-information comparison supplies evidence at the manuscript's required independent strength |
 
+## Independent audit snapshot
+
+The publication-readiness trigger was independently rerun against the current
+worktree on 2026-08-27. The fail-closed command
+`python3 paper/check_publication_artifacts.py` passed with exactly 50 required
+files, two parseable linked figures, eight traceable references and 39
+contiguous claim-ledger records. A separate unfinished-text scan found no
+`TODO`, `TBD`, `FIXME` or `PLACEHOLDER` marker in the Markdown publication
+artifacts. The worktree was clean before this audit note was added.
+
+This is a consistency and reproducibility result, not a scientific result. It
+does not change any evidence state in the blocker matrix and cannot support
+`READY_FOR_HUMAN_REVIEW`. The next decision-bearing development action remains
+fail-closed admission of the frozen rank-coherent mechanism: only a
+controller-visible record with a literal reviewed mode and a trusted synthetic
+directory accepted with `decision_bearing=True` may authorize one full CPU
+proposal. Until then, no implemented negative baseline is repeated and no mode
+identifier is invented.
+
 ## Unique cross-artifact closure routes
 
 Each blocker has exactly one frozen contract and one insertion route into the
