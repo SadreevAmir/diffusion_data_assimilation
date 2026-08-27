@@ -12,6 +12,7 @@ from paper.check_publication_artifacts import (
 
 
 DIGEST = "0123456789abcdef" * 4
+ADMISSION_DIGEST = "fedcba9876543210" * 4
 FAMILIES_TRUE = (
     "proper_score=true; reliability=true; boundary=true; "
     "spatial_physical=true; operational=true"
@@ -19,13 +20,17 @@ FAMILIES_TRUE = (
 POSITIVE = (
     "SCORE_AWARE_RESULT: status=RECONCILED_POSITIVE; "
     "experiment_id=score_aware_valid; candidate=score_aware_candidate; "
-    f"compact_directory_sha256={DIGEST}; {FAMILIES_TRUE}; "
+    f"admission_record_sha256={ADMISSION_DIGEST}; "
+    f"compact_directory_sha256={DIGEST}; completed_cases=40; ensemble_size=10; "
+    f"{FAMILIES_TRUE}; "
     "overall_eligible=true"
 )
 NEGATIVE = (
     "SCORE_AWARE_RESULT: status=RECONCILED_NEGATIVE; "
     "experiment_id=score_aware_valid; candidate=score_aware_candidate; "
-    f"compact_directory_sha256={DIGEST}; proper_score=true; reliability=false; "
+    f"admission_record_sha256={ADMISSION_DIGEST}; "
+    f"compact_directory_sha256={DIGEST}; completed_cases=40; ensemble_size=10; "
+    "proper_score=true; reliability=false; "
     "boundary=true; spatial_physical=true; operational=true; "
     "overall_eligible=false"
 )
@@ -67,6 +72,30 @@ class ScoreAwareReconciliationConsistencyTests(unittest.TestCase):
             validate_score_aware_reconciliation_consistency(
                 POSITIVE, POSITIVE, substituted, POSITIVE, POSITIVE
             )
+
+    def test_cross_file_admission_identity_substitution_fails_closed(self) -> None:
+        substituted = POSITIVE.replace(ADMISSION_DIGEST, "e" * 64)
+        with self.assertRaisesRegex(ValueError, "markers disagree"):
+            validate_score_aware_reconciliation_consistency(
+                POSITIVE, substituted, POSITIVE, POSITIVE, POSITIVE
+            )
+
+    def test_cross_file_completed_cases_substitution_fails_closed(self) -> None:
+        substituted = NEGATIVE.replace("completed_cases=40", "completed_cases=39")
+        with self.assertRaisesRegex(ValueError, "markers disagree"):
+            validate_score_aware_reconciliation_consistency(
+                NEGATIVE, NEGATIVE, NEGATIVE, NEGATIVE, substituted
+            )
+
+    def test_consistent_incomplete_case_count_fails_closed(self) -> None:
+        incomplete = POSITIVE.replace("completed_cases=40", "completed_cases=39")
+        with self.assertRaisesRegex(ValueError, "frozen completed counts"):
+            validate_score_aware_reconciliation_consistency(*([incomplete] * 5))
+
+    def test_consistent_wrong_ensemble_size_fails_closed(self) -> None:
+        wrong_size = POSITIVE.replace("ensemble_size=10", "ensemble_size=9")
+        with self.assertRaisesRegex(ValueError, "frozen completed counts"):
+            validate_score_aware_reconciliation_consistency(*([wrong_size] * 5))
 
     def test_cross_file_family_substitution_fails_closed(self) -> None:
         substituted = NEGATIVE.replace("boundary=true", "boundary=false")

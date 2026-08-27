@@ -601,7 +601,10 @@ SCORE_AWARE_RESULT_MARKER = re.compile(
     r"^SCORE_AWARE_RESULT: status=(?P<status>RECONCILED_(?:POSITIVE|NEGATIVE)); "
     r"experiment_id=(?P<experiment_id>[a-z0-9_]{1,64}); "
     r"candidate=(?P<candidate>[a-z0-9_]{1,64}); "
+    r"admission_record_sha256=(?P<admission_digest>[0-9a-f]{64}); "
     r"compact_directory_sha256=(?P<digest>[0-9a-f]{64}); "
+    r"completed_cases=(?P<completed_cases>[1-9][0-9]*); "
+    r"ensemble_size=(?P<ensemble_size>[1-9][0-9]*); "
     r"proper_score=(?P<proper_score>true|false); "
     r"reliability=(?P<reliability>true|false); "
     r"boundary=(?P<boundary>true|false); "
@@ -649,7 +652,14 @@ def validate_score_aware_reconciliation_consistency(
         all(found[0] == canonical for found in matches.values()),
         "score-aware result markers disagree across publication files",
     )
-    status, _, _, _, *family_values, eligible = canonical
+    (
+        status, _, _, _, _, completed_cases, ensemble_size,
+        *family_values, eligible,
+    ) = canonical
+    require(
+        completed_cases == "40" and ensemble_size == "10",
+        "score-aware reconciled marker contradicts frozen completed counts",
+    )
     family_eligible = all(value == "true" for value in family_values)
     require(
         (eligible == "true") == family_eligible,

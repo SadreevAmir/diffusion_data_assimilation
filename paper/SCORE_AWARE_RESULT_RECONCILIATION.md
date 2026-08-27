@@ -95,11 +95,16 @@ update is not publication-ready.
 - `RECONCILED_NEGATIVE` requires at least one false family and
   `overall_eligible=false`.
 - The manuscript, claim ledger, readiness audit, reproducibility handoff and
-  this file must name the same experiment, candidate and decision.
+  this file must name the same experiment, candidate, admission-record SHA-256,
+  completed case count, ensemble size and decision. The completed envelope is
+  exactly 40 cases by 10 members; mutually consistent but incomplete counts fail
+  closed.
 - On reconciliation, each of those five files must contain exactly one identical
   machine-readable line of the form `SCORE_AWARE_RESULT: status=RECONCILED_POSITIVE;
   experiment_id=<id>; candidate=<id>;
-  compact_directory_sha256=<64-lowercase-hex>; proper_score=true;
+  admission_record_sha256=<64-lowercase-hex>;
+  compact_directory_sha256=<64-lowercase-hex>; completed_cases=40;
+  ensemble_size=10; proper_score=true;
   reliability=true; boundary=true; spatial_physical=true; operational=true;
   overall_eligible=true` or its negative counterpart with every authoritative
   family Boolean copied literally. The pre-result state must contain no such

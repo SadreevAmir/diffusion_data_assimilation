@@ -578,7 +578,10 @@ publication update must also follow
 `SCORE_AWARE_RESULT_RECONCILIATION.md`. The pre-result state is normative until
 combined admission succeeds; afterward the manuscript, claim ledger, readiness
 audit, reproducibility record and reconciliation file must be updated atomically
-from the same byte-exact compact directory.
+from the same byte-exact compact directory. Their identical canonical marker
+also binds the SHA-256 identity of the exact admission JSON and requires the
+complete frozen 40-case, 10-member envelope; agreement on incomplete counts is
+rejected rather than treated as successful reconciliation.
 
 Before any future literal score-aware mode can become decision-bearing, its
 reviewed runner and exact admission JSON must pass semantic parity with the
