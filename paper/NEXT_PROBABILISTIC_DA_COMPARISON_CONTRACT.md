@@ -104,6 +104,11 @@ three files, invokes `validate_manifest`, `validate_case_rows` and
 `evaluate_decision`, verifies both payload hashes, and rejects a claimed outcome
 that differs from the recomputed frozen label. No fourth admission artifact is
 permitted.
+The controller-facing `validate_probabilistic_da_admission.py` CLI hashes the
+exact filenames and bytes of all three artifacts with length-delimited framing,
+runs the complete semantic adapter, and repeats the directory digest afterward.
+Any payload or directory-membership substitution during admission fails closed;
+the emitted JSON binds the recomputed outcome to the admitted directory SHA-256.
 No raw backgrounds, analyses, observations or truths are retrieved. No currently
 admitted trusted mode implements this contract, so it must not be proposed under
 an invented identifier. Admission requires a separately reviewed runner that

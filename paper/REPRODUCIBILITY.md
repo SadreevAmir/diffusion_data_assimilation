@@ -581,6 +581,7 @@ python3 -m unittest -v \
   paper.test_validate_conformal_area_admission \
   paper.test_probabilistic_da_contract_oracle \
   paper.test_probabilistic_da_adapter_parity \
+  paper.test_validate_probabilistic_da_admission \
   paper.test_rank_coherent_runner_prototype \
   paper.test_rank_coherent_adapter_parity \
   paper.test_validate_rank_coherent_admission \
