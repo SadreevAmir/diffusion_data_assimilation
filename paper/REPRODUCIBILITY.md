@@ -573,6 +573,13 @@ python3 paper/check_publication_artifacts.py
 ```
 
 Before any future literal score-aware mode can become decision-bearing, its
+publication update must also follow
+`SCORE_AWARE_RESULT_RECONCILIATION.md`. The pre-result state is normative until
+combined admission succeeds; afterward the manuscript, claim ledger, readiness
+audit, reproducibility record and reconciliation file must be updated atomically
+from the same byte-exact compact directory.
+
+Before any future literal score-aware mode can become decision-bearing, its
 reviewed runner and exact admission JSON must pass semantic parity with the
 frozen oracle:
 

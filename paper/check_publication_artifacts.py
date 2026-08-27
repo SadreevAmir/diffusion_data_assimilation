@@ -182,6 +182,7 @@ REQUIRED_FILES = (
     "raw_member_reweighting_reference.py",
     "test_raw_member_reweighting_reference.py",
     "NEXT_SCORE_AWARE_RAW_REWEIGHTING_CONTRACT.md",
+    "SCORE_AWARE_RESULT_RECONCILIATION.md",
     "score_aware_raw_reweighting_reference.py",
     "test_score_aware_raw_reweighting_reference.py",
     "validate_score_aware_raw_reweighting_admission.py",
@@ -583,6 +584,16 @@ REPRODUCIBILITY_SECTION_ORDER = (
     "## Archived clean-checkpoint deep-ensemble executable handoff",
     "## Compact-artifact contract",
     "## Required reconciliation checks",
+)
+SCORE_AWARE_RECONCILIATION_ANCHORS = (
+    "Status: PRE_RESULT_NO_TRUSTED_MODE",
+    "## Mutually exclusive scientific branches",
+    "### Positive branch",
+    "### Negative branch",
+    "## Atomic publication update map",
+    "## Fail-closed consistency rules",
+    "compact_directory_sha256",
+    "decision_bearing=True",
 )
 AMENDED_PRIMARY_ANCHORS = {
     "AMENDED_PRIMARY_EVALUATION_CONTRACT.md": (
@@ -1480,6 +1491,19 @@ def main() -> int:
     manuscript = (PAPER_DIR / "PAPER_DRAFT.md").read_text(encoding="utf-8")
     claim_ledger = (PAPER_DIR / "CLAIM_LEDGER.md").read_text(encoding="utf-8")
     readiness = (PAPER_DIR / "PUBLICATION_READINESS.md").read_text(encoding="utf-8")
+    score_aware_reconciliation = (
+        PAPER_DIR / "SCORE_AWARE_RESULT_RECONCILIATION.md"
+    ).read_text(encoding="utf-8")
+    missing_score_aware_reconciliation_anchors = [
+        anchor
+        for anchor in SCORE_AWARE_RECONCILIATION_ANCHORS
+        if anchor not in score_aware_reconciliation
+    ]
+    require(
+        not missing_score_aware_reconciliation_anchors,
+        "SCORE_AWARE_RESULT_RECONCILIATION.md is missing anchors: "
+        + ", ".join(missing_score_aware_reconciliation_anchors),
+    )
     validate_readiness_blockers(readiness, PAPER_DIR)
     reference_traceability = (PAPER_DIR / "REFERENCE_TRACEABILITY.md").read_text(
         encoding="utf-8"

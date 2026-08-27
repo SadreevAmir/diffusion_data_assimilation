@@ -31,7 +31,7 @@ another row.
 
 The publication-readiness trigger was independently rerun against the current
 worktree on 2026-08-27. The fail-closed command
-`python3 paper/check_publication_artifacts.py` audit passed with 59 required files,
+`python3 paper/check_publication_artifacts.py` audit passed with 60 required files,
 two parseable linked figures, eight traceable references and 39
 contiguous claim-ledger records. A separate unfinished-text scan found no
 `TODO`, `TBD`, `FIXME` or `PLACEHOLDER` marker in the Markdown publication
@@ -116,6 +116,16 @@ pre-admission semantically valid reserialization and substitution immediately
 after semantic admission.  This strengthens evidence admission only: a literal
 trusted mode and an eligible scientific result are still absent, so status
 remains `NOT_READY`.
+
+The publication handoff now also has a fail-closed score-aware result
+reconciliation template. It reserves the exact admission identities, separates
+positive and negative branches, and requires one atomic update across the
+manuscript, claim ledger, readiness audit, reproducibility record and the
+reconciliation file itself. The template is a mandatory publication artifact;
+its current `PRE_RESULT_NO_TRUSTED_MODE` state cannot be mistaken for evidence
+or authorization. This closes an autonomous result-transfer gap only: no
+literal trusted mode or scientific result exists, and all normative blockers
+remain open.
 
 ## Unique cross-artifact closure routes
 
