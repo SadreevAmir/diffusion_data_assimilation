@@ -46,6 +46,16 @@ directory accepted with `decision_bearing=True` may authorize one full CPU
 proposal. Until then, no implemented negative baseline is repeated and no mode
 identifier is invented.
 
+The independent status-derivation audit found that the unified checker formerly
+validated the normative blocker matrix and the top-level readiness declaration
+separately. A two-line edit could therefore claim `READY_FOR_HUMAN_REVIEW` and
+`Required scientific blockers: none` while retaining `MISSING`,
+`MISSING_ELIGIBLE_RESULT` or `PRESENT_DEVELOPMENT_ONLY` states in the matrix.
+The checker now rejects that contradiction explicitly, and a negative fixture
+proves that the false promotion fails closed. This strengthens the completion
+guard only; all four normative blockers remain open and status stays
+`NOT_READY`.
+
 The independent rerun also found that the newly frozen raw-member reweighting
 oracle and its fail-closed tests were described by the contract but were not
 members of the required publication inventory or documented regression suite.

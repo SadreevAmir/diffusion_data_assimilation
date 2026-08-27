@@ -18,6 +18,7 @@ from paper.check_publication_artifacts import (
     validate_documented_regression_suites,
     validate_minimum_tier_key_claims,
     validate_minimum_tier_comparisons,
+    validate_publication_status,
     validate_readiness_blockers,
     validate_server_only_command_inputs,
 )
@@ -244,6 +245,32 @@ class MinimumTierComparisonAuditTests(unittest.TestCase):
 
     def test_readiness_blockers_match_normative_evidence(self) -> None:
         validate_readiness_blockers(self.readiness, PAPER_DIR)
+
+    def test_readiness_status_matches_open_blockers(self) -> None:
+        frozen_handoff = (PAPER_DIR / "FROZEN_EVALUATION_HANDOFF.md").read_text(
+            encoding="utf-8"
+        )
+        self.assertEqual(
+            validate_publication_status(self.readiness, frozen_handoff), "NOT_READY"
+        )
+
+    def test_readiness_cannot_claim_ready_with_open_blocker_matrix(self) -> None:
+        frozen_handoff = (PAPER_DIR / "FROZEN_EVALUATION_HANDOFF.md").read_text(
+            encoding="utf-8"
+        )
+        mutated = self.readiness.replace(
+            "Publication status: NOT_READY", "Publication status: READY_FOR_HUMAN_REVIEW", 1
+        ).replace(
+            "Required scientific blockers: an eligible spatially preserving calibration and\n"
+            "the remaining minimum-tier comparisons",
+            "Required scientific blockers: none",
+            1,
+        )
+        self.assertNotEqual(mutated, self.readiness)
+        with self.assertRaisesRegex(
+            ValueError, "ready status contradicts unresolved normative blocker states"
+        ):
+            validate_publication_status(mutated, frozen_handoff)
 
     def test_readiness_cannot_drop_blocker(self) -> None:
         row = READINESS_BLOCKER_ROW.search(self.readiness)

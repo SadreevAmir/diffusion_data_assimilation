@@ -1390,6 +1390,41 @@ def validate_readiness_blockers(readiness: str, paper_dir: Path) -> None:
         require(ledger_anchor in ledger, "claim-ledger closure target is missing")
 
 
+def validate_publication_status(readiness: str, frozen_handoff: str) -> str:
+    """Prevent a READY declaration while the normative blocker matrix is open."""
+    status_lines = re.findall(r"^Publication status: (\S+)$", readiness, re.MULTILINE)
+    blocker_lines = re.findall(
+        r"^Required scientific blockers:(.*)$", readiness, re.MULTILINE
+    )
+    require(len(status_lines) == 1, "readiness must contain exactly one publication status")
+    require(len(blocker_lines) == 1, "readiness must contain exactly one blocker declaration")
+    status = status_lines[0]
+    blockers = blocker_lines[0].strip()
+    require(
+        status in {"NOT_READY", "READY_FOR_HUMAN_REVIEW"},
+        f"unknown publication status: {status}",
+    )
+    blocker_states = [row["status"] for row in READINESS_BLOCKER_ROW.finditer(readiness)]
+    unresolved_states = {"MISSING", "MISSING_ELIGIBLE_RESULT", "PRESENT_DEVELOPMENT_ONLY"}
+    if status == "READY_FOR_HUMAN_REVIEW":
+        require(blockers == "none", "ready status requires no scientific blockers")
+        require(
+            not any(state in unresolved_states for state in blocker_states),
+            "ready status contradicts unresolved normative blocker states",
+        )
+        require(
+            "Status: AUTHORIZED_ACTIVE_PENDING_COMPACT_RESULT" not in frozen_handoff,
+            "ready status contradicts active evaluation awaiting compact result",
+        )
+    else:
+        require(blockers != "none", "not-ready status requires explicit scientific blockers")
+        require(
+            "Scientific primary reconciliation: COMPLETE_NEGATIVE" in readiness,
+            "not-ready status requires an explicit reconciled primary decision",
+        )
+    return status
+
+
 def main() -> int:
     missing = [name for name in REQUIRED_FILES if not (PAPER_DIR / name).is_file()]
     require(not missing, f"missing required publication files: {', '.join(missing)}")
@@ -1860,30 +1895,7 @@ def main() -> int:
 
     validate_empirical_traceability(manuscript, PAPER_DIR)
 
-    status_lines = re.findall(r"^Publication status: (\S+)$", readiness, re.MULTILINE)
-    blocker_lines = re.findall(
-        r"^Required scientific blockers:(.*)$", readiness, re.MULTILINE
-    )
-    require(len(status_lines) == 1, "readiness must contain exactly one publication status")
-    require(len(blocker_lines) == 1, "readiness must contain exactly one blocker declaration")
-    status = status_lines[0]
-    blockers = blocker_lines[0].strip()
-    require(
-        status in {"NOT_READY", "READY_FOR_HUMAN_REVIEW"},
-        f"unknown publication status: {status}",
-    )
-    if status == "READY_FOR_HUMAN_REVIEW":
-        require(blockers == "none", "ready status requires no scientific blockers")
-        require(
-            "Status: AUTHORIZED_ACTIVE_PENDING_COMPACT_RESULT" not in frozen_handoff,
-            "ready status contradicts active evaluation awaiting compact result",
-        )
-    else:
-        require(blockers != "none", "not-ready status requires explicit scientific blockers")
-        require(
-            "Scientific primary reconciliation: COMPLETE_NEGATIVE" in readiness,
-            "not-ready status requires an explicit reconciled primary decision",
-        )
+    status = validate_publication_status(readiness, frozen_handoff)
 
     print(
         f"publication artifact audit passed: {len(REQUIRED_FILES)} files, "
