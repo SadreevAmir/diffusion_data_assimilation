@@ -13,6 +13,22 @@ Controller readiness: NOT_READY
 Scientific primary reconciliation: COMPLETE_NEGATIVE
 Autonomous publication work remaining: YES
 
+## Current independent audit snapshot
+
+The 2026-08-27 independent rerun against the current worktree passed with 66
+required files, two parseable linked figures, eight traceable references and 39
+contiguous claim-ledger records. The immutable rank-coherent package separately
+passed its 13-file manifest check and all 26 focused prototype, adapter-parity,
+combined-admission and manifest fixtures. These current counts supersede the
+smaller historical inventory counts recorded later in this chronology; those
+older counts remain as audit history rather than descriptions of the current
+inventory.
+
+This rerun confirms local integrity only. The rank-coherent contract still has
+no literal reviewed trusted mode, and the conformal and probabilistic-DA
+contracts remain frozen but non-executable. No decision-bearing scientific row
+therefore changes, and publication status remains `NOT_READY`.
+
 ## Decision-bearing readiness blocker matrix
 
 This table is normative for the current `NOT_READY` decision. Its evidence
