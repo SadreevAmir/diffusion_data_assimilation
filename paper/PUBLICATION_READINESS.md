@@ -27,6 +27,16 @@ another row.
 | Probabilistic DA baseline such as EnKF/LETKF | `MINIMUM_TIER_COMPARISON_AUDIT.md` | MISSING | The corresponding normative comparison row becomes decision-bearing after valid trusted execution |
 | Independent-strength deterministic background and 3D-Var | `MINIMUM_TIER_COMPARISON_AUDIT.md` | PRESENT_DEVELOPMENT_ONLY | A frozen common-information comparison supplies evidence at the manuscript's required independent strength |
 
+The 2026-08-27 closure-condition audit found that the checker required all four
+conditions to be non-empty but did not bind their exact scientific meaning. A
+plausible edit could therefore replace the eligible-calibration requirement to
+pass every mandatory no-compensation family with improvement in only one
+family. The checker now compares every condition with its exact normative value,
+and a negative fixture proves that a non-empty single-family substitution fails
+closed. This strengthens the local mapping from every remaining blocker to its
+verifiable closure artifact; it adds no scientific result and leaves status
+`NOT_READY`.
+
 ## Independent audit snapshot
 
 The publication-readiness trigger was independently rerun against the current

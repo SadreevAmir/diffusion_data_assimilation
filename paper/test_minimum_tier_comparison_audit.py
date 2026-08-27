@@ -473,7 +473,17 @@ class MinimumTierComparisonAuditTests(unittest.TestCase):
             1,
         )
         self.assertNotEqual(mutated, self.readiness)
-        with self.assertRaisesRegex(ValueError, "exact closure condition"):
+        with self.assertRaisesRegex(ValueError, "closure conditions differ"):
+            validate_readiness_blockers(mutated, PAPER_DIR)
+
+    def test_readiness_cannot_weaken_nonempty_closure_condition(self) -> None:
+        mutated = self.readiness.replace(
+            "One frozen candidate passes every mandatory no-compensation gate family",
+            "One frozen candidate improves at least one mandatory gate family",
+            1,
+        )
+        self.assertNotEqual(mutated, self.readiness)
+        with self.assertRaisesRegex(ValueError, "closure conditions differ"):
             validate_readiness_blockers(mutated, PAPER_DIR)
 
     def test_readiness_cannot_drop_closure_route(self) -> None:

@@ -473,6 +473,23 @@ READINESS_BLOCKERS = {
         "PRESENT_DEVELOPMENT_ONLY",
     ),
 }
+READINESS_CLOSURE_CONDITIONS = {
+    "Eligible spatially preserving calibration": (
+        "One frozen candidate passes every mandatory no-compensation gate family"
+    ),
+    "Conformal intervals": (
+        "The corresponding normative comparison row becomes decision-bearing "
+        "after valid trusted execution"
+    ),
+    "Probabilistic DA baseline such as EnKF/LETKF": (
+        "The corresponding normative comparison row becomes decision-bearing "
+        "after valid trusted execution"
+    ),
+    "Independent-strength deterministic background and 3D-Var": (
+        "A frozen common-information comparison supplies evidence at the "
+        "manuscript's required independent strength"
+    ),
+}
 READINESS_BLOCKER_ROW = re.compile(
     r"^\| (?P<blocker>[^|]+?) \| `(?P<source>RESEARCH_PLAN\.md|MINIMUM_TIER_COMPARISON_AUDIT\.md)` \| "
     r"(?P<status>[A-Z_]+) \| (?P<closure>[^|]*?) \|$",
@@ -1670,9 +1687,12 @@ def validate_readiness_blockers(readiness: str, paper_dir: Path) -> None:
         observed == READINESS_BLOCKERS,
         "readiness blocker matrix differs from the normative blocker set",
     )
+    closure_conditions = {
+        row["blocker"].strip(): row["closure"].strip() for row in rows
+    }
     require(
-        all(row["closure"].strip() for row in rows),
-        "readiness blocker lacks an exact closure condition",
+        closure_conditions == READINESS_CLOSURE_CONDITIONS,
+        "readiness blocker closure conditions differ from the normative contract",
     )
     audit = (paper_dir / "MINIMUM_TIER_COMPARISON_AUDIT.md").read_text(
         encoding="utf-8"
