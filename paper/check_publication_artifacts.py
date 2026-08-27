@@ -1661,7 +1661,7 @@ def validate_minimum_tier_comparisons(paper_dir: Path) -> None:
         paper_dir / "NEXT_CONFORMAL_BASELINE_CONTRACT.md"
     ).read_text(encoding="utf-8")
     conformal_anchors = (
-        "Status: `FROZEN_NOT_EXECUTABLE`",
+        "Status: `FROZEN_RUNNER_PARITY_READY_NOT_ADMITTED`",
         "`s = max(L - y, y - U, 0)`",
         "`ceil((n + 1) * 0.90)`",
         "coverage of at least `0.85`",

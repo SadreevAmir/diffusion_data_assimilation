@@ -1,6 +1,6 @@
 # Frozen block-conformal sea-ice-area baseline contract
 
-Status: `FROZEN_NOT_EXECUTABLE`
+Status: `FROZEN_RUNNER_PARITY_READY_NOT_ADMITTED`
 
 ## Publication role
 
@@ -68,5 +68,11 @@ All computation and analysis must run on the server with `summary_only`
 retrieval. The compact return is limited to one JSON decision summary and one
 CSV containing the forty date-level raw/conformal endpoints, truth area and
 fold identifier. No currently admitted trusted mode implements this contract;
-therefore it must not be proposed under an invented mode identifier. Admission
-requires a separately reviewed runner using this literal contract.
+therefore it must not be proposed under an invented mode identifier. The
+outcome-agnostic oracle, server-CPU prototype and synthetic parity tests are
+frozen in `conformal_area_reference.py`,
+`conformal_area_runner_prototype.py` and
+`test_conformal_area_runner_prototype.py`. They do not create controller
+admission: admission still requires an independently reviewed trusted runner,
+a literal mode identifier and a passing synthetic adapter check using this
+contract without deviations.
