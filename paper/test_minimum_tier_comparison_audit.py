@@ -16,6 +16,7 @@ from paper.check_publication_artifacts import (
     REQUIRED_REGRESSION_SUITES,
     SERVER_ONLY_COMMAND_INPUTS,
     validate_documented_regression_suites,
+    validate_eligible_calibration_transition,
     validate_minimum_tier_key_claims,
     validate_minimum_tier_evidence_guards,
     validate_minimum_tier_comparisons,
@@ -252,6 +253,47 @@ class MinimumTierComparisonAuditTests(unittest.TestCase):
         validate_minimum_tier_evidence_guards(
             self.manuscript, self.ledger, self.readiness, self.audit
         )
+
+    def test_eligible_calibration_guard_passes_current_blocked_state(self) -> None:
+        validate_eligible_calibration_transition(
+            self.manuscript, self.ledger, self.readiness, self.reproducibility
+        )
+
+    def test_eligible_calibration_positive_marker_updates_all_surfaces(self) -> None:
+        marker = "a" * 64
+        old = "| `eligible_calibration` | `MISSING_ELIGIBLE_RESULT` | `NONE` | `BLOCKED` |"
+        new = f"| `eligible_calibration` | `ELIGIBLE` | `{marker}` | `DECISION_BEARING` |"
+        originals = (self.manuscript, self.ledger, self.readiness, self.reproducibility)
+        updated = [text.replace(old, new, 1) for text in originals]
+        self.assertTrue(all(text != original for text, original in zip(updated, originals)))
+        validate_eligible_calibration_transition(*updated)
+
+    def test_eligible_calibration_partial_positive_update_fails_closed(self) -> None:
+        marker = "b" * 64
+        mutated = self.manuscript.replace(
+            "| `eligible_calibration` | `MISSING_ELIGIBLE_RESULT` | `NONE` | `BLOCKED` |",
+            f"| `eligible_calibration` | `ELIGIBLE` | `{marker}` | `DECISION_BEARING` |",
+            1,
+        )
+        with self.assertRaisesRegex(ValueError, "not atomic"):
+            validate_eligible_calibration_transition(
+                mutated, self.ledger, self.readiness, self.reproducibility
+            )
+
+    def test_eligible_calibration_positive_records_must_match(self) -> None:
+        old = "| `eligible_calibration` | `MISSING_ELIGIBLE_RESULT` | `NONE` | `BLOCKED` |"
+        texts = []
+        for index, source in enumerate(
+            (self.manuscript, self.ledger, self.readiness, self.reproducibility)
+        ):
+            record = ("c" if index < 3 else "d") * 64
+            texts.append(source.replace(
+                old,
+                f"| `eligible_calibration` | `ELIGIBLE` | `{record}` | `DECISION_BEARING` |",
+                1,
+            ))
+        with self.assertRaisesRegex(ValueError, "not atomic"):
+            validate_eligible_calibration_transition(*texts)
 
     def test_conformal_decision_without_compact_record_fails_closed(self) -> None:
         mutated = self.manuscript + "\nThe result is `CONFORMAL_USEFUL`.\n"

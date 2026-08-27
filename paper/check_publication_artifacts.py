@@ -528,6 +528,48 @@ MINIMUM_TIER_EVIDENCE_GUARD_ROW = re.compile(
     re.MULTILINE,
 )
 
+ELIGIBLE_CALIBRATION_GUARD_STATES = {
+    ("MISSING_ELIGIBLE_RESULT", "NONE", "BLOCKED"),
+    ("ELIGIBLE", "COMPACT_RECORD", "DECISION_BEARING"),
+}
+ELIGIBLE_CALIBRATION_GUARD_ROW = re.compile(
+    r"^\| `eligible_calibration` \| `(?P<status>MISSING_ELIGIBLE_RESULT|ELIGIBLE)` \| "
+    r"`(?P<record>NONE|[0-9a-f]{64})` \| `(?P<presentation>BLOCKED|DECISION_BEARING)` \|$",
+    re.MULTILINE,
+)
+
+
+def validate_eligible_calibration_transition(
+    manuscript: str, claim_ledger: str, readiness: str, reproducibility: str
+) -> None:
+    """Bind a positive calibration transition to one compact record everywhere."""
+    documents = {
+        "PAPER_DRAFT.md": manuscript,
+        "CLAIM_LEDGER.md": claim_ledger,
+        "PUBLICATION_READINESS.md": readiness,
+        "REPRODUCIBILITY.md": reproducibility,
+    }
+    observed: dict[str, tuple[str, str, str]] = {}
+    for filename, text in documents.items():
+        rows = list(ELIGIBLE_CALIBRATION_GUARD_ROW.finditer(text))
+        require(len(rows) == 1, f"{filename} eligible-calibration guard is missing or duplicated")
+        row = rows[0]
+        record = row["record"]
+        state = (
+            row["status"],
+            "COMPACT_RECORD" if record != "NONE" else "NONE",
+            row["presentation"],
+        )
+        require(
+            state in ELIGIBLE_CALIBRATION_GUARD_STATES,
+            f"{filename} contains an invalid eligible-calibration transition",
+        )
+        observed[filename] = (row["status"], record, row["presentation"])
+    require(
+        len(set(observed.values())) == 1,
+        "eligible-calibration transition is not atomic across publication surfaces",
+    )
+
 
 def validate_minimum_tier_evidence_guards(
     manuscript: str, claim_ledger: str, readiness: str, audit: str
@@ -1603,6 +1645,12 @@ def main() -> int:
     reproducibility = (PAPER_DIR / "REPRODUCIBILITY.md").read_text(encoding="utf-8")
     validate_documented_regression_suites(reproducibility)
     validate_server_only_command_inputs(reproducibility)
+    validate_eligible_calibration_transition(
+        (PAPER_DIR / "PAPER_DRAFT.md").read_text(encoding="utf-8"),
+        (PAPER_DIR / "CLAIM_LEDGER.md").read_text(encoding="utf-8"),
+        (PAPER_DIR / "PUBLICATION_READINESS.md").read_text(encoding="utf-8"),
+        reproducibility,
+    )
     regression_suite = subprocess.run(
         [sys.executable, "-m", "unittest", *REQUIRED_REGRESSION_SUITES],
         cwd=PAPER_DIR.parent,

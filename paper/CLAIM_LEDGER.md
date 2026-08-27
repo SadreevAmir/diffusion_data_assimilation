@@ -66,6 +66,12 @@ evidence identity is admitted across all normative publication surfaces.
 | `probabilistic_da` | `MISSING` | `NONE` | `PRE_RESULT_ONLY` |
 | `independent_deterministic` | `PRESENT_DEVELOPMENT_ONLY` | `NONE` | `DEVELOPMENT_ONLY` |
 
+| `eligible_calibration` | `MISSING_ELIGIBLE_RESULT` | `NONE` | `BLOCKED` |
+
+The eligible-calibration row has a separate machine-bound transition. It may
+become decision-bearing only when the same compact-record hash appears on all
+four normative publication surfaces.
+
 ## Mandatory language discipline
 
 - Say **model-to-model sparse-observation assimilation experiment**, not real-observation assimilation.

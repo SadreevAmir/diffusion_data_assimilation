@@ -310,6 +310,12 @@ minimum-tier audit.
 | `probabilistic_da` | `MISSING` | `NONE` | `PRE_RESULT_ONLY` |
 | `independent_deterministic` | `PRESENT_DEVELOPMENT_ONLY` | `NONE` | `DEVELOPMENT_ONLY` |
 
+| `eligible_calibration` | `MISSING_ELIGIBLE_RESULT` | `NONE` | `BLOCKED` |
+
+The positive learned-joint calibration row is independently fail-closed. A
+decision-bearing eligibility claim requires one identical compact-record hash
+on the manuscript, claim ledger, readiness audit and reproducibility handoff.
+
 We additionally evaluate the frozen cross-fitted scales followed by an exact
 capped-simplex projection of each ten-member pixel distribution. The projection
 preserves the raw ensemble mean while enforcing bounded members and preserving

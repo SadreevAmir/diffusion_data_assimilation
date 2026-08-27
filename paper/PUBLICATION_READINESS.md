@@ -180,6 +180,12 @@ forbids a decision-bearing result claim or independent-strength promotion.
 | `probabilistic_da` | `MISSING` | `NONE` | `PRE_RESULT_ONLY` |
 | `independent_deterministic` | `PRESENT_DEVELOPMENT_ONLY` | `NONE` | `DEVELOPMENT_ONLY` |
 
+| `eligible_calibration` | `MISSING_ELIGIBLE_RESULT` | `NONE` | `BLOCKED` |
+
+The positive eligible-calibration row is separately bound to one compact record
+across manuscript, claim ledger, readiness and reproducibility. The current
+missing state forbids a decision-bearing eligibility claim.
+
 The 2026-08-27 closure-route audit now makes those three rows executable
 publication guards rather than prose-only destinations. The checker requires
 the same status, compact-record identity and allowed presentation in the

@@ -536,6 +536,12 @@ conformal and probabilistic DA are the only `MISSING` result rows, whereas the
 deterministic comparison is `PRESENT_DEVELOPMENT_ONLY`. It remains a blocker for
 the main comparison table without being misreported as a third absent family.
 
+| `eligible_calibration` | `MISSING_ELIGIBLE_RESULT` | `NONE` | `BLOCKED` |
+
+The positive eligible-calibration row uses a separate four-surface compact
+identity guard. A result becomes decision-bearing only if manuscript, claim
+ledger, readiness and this handoff carry the same SHA-256 record.
+
 Generated text artifacts use a prepare-first, same-directory publication
 helper. Every temporary file is flushed and `fsync`-ed before publication. For
 multi-file outputs, each existing target is then moved to a same-directory
