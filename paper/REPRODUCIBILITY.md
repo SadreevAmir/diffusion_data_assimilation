@@ -481,6 +481,14 @@ relevant binding as `compact_manifest.json`. The consumer validates that sidecar
 inside its own process before parsing the payload, creating output directories
 or writing output files. The standalone equivalent is:
 
+Consumer outputs are published through same-directory temporary files followed
+by `os.replace`. For the two-output case-level consumer, both files are fully
+written and `fsync`-ed before either destination is replaced. The executable
+fault fixture forces the second temporary-file write to fail and requires both
+pre-existing destinations to remain byte-identical, with no temporary file left
+behind. This prepare-stage guarantee does not claim a filesystem-wide atomic
+transaction across the two final `replace` calls.
+
 ```bash
 python3 paper/validate_server_only_manifest.py \
   COMPACT_ARTIFACT compact_manifest.json EXPECTED_PRODUCER_EXPERIMENT
@@ -542,7 +550,8 @@ python3 -m unittest -v \
   paper.test_publication_limitation_traceability \
   paper.test_publication_claim_status_consistency \
   paper.test_validate_server_only_manifest \
-  paper.test_server_only_consumer_cli
+  paper.test_server_only_consumer_cli \
+  paper.test_atomic_publish
 python3 paper/check_publication_artifacts.py
 ```
 

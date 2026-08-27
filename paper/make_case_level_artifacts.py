@@ -18,8 +18,10 @@ import random
 from pathlib import Path
 
 if __package__:
+    from .atomic_publish import publish_text_artifacts
     from .validate_server_only_manifest import validate_manifest
 else:
+    from atomic_publish import publish_text_artifacts
     from validate_server_only_manifest import validate_manifest
 
 
@@ -336,7 +338,7 @@ def reconcile_case_means(
         )
 
 
-def make_svg(deltas: list[float], output: Path) -> None:
+def make_svg(deltas: list[float]) -> str:
     width, height = 760, 360
     left, right, top, bottom = 72, 24, 34, 58
     plot_width, plot_height = width - left - right, height - top - bottom
@@ -359,7 +361,7 @@ def make_svg(deltas: list[float], output: Path) -> None:
 <text x="{left}" y="{height - 20}" font-family="sans-serif" font-size="12">lower is better; vertical solid line is the paired case mean</text>
 <text x="{width - right}" y="{height - 20}" text-anchor="end" font-family="sans-serif" font-size="12">n={len(deltas)}</text>
 </svg>'''
-    output.write_text(svg, encoding="utf-8")
+    return svg
 
 
 def main() -> None:
@@ -432,14 +434,16 @@ def main() -> None:
         compared_methods=compared_methods,
     )
     reconcile_case_means(summary, expected_case_means)
-    args.summary.parent.mkdir(parents=True, exist_ok=True)
-    args.figure.parent.mkdir(parents=True, exist_ok=True)
-    args.summary.write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
     fair_deltas = [
         case["analysis_fair_crps"] - case["raw_analysis_fair_crps"]
         for case in cases
     ]
-    make_svg(fair_deltas, args.figure)
+    publish_text_artifacts(
+        (
+            (args.summary, json.dumps(summary, indent=2) + "\n"),
+            (args.figure, make_svg(fair_deltas)),
+        )
+    )
 
 
 if __name__ == "__main__":

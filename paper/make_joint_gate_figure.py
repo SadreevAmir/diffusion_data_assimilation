@@ -10,8 +10,10 @@ import math
 from pathlib import Path
 
 if __package__:
+    from .atomic_publish import publish_text_artifacts
     from .validate_server_only_manifest import validate_manifest
 else:
+    from atomic_publish import publish_text_artifacts
     from validate_server_only_manifest import validate_manifest
 
 
@@ -93,8 +95,7 @@ def main() -> None:
     args = parser.parse_args()
     validate_manifest(args.aggregate_json, args.manifest, EXPECTED_EXPERIMENT)
     raw, candidate = load_summary(args.aggregate_json)
-    args.output_svg.parent.mkdir(parents=True, exist_ok=True)
-    args.output_svg.write_text(make_svg(raw, candidate), encoding="utf-8")
+    publish_text_artifacts(((args.output_svg, make_svg(raw, candidate)),))
 
 
 if __name__ == "__main__":

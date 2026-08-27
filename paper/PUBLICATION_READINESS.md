@@ -106,6 +106,15 @@ manifest and a schema-invalid payload for each consumer and require that no
 partial SVG or JSON remains. This closes an executable atomicity/provenance gap
 without adding scientific evidence, so publication status remains `NOT_READY`.
 
+The 2026-08-27 output-publication audit replaces direct final-path writes in all
+three consumers with same-directory temporary files and `os.replace`. The
+two-output case-level path prepares and `fsync`-s both artifacts before the
+first replacement. A fault-injection fixture makes preparation of the second
+artifact fail and verifies that both prior destinations remain byte-identical
+and no temporary files survive. This is an explicit prepare-stage guarantee,
+not a claim of a filesystem-wide transaction across multiple replacements, and
+it does not change the scientific `NOT_READY` status.
+
 The 2026-08-27 pre-result interpretation audit now freezes in `PAPER_DRAFT.md`
 all four valid joint outcomes of the two outstanding minimum-tier contracts.
 Each conformal and probabilistic-DA result closes only its exact evidence row;
