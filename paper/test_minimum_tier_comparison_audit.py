@@ -486,6 +486,43 @@ class MinimumTierComparisonAuditTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "closure conditions differ"):
             validate_readiness_blockers(mutated, PAPER_DIR)
 
+    def test_readiness_cannot_weaken_conformal_closure_condition(self) -> None:
+        mutated = self.readiness.replace(
+            "The corresponding normative comparison row becomes decision-bearing "
+            "after valid trusted execution",
+            "The corresponding normative comparison contract is available",
+            1,
+        )
+        self.assertNotEqual(mutated, self.readiness)
+        with self.assertRaisesRegex(ValueError, "closure conditions differ"):
+            validate_readiness_blockers(mutated, PAPER_DIR)
+
+    def test_readiness_cannot_weaken_probabilistic_da_closure_condition(self) -> None:
+        closure = (
+            "The corresponding normative comparison row becomes decision-bearing "
+            "after valid trusted execution"
+        )
+        first = self.readiness.index(closure)
+        second = self.readiness.index(closure, first + len(closure))
+        mutated = (
+            self.readiness[:second]
+            + "The corresponding normative comparison contract is available"
+            + self.readiness[second + len(closure):]
+        )
+        self.assertNotEqual(mutated, self.readiness)
+        with self.assertRaisesRegex(ValueError, "closure conditions differ"):
+            validate_readiness_blockers(mutated, PAPER_DIR)
+
+    def test_readiness_cannot_weaken_independent_strength_closure_condition(self) -> None:
+        mutated = self.readiness.replace(
+            "A frozen common-information comparison supplies evidence at the manuscript's required independent strength",
+            "A development-only deterministic comparison is documented",
+            1,
+        )
+        self.assertNotEqual(mutated, self.readiness)
+        with self.assertRaisesRegex(ValueError, "closure conditions differ"):
+            validate_readiness_blockers(mutated, PAPER_DIR)
+
     def test_readiness_cannot_drop_closure_route(self) -> None:
         row = READINESS_CLOSURE_ROUTE_ROW.search(self.readiness)
         self.assertIsNotNone(row)

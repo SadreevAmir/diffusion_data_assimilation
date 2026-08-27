@@ -31,11 +31,14 @@ The 2026-08-27 closure-condition audit found that the checker required all four
 conditions to be non-empty but did not bind their exact scientific meaning. A
 plausible edit could therefore replace the eligible-calibration requirement to
 pass every mandatory no-compensation family with improvement in only one
-family. The checker now compares every condition with its exact normative value,
-and a negative fixture proves that a non-empty single-family substitution fails
-closed. This strengthens the local mapping from every remaining blocker to its
-verifiable closure artifact; it adds no scientific result and leaves status
-`NOT_READY`.
+family. The checker now compares every condition with its exact normative value.
+Four independent negative fixtures prove that non-empty substitutions fail
+closed: single-family improvement cannot replace joint eligibility, contract
+availability cannot replace a decision-bearing trusted conformal or
+probabilistic-DA result, and development-only documentation cannot replace
+independent-strength common-information evidence. This strengthens the local
+mapping from every remaining blocker to its verifiable closure artifact; it adds
+no scientific result and leaves status `NOT_READY`.
 
 ## Independent audit snapshot
 
