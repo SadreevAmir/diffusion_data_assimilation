@@ -15,6 +15,15 @@ files, two figures, eight references and 39 claims.  The fixtures close a local
 test-design gap but do not create trusted scientific evidence, so publication
 status remains `NOT_READY`.
 
+An independent 109-test publication-surface rerun covered claim-status,
+figure-generation, limitation, reference, minimum-tier, empirical-traceability,
+immutable-identity, score-aware reconciliation and score-aware reference
+contracts. All executable tests passed; five NumPy-dependent score-aware tests
+were skipped because NumPy is unavailable in each installed local Python
+runtime. The manuscript, claim ledger, both linked figures and their tabulated
+negative decisions therefore agree with the current evidence matrix. This is
+local consistency evidence only and does not change any blocker state.
+
 The score-aware runner admission boundary now independently exercises both the
 positional cross-fitting semantics and exact training-row construction that the
 compact validator expects. The reference exposes the frozen forty-case,
@@ -67,7 +76,7 @@ earlier lower counts below are retained only as dated audit history.
 
 ## Current independent audit snapshot
 
-The current audit passed with 71 required files, two parseable linked figures,
+The current audit passed with 79 required files, two parseable linked figures,
 eight traceable references and 39 contiguous claim-ledger records. The
 immutable rank-coherent package separately
 passed its 13-file manifest check and all 26 focused prototype, adapter-parity,
@@ -82,7 +91,7 @@ contracts remain frozen but non-executable. No decision-bearing scientific row
 therefore changes, and publication status remains `NOT_READY`.
 
 The publication-readiness trigger was then independently repeated against this
-exact worktree state. The unified checker again passed with 71 required files,
+exact worktree state. The unified checker again passed with 79 required files,
 two parseable linked figures, eight traceable references and 39 contiguous
 claim-ledger records. A focused 61-test decision-surface suite covering
 conformal admission, claim-status consistency and the minimum-tier comparison
