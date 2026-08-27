@@ -28,9 +28,12 @@ def load_summary(path: Path) -> tuple[dict[str, float], dict[str, float]]:
         raise ValueError("expected method_aggregates and gate objects")
     if gate.get("candidate_method") != METHOD or gate.get("overall_eligible") is not False:
         raise ValueError("unexpected candidate or gate decision")
-    selected = {row.get("method"): row for row in rows if row.get("region") == "full"}
-    if set(("raw", METHOD)) - selected.keys():
-        raise ValueError("missing raw or projected-spread full-region row")
+    full_rows = [row for row in rows if row.get("region") == "full"]
+    if len(full_rows) != 2:
+        raise ValueError("expected exactly two full-region method rows")
+    selected = {row.get("method"): row for row in full_rows}
+    if set(selected) != {"raw", METHOD} or len(selected) != len(full_rows):
+        raise ValueError("full-region rows must identify raw and the exact candidate once")
     raw, candidate = selected["raw"], selected[METHOD]
     if int(raw.get("num_cases", -1)) != 40 or int(candidate.get("num_cases", -1)) != 40:
         raise ValueError("num_cases must equal 40")

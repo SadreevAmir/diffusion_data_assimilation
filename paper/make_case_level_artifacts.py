@@ -191,13 +191,32 @@ def read_long_form_cases(
         reader = csv.DictReader(handle)
         if reader.fieldnames is None:
             raise ValueError("input table has no header")
-        required = {date_column, method_column, *LONG_FORM_METRICS}
+        required = {date_column, method_column, "fold", *LONG_FORM_METRICS}
         missing = sorted(required - set(reader.fieldnames))
         if missing:
             raise ValueError(f"input table is missing columns: {', '.join(missing)}")
-        selected = [
-            row for row in reader if row[method_column] in {raw_method, corrected_method}
-        ]
+        rows = list(reader)
+    expected_total_rows = 4 * EXPECTED_CASES
+    if len(rows) != expected_total_rows:
+        raise ValueError(
+            f"expected {expected_total_rows} rows in the frozen long-form payload, "
+            f"found {len(rows)}"
+        )
+    identities: set[tuple[dt.date, str]] = set()
+    selected = []
+    for index, row in enumerate(rows):
+        try:
+            date = dt.date.fromisoformat(row[date_column])
+        except ValueError as error:
+            raise ValueError(
+                f"row {index} has a non-ISO date in {date_column}: {row[date_column]!r}"
+            ) from error
+        identity = (date, row[method_column])
+        if identity in identities:
+            raise ValueError(f"duplicate ({date_column}, {method_column}) pair")
+        identities.add(identity)
+        if row[method_column] in {raw_method, corrected_method}:
+            selected.append(row)
     expected_rows = 2 * EXPECTED_CASES
     if len(selected) != expected_rows:
         raise ValueError(
@@ -205,12 +224,7 @@ def read_long_form_cases(
         )
     by_date: dict[dt.date, dict[str, dict[str, float]]] = {}
     for index, row in enumerate(selected):
-        try:
-            date = dt.date.fromisoformat(row[date_column])
-        except ValueError as error:
-            raise ValueError(
-                f"row {index} has a non-ISO date in {date_column}: {row[date_column]!r}"
-            ) from error
+        date = dt.date.fromisoformat(row[date_column])
         method = row[method_column]
         if method in by_date.setdefault(date, {}):
             raise ValueError(f"duplicate ({date_column}, {method_column}) pair")

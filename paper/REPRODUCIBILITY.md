@@ -442,9 +442,12 @@ of the trusted summary and can be regenerated only after these checks pass.
 
 Both figure generators are covered by the required publication regression
 suite. The tests exercise deterministic rendering from compact fixtures and
-fail-closed rejection of negative metrics, a jointly zero plotting scale and a
-zero raw denominator. This prevents malformed but finite compact input from
-producing a misleading or undefined checked-in SVG.
+fail-closed rejection of negative metrics, a jointly zero plotting scale, a
+zero raw denominator, candidate substitution, duplicate full-region rows and a
+non-Boolean gate decision. The long-form consumer is independently tested
+against a wrong 160-row envelope and duplicate method/date identities. This
+prevents malformed but finite compact input from producing a misleading or
+undefined checked-in artifact.
 
 ### Execution boundary for documented commands
 
@@ -530,6 +533,7 @@ python3 -m unittest -v \
   paper.test_publication_empirical_traceability \
   paper.test_minimum_tier_comparison_audit \
   paper.test_publication_figure_generators \
+  paper.test_publication_compact_payload_schemas \
   paper.test_publication_reference_traceability \
   paper.test_publication_limitation_traceability \
   paper.test_publication_claim_status_consistency \

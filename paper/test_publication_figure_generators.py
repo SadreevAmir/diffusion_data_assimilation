@@ -71,6 +71,24 @@ class PublicationFigureGeneratorTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             load_gate(self.write_json(payload))
 
+    def test_joint_gate_rejects_candidate_identity_substitution(self) -> None:
+        payload = self.gate_payload()
+        payload["gate"]["candidate_method"] = "substituted_candidate"
+        with self.assertRaises(ValueError):
+            load_gate(self.write_json(payload))
+
+    def test_joint_gate_rejects_non_boolean_eligibility(self) -> None:
+        payload = self.gate_payload()
+        payload["gate"]["overall_eligible"] = 0
+        with self.assertRaises(ValueError):
+            load_gate(self.write_json(payload))
+
+    def test_joint_gate_rejects_duplicate_full_region_row(self) -> None:
+        payload = self.gate_payload()
+        payload["method_aggregates"].append(dict(payload["method_aggregates"][1]))
+        with self.assertRaises(ValueError):
+            load_gate(self.write_json(payload))
+
 
 if __name__ == "__main__":
     unittest.main()
