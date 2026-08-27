@@ -581,6 +581,7 @@ python3 -m unittest -v \
   paper.test_publication_limitation_traceability \
   paper.test_publication_claim_status_consistency \
   paper.test_score_aware_reconciliation_consistency \
+  paper.test_rank_coherent_result_reconciliation \
   paper.test_validate_server_only_manifest \
   paper.test_server_only_consumer_cli \
   paper.test_atomic_publish \
@@ -590,6 +591,16 @@ python3 -m unittest -v \
   paper.test_validate_score_aware_compact_outputs
 python3 paper/check_publication_artifacts.py
 ```
+
+The rank-coherent path has a separate executable downstream reconciliation
+boundary in `RANK_COHERENT_RESULT_RECONCILIATION.md`. It invokes combined
+admission itself and accepts only the identities returned for the exact compact
+directory, derives the positive or negative branch from the five literal gate
+families, and publishes the manuscript, claim ledger, reproducibility record,
+readiness audit and reconciliation record through one rollback-protected
+operation. Missing or unequal canonical markers fail before any write.
+The publisher independently repeats combined admission and marker derivation;
+it does not trust a caller-supplied marker identity.
 
 Before any future literal score-aware mode can become decision-bearing, its
 publication update must also follow

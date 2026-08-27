@@ -28,6 +28,7 @@ REQUIRED_REGRESSION_SUITES = (
     "paper.test_publication_limitation_traceability",
     "paper.test_publication_claim_status_consistency",
     "paper.test_score_aware_reconciliation_consistency",
+    "paper.test_rank_coherent_result_reconciliation",
     "paper.test_validate_server_only_manifest",
     "paper.test_server_only_consumer_cli",
     "paper.test_atomic_publish",
@@ -184,6 +185,9 @@ REQUIRED_FILES = (
     "test_raw_member_reweighting_reference.py",
     "NEXT_SCORE_AWARE_RAW_REWEIGHTING_CONTRACT.md",
     "SCORE_AWARE_RESULT_RECONCILIATION.md",
+    "RANK_COHERENT_RESULT_RECONCILIATION.md",
+    "rank_coherent_result_reconciliation.py",
+    "test_rank_coherent_result_reconciliation.py",
     "score_aware_raw_reweighting_reference.py",
     "test_score_aware_raw_reweighting_reference.py",
     "validate_score_aware_raw_reweighting_admission.py",
@@ -802,6 +806,16 @@ SCORE_AWARE_RECONCILIATION_ANCHORS = (
     "## Fail-closed consistency rules",
     "compact_directory_sha256",
     "decision_bearing=True",
+)
+RANK_COHERENT_RECONCILIATION_ANCHORS = (
+    "Status: PRE_RESULT_NO_TRUSTED_MODE",
+    "## Mutually exclusive scientific branches",
+    "## Atomic publication update map",
+    "## Fail-closed consistency rules",
+    "load_and_validate_combined",
+    "canonical_marker",
+    "publish_reconciliation",
+    "RANK_COHERENT_RESULT",
 )
 SCORE_AWARE_RESULT_MARKER = re.compile(
     r"^SCORE_AWARE_RESULT: status=(?P<status>RECONCILED_(?:POSITIVE|NEGATIVE)); "
@@ -1909,6 +1923,25 @@ def main() -> int:
         reproducibility,
         score_aware_reconciliation,
     )
+    rank_coherent_reconciliation = (
+        PAPER_DIR / "RANK_COHERENT_RESULT_RECONCILIATION.md"
+    ).read_text(encoding="utf-8")
+    missing_rank_coherent_anchors = [
+        anchor for anchor in RANK_COHERENT_RECONCILIATION_ANCHORS
+        if anchor not in rank_coherent_reconciliation
+    ]
+    require(
+        not missing_rank_coherent_anchors,
+        "RANK_COHERENT_RESULT_RECONCILIATION.md is missing anchors: "
+        + ", ".join(missing_rank_coherent_anchors),
+    )
+    if "Status: PRE_RESULT_NO_TRUSTED_MODE" in rank_coherent_reconciliation:
+        require(
+            not any(re.search(r"^RANK_COHERENT_RESULT:", text, re.MULTILINE)
+                    for text in (manuscript, claim_ledger, readiness, reproducibility,
+                                 rank_coherent_reconciliation)),
+            "pre-result rank-coherent state contains a reconciled decision marker",
+        )
     validate_minimum_tier_comparisons(PAPER_DIR)
     validate_minimum_tier_key_claims(manuscript, PAPER_DIR)
     missing_outcome_anchors = [

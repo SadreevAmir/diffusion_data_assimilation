@@ -204,6 +204,20 @@ This is implementation-integrity evidence only: there is still no admitted
 literal mode or eligible result, so every scientific blocker and publication
 status remain unchanged.
 
+The downstream rank-coherent result transition is now executable and
+fail-closed. `canonical_marker` invokes combined admission over the exact JSON
+and compact directory, then binds its returned identities to all five literal
+gate-family decisions and their conjunction. `publish_reconciliation` requires
+the identical canonical marker in complete replacements for the manuscript,
+claim ledger, reproducibility record, readiness audit and reconciliation record
+before one prepare-first, rollback-protected publication; the publisher derives
+the marker again rather than trusting caller text. Negative fixtures
+prove that a partial surface transition performs no writes and that an injected
+failure after replacement begins restores all five prior surfaces. This adds no
+trusted mode or scientific result; status remains `NOT_READY`.
+The expanded unified audit passed with 64 required files after the executable
+reconciliation fixtures were added.
+
 ## Unique cross-artifact closure routes
 
 Each blocker has exactly one frozen contract and one insertion route into the
