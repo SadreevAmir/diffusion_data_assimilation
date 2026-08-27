@@ -2,6 +2,13 @@
 
 Status: `FROZEN_NOT_EXECUTABLE`
 
+Local runner-parity guard: `paper/probabilistic_da_contract_oracle.py` validates
+the exact compact manifest, observation-output identity, localization grid,
+assimilation procedure, purged fold selection and decision thresholds. Its
+negative fixtures are in `paper/test_probabilistic_da_contract_oracle.py`.
+Passing this oracle does not make the contract executable and does not admit a
+trusted mode; it is a fail-closed prerequisite for subsequent runner review.
+
 ## Publication role
 
 This contract freezes the missing probabilistic DA comparator without claiming
