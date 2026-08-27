@@ -48,6 +48,39 @@ fair-CRPS/rank/RMSE usefulness criteria. Its status remains `MISSING` until a
 separately reviewed trusted runner executes the literal contract. Invalid
 common-information or leakage checks cannot close the row.
 
+## Completed no-compensation gate cross-check
+
+The completed compact decisions admitted on the publication surfaces were
+cross-checked against the claim ledger and reproducibility handoff on
+2026-08-27. No admitted candidate has `overall_eligible=true`. This is a
+decision inventory, not a new numerical analysis: it neither reconstructs
+server-only case data nor changes any comparison row above.
+
+| Mechanism family | Decision-bearing publication record | Joint-gate result |
+|---|---|---|
+| Global anomaly scaling | `CLAIM_LEDGER.md` C8, C18--C20 | `overall_eligible=false` |
+| Purged hurdle-IDR/ECC-Q | `CLAIM_LEDGER.md` C21--C22 | `overall_eligible=false` |
+| Mean-preserving projected spread | `CLAIM_LEDGER.md` C23--C25 | `overall_eligible=false` |
+| Mean-preserving open-logit desaturation | `CLAIM_LEDGER.md` C26--C27 | `overall_eligible=false` |
+| ZOIB-EMOS/ECC-Q | `CLAIM_LEDGER.md` C28--C29 | `overall_eligible=false` |
+| Topology-preserving stratified transport | `CLAIM_LEDGER.md` C30 | `overall_eligible=false` |
+| Purged analog-residual dressing | `CLAIM_LEDGER.md` C31 | `overall_eligible=false` |
+| Frozen guidance mixture | `CLAIM_LEDGER.md` C32 | `overall_eligible=false` |
+| Coherent and slack-limited member offsets | `CLAIM_LEDGER.md` C33--C34 | `overall_eligible=false` |
+| Frozen latent temperature | `CLAIM_LEDGER.md` C35 | `overall_eligible=false` |
+| Locked MC dropout | `CLAIM_LEDGER.md` C38 | `overall_eligible=false` |
+| Cross-fitted iid calendar global-bias mixture | `CLAIM_LEDGER.md` C37 | `overall_eligible=false` |
+
+The independent primary in C39 is also negative, but it is not counted as an
+additional development calibration candidate and does not repair a missing
+minimum-tier row. The superseded primary recovery is excluded from this audit.
+Consequently the eligible-calibration blocker remains open, and the next
+mechanistically distinct score-aware raw-scenario reweighting route remains a
+frozen pre-result contract only: its trusted mode is not among the implemented
+executor interfaces, so it must not be proposed under an invented identifier.
+This conclusion preserves every existing evidence row and forbids rerunning or
+retuning a rejected mechanism merely to create activity.
+
 ## Decision-bearing evidence guard
 
 The rows below are normative and repeated verbatim on every publication surface
