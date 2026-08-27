@@ -564,7 +564,8 @@ python3 -m unittest -v \
   paper.test_publication_claim_status_consistency \
   paper.test_validate_server_only_manifest \
   paper.test_server_only_consumer_cli \
-  paper.test_atomic_publish
+  paper.test_atomic_publish \
+  paper.test_raw_member_reweighting_reference
 python3 paper/check_publication_artifacts.py
 ```
 

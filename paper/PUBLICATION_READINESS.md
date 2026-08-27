@@ -31,7 +31,7 @@ another row.
 
 The publication-readiness trigger was independently rerun against the current
 worktree on 2026-08-27. The fail-closed command
-`python3 paper/check_publication_artifacts.py` passed with exactly 50 required
+`python3 paper/check_publication_artifacts.py` passed with exactly 52 required
 files, two parseable linked figures, eight traceable references and 39
 contiguous claim-ledger records. A separate unfinished-text scan found no
 `TODO`, `TBD`, `FIXME` or `PLACEHOLDER` marker in the Markdown publication
@@ -45,6 +45,15 @@ controller-visible record with a literal reviewed mode and a trusted synthetic
 directory accepted with `decision_bearing=True` may authorize one full CPU
 proposal. Until then, no implemented negative baseline is repeated and no mode
 identifier is invented.
+
+The independent rerun also found that the newly frozen raw-member reweighting
+oracle and its fail-closed tests were described by the contract but were not
+members of the required publication inventory or documented regression suite.
+Both files and the test module are now mandatory in the unified checker and in
+the reproducibility command. This prevents the construction oracle from being
+silently removed or drifting untested while the prose contract remains. The
+change strengthens a contingent trusted-runner handoff only; it supplies no
+decision-bearing result and leaves publication status `NOT_READY`.
 
 ## Unique cross-artifact closure routes
 
@@ -268,7 +277,7 @@ mode or change `NOT_READY`.
 
 The 2026-08-27 independent publication-readiness rerun completed the unified
 fail-closed audit and the full documented regression contract against the
-current worktree. The audit passed with 50 required files, two figures, six
+current worktree. The audit passed with 52 required files, two figures, six
 references and all 39 claim-ledger rows traced; all 92 regression tests passed.
 The compact-payload subset now explicitly rejects a wrong 160-row envelope,
 duplicate method/date identities, candidate substitution, duplicate full-region

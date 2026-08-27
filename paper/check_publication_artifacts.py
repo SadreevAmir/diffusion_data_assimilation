@@ -30,6 +30,7 @@ REQUIRED_REGRESSION_SUITES = (
     "paper.test_validate_server_only_manifest",
     "paper.test_server_only_consumer_cli",
     "paper.test_atomic_publish",
+    "paper.test_raw_member_reweighting_reference",
 )
 REGRESSION_COMMAND = re.compile(
     r"python3 -m unittest -v \\\n(?P<body>(?:  paper\.[a-z0-9_]+(?: \\\n|\n))+)",
@@ -175,6 +176,8 @@ REQUIRED_FILES = (
     "NEXT_METHOD_CONTRACT.md",
     "NEXT_RANK_COHERENT_CONTRACT.md",
     "NEXT_RAW_MEMBER_REWEIGHTING_CONTRACT.md",
+    "raw_member_reweighting_reference.py",
+    "test_raw_member_reweighting_reference.py",
     "RANK_COHERENT_RUNNER_REVIEW_CHECKLIST.md",
     "RANK_COHERENT_CONTROLLER_HANDOFF.md",
     "FROZEN_EVALUATION_HANDOFF.md",
