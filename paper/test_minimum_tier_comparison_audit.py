@@ -13,6 +13,7 @@ from paper.check_publication_artifacts import (
     PAPER_DIR,
     READINESS_BLOCKER_ROW,
     READINESS_CLOSURE_ROUTE_ROW,
+    READINESS_DECISION_SURFACE_ANCHORS,
     READINESS_STOP_GO_CROSS_ARTIFACT_ANCHORS,
     REQUIRED_REGRESSION_SUITES,
     SERVER_ONLY_COMMAND_INPUTS,
@@ -62,6 +63,10 @@ class MinimumTierComparisonAuditTests(unittest.TestCase):
         )
         for filename in ("RESEARCH_PLAN.md", "FROZEN_EVALUATION_HANDOFF.md"):
             (fixture_dir / filename).write_bytes((PAPER_DIR / filename).read_bytes())
+        for filename in ("PAPER_DRAFT.md", "CLAIM_LEDGER.md"):
+            target = fixture_dir / filename
+            if not target.exists():
+                target.write_bytes((PAPER_DIR / filename).read_bytes())
         return temporary
 
     def assert_fixture_fails(self, audit: str, message: str) -> None:
@@ -280,6 +285,33 @@ class MinimumTierComparisonAuditTests(unittest.TestCase):
                     "normative stop/go closure binding is incomplete or weakened",
                 ):
                     validate_readiness_blockers(self.readiness, fixture_dir)
+
+    def test_decision_transition_guards_cover_both_publication_surfaces(self) -> None:
+        self.assertEqual(
+            set(READINESS_DECISION_SURFACE_ANCHORS),
+            {"PAPER_DRAFT.md", "CLAIM_LEDGER.md"},
+        )
+
+    def test_each_partial_publication_surface_update_fails_closed(self) -> None:
+        for filename, anchors in READINESS_DECISION_SURFACE_ANCHORS.items():
+            for index, anchor in enumerate(anchors):
+                with (
+                    self.subTest(filename=filename, anchor=index),
+                    self.make_fixture(self.audit) as temporary,
+                ):
+                    fixture_dir = Path(temporary)
+                    target = fixture_dir / filename
+                    text = target.read_text(encoding="utf-8")
+                    self.assertIn(anchor, text)
+                    target.write_text(
+                        text.replace(anchor, "Weakened publication transition.", 1),
+                        encoding="utf-8",
+                    )
+                    with self.assertRaisesRegex(
+                        ValueError,
+                        "publication decision transition is incomplete or weakened",
+                    ):
+                        validate_readiness_blockers(self.readiness, fixture_dir)
 
     def test_minimum_tier_evidence_guards_pass(self) -> None:
         validate_minimum_tier_evidence_guards(

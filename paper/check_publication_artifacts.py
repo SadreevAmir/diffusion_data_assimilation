@@ -510,6 +510,20 @@ READINESS_STOP_GO_CROSS_ARTIFACT_ANCHORS = {
         "Eligible-calibration closure requires one frozen candidate to pass every mandatory no-compensation family; no partial metric improvement can close that blocker.",
     ),
 }
+READINESS_DECISION_SURFACE_ANCHORS = {
+    "PAPER_DRAFT.md": (
+        "A valid conformal result changes the `conformal` row from `MISSING` only to the matching frozen decision-bearing outcome in the matrix above; invalid execution leaves that row unchanged.",
+        "A valid probabilistic-DA result changes the `probabilistic_da` row from `MISSING` only to the matching frozen decision-bearing outcome in the matrix above; an invalid comparator leaves that row unchanged.",
+        "The `independent_deterministic` row may leave `PRESENT_DEVELOPMENT_ONLY` only when the frozen common-information comparison supplies independent-strength evidence.",
+        "The `eligible_calibration` row may leave `MISSING_ELIGIBLE_RESULT` only when one frozen candidate passes every mandatory no-compensation family.",
+    ),
+    "CLAIM_LEDGER.md": (
+        "A conformal claim may become decision-bearing only with valid compact evidence for exactly one frozen matrix outcome; invalid execution preserves `MISSING`.",
+        "A probabilistic-DA claim may become decision-bearing only with valid compact evidence for exactly one frozen matrix outcome; an invalid comparator preserves `MISSING`.",
+        "Claims C9 and C17 may gain independent-strength deterministic support only from the frozen common-information comparison; development-only evidence cannot promote them.",
+        "A new positive calibration claim requires one frozen candidate to pass every mandatory no-compensation family; partial metric improvement cannot promote the blocked row.",
+    ),
+}
 READINESS_BLOCKER_ROW = re.compile(
     r"^\| (?P<blocker>[^|]+?) \| `(?P<source>RESEARCH_PLAN\.md|MINIMUM_TIER_COMPARISON_AUDIT\.md)` \| "
     r"(?P<status>[A-Z_]+) \| (?P<closure>[^|]*?) \|$",
@@ -1719,6 +1733,12 @@ def validate_readiness_blockers(readiness: str, paper_dir: Path) -> None:
         require(
             all(anchor in text for anchor in anchors),
             f"normative stop/go closure binding is incomplete or weakened: {filename}",
+        )
+    for filename, anchors in READINESS_DECISION_SURFACE_ANCHORS.items():
+        text = (paper_dir / filename).read_text(encoding="utf-8")
+        require(
+            all(anchor in text for anchor in anchors),
+            f"publication decision transition is incomplete or weakened: {filename}",
         )
     audit = (paper_dir / "MINIMUM_TIER_COMPARISON_AUDIT.md").read_text(
         encoding="utf-8"

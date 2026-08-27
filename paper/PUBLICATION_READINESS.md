@@ -54,6 +54,19 @@ two figures, eight references and 39 claims. This is stronger consistency
 evidence, not a blocker closure or a new scientific result; status remains
 `NOT_READY`.
 
+The following 2026-08-27 decision-surface audit closes the remaining local
+fail-open gap. The checker previously verified only generic section and claim
+anchors in `PAPER_DRAFT.md` and `CLAIM_LEDGER.md`; those anchors could survive
+while one route-specific transition was weakened. It now requires all four
+exact transition rules on both publication surfaces: the conformal and
+probabilistic-DA rows require valid compact evidence for one frozen matrix
+outcome, independent deterministic evidence requires the frozen
+common-information comparison, and eligible calibration requires a pass in
+every mandatory no-compensation family. Eight independent negative fixtures
+weaken one transition on one surface at a time and fail closed. This is
+cross-artifact consistency evidence only: no new scientific result exists, no
+blocker closes and publication status remains `NOT_READY`.
+
 ## Independent audit snapshot
 
 The publication-readiness trigger was independently rerun against the current
