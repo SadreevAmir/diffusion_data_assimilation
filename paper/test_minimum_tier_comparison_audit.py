@@ -266,7 +266,55 @@ class MinimumTierComparisonAuditTests(unittest.TestCase):
         originals = (self.manuscript, self.ledger, self.readiness, self.reproducibility)
         updated = [text.replace(old, new, 1) for text in originals]
         self.assertTrue(all(text != original for text, original in zip(updated, originals)))
+        updated[0] += (
+            f"\nEligible calibration decision: `ELIGIBLE`; compact record: `{marker}`; "
+            "claim role: `DECISION_BEARING`.\n"
+        )
+        updated[2] = updated[2].replace(
+            "| Eligible spatially preserving calibration | `RESEARCH_PLAN.md` | MISSING_ELIGIBLE_RESULT |",
+            "| Eligible spatially preserving calibration | `RESEARCH_PLAN.md` | ELIGIBLE |",
+            1,
+        )
+        updated[3] += (
+            f"\nEligible calibration reproducibility identity: `{marker}`; "
+            "verification: `HASH_VERIFIED`.\n"
+        )
         validate_eligible_calibration_transition(*updated)
+
+    def test_eligible_calibration_positive_guard_without_full_transition_fails(self) -> None:
+        marker = "e" * 64
+        old = "| `eligible_calibration` | `MISSING_ELIGIBLE_RESULT` | `NONE` | `BLOCKED` |"
+        new = f"| `eligible_calibration` | `ELIGIBLE` | `{marker}` | `DECISION_BEARING` |"
+        updated = [
+            text.replace(old, new, 1)
+            for text in (self.manuscript, self.ledger, self.readiness, self.reproducibility)
+        ]
+        with self.assertRaisesRegex(ValueError, "manuscript claim"):
+            validate_eligible_calibration_transition(*updated)
+
+    def test_eligible_calibration_positive_status_must_follow_blocker_matrix(self) -> None:
+        marker = "f" * 64
+        old = "| `eligible_calibration` | `MISSING_ELIGIBLE_RESULT` | `NONE` | `BLOCKED` |"
+        new = f"| `eligible_calibration` | `ELIGIBLE` | `{marker}` | `DECISION_BEARING` |"
+        updated = [
+            text.replace(old, new, 1)
+            for text in (self.manuscript, self.ledger, self.readiness, self.reproducibility)
+        ]
+        updated[0] += (
+            f"\nEligible calibration decision: `ELIGIBLE`; compact record: `{marker}`; "
+            "claim role: `DECISION_BEARING`.\n"
+        )
+        updated[2] = updated[2].replace(
+            "| Eligible spatially preserving calibration | `RESEARCH_PLAN.md` | MISSING_ELIGIBLE_RESULT |",
+            "| Eligible spatially preserving calibration | `RESEARCH_PLAN.md` | ELIGIBLE |",
+            1,
+        ).replace("Publication status: NOT_READY", "Publication status: READY_FOR_HUMAN_REVIEW", 1)
+        updated[3] += (
+            f"\nEligible calibration reproducibility identity: `{marker}`; "
+            "verification: `HASH_VERIFIED`.\n"
+        )
+        with self.assertRaisesRegex(ValueError, "status is inconsistent"):
+            validate_eligible_calibration_transition(*updated)
 
     def test_eligible_calibration_partial_positive_update_fails_closed(self) -> None:
         marker = "b" * 64

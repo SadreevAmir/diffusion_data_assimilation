@@ -537,6 +537,16 @@ ELIGIBLE_CALIBRATION_GUARD_ROW = re.compile(
     r"`(?P<record>NONE|[0-9a-f]{64})` \| `(?P<presentation>BLOCKED|DECISION_BEARING)` \|$",
     re.MULTILINE,
 )
+ELIGIBLE_CALIBRATION_MANUSCRIPT_DECISION = re.compile(
+    r"^Eligible calibration decision: `ELIGIBLE`; compact record: `(?P<record>[0-9a-f]{64})`; "
+    r"claim role: `DECISION_BEARING`\.$",
+    re.MULTILINE,
+)
+ELIGIBLE_CALIBRATION_REPRODUCIBILITY_IDENTITY = re.compile(
+    r"^Eligible calibration reproducibility identity: `(?P<record>[0-9a-f]{64})`; "
+    r"verification: `HASH_VERIFIED`\.$",
+    re.MULTILINE,
+)
 
 
 def validate_eligible_calibration_transition(
@@ -568,6 +578,53 @@ def validate_eligible_calibration_transition(
     require(
         len(set(observed.values())) == 1,
         "eligible-calibration transition is not atomic across publication surfaces",
+    )
+    status, record, _ = next(iter(observed.values()))
+    if status == "MISSING_ELIGIBLE_RESULT":
+        return
+
+    manuscript_decisions = list(
+        ELIGIBLE_CALIBRATION_MANUSCRIPT_DECISION.finditer(manuscript)
+    )
+    reproducibility_identities = list(
+        ELIGIBLE_CALIBRATION_REPRODUCIBILITY_IDENTITY.finditer(reproducibility)
+    )
+    require(
+        len(manuscript_decisions) == 1
+        and manuscript_decisions[0]["record"] == record,
+        "eligible-calibration decision-bearing manuscript claim is missing or mismatched",
+    )
+    require(
+        len(reproducibility_identities) == 1
+        and reproducibility_identities[0]["record"] == record,
+        "eligible-calibration reproducibility identity is missing or mismatched",
+    )
+
+    blocker_rows = list(READINESS_BLOCKER_ROW.finditer(readiness))
+    eligible_rows = [
+        row for row in blocker_rows
+        if row["blocker"] == "Eligible spatially preserving calibration"
+    ]
+    require(
+        len(eligible_rows) == 1 and eligible_rows[0]["status"] == "ELIGIBLE",
+        "eligible-calibration readiness blocker is not closed atomically",
+    )
+    publication_statuses = re.findall(
+        r"^Publication status: (\S+)$", readiness, re.MULTILINE
+    )
+    require(
+        len(publication_statuses) == 1,
+        "eligible-calibration transition requires one publication status",
+    )
+    unresolved_states = {"MISSING", "MISSING_ELIGIBLE_RESULT", "PRESENT_DEVELOPMENT_ONLY"}
+    expected_status = (
+        "NOT_READY"
+        if any(row["status"] in unresolved_states for row in blocker_rows)
+        else "READY_FOR_HUMAN_REVIEW"
+    )
+    require(
+        publication_statuses[0] == expected_status,
+        "eligible-calibration publication status is inconsistent with blocker matrix",
     )
 
 
