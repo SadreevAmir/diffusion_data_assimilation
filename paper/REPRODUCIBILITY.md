@@ -613,6 +613,7 @@ python3 -m unittest -v \
   paper.test_server_only_consumer_cli \
   paper.test_atomic_publish \
   paper.test_raw_member_reweighting_reference \
+  paper.test_validate_raw_member_reweighting_review \
   paper.test_score_aware_raw_reweighting_reference \
   paper.test_validate_score_aware_raw_reweighting_admission \
   paper.test_validate_score_aware_compact_outputs

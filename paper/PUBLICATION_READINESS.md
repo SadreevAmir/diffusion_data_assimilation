@@ -1,5 +1,16 @@
 # Publication readiness audit
 
+The 2026-08-29 reproducibility-inventory audit found that the newly completed
+fail-closed raw-member reweighting review validator and its regression suite
+were described by the handoff checklist but were not mandatory inputs to the
+unified publication audit. Both executable files and the checklist are now
+required publication artifacts, and the review suite is part of the exact
+documented regression command. The unified audit passed with 82 required files,
+two figures, eight references, 40 claims and 29 suites. This closes a
+deletion/drift gap in the autonomous handoff
+only; it does not create a reviewed trusted mode, authorize an experiment or
+change any scientific evidence state. Publication status remains `NOT_READY`.
+
 The 2026-08-29 independent publication-readiness rerun exposed two stale
 fail-closed bindings in the current committed state.  Claim `C40` was present
 in the ledger and manuscript result subsection but absent from the manuscript's
