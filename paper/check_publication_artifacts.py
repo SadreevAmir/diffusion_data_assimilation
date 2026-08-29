@@ -207,6 +207,7 @@ REQUIRED_FILES = (
     "RAW_MEMBER_REWEIGHTING_RUNNER_REVIEW_CHECKLIST.md",
     "validate_raw_member_reweighting_review.py",
     "test_validate_raw_member_reweighting_review.py",
+    "RAW_MEMBER_REWEIGHTING_RESULT_RECONCILIATION.md",
     "NEXT_SCORE_AWARE_RAW_REWEIGHTING_CONTRACT.md",
     "SCORE_AWARE_RESULT_RECONCILIATION.md",
     "RANK_COHERENT_RESULT_RECONCILIATION.md",
@@ -1073,6 +1074,17 @@ SCORE_AWARE_RECONCILIATION_ANCHORS = (
     "## Fail-closed consistency rules",
     "compact_directory_sha256",
     "decision_bearing=True",
+)
+RAW_MEMBER_REWEIGHTING_RECONCILIATION_ANCHORS = (
+    "Status: PRE_RESULT_NO_TRUSTED_MODE",
+    "## Authoritative input and immutable identities",
+    "## Mutually exclusive scientific branches",
+    "### Positive branch",
+    "### Negative branch",
+    "## Atomic publication update map",
+    "## Fail-closed consistency rules",
+    "validate_raw_member_reweighting_review.py",
+    "overall_eligible=true",
 )
 RANK_COHERENT_RECONCILIATION_ANCHORS = (
     "Status: RESULT_COMPLETED_AWAITING_COMBINED_ADMISSION",
@@ -2265,6 +2277,19 @@ def main() -> int:
         not missing_score_aware_reconciliation_anchors,
         "SCORE_AWARE_RESULT_RECONCILIATION.md is missing anchors: "
         + ", ".join(missing_score_aware_reconciliation_anchors),
+    )
+    raw_member_reconciliation = (
+        PAPER_DIR / "RAW_MEMBER_REWEIGHTING_RESULT_RECONCILIATION.md"
+    ).read_text(encoding="utf-8")
+    missing_raw_member_reconciliation_anchors = [
+        anchor
+        for anchor in RAW_MEMBER_REWEIGHTING_RECONCILIATION_ANCHORS
+        if anchor not in raw_member_reconciliation
+    ]
+    require(
+        not missing_raw_member_reconciliation_anchors,
+        "RAW_MEMBER_REWEIGHTING_RESULT_RECONCILIATION.md is missing anchors: "
+        + ", ".join(missing_raw_member_reconciliation_anchors),
     )
     validate_readiness_blockers(readiness, PAPER_DIR)
     reference_traceability = (PAPER_DIR / "REFERENCE_TRACEABILITY.md").read_text(

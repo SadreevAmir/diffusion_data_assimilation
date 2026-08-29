@@ -5,7 +5,7 @@ fail-closed raw-member reweighting review validator and its regression suite
 were described by the handoff checklist but were not mandatory inputs to the
 unified publication audit. Both executable files and the checklist are now
 required publication artifacts, and the review suite is part of the exact
-documented regression command. The unified audit passed with 82 required files,
+documented regression command. The unified audit passed with 83 required files,
 two figures, eight references, 40 claims and 29 suites. This closes a
 deletion/drift gap in the autonomous handoff
 only; it does not create a reviewed trusted mode, authorize an experiment or
@@ -1408,3 +1408,13 @@ prohibit compensation by the relative rank improvement. This closes the fixed
 mechanism without post-result tuning. No eligible calibration has been obtained,
 so publication status remains `NOT_READY` and the next mechanistically distinct
 contract remains active work.
+
+The subsequent pre-result audit adds
+`RAW_MEMBER_REWEIGHTING_RESULT_RECONCILIATION.md` to the mandatory publication
+inventory. It freezes mutually exclusive positive and negative interpretations,
+the atomic five-file update surface, exact completed counts and the prohibition
+on compensation or post-result retuning before any trusted mode or scientific
+result exists. The unified checker now fails if this handoff or any of its
+decision anchors disappears. This closes an autonomous result-integration gap
+only: it creates no mode or evidence, leaves `overall_eligible` unresolved and
+keeps publication status `NOT_READY`.
