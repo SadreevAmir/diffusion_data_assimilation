@@ -1278,3 +1278,16 @@ finite-ensemble reliability and operational validity pass. Their quoted fair-
 CRPS anchors also reconcile exactly. No provenance correction was warranted;
 this records a completed negative audit, does not add evidence or alter either
 gate decision, and leaves publication status `NOT_READY`.
+
+The subsequent 2026-08-29 provenance audit checked both coherent-offset rows.
+For the projected coherent member offset, `PAPER_DRAFT.md`, `CLAIM_LEDGER.md`
+C33 and `REPRODUCIBILITY.md` agree that training-only selection chooses the
+null amplitude, raw and candidate fair CRPS are both `0.0584905850`, ranks and
+coverage are unchanged, proper-score and finite-ensemble-reliability families
+fail, and boundary, spatial/physical and operational families pass. For the
+projection-free slack-limited ablation, all three surfaces agree that every
+pixel is blocked, selected and effective amplitudes are `0.0`, every paired
+metric and interval equals raw, the same two scientific families fail, and the
+same three families pass. Both rows retain `overall_eligible=false`. No
+provenance correction was warranted; this negative audit adds no scientific
+evidence, authorizes no retuning and leaves publication status `NOT_READY`.
