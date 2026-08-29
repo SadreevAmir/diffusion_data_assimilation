@@ -1357,3 +1357,14 @@ reproducibility handoff agree on raw/candidate fair CRPS
 proper-score, boundary and spatial/physical failures. No additional provenance
 correction was warranted. The audit adds no evidence, permits no retuning and
 leaves publication status `NOT_READY`.
+
+The 2026-08-29 rank-first reconciliation adds
+`joint_rank_coherent_rank_first_valid` to the manuscript, claim ledger and
+reproducibility handoff. All 40 cases complete and operational validity passes,
+but `overall_eligible=false`: absolute rank adequacy, proper-score, boundary and
+spatial/physical families fail. Fair CRPS worsens by `0.0053490344` with date
+interval `[0.0026379728, 0.0085435566]`; exact-one mass and variogram damage
+prohibit compensation by the relative rank improvement. This closes the fixed
+mechanism without post-result tuning. No eligible calibration has been obtained,
+so publication status remains `NOT_READY` and the next mechanistically distinct
+contract remains active work.

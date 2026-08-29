@@ -543,6 +543,18 @@ and edge disagreement are exact invariants, but the established-ice Brier limit
 is exceeded; member-spatial safety also fails in the full lag audit. The panel
 is a decision summary, not a composite score.
 
+### Rank-first coherent anomaly transport
+
+The fixed rank-first follow-up completed all 40 cases and selected `alpha=2.0`.
+It reduced date-balanced rank total variation from `0.356694` to `0.196974`
+and passed both attainable-coverage criteria, but maximum-bin deviation,
+normalized mean and total variation all failed absolute adequacy. Fair CRPS
+worsened from `0.0584906` to `0.0638396` (paired delta `0.00534903`,
+date-bootstrap 95% CI `[0.00263797, 0.00854356]`), exact-one mass error rose
+from `0.00904188` to `0.0981976`, and all three local variogram-score checks
+worsened. Thus only operational validity passed and `overall_eligible=false`.
+The result rejects the frozen mechanism without retuning alpha or thresholds.
+
 ## 7. Limitations
 
 The completed evidence uses one legacy checkpoint, one sampling seed, ten

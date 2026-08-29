@@ -707,3 +707,16 @@ established-ice Brier and near-upper-bound anchors, together with the frozen
 no-post-hoc-tuning decision, in the manuscript, claim ledger, reproducibility
 handoff and readiness audit. This catches a partially updated evidence chain;
 it validates package integrity, not scientific eligibility.
+
+## Completed rank-first coherent transport handoff
+
+`joint_rank_coherent_rank_first_valid` completed 40/40 cases with ten members
+per case. The compact gate records `overall_eligible=false`: operational
+validity passes, while proper-score, finite-ensemble-reliability, boundary and
+spatial/physical families fail. Candidate/raw fair CRPS is
+`0.0638396195`/`0.0584905850`; the paired candidate-minus-raw delta is
+`0.0053490344`, with date-bootstrap interval
+`[0.0026379728, 0.0085435566]`. Date-balanced rank total variation improves
+from `0.3566938377` to `0.1969742919`, but every absolute rank-histogram
+adequacy flag remains false. The frozen alpha set, folds, purge and thresholds
+must not be altered after this result.
