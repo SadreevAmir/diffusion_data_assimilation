@@ -126,14 +126,34 @@ def load_and_validate(record_path: Path, runner: Path, synthetic_result: Path) -
     return mode
 
 
+def build_admission_payload(
+    record_path: Path, runner: Path, synthetic_result: Path
+) -> dict[str, str]:
+    """Return one self-contained admission object with every verified identity."""
+    record_bytes = record_path.read_bytes()
+    record = json.loads(record_bytes.decode("utf-8"))
+    mode = load_and_validate(record_path, runner, synthetic_result)
+    if record_path.read_bytes() != record_bytes:
+        raise ValueError("review record changed while building admission payload")
+    return {
+        "reviewed_mode": mode,
+        "admission": "GO",
+        "review_record_sha256": hashlib.sha256(record_bytes).hexdigest(),
+        "publication_commit": record["publication_commit"],
+        "runner_sha256": record["runner_sha256"],
+        "contract_sha256": record["contract_sha256"],
+        "synthetic_result_sha256": record["synthetic_result_sha256"],
+    }
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("record", type=Path)
     parser.add_argument("runner", type=Path)
     parser.add_argument("synthetic_result", type=Path)
     args = parser.parse_args()
-    mode = load_and_validate(args.record, args.runner, args.synthetic_result)
-    print(json.dumps({"reviewed_mode": mode, "admission": "GO"}, sort_keys=True))
+    payload = build_admission_payload(args.record, args.runner, args.synthetic_result)
+    print(json.dumps(payload, sort_keys=True))
 
 
 if __name__ == "__main__":

@@ -10,6 +10,7 @@ from pathlib import Path
 from paper.validate_raw_member_reweighting_review import (
     CONTRACT,
     REQUIRED_KEYS,
+    build_admission_payload,
     load_and_validate,
     validate_record,
     validate_semantic_parity,
@@ -104,6 +105,26 @@ class ReviewAdmissionTests(unittest.TestCase):
                 load_and_validate(record_path, REFERENCE, synthetic),
                 "validation_reviewed_raw_member_reweighting",
             )
+
+    def test_admission_payload_carries_every_verified_identity(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            synthetic = root / "synthetic.json"
+            synthetic.write_text('{"status":"PASS"}\n', encoding="utf-8")
+            record_path = root / "review.json"
+            record = valid_record(REFERENCE, synthetic)
+            record_path.write_text(json.dumps(record, sort_keys=True), encoding="utf-8")
+            payload = build_admission_payload(record_path, REFERENCE, synthetic)
+            self.assertEqual(payload["admission"], "GO")
+            self.assertEqual(payload["reviewed_mode"], record["reviewed_mode"])
+            self.assertEqual(payload["review_record_sha256"], digest(record_path))
+            for key in (
+                "publication_commit",
+                "runner_sha256",
+                "contract_sha256",
+                "synthetic_result_sha256",
+            ):
+                self.assertEqual(payload[key], record[key])
 
 
 if __name__ == "__main__":

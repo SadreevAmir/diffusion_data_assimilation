@@ -1,5 +1,16 @@
 # Publication readiness audit
 
+The 2026-08-29 raw-member admission-to-proposal audit found that the validator
+checked the review record, runner, frozen contract and synthetic-result
+identities but discarded those bindings from its successful CLI payload. That
+made the downstream requirement for exact proposal bindings dependent on a
+second, unbound file read. The admission payload now atomically emits the review
+record SHA-256, publication commit and all three reviewed artifact SHA-256
+identities with the literal mode and `admission=GO`; a focused regression fixture
+requires exact equality. This closes a local substitution surface only. It does
+not create a reviewed mode, authorize a proposal or change any scientific
+evidence state; publication status remains `NOT_READY`.
+
 The 2026-08-29 independent cross-surface rerun checked the current manuscript,
 claim ledger, both publication figures, compact-evidence handoff and documented
 reproducibility entry point against the normative blocker matrix.  The unified

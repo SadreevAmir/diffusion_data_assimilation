@@ -107,3 +107,9 @@ synthetic-result bytes, checks the runner's pure construction surface against
 and emits `admission=GO` only with the reviewed literal mode. This check does
 not implement, name or launch a trusted mode; controller visibility and the
 independent review remain mandatory.
+
+The successful JSON payload is self-contained: alongside `admission=GO` and
+the literal `reviewed_mode`, it carries the SHA-256 of the exact review record,
+the reviewed publication commit and the verified runner, contract and synthetic
+result SHA-256 identities. A downstream proposal must consume those emitted
+bindings atomically; rereading an unbound review file is not equivalent.

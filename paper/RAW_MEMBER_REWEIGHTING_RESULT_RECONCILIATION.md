@@ -17,6 +17,11 @@ synthetic-result SHA-256, candidate identifier, completed case count and
 ensemble size. Until then every value remains `PENDING` and no manuscript claim
 changes.
 
+The first six review identities must be taken from one successful admission
+JSON emitted by `validate_raw_member_reweighting_review.py`. Reconstructing them
+by rereading separate files after admission is fail closed because it does not
+prove that the proposal consumed the exact bytes that passed validation.
+
 The decision-bearing compact result must contain the full gate, raw and
 candidate aggregates, paired date uncertainty, fixed four-case-block
 sensitivity, fold and analog provenance, rank-bin probabilities, source-index
