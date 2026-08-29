@@ -924,6 +924,22 @@ def validate_minimum_tier_reproducibility_guards(
         == observed_by_file["REPRODUCIBILITY.md"],
         "minimum-tier reproducibility transition is not atomic",
     )
+
+
+def validate_minimum_tier_publication_transition(
+    manuscript: str,
+    claim_ledger: str,
+    readiness: str,
+    audit: str,
+    reproducibility: str,
+) -> None:
+    """Validate every minimum-tier outcome across all publication surfaces."""
+    validate_minimum_tier_evidence_guards(
+        manuscript, claim_ledger, readiness, audit
+    )
+    validate_minimum_tier_reproducibility_guards(manuscript, reproducibility)
+
+
 EXTERNAL_PRIMARY_HANDOFF_ANCHORS = {
     "PUBLICATION_READINESS.md": (
         "External primary evidence state: RECONCILED_NEGATIVE",
@@ -2057,10 +2073,9 @@ def validate_joint_readiness_transition(
     frozen_handoff: str,
 ) -> str:
     """Validate all four scientific closures as one fail-closed transition."""
-    validate_minimum_tier_evidence_guards(
-        manuscript, claim_ledger, readiness, audit
+    validate_minimum_tier_publication_transition(
+        manuscript, claim_ledger, readiness, audit, reproducibility
     )
-    validate_minimum_tier_reproducibility_guards(manuscript, reproducibility)
     validate_eligible_calibration_transition(
         manuscript, claim_ledger, readiness, reproducibility
     )
@@ -2090,10 +2105,13 @@ def main() -> int:
         + (rank_oracle.stderr.strip() or rank_oracle.stdout.strip() or "no output"),
     )
 
+    manuscript = (PAPER_DIR / "PAPER_DRAFT.md").read_text(encoding="utf-8")
+    claim_ledger = (PAPER_DIR / "CLAIM_LEDGER.md").read_text(encoding="utf-8")
+    readiness = (PAPER_DIR / "PUBLICATION_READINESS.md").read_text(encoding="utf-8")
+    audit = (PAPER_DIR / "MINIMUM_TIER_COMPARISON_AUDIT.md").read_text(encoding="utf-8")
     reproducibility = (PAPER_DIR / "REPRODUCIBILITY.md").read_text(encoding="utf-8")
-    validate_minimum_tier_reproducibility_guards(
-        (PAPER_DIR / "PAPER_DRAFT.md").read_text(encoding="utf-8"),
-        reproducibility,
+    validate_minimum_tier_publication_transition(
+        manuscript, claim_ledger, readiness, audit, reproducibility
     )
     validate_documented_regression_suites(reproducibility)
     validate_server_only_command_inputs(reproducibility)

@@ -25,6 +25,7 @@ from paper.check_publication_artifacts import (
     validate_eligible_calibration_transition,
     validate_joint_readiness_transition,
     validate_minimum_tier_key_claims,
+    validate_minimum_tier_publication_transition,
     validate_minimum_tier_evidence_guards,
     validate_minimum_tier_reproducibility_guards,
     validate_minimum_tier_handoff_inventory,
@@ -496,7 +497,26 @@ class MinimumTierComparisonAuditTests(unittest.TestCase):
         for index, (route, status) in enumerate(cases):
             with self.subTest(route=route, status=status):
                 surfaces = self.transition_surfaces(route, status, f"{index + 1:064x}")
-                validate_minimum_tier_evidence_guards(*surfaces, self.audit)
+                old_status, _, old_presentation = MINIMUM_TIER_EVIDENCE_GUARD_ROWS[route]
+                old = f"| `{route}` | `{old_status}` | `NONE` | `{old_presentation}` |"
+                new = (
+                    f"| `{route}` | `{status}` | `{index + 1:064x}` | "
+                    "`DECISION_BEARING` |"
+                )
+                reproducibility = self.reproducibility.replace(old, new, 1)
+                self.assertNotEqual(reproducibility, self.reproducibility)
+                validate_minimum_tier_publication_transition(
+                    *surfaces, self.audit, reproducibility
+                )
+
+    def test_minimum_tier_outcome_without_reproducibility_update_fails_closed(self) -> None:
+        surfaces = self.transition_surfaces(
+            "probabilistic_da", "PROBABILISTIC_DA_NEGATIVE", "b" * 64
+        )
+        with self.assertRaisesRegex(ValueError, "reproducibility transition is not atomic"):
+            validate_minimum_tier_publication_transition(
+                *surfaces, self.audit, self.reproducibility
+            )
 
     def test_minimum_tier_partial_transition_fails_closed(self) -> None:
         manuscript, _, _ = self.transition_surfaces(
