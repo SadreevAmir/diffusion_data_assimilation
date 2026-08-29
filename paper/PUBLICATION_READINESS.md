@@ -1,5 +1,16 @@
 # Publication readiness audit
 
+The 2026-08-29 independent-deterministic closure-binding audit found that all
+four normative publication surfaces already required one compact-record
+SHA-256 identity, while `FROZEN_EVALUATION_HANDOFF.md` required only aligned
+comparator evidence and unspecified immutable identities. The handoff now
+requires the same exact compact-record identity in the manuscript, claim
+ledger, readiness audit and reproducibility handoff, and states that neither a
+promotion label nor a non-identical provenance-identity collection closes the
+row. No scientific result or evidence state changed:
+`independent_deterministic` remains `PRESENT_DEVELOPMENT_ONLY` with compact
+identity `NONE`.
+
 The 2026-08-29 probabilistic-DA closure-binding audit found that the frozen
 contract required a valid trusted execution and one decision-bearing outcome,
 but did not itself require the compact-record SHA-256 identity already mandated

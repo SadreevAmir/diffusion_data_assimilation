@@ -662,8 +662,10 @@ MINIMUM_TIER_ADMISSION_TRANSITION_ANCHORS = {
     ),
     "FROZEN_EVALUATION_HANDOFF.md": (
         "No local admission fixture closes the independent deterministic row: closure\n"
-        "requires the aligned compact comparator evidence and immutable identities in\n"
-        "the trusted return package above.",
+        "requires the aligned compact comparator evidence and the same exact compact-\n"
+        "record SHA-256 identity in `PAPER_DRAFT.md`, `CLAIM_LEDGER.md`,\n"
+        "`PUBLICATION_READINESS.md` and `REPRODUCIBILITY.md`. A promotion label or a\n"
+        "non-identical collection of immutable provenance identities closes nothing.",
     ),
 }
 READINESS_BLOCKER_ROW = re.compile(
