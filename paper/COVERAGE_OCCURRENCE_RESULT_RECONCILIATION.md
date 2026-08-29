@@ -34,6 +34,20 @@ infer a family decision from an aggregate metric or job completion status.
 
 ## Atomic decision procedure
 
+Before changing any publication surface, run the fail-closed joint admission:
+
+```bash
+python paper/validate_coverage_occurrence_admission.py \
+  --threshold /server/compact/threshold/gate_decision.json \
+  --joint-rank /server/compact/joint_rank/gate_decision.json
+```
+
+The two paths are placeholders for controller-visible compact files, not local
+result locations. The command emits `admission=GO` only after both exact
+identities, source, 40-by-10 envelope, Boolean family decisions and the literal
+family conjunction have passed. Its SHA-256 values bind the admitted bytes used
+by the subsequent atomic publication update.
+
 1. Admit both compact payloads and bind each to its exact experiment identity
    and immutable digest.
 2. Verify counts, source, folds, purge, candidate identity, frozen selection
