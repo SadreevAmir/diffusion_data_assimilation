@@ -1,5 +1,20 @@
 # Publication readiness audit
 
+The 2026-08-29 independent publication-readiness trigger audit reran the
+documented unified checker from the current worktree and obtained the exact
+verdict `83 files, 2 figures, 8 references, 40 claims, status=NOT_READY`.
+Manual cross-checking of `PAPER_DRAFT.md`, `CLAIM_LEDGER.md`, both publication
+figures and `REPRODUCIBILITY.md` found no promotion of the reconciled negative
+primary, no use of the superseded normalization result and no disagreement in
+the four normative evidence rows.  The remaining gaps are scientific rather
+than editorial: no jointly eligible calibration, no conformal comparison, no
+probabilistic-DA comparison and no independent-strength deterministic
+comparison.  The permitted trusted-mode inventory contains no executable mode
+for the three missing comparison rows, and the raw-member reweighting route
+still lacks a controller-visible reviewed literal mode.  This rerun therefore
+adds current-snapshot audit evidence but does not authorize an experiment or
+change publication status.
+
 The 2026-08-29 raw-member admission-to-proposal audit found that the validator
 checked the review record, runner, frozen contract and synthetic-result
 identities but discarded those bindings from its successful CLI payload. That
