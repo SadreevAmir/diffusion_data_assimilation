@@ -50,7 +50,7 @@ recorded as `PASS` in one controller-visible review with no deviations.
 - [ ] Compact output contains the complete gate, raw/candidate aggregates,
   paired date and fixed four-case-block uncertainty, fold/analog provenance,
   rank-bin probabilities, source multiplicities, identity/mask invariants and
-  operational counts, but no fields.
+  operational counts, but no raw-member, candidate or truth fields.
 - [ ] Candidate-minus-raw deltas reconcile to ordered case records. The primary
   prediction is at least 3% improvement in `analysis_fair_crps` with the paired
   date interval wholly improving; ordinary `analysis_crps` may worsen by at
