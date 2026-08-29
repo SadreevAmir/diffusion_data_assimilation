@@ -67,7 +67,9 @@ class MinimumTierComparisonAuditTests(unittest.TestCase):
         )
         for filename in ("RESEARCH_PLAN.md", "FROZEN_EVALUATION_HANDOFF.md"):
             (fixture_dir / filename).write_bytes((PAPER_DIR / filename).read_bytes())
-        for filename in ("PAPER_DRAFT.md", "CLAIM_LEDGER.md"):
+        for filename in (
+            "PAPER_DRAFT.md", "CLAIM_LEDGER.md", "PUBLICATION_READINESS.md"
+        ):
             target = fixture_dir / filename
             if not target.exists():
                 target.write_bytes((PAPER_DIR / filename).read_bytes())
@@ -315,10 +317,10 @@ class MinimumTierComparisonAuditTests(unittest.TestCase):
                 ):
                     validate_readiness_blockers(self.readiness, fixture_dir)
 
-    def test_decision_transition_guards_cover_both_publication_surfaces(self) -> None:
+    def test_decision_transition_guards_cover_all_three_publication_surfaces(self) -> None:
         self.assertEqual(
             set(READINESS_DECISION_SURFACE_ANCHORS),
-            {"PAPER_DRAFT.md", "CLAIM_LEDGER.md"},
+            {"PAPER_DRAFT.md", "CLAIM_LEDGER.md", "PUBLICATION_READINESS.md"},
         )
 
     def test_admission_transition_guards_cover_all_three_routes(self) -> None:

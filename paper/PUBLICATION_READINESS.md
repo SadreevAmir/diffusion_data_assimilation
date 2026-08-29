@@ -396,6 +396,11 @@ The positive eligible-calibration row is separately bound to one compact record
 across manuscript, claim ledger, readiness and reproducibility. The current
 missing state forbids a decision-bearing eligibility claim.
 
+The `conformal` blocker may close only when one frozen matrix outcome and its exact compact record SHA-256 identity match the manuscript and claim ledger; an outcome label alone closes nothing.
+The `probabilistic_da` blocker may close only when one frozen matrix outcome and its exact compact record SHA-256 identity match the manuscript and claim ledger; an outcome label alone closes nothing.
+The `independent_deterministic` blocker may close at independent strength only when the frozen common-information evidence and its exact compact record SHA-256 identity match the manuscript and claim ledger; a promotion label alone closes nothing.
+The `eligible_calibration` blocker may close only when every mandatory no-compensation family passes and the exact compact record SHA-256 identity matches the manuscript and claim ledger; an eligibility label alone closes nothing.
+
 The 2026-08-27 closure-route audit now makes those three rows executable
 publication guards rather than prose-only destinations. The checker requires
 the same status, compact-record identity and allowed presentation in the

@@ -72,10 +72,10 @@ The eligible-calibration row has a separate machine-bound transition. It may
 become decision-bearing only when the same compact-record hash appears on all
 four normative publication surfaces.
 
-A conformal claim may become decision-bearing only with valid compact evidence for exactly one frozen matrix outcome; invalid execution preserves `MISSING`.
-A probabilistic-DA claim may become decision-bearing only with valid compact evidence for exactly one frozen matrix outcome; an invalid comparator preserves `MISSING`.
-Claims C9 and C17 may gain independent-strength deterministic support only from the frozen common-information comparison; development-only evidence cannot promote them.
-A new positive calibration claim requires one frozen candidate to pass every mandatory no-compensation family; partial metric improvement cannot promote the blocked row.
+A conformal claim may become decision-bearing only with exactly one frozen matrix outcome and the same exact compact record SHA-256 identity used by every publication surface; invalid execution preserves `MISSING`.
+A probabilistic-DA claim may become decision-bearing only with exactly one frozen matrix outcome and the same exact compact record SHA-256 identity used by every publication surface; an invalid comparator preserves `MISSING`.
+Claims C9 and C17 may gain independent-strength deterministic support only from the frozen common-information comparison and the same exact compact record SHA-256 identity used by every publication surface; development-only evidence cannot promote them.
+A new positive calibration claim requires one frozen candidate to pass every mandatory no-compensation family and the same exact compact record SHA-256 identity used by every publication surface; partial metric improvement cannot promote the blocked row.
 
 ## Mandatory language discipline
 

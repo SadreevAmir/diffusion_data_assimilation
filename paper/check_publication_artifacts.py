@@ -586,16 +586,22 @@ READINESS_STOP_GO_CROSS_ARTIFACT_ANCHORS = {
 }
 READINESS_DECISION_SURFACE_ANCHORS = {
     "PAPER_DRAFT.md": (
-        "A valid conformal result changes the `conformal` row from `MISSING` only to the matching frozen decision-bearing outcome in the matrix above; invalid execution leaves that row unchanged.",
-        "A valid probabilistic-DA result changes the `probabilistic_da` row from `MISSING` only to the matching frozen decision-bearing outcome in the matrix above; an invalid comparator leaves that row unchanged.",
-        "The `independent_deterministic` row may leave `PRESENT_DEVELOPMENT_ONLY` only when the frozen common-information comparison supplies independent-strength evidence.",
-        "The `eligible_calibration` row may leave `MISSING_ELIGIBLE_RESULT` only when one frozen candidate passes every mandatory no-compensation family.",
+        "A valid conformal result changes the `conformal` row from `MISSING` only when the matching frozen decision-bearing outcome and its exact compact record SHA-256 identity are recorded; invalid execution leaves that row unchanged.",
+        "A valid probabilistic-DA result changes the `probabilistic_da` row from `MISSING` only when the matching frozen decision-bearing outcome and its exact compact record SHA-256 identity are recorded; an invalid comparator leaves that row unchanged.",
+        "The `independent_deterministic` row may leave `PRESENT_DEVELOPMENT_ONLY` only when the frozen common-information comparison supplies independent-strength evidence and its exact compact record SHA-256 identity.",
+        "The `eligible_calibration` row may leave `MISSING_ELIGIBLE_RESULT` only when one frozen candidate passes every mandatory no-compensation family and the exact compact record SHA-256 identity is recorded.",
     ),
     "CLAIM_LEDGER.md": (
-        "A conformal claim may become decision-bearing only with valid compact evidence for exactly one frozen matrix outcome; invalid execution preserves `MISSING`.",
-        "A probabilistic-DA claim may become decision-bearing only with valid compact evidence for exactly one frozen matrix outcome; an invalid comparator preserves `MISSING`.",
-        "Claims C9 and C17 may gain independent-strength deterministic support only from the frozen common-information comparison; development-only evidence cannot promote them.",
-        "A new positive calibration claim requires one frozen candidate to pass every mandatory no-compensation family; partial metric improvement cannot promote the blocked row.",
+        "A conformal claim may become decision-bearing only with exactly one frozen matrix outcome and the same exact compact record SHA-256 identity used by every publication surface; invalid execution preserves `MISSING`.",
+        "A probabilistic-DA claim may become decision-bearing only with exactly one frozen matrix outcome and the same exact compact record SHA-256 identity used by every publication surface; an invalid comparator preserves `MISSING`.",
+        "Claims C9 and C17 may gain independent-strength deterministic support only from the frozen common-information comparison and the same exact compact record SHA-256 identity used by every publication surface; development-only evidence cannot promote them.",
+        "A new positive calibration claim requires one frozen candidate to pass every mandatory no-compensation family and the same exact compact record SHA-256 identity used by every publication surface; partial metric improvement cannot promote the blocked row.",
+    ),
+    "PUBLICATION_READINESS.md": (
+        "The `conformal` blocker may close only when one frozen matrix outcome and its exact compact record SHA-256 identity match the manuscript and claim ledger; an outcome label alone closes nothing.",
+        "The `probabilistic_da` blocker may close only when one frozen matrix outcome and its exact compact record SHA-256 identity match the manuscript and claim ledger; an outcome label alone closes nothing.",
+        "The `independent_deterministic` blocker may close at independent strength only when the frozen common-information evidence and its exact compact record SHA-256 identity match the manuscript and claim ledger; a promotion label alone closes nothing.",
+        "The `eligible_calibration` blocker may close only when every mandatory no-compensation family passes and the exact compact record SHA-256 identity matches the manuscript and claim ledger; an eligibility label alone closes nothing.",
     ),
 }
 MINIMUM_TIER_ADMISSION_TRANSITION_ANCHORS = {

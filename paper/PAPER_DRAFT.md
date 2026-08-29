@@ -316,10 +316,10 @@ The positive learned-joint calibration row is independently fail-closed. A
 decision-bearing eligibility claim requires one identical compact-record hash
 on the manuscript, claim ledger, readiness audit and reproducibility handoff.
 
-A valid conformal result changes the `conformal` row from `MISSING` only to the matching frozen decision-bearing outcome in the matrix above; invalid execution leaves that row unchanged.
-A valid probabilistic-DA result changes the `probabilistic_da` row from `MISSING` only to the matching frozen decision-bearing outcome in the matrix above; an invalid comparator leaves that row unchanged.
-The `independent_deterministic` row may leave `PRESENT_DEVELOPMENT_ONLY` only when the frozen common-information comparison supplies independent-strength evidence.
-The `eligible_calibration` row may leave `MISSING_ELIGIBLE_RESULT` only when one frozen candidate passes every mandatory no-compensation family.
+A valid conformal result changes the `conformal` row from `MISSING` only when the matching frozen decision-bearing outcome and its exact compact record SHA-256 identity are recorded; invalid execution leaves that row unchanged.
+A valid probabilistic-DA result changes the `probabilistic_da` row from `MISSING` only when the matching frozen decision-bearing outcome and its exact compact record SHA-256 identity are recorded; an invalid comparator leaves that row unchanged.
+The `independent_deterministic` row may leave `PRESENT_DEVELOPMENT_ONLY` only when the frozen common-information comparison supplies independent-strength evidence and its exact compact record SHA-256 identity.
+The `eligible_calibration` row may leave `MISSING_ELIGIBLE_RESULT` only when one frozen candidate passes every mandatory no-compensation family and the exact compact record SHA-256 identity is recorded.
 
 We additionally evaluate the frozen cross-fitted scales followed by an exact
 capped-simplex projection of each ten-member pixel distribution. The projection
