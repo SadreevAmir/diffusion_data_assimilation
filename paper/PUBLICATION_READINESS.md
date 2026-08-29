@@ -1,5 +1,19 @@
 # Publication readiness audit
 
+The 2026-08-29 independent cross-surface rerun checked the current manuscript,
+claim ledger, both publication figures, compact-evidence handoff and documented
+reproducibility entry point against the normative blocker matrix.  The unified
+checker passed with 83 required files, two figures, eight references and 40
+claims, while the manual comparison found no promotion of a negative result and
+no disagreement in evidence status.  The four decision-bearing gaps remain
+unchanged: no jointly eligible calibration result, no conformal comparison, no
+probabilistic-DA comparison and no independent-strength deterministic
+comparison.  A raw-member reweighting proposal also remains fail closed until
+one controller-visible review record binds a literal implemented mode and
+passes the documented admission validator without deviations.  This audit
+therefore strengthens the readiness provenance but supplies no new scientific
+result; publication status remains `NOT_READY`.
+
 The 2026-08-29 current-snapshot provenance audit found that the unified checker
 already required and passed 83 publication files and 29 regression suites, but
 the undated `Current independent audit snapshot` and its trigger-specific rerun
