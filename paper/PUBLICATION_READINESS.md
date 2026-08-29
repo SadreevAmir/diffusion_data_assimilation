@@ -1267,3 +1267,14 @@ requires it to match the manuscript atomically. Focused fixtures accept the
 current missing/development-only state and reject an omitted identity row. This
 closes a reproducibility synchronization gap only: no compact result is created,
 all four scientific blockers remain open and status remains `NOT_READY`.
+
+The 2026-08-29 continuation audit checked the first two remaining family-level
+matrix rows against their declared compact publication source. For topology-
+preserving stratified transport, `PAPER_DRAFT.md`, `CLAIM_LEDGER.md` C30 and
+`REPRODUCIBILITY.md` agree that proper-score and finite-ensemble-reliability
+families fail while boundary, spatial/physical and operational families pass.
+For purged analog-residual dressing, the same three surfaces agree that only
+finite-ensemble reliability and operational validity pass. Their quoted fair-
+CRPS anchors also reconcile exactly. No provenance correction was warranted;
+this records a completed negative audit, does not add evidence or alter either
+gate decision, and leaves publication status `NOT_READY`.
