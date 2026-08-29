@@ -1291,3 +1291,17 @@ metric and interval equals raw, the same two scientific families fail, and the
 same three families pass. Both rows retain `overall_eligible=false`. No
 provenance correction was warranted; this negative audit adds no scientific
 evidence, authorizes no retuning and leaves publication status `NOT_READY`.
+
+The next 2026-08-29 family-level provenance audit checked the guidance-mixture
+and latent-temperature rows. For guidance mixture, the manuscript matrix,
+`CLAIM_LEDGER.md` C32 and the corrected compact handoff in
+`REPRODUCIBILITY.md` agree that proper-score, finite-ensemble-reliability,
+boundary and spatial/physical families fail, operational validity passes and
+`overall_eligible=false`. For latent temperature, `PAPER_DRAFT.md`,
+`CLAIM_LEDGER.md` C35, `LATENT_TEMPERATURE_RESULT_RECONCILIATION.md` and the
+reproducibility handoff agree on raw/candidate fair CRPS
+`0.0584905850`/`0.0631177443`, paired delta `0.0046271592`, date interval
+`[0.0014355657, 0.0075956683]`, reliability and operational passes, and
+proper-score, boundary and spatial/physical failures. No additional provenance
+correction was warranted. The audit adds no evidence, permits no retuning and
+leaves publication status `NOT_READY`.
