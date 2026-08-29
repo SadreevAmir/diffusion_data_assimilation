@@ -822,6 +822,57 @@ class MinimumTierComparisonAuditTests(unittest.TestCase):
             "READY_FOR_HUMAN_REVIEW",
         )
 
+    def test_required_python_artifacts_reject_invalid_syntax(self) -> None:
+        manuscript, ledger, readiness, reproducibility, handoff = (
+            self.fully_closed_surfaces()
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            artifact_dir = Path(directory)
+            for name in REQUIRED_FILES:
+                source = (PAPER_DIR / name).read_bytes()
+                (artifact_dir / name).write_bytes(source)
+            (artifact_dir / "rank_coherent_reference.py").write_text(
+                "def broken(:\n", encoding="utf-8"
+            )
+            with self.assertRaisesRegex(
+                ValueError,
+                "required Python artifact has invalid syntax: rank_coherent_reference.py",
+            ):
+                validate_joint_readiness_transition(
+                    manuscript,
+                    ledger,
+                    readiness,
+                    self.audit,
+                    reproducibility,
+                    handoff,
+                    artifact_dir=artifact_dir,
+                )
+
+    def test_required_python_artifacts_reject_false_executable_oracle(self) -> None:
+        manuscript, ledger, readiness, reproducibility, handoff = (
+            self.fully_closed_surfaces()
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            artifact_dir = Path(directory)
+            for name in REQUIRED_FILES:
+                source = (PAPER_DIR / name).read_bytes()
+                (artifact_dir / name).write_bytes(source)
+            (artifact_dir / "rank_coherent_reference.py").write_text(
+                'print("rank-coherent reference checks: FALSE")\n', encoding="utf-8"
+            )
+            with self.assertRaisesRegex(
+                ValueError, "rank-coherent executable oracle failed"
+            ):
+                validate_joint_readiness_transition(
+                    manuscript,
+                    ledger,
+                    readiness,
+                    self.audit,
+                    reproducibility,
+                    handoff,
+                    artifact_dir=artifact_dir,
+                )
+
     def test_joint_transition_rejects_ready_with_any_open_blocker(self) -> None:
         manuscript, ledger, readiness, reproducibility, handoff = (
             self.fully_closed_surfaces()

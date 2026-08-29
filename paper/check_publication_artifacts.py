@@ -2133,6 +2133,30 @@ def validate_figure_integrity(manuscript: str, paper_dir: Path = PAPER_DIR) -> l
     return figures
 
 
+def validate_required_python_artifacts(paper_dir: Path = PAPER_DIR) -> None:
+    """Fail closed on invalid required Python and its executable reference oracle."""
+    for name in PYTHON_FILES:
+        source = (paper_dir / name).read_text(encoding="utf-8")
+        try:
+            ast.parse(source, filename=name)
+        except SyntaxError as exc:
+            raise ValueError(f"required Python artifact has invalid syntax: {name}") from exc
+
+    rank_oracle = subprocess.run(
+        [sys.executable, str(paper_dir / "rank_coherent_reference.py")],
+        cwd=paper_dir.parent,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    require(
+        rank_oracle.returncode == 0
+        and rank_oracle.stdout.strip() == "rank-coherent reference checks: PASS",
+        "rank-coherent executable oracle failed: "
+        + (rank_oracle.stderr.strip() or rank_oracle.stdout.strip() or "no output"),
+    )
+
+
 def validate_joint_readiness_transition(
     manuscript: str,
     claim_ledger: str,
@@ -2145,9 +2169,9 @@ def validate_joint_readiness_transition(
     artifact_dir: Path | None = None,
 ) -> str:
     """Validate scientific closures and publication surfaces as one transition."""
-    validate_required_publication_files(
-        PAPER_DIR if artifact_dir is None else artifact_dir
-    )
+    artifact_dir = PAPER_DIR if artifact_dir is None else artifact_dir
+    validate_required_publication_files(artifact_dir)
+    validate_required_python_artifacts(artifact_dir)
     validate_minimum_tier_publication_transition(
         manuscript, claim_ledger, readiness, audit, reproducibility
     )
@@ -2177,24 +2201,7 @@ def validate_joint_readiness_transition(
 def main() -> int:
     validate_minimum_tier_handoff_inventory()
     validate_required_publication_files()
-
-    for name in PYTHON_FILES:
-        source = (PAPER_DIR / name).read_text(encoding="utf-8")
-        ast.parse(source, filename=name)
-
-    rank_oracle = subprocess.run(
-        [sys.executable, str(PAPER_DIR / "rank_coherent_reference.py")],
-        cwd=PAPER_DIR.parent,
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    require(
-        rank_oracle.returncode == 0
-        and rank_oracle.stdout.strip() == "rank-coherent reference checks: PASS",
-        "rank-coherent executable oracle failed: "
-        + (rank_oracle.stderr.strip() or rank_oracle.stdout.strip() or "no output"),
-    )
+    validate_required_python_artifacts()
 
     manuscript = (PAPER_DIR / "PAPER_DRAFT.md").read_text(encoding="utf-8")
     claim_ledger = (PAPER_DIR / "CLAIM_LEDGER.md").read_text(encoding="utf-8")
