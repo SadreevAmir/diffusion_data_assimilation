@@ -2268,6 +2268,22 @@ def main() -> int:
     score_aware_reconciliation = (
         PAPER_DIR / "SCORE_AWARE_RESULT_RECONCILIATION.md"
     ).read_text(encoding="utf-8")
+    coverage_occurrence_reconciliation = (
+        PAPER_DIR / "COVERAGE_OCCURRENCE_RESULT_RECONCILIATION.md"
+    ).read_text(encoding="utf-8")
+    for anchor in (
+        "Status: PRE_RESULT_COMPACT_PAYLOAD_PENDING",
+        "`joint_coverage_occurrence_threshold_valid`",
+        "`joint_coverage_occurrence_joint_rank_valid`",
+        "`overall_eligible` is not the literal conjunction of the five families",
+        "If both candidates have `overall_eligible=false`",
+        "requires a literal reviewed mode",
+    ):
+        require(
+            anchor in coverage_occurrence_reconciliation,
+            "COVERAGE_OCCURRENCE_RESULT_RECONCILIATION.md is missing anchor: "
+            + anchor,
+        )
     missing_score_aware_reconciliation_anchors = [
         anchor
         for anchor in SCORE_AWARE_RECONCILIATION_ANCHORS

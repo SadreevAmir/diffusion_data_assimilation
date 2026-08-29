@@ -1485,3 +1485,15 @@ result exists. The unified checker now fails if this handoff or any of its
 decision anchors disappears. This closes an autonomous result-integration gap
 only: it creates no mode or evidence, leaves `overall_eligible` unresolved and
 keeps publication status `NOT_READY`.
+
+The next 2026-08-29 integration audit adds
+`COVERAGE_OCCURRENCE_RESULT_RECONCILIATION.md` as a fail-closed boundary for the
+two completed occurrence-calibration jobs. Their scheduler completion records
+do not expose the five mandatory family decisions, so no scientific outcome is
+inferred. The handoff requires both controller-visible compact payloads in one
+atomic audit, verifies `overall_eligible` as their family conjunction, and
+predeclares mutually exclusive positive and jointly negative publication
+updates. It forbids a repeated computation, compensating interpretation or
+activation of score-aware reweighting without two admitted negative gates and a
+literal reviewed mode. This closes an autonomous result-integration gap while
+publication status remains `NOT_READY`.
