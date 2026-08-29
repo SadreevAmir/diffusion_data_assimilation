@@ -174,7 +174,7 @@ with a different digest, is rejected. This closes the local admission-to-
 reconciliation identity gap without changing the scientific evidence row or
 the not-ready status below.
 
-Audit date: 2026-08-27
+Audit date: 2026-08-29
 
 Publication status: NOT_READY
 
@@ -204,7 +204,7 @@ earlier lower counts below are retained only as dated audit history.
 ## Current independent audit snapshot
 
 The current audit passed with 79 required files, two parseable linked figures,
-eight traceable references and 39 contiguous claim-ledger records. The
+eight traceable references and 40 contiguous claim-ledger records. The
 immutable rank-coherent package separately
 passed its 13-file manifest check and all 26 focused prototype, adapter-parity,
 combined-admission and manifest fixtures. These current counts supersede the
@@ -219,7 +219,7 @@ therefore changes, and publication status remains `NOT_READY`.
 
 The publication-readiness trigger was then independently repeated against this
 exact worktree state. The unified checker again passed with 79 required files,
-two parseable linked figures, eight traceable references and 39 contiguous
+two parseable linked figures, eight traceable references and 40 contiguous
 claim-ledger records. A focused 61-test decision-surface suite covering
 conformal admission, claim-status consistency and the minimum-tier comparison
 audit also passed, and `git diff --check` reported no whitespace errors. This
