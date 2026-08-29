@@ -8,6 +8,7 @@ import unittest
 from pathlib import Path
 
 from paper.check_publication_artifacts import (
+    FIGURE_TEXT_ANCHORS,
     MINIMUM_TIER_ADMISSION_TRANSITION_ANCHORS,
     MINIMUM_TIER_EVIDENCE_GUARD_ROWS,
     MINIMUM_TIER_HANDOFF_INVENTORY,
@@ -894,6 +895,57 @@ class MinimumTierComparisonAuditTests(unittest.TestCase):
                 handoff,
                 reference_traceability=traceability,
             )
+
+    def test_joint_transition_rejects_regression_command_omission_after_closure(self) -> None:
+        manuscript, ledger, readiness, reproducibility, handoff = (
+            self.fully_closed_surfaces()
+        )
+        suite = REQUIRED_REGRESSION_SUITES[-1]
+        reproducibility = reproducibility.replace(f"  {suite}\n", "", 1)
+        with self.assertRaisesRegex(ValueError, "differ from the required"):
+            validate_joint_readiness_transition(
+                manuscript, ledger, readiness, self.audit, reproducibility, handoff
+            )
+
+    def test_joint_transition_rejects_missing_figure_after_closure(self) -> None:
+        manuscript, ledger, readiness, reproducibility, handoff = (
+            self.fully_closed_surfaces()
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            with self.assertRaisesRegex(ValueError, "linked figure does not exist"):
+                validate_joint_readiness_transition(
+                    manuscript,
+                    ledger,
+                    readiness,
+                    self.audit,
+                    reproducibility,
+                    handoff,
+                    figure_dir=Path(directory),
+                )
+
+    def test_joint_transition_rejects_figure_semantic_mutation_after_closure(self) -> None:
+        manuscript, ledger, readiness, reproducibility, handoff = (
+            self.fully_closed_surfaces()
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            figure_dir = Path(directory)
+            for relative_name, anchors in FIGURE_TEXT_ANCHORS.items():
+                target = figure_dir / relative_name
+                target.parent.mkdir(parents=True, exist_ok=True)
+                text = (PAPER_DIR / relative_name).read_text(encoding="utf-8")
+                if relative_name == "figures/calibration_summary.svg":
+                    text = text.replace(anchors[0], "semantic-anchor-removed", 1)
+                target.write_text(text, encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "missing semantic anchors"):
+                validate_joint_readiness_transition(
+                    manuscript,
+                    ledger,
+                    readiness,
+                    self.audit,
+                    reproducibility,
+                    handoff,
+                    figure_dir=figure_dir,
+                )
 
     def test_readiness_cannot_claim_ready_with_open_blocker_matrix(self) -> None:
         frozen_handoff = (PAPER_DIR / "FROZEN_EVALUATION_HANDOFF.md").read_text(

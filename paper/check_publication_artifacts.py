@@ -2090,6 +2090,30 @@ def validate_publication_status(readiness: str, frozen_handoff: str) -> str:
     return status
 
 
+def validate_figure_integrity(manuscript: str, paper_dir: Path = PAPER_DIR) -> list[str]:
+    """Bind linked publication figures and their semantic labels to readiness."""
+    figures = FIGURE_PATTERN.findall(manuscript)
+    require(figures, "manuscript contains no linked figures")
+    for relative_name in figures:
+        figure = (paper_dir / relative_name).resolve()
+        require(
+            figure.is_relative_to(paper_dir.resolve()),
+            f"figure escapes paper directory: {relative_name}",
+        )
+        require(figure.is_file(), f"linked figure does not exist: {relative_name}")
+        if figure.suffix.lower() == ".svg":
+            ET.parse(figure)
+        anchors = FIGURE_TEXT_ANCHORS.get(relative_name, ())
+        figure_text = figure.read_text(encoding="utf-8")
+        missing_figure_anchors = [anchor for anchor in anchors if anchor not in figure_text]
+        require(
+            not missing_figure_anchors,
+            f"{relative_name} is missing semantic anchors: "
+            + ", ".join(missing_figure_anchors),
+        )
+    return figures
+
+
 def validate_joint_readiness_transition(
     manuscript: str,
     claim_ledger: str,
@@ -2098,6 +2122,7 @@ def validate_joint_readiness_transition(
     reproducibility: str,
     frozen_handoff: str,
     reference_traceability: str | None = None,
+    figure_dir: Path | None = None,
 ) -> str:
     """Validate scientific closures and publication surfaces as one transition."""
     validate_minimum_tier_publication_transition(
@@ -2120,6 +2145,9 @@ def validate_joint_readiness_transition(
         )
     validate_reference_traceability(reference_traceability)
     validate_empirical_traceability(manuscript, PAPER_DIR)
+    validate_documented_regression_suites(reproducibility)
+    validate_server_only_command_inputs(reproducibility)
+    validate_figure_integrity(manuscript, PAPER_DIR if figure_dir is None else figure_dir)
     return validate_publication_status(readiness, frozen_handoff)
 
 
@@ -2580,25 +2608,7 @@ def main() -> int:
         + ", ".join(missing_locked_dropout_anchors),
     )
 
-    figures = FIGURE_PATTERN.findall(manuscript)
-    require(figures, "manuscript contains no linked figures")
-    for relative_name in figures:
-        figure = (PAPER_DIR / relative_name).resolve()
-        require(
-            figure.is_relative_to(PAPER_DIR),
-            f"figure escapes paper directory: {relative_name}",
-        )
-        require(figure.is_file(), f"linked figure does not exist: {relative_name}")
-        if figure.suffix.lower() == ".svg":
-            ET.parse(figure)
-        anchors = FIGURE_TEXT_ANCHORS.get(relative_name, ())
-        figure_text = figure.read_text(encoding="utf-8")
-        missing_figure_anchors = [anchor for anchor in anchors if anchor not in figure_text]
-        require(
-            not missing_figure_anchors,
-            f"{relative_name} is missing semantic anchors: "
-            + ", ".join(missing_figure_anchors),
-        )
+    figures = validate_figure_integrity(manuscript)
 
     validate_manuscript_reference_consistency(manuscript)
     reference_heading = "## References\n"
