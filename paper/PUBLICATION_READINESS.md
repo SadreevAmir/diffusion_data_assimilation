@@ -1,5 +1,15 @@
 # Publication readiness audit
 
+The 2026-08-29 end-to-end reproducibility audit executed the complete two-command
+handoff documented in `REPRODUCIBILITY.md`, rather than relying on static command
+inspection.  The documented 27-suite list exactly matches
+`REQUIRED_REGRESSION_SUITES` in order and membership, and the subsequent unified
+checker completed with 79 required files, two figures, eight references and 39
+claims at status `NOT_READY`.  No missing or stale executable step was found.
+This establishes local handoff executability only: it supplies no new scientific
+result, closes none of the four normative blocker rows and does not change the
+publication status.
+
 The 2026-08-29 cross-surface evidence audit independently traced all four
 normative blocker states through `PAPER_DRAFT.md`, `CLAIM_LEDGER.md`,
 `MINIMUM_TIER_COMPARISON_AUDIT.md`, both linked figures and the compact-result
