@@ -1,5 +1,22 @@
 # Publication readiness audit
 
+The 2026-08-29 decision-bearing evidence audit independently searched the
+publication worktree for compact outputs from the two completed
+coverage--occurrence jobs and found no result payload, metadata bundle or
+reconciliation artifact for either job.  A scheduler status of `summary_ready`
+therefore remains operational evidence only and cannot supply candidate
+identity, five-family decisions, paired uncertainty or invariant checks.  The
+same snapshot passed the unified checker with 83 required files, two figures,
+eight references and 40 claims at `NOT_READY`; a focused 129-test boundary over
+claim status, compact schemas, empirical traceability, figure generation,
+limitations, references, minimum-tier comparisons and raw-member review also
+passed.  This closes the current editorial-consistency audit but does not admit
+either missing compact result, authorize an unimplemented mode or change any
+scientific blocker.  The next scientific transition remains fail closed: admit
+and reconcile those exact compact payloads if they become controller-visible;
+if both are negative, consume only a controller-visible `GO` record for the
+already frozen raw-member reweighting mechanism.
+
 The 2026-08-29 independent publication-readiness trigger audit reran the
 documented unified checker from the current worktree and obtained the exact
 verdict `83 files, 2 figures, 8 references, 40 claims, status=NOT_READY`.
