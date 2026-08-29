@@ -303,7 +303,7 @@ earlier lower counts below are retained only as dated audit history.
 
 ## Current independent audit snapshot
 
-The current audit passed with 83 required files, two parseable linked figures,
+The current audit passed with 86 required files, two parseable linked figures,
 eight traceable references and 40 contiguous claim-ledger records. The
 immutable rank-coherent package separately
 passed its 13-file manifest check and all 26 focused prototype, adapter-parity,
@@ -318,15 +318,15 @@ contracts remain frozen but non-executable. No decision-bearing scientific row
 therefore changes, and publication status remains `NOT_READY`.
 
 The publication-readiness trigger was then independently repeated against this
-exact worktree state. The unified checker again passed with 83 required files,
-two parseable linked figures, eight traceable references and 40 contiguous
-claim-ledger records. A focused 61-test decision-surface suite covering
-conformal admission, claim-status consistency and the minimum-tier comparison
-audit also passed, and `git diff --check` reported no whitespace errors. This
-records the trigger-specific verification rather than relying on the earlier
-controller summary. It remains local integrity evidence only: none of the four
-normative blocker states changes, no experiment is authorized, and the status
-remains `NOT_READY`.
+exact worktree state. The complete 30-suite command documented in
+`REPRODUCIBILITY.md` ran 276 tests: 268 passed and eight NumPy-dependent tests
+were explicit dependency-only skips. The unified checker then passed with 86
+required files, two parseable linked figures, eight traceable references and 40
+contiguous claim-ledger records; `git diff --check` reported no whitespace
+errors. This records the trigger-specific verification rather than relying on
+the earlier controller summary. It remains local integrity evidence only: none
+of the four normative blocker states changes, no experiment is authorized, and
+the status remains `NOT_READY`.
 
 The same audit found that the newly executable conformal oracle, CPU runner
 prototype and synthetic suite were not yet members of the mandatory publication
