@@ -853,6 +853,48 @@ class MinimumTierComparisonAuditTests(unittest.TestCase):
                 manuscript, ledger, readiness, self.audit, reproducibility, handoff
             )
 
+    def test_joint_transition_rejects_claim_status_mismatch_after_closure(self) -> None:
+        manuscript, ledger, readiness, reproducibility, handoff = (
+            self.fully_closed_surfaces()
+        )
+        manuscript = manuscript.replace(
+            "| C38 | Section 8 later-mechanism family matrix",
+            "| C1 | Section 8 later-mechanism family matrix",
+            1,
+        )
+        with self.assertRaisesRegex(ValueError, "Rejected claim is missing"):
+            validate_joint_readiness_transition(
+                manuscript, ledger, readiness, self.audit, reproducibility, handoff
+            )
+
+    def test_joint_transition_rejects_citation_mismatch_after_closure(self) -> None:
+        manuscript, ledger, readiness, reproducibility, handoff = (
+            self.fully_closed_surfaces()
+        )
+        manuscript = manuscript.replace("[8]", "[7]", 1)
+        with self.assertRaisesRegex(ValueError, "reference/citation mismatch"):
+            validate_joint_readiness_transition(
+                manuscript, ledger, readiness, self.audit, reproducibility, handoff
+            )
+
+    def test_joint_transition_rejects_reference_audit_mismatch_after_closure(self) -> None:
+        manuscript, ledger, readiness, reproducibility, handoff = (
+            self.fully_closed_surfaces()
+        )
+        traceability = (PAPER_DIR / "REFERENCE_TRACEABILITY.md").read_text(
+            encoding="utf-8"
+        ).replace("10.1002/qj.2270", "10.1002/qj.invalid", 1)
+        with self.assertRaisesRegex(ValueError, "reference 3 identity mismatch"):
+            validate_joint_readiness_transition(
+                manuscript,
+                ledger,
+                readiness,
+                self.audit,
+                reproducibility,
+                handoff,
+                reference_traceability=traceability,
+            )
+
     def test_readiness_cannot_claim_ready_with_open_blocker_matrix(self) -> None:
         frozen_handoff = (PAPER_DIR / "FROZEN_EVALUATION_HANDOFF.md").read_text(
             encoding="utf-8"

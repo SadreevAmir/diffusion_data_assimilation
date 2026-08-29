@@ -435,6 +435,32 @@ def validate_reference_traceability(text: str) -> None:
         require(statement_anchor in prose, f"reference {number} support mapping mismatch")
     require("does not support project-specific empirical values" in text,
             "reference audit lacks an explicit empirical-claim boundary")
+
+
+def validate_manuscript_reference_consistency(manuscript: str) -> None:
+    """Require every numbered bibliography item to be cited, and vice versa."""
+    reference_heading = "## References\n"
+    require(reference_heading in manuscript, "manuscript contains no References section")
+    reference_section = manuscript.split(reference_heading, maxsplit=1)[1]
+    references = [int(value) for value in REFERENCE_PATTERN.findall(reference_section)]
+    require(references, "manuscript contains no numbered references")
+    require(
+        references == list(range(1, len(references) + 1)),
+        "numbered references are not contiguous from 1",
+    )
+    manuscript_body = manuscript.split(reference_heading, maxsplit=1)[0]
+    cited_references = {
+        int(value)
+        for citation in CITATION_PATTERN.findall(manuscript_body)
+        for value in re.split(r"\s*,\s*", citation)
+    }
+    require(
+        cited_references == set(references),
+        "reference/citation mismatch: cited="
+        + ",".join(map(str, sorted(cited_references)))
+        + "; listed="
+        + ",".join(map(str, references)),
+    )
 LOCKED_DROPOUT_RECONCILIATION_ANCHORS = (
     "Status: NEGATIVE_DECISION_RECORDED_QUANTITATIVE_RECONCILIATION_PENDING",
     "gate.overall_eligible=false",
@@ -2071,6 +2097,7 @@ def validate_joint_readiness_transition(
     audit: str,
     reproducibility: str,
     frozen_handoff: str,
+    reference_traceability: str | None = None,
 ) -> str:
     """Validate scientific closures and publication surfaces as one transition."""
     validate_minimum_tier_publication_transition(
@@ -2085,6 +2112,13 @@ def validate_joint_readiness_transition(
     validate_limitation_traceability(
         manuscript, claim_ledger, limitation_traceability
     )
+    validate_claim_status_consistency(manuscript, claim_ledger)
+    validate_manuscript_reference_consistency(manuscript)
+    if reference_traceability is None:
+        reference_traceability = (PAPER_DIR / "REFERENCE_TRACEABILITY.md").read_text(
+            encoding="utf-8"
+        )
+    validate_reference_traceability(reference_traceability)
     validate_empirical_traceability(manuscript, PAPER_DIR)
     return validate_publication_status(readiness, frozen_handoff)
 
@@ -2566,28 +2600,10 @@ def main() -> int:
             + ", ".join(missing_figure_anchors),
         )
 
+    validate_manuscript_reference_consistency(manuscript)
     reference_heading = "## References\n"
-    require(reference_heading in manuscript, "manuscript contains no References section")
     reference_section = manuscript.split(reference_heading, maxsplit=1)[1]
     references = [int(value) for value in REFERENCE_PATTERN.findall(reference_section)]
-    require(references, "manuscript contains no numbered references")
-    require(
-        references == list(range(1, len(references) + 1)),
-        "numbered references are not contiguous from 1",
-    )
-    manuscript_body = manuscript.split(reference_heading, maxsplit=1)[0]
-    cited_references = {
-        int(value)
-        for citation in CITATION_PATTERN.findall(manuscript_body)
-        for value in re.split(r"\s*,\s*", citation)
-    }
-    require(
-        cited_references == set(references),
-        "reference/citation mismatch: cited="
-        + ",".join(map(str, sorted(cited_references)))
-        + "; listed="
-        + ",".join(map(str, references)),
-    )
 
     require(
         TRACEABILITY_HEADING in manuscript,
