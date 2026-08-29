@@ -60,6 +60,9 @@ blocked coverage, not as evidence against all conformal methods.
 ## Publication-readiness closure binding
 
 Readiness closure requires a valid trusted execution and exactly one decision-bearing outcome: `CONFORMAL_USEFUL` or `CONFORMAL_NEGATIVE`.
+It additionally requires the same exact compact-record SHA-256 identity on the
+manuscript, claim ledger, readiness audit and reproducibility handoff. An
+outcome label without that four-surface identity closes nothing.
 Contract availability, an incomplete run or an invalid execution leaves the normative comparison row `MISSING`.
 
 ## Execution boundary

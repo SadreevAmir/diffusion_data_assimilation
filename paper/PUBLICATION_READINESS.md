@@ -34,6 +34,15 @@ incomplete, and that comparison completeness cannot compensate for a failed
 calibration-gate family. This is an editorial traceability correction only; all
 four normative evidence states and publication status remain unchanged.
 
+The 2026-08-29 conformal closure-binding audit found a narrower fail-open
+asymmetry in the frozen contract itself. The manuscript, claim ledger,
+readiness matrix and reproducibility handoff already required one identical
+compact-record SHA-256 identity, but the contract's closure paragraph named
+only valid trusted execution and an outcome label. The paragraph now requires
+the same exact identity on all four publication surfaces and explicitly states
+that a label alone closes nothing. No method, threshold, result or normative
+evidence state changed; the conformal row remains `MISSING`.
+
 The 2026-08-29 end-to-end reproducibility audit executed the complete two-command
 handoff documented in `REPRODUCIBILITY.md`, rather than relying on static command
 inspection.  The documented 27-suite list exactly matches
