@@ -2072,13 +2072,20 @@ def validate_joint_readiness_transition(
     reproducibility: str,
     frozen_handoff: str,
 ) -> str:
-    """Validate all four scientific closures as one fail-closed transition."""
+    """Validate scientific closures and publication surfaces as one transition."""
     validate_minimum_tier_publication_transition(
         manuscript, claim_ledger, readiness, audit, reproducibility
     )
     validate_eligible_calibration_transition(
         manuscript, claim_ledger, readiness, reproducibility
     )
+    limitation_traceability = (PAPER_DIR / "LIMITATION_TRACEABILITY.md").read_text(
+        encoding="utf-8"
+    )
+    validate_limitation_traceability(
+        manuscript, claim_ledger, limitation_traceability
+    )
+    validate_empirical_traceability(manuscript, PAPER_DIR)
     return validate_publication_status(readiness, frozen_handoff)
 
 

@@ -812,6 +812,47 @@ class MinimumTierComparisonAuditTests(unittest.TestCase):
                 manuscript, ledger, readiness, self.audit, reproducibility, active_handoff
             )
 
+    def test_joint_transition_rejects_missing_limitation_after_closure(self) -> None:
+        manuscript, ledger, readiness, reproducibility, handoff = (
+            self.fully_closed_surfaces()
+        )
+        manuscript = manuscript.replace(
+            "residual upper-tail undercoverage remains",
+            "residual upper-tail behavior is documented",
+            1,
+        )
+        with self.assertRaisesRegex(ValueError, "L6 is absent from Section 7"):
+            validate_joint_readiness_transition(
+                manuscript, ledger, readiness, self.audit, reproducibility, handoff
+            )
+
+    def test_joint_transition_rejects_presentation_unit_mismatch_after_closure(self) -> None:
+        manuscript, ledger, readiness, reproducibility, handoff = (
+            self.fully_closed_surfaces()
+        )
+        manuscript = manuscript.replace(
+            "Frozen-mechanism table; paired-diagnostic table; Figure 1",
+            "Frozen-mechanism table; Figure 1",
+            1,
+        )
+        with self.assertRaisesRegex(ValueError, "decision-bearing presentation audit mismatch"):
+            validate_joint_readiness_transition(
+                manuscript, ledger, readiness, self.audit, reproducibility, handoff
+            )
+
+    def test_joint_transition_rejects_compact_identity_mismatch_after_closure(self) -> None:
+        manuscript, ledger, readiness, reproducibility, handoff = (
+            self.fully_closed_surfaces()
+        )
+        marker = f"{1:064x}"
+        manuscript = manuscript.replace(marker, "f" * 64, 1)
+        with self.assertRaisesRegex(
+            ValueError, "transition is not atomic across publication surfaces"
+        ):
+            validate_joint_readiness_transition(
+                manuscript, ledger, readiness, self.audit, reproducibility, handoff
+            )
+
     def test_readiness_cannot_claim_ready_with_open_blocker_matrix(self) -> None:
         frozen_handoff = (PAPER_DIR / "FROZEN_EVALUATION_HANDOFF.md").read_text(
             encoding="utf-8"
