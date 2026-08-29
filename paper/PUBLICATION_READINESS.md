@@ -1,5 +1,14 @@
 # Publication readiness audit
 
+The 2026-08-29 probabilistic-DA closure-binding audit found that the frozen
+contract required a valid trusted execution and one decision-bearing outcome,
+but did not itself require the compact-record SHA-256 identity already mandated
+by the manuscript, claim ledger, this readiness audit and reproducibility
+handoff. `NEXT_PROBABILISTIC_DA_COMPARISON_CONTRACT.md` now requires that exact
+four-surface identity and states that an outcome label alone closes nothing.
+No method, threshold, result or evidence status changed: `probabilistic_da`
+remains `MISSING` with compact identity `NONE`.
+
 The final 2026-08-29 family-matrix provenance pass checked locked MC dropout
 and the iid calendar global-bias mixture.  For locked MC dropout,
 `PAPER_DRAFT.md`, `CLAIM_LEDGER.md` C38, `REPRODUCIBILITY.md` and

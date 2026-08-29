@@ -91,6 +91,9 @@ probabilistic DA family.
 ## Publication-readiness closure binding
 
 Readiness closure requires a valid trusted execution and exactly one decision-bearing outcome: `PROBABILISTIC_DA_USEFUL` or `PROBABILISTIC_DA_NEGATIVE`.
+It also requires the same exact compact-record SHA-256 identity in the
+manuscript, claim ledger, readiness audit and reproducibility handoff; an outcome
+label without that four-surface identity closes nothing.
 Contract availability or `COMPARATOR_INVALID` leaves the normative comparison row `MISSING`.
 
 ## Execution and compact evidence boundary
