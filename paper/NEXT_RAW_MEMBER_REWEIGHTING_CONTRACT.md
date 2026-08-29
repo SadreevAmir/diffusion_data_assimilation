@@ -116,3 +116,9 @@ maximally concentrated analog library, verify a permuted held-out ordering with
 equal case means, and reject incomplete, non-finite or out-of-range rank and
 member-mean inputs. It is a construction oracle, not an experiment entry point
 or decision-bearing runner.
+
+The outcome-agnostic trusted-integration boundary is frozen separately in
+`RAW_MEMBER_REWEIGHTING_RUNNER_REVIEW_CHECKLIST.md`. Every checklist item and
+its controller-visible admission record must pass before a literal reviewed
+mode may be proposed; the checklist adds no runtime parameter or scientific
+degree of freedom.
