@@ -282,8 +282,9 @@ Only reliability and operational validity pass. These values document a
 rejected mechanism and must not be used to reconstruct paired cases.
 
 The guidance-mixture result is complete and rejected; its operational checks
-pass, but proper-score, reliability and boundary criteria fail. It is retained
-as negative mechanism evidence and is not retuned.
+pass, but proper-score, reliability and boundary criteria fail, and every
+spatial/physical criterion fails. It is retained as negative mechanism evidence
+and is not retuned.
 
 ## Completed coherent-member-offset handoff
 

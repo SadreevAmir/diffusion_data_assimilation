@@ -611,6 +611,15 @@ Boolean is present locally. This makes the negative comparison auditable without
 inventing unavailable effect sizes or failure causes. It improves manuscript
 traceability but does not change `NOT_READY` or remove any scientific blocker.
 
+The 2026-08-29 family-source traceability audit found that the guidance-mixture
+row in the manuscript matrix and C32 correctly recorded a spatial/physical
+family failure, while the compact-source handoff in `REPRODUCIBILITY.md`
+enumerated only the proper-score, reliability and boundary failures. The
+handoff now also records that every spatial/physical criterion failed, matching
+the already reconciled readiness evidence without adding an effect size or
+changing `overall_eligible=false`. This closes a family-specific provenance gap
+but does not change `NOT_READY` or remove any scientific blocker.
+
 The 2026-08-26 table-integrity audit made the publication checker fail closed
 on malformed Markdown evidence tables. It now verifies header/separator widths,
 non-empty headers and body cells, constant row widths, non-empty bodies, at
