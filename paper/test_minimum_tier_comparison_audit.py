@@ -387,10 +387,21 @@ class MinimumTierComparisonAuditTests(unittest.TestCase):
         }[route]
         old = f"| `{route}` | `{old_status}` | `{old_record}` | `{old_presentation}` |"
         new = f"| `{route}` | `{status}` | `{marker}` | `DECISION_BEARING` |"
-        return tuple(
+        surfaces = tuple(
             text.replace(old, new, 1)
             for text in (self.manuscript, self.ledger, self.readiness)
         )
+        blocker = {
+            "conformal": "Conformal intervals",
+            "probabilistic_da": "Probabilistic DA baseline such as EnKF/LETKF",
+            "independent_deterministic": "Independent-strength deterministic background and 3D-Var",
+        }[route]
+        readiness = surfaces[2].replace(
+            f"| {blocker} | `MINIMUM_TIER_COMPARISON_AUDIT.md` | {old_status} |",
+            f"| {blocker} | `MINIMUM_TIER_COMPARISON_AUDIT.md` | {status} |",
+            1,
+        )
+        return surfaces[0], surfaces[1], readiness
 
     def test_minimum_tier_positive_and_negative_transitions_are_executable(self) -> None:
         cases = (
@@ -434,6 +445,46 @@ class MinimumTierComparisonAuditTests(unittest.TestCase):
         )
         with self.assertRaisesRegex(ValueError, "without compact evidence"):
             validate_minimum_tier_evidence_guards(*surfaces, self.audit)
+
+    def test_minimum_tier_transition_requires_blocker_row_update(self) -> None:
+        manuscript, ledger, readiness = self.transition_surfaces(
+            "conformal", "CONFORMAL_USEFUL", "d" * 64
+        )
+        readiness = readiness.replace(
+            "| Conformal intervals | `MINIMUM_TIER_COMPARISON_AUDIT.md` | CONFORMAL_USEFUL |",
+            "| Conformal intervals | `MINIMUM_TIER_COMPARISON_AUDIT.md` | MISSING |",
+            1,
+        )
+        with self.assertRaisesRegex(ValueError, "readiness blocker row"):
+            validate_minimum_tier_evidence_guards(
+                manuscript, ledger, readiness, self.audit
+            )
+
+    def test_minimum_tier_transition_rejects_wrong_blocker_closure(self) -> None:
+        manuscript, ledger, readiness = self.transition_surfaces(
+            "probabilistic_da", "PROBABILISTIC_DA_NEGATIVE", "e" * 64
+        )
+        readiness = readiness.replace(
+            "| Probabilistic DA baseline such as EnKF/LETKF | `MINIMUM_TIER_COMPARISON_AUDIT.md` | PROBABILISTIC_DA_NEGATIVE |",
+            "| Probabilistic DA baseline such as EnKF/LETKF | `MINIMUM_TIER_COMPARISON_AUDIT.md` | PROBABILISTIC_DA_USEFUL |",
+            1,
+        )
+        with self.assertRaisesRegex(ValueError, "readiness blocker row"):
+            validate_minimum_tier_evidence_guards(
+                manuscript, ledger, readiness, self.audit
+            )
+
+    def test_minimum_tier_transition_status_is_derived_from_matrix(self) -> None:
+        manuscript, ledger, readiness = self.transition_surfaces(
+            "independent_deterministic", "PRESENT_INDEPENDENT", "f" * 64
+        )
+        readiness = readiness.replace(
+            "Publication status: NOT_READY", "Publication status: READY_FOR_HUMAN_REVIEW", 1
+        )
+        with self.assertRaisesRegex(ValueError, "publication status"):
+            validate_minimum_tier_evidence_guards(
+                manuscript, ledger, readiness, self.audit
+            )
 
     def test_eligible_calibration_guard_passes_current_blocked_state(self) -> None:
         validate_eligible_calibration_transition(

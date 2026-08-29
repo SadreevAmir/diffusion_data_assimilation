@@ -683,6 +683,11 @@ MINIMUM_TIER_FUTURE_STATES = {
         ("INDEPENDENT_NEGATIVE", "DECISION_BEARING"),
     },
 }
+MINIMUM_TIER_READINESS_BLOCKERS = {
+    "conformal": "Conformal intervals",
+    "probabilistic_da": "Probabilistic DA baseline such as EnKF/LETKF",
+    "independent_deterministic": "Independent-strength deterministic background and 3D-Var",
+}
 MINIMUM_TIER_EVIDENCE_GUARD_ROW = re.compile(
     r"^\| `(?P<route>conformal|probabilistic_da|independent_deterministic)` \| "
     r"`(?P<status>[A-Z_]+)` \| `(?P<record>NONE|[0-9a-f]{64})` \| "
@@ -835,6 +840,45 @@ def validate_minimum_tier_evidence_guards(
     require(
         publication_states[0] == publication_states[1] == publication_states[2],
         "minimum-tier transition is not atomic across publication surfaces",
+    )
+
+    readiness_rows = {
+        row["blocker"].strip(): row["status"]
+        for row in READINESS_BLOCKER_ROW.finditer(readiness)
+    }
+    require(
+        len(readiness_rows) == len(READINESS_BLOCKERS),
+        "minimum-tier transition requires the complete readiness blocker matrix",
+    )
+    for route, (status, _, _) in publication_states[2].items():
+        expected_blocker_status = (
+            MINIMUM_TIER_EVIDENCE_GUARD_ROWS[route][0]
+            if (status, publication_states[2][route][1], publication_states[2][route][2])
+            == MINIMUM_TIER_EVIDENCE_GUARD_ROWS[route]
+            else status
+        )
+        require(
+            readiness_rows.get(MINIMUM_TIER_READINESS_BLOCKERS[route])
+            == expected_blocker_status,
+            f"{route} compact transition is inconsistent with its readiness blocker row",
+        )
+
+    publication_statuses = re.findall(
+        r"^Publication status: (\S+)$", readiness, re.MULTILINE
+    )
+    require(
+        len(publication_statuses) == 1,
+        "minimum-tier transition requires one publication status",
+    )
+    unresolved_states = {"MISSING", "MISSING_ELIGIBLE_RESULT", "PRESENT_DEVELOPMENT_ONLY"}
+    expected_publication_status = (
+        "NOT_READY"
+        if any(status in unresolved_states for status in readiness_rows.values())
+        else "READY_FOR_HUMAN_REVIEW"
+    )
+    require(
+        publication_statuses[0] == expected_publication_status,
+        "minimum-tier publication status is inconsistent with blocker matrix",
     )
 
     matrix = re.search(

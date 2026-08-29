@@ -1198,3 +1198,12 @@ a label-only transition. This closes the previously identified executable
 future-state gap but supplies no new scientific evidence: the current guard
 rows and blocker matrix remain unchanged, so publication status remains
 `NOT_READY`.
+
+The subsequent blocker-transition audit makes those future states operationally
+complete. For each of the six admitted outcomes, the checker now requires the
+matching readiness blocker row to carry that exact outcome state and derives
+`Publication status` from the entire blocker matrix. Focused negative fixtures
+reject an unchanged blocker row, a blocker closed with the wrong outcome and a
+premature ready declaration while any normative blocker remains unresolved.
+Thus compact identity alone cannot create an editorially inconsistent closure;
+the current evidence rows are unchanged and status remains `NOT_READY`.
