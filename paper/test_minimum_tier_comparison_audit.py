@@ -861,7 +861,7 @@ class MinimumTierComparisonAuditTests(unittest.TestCase):
                 'print("rank-coherent reference checks: FALSE")\n', encoding="utf-8"
             )
             with self.assertRaisesRegex(
-                ValueError, "rank-coherent executable oracle failed"
+                ValueError, "rank-coherent executable oracle emitted unexpected stdout"
             ):
                 validate_joint_readiness_transition(
                     manuscript,
@@ -871,6 +871,64 @@ class MinimumTierComparisonAuditTests(unittest.TestCase):
                     reproducibility,
                     handoff,
                     artifact_dir=artifact_dir,
+                )
+
+    def test_required_python_artifacts_reject_nonzero_executable_oracle(self) -> None:
+        manuscript, ledger, readiness, reproducibility, handoff = (
+            self.fully_closed_surfaces()
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            artifact_dir = Path(directory)
+            for name in REQUIRED_FILES:
+                (artifact_dir / name).write_bytes((PAPER_DIR / name).read_bytes())
+            (artifact_dir / "rank_coherent_reference.py").write_text(
+                'raise SystemExit(7)\n', encoding="utf-8"
+            )
+            with self.assertRaisesRegex(
+                ValueError, "rank-coherent executable oracle exited nonzero"
+            ):
+                validate_joint_readiness_transition(
+                    manuscript, ledger, readiness, self.audit, reproducibility,
+                    handoff, artifact_dir=artifact_dir,
+                )
+
+    def test_required_python_artifacts_reject_extra_oracle_stdout(self) -> None:
+        manuscript, ledger, readiness, reproducibility, handoff = (
+            self.fully_closed_surfaces()
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            artifact_dir = Path(directory)
+            for name in REQUIRED_FILES:
+                (artifact_dir / name).write_bytes((PAPER_DIR / name).read_bytes())
+            (artifact_dir / "rank_coherent_reference.py").write_text(
+                'print("debug")\nprint("rank-coherent reference checks: PASS")\n',
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(
+                ValueError, "rank-coherent executable oracle emitted unexpected stdout"
+            ):
+                validate_joint_readiness_transition(
+                    manuscript, ledger, readiness, self.audit, reproducibility,
+                    handoff, artifact_dir=artifact_dir,
+                )
+
+    def test_required_python_artifacts_reject_oracle_timeout(self) -> None:
+        manuscript, ledger, readiness, reproducibility, handoff = (
+            self.fully_closed_surfaces()
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            artifact_dir = Path(directory)
+            for name in REQUIRED_FILES:
+                (artifact_dir / name).write_bytes((PAPER_DIR / name).read_bytes())
+            (artifact_dir / "rank_coherent_reference.py").write_text(
+                'import time\ntime.sleep(10)\n', encoding="utf-8"
+            )
+            with self.assertRaisesRegex(
+                ValueError, "rank-coherent executable oracle timed out"
+            ):
+                validate_joint_readiness_transition(
+                    manuscript, ledger, readiness, self.audit, reproducibility,
+                    handoff, artifact_dir=artifact_dir,
                 )
 
     def test_joint_transition_rejects_ready_with_any_open_blocker(self) -> None:

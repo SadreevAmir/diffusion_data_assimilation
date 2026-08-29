@@ -2142,18 +2142,26 @@ def validate_required_python_artifacts(paper_dir: Path = PAPER_DIR) -> None:
         except SyntaxError as exc:
             raise ValueError(f"required Python artifact has invalid syntax: {name}") from exc
 
-    rank_oracle = subprocess.run(
-        [sys.executable, str(paper_dir / "rank_coherent_reference.py")],
-        cwd=paper_dir.parent,
-        check=False,
-        capture_output=True,
-        text=True,
+    try:
+        rank_oracle = subprocess.run(
+            [sys.executable, str(paper_dir / "rank_coherent_reference.py")],
+            cwd=paper_dir.parent,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise ValueError("rank-coherent executable oracle timed out") from exc
+    require(
+        rank_oracle.returncode == 0,
+        "rank-coherent executable oracle exited nonzero: "
+        + (rank_oracle.stderr.strip() or rank_oracle.stdout.strip() or "no output"),
     )
     require(
-        rank_oracle.returncode == 0
-        and rank_oracle.stdout.strip() == "rank-coherent reference checks: PASS",
-        "rank-coherent executable oracle failed: "
-        + (rank_oracle.stderr.strip() or rank_oracle.stdout.strip() or "no output"),
+        rank_oracle.stdout == "rank-coherent reference checks: PASS\n",
+        "rank-coherent executable oracle emitted unexpected stdout: "
+        + (rank_oracle.stdout.strip() or "no output"),
     )
 
 
