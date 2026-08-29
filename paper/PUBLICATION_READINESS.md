@@ -1,5 +1,16 @@
 # Publication readiness audit
 
+The 2026-08-29 independent executable publication audit rechecked the current
+manuscript, claim ledger, figures, tables, compact-evidence guards and
+reproducibility boundary without relying on scheduler status.  The unified
+checker passed with 83 required files, two figures, eight references and 40
+claims at `NOT_READY`.  A broader test discovery executed 272 tests across the
+publication package; all executable paths passed and eight numerical fixtures
+were explicit dependency-only skips because NumPy is absent from the minimal
+local runtime.  This new snapshot confirms internal consistency but supplies no
+missing compact payload and no eligible scientific result.  The publication
+status and blocker matrix therefore remain unchanged.
+
 The 2026-08-29 decision-bearing evidence audit independently searched the
 publication worktree for compact outputs from the two completed
 coverage--occurrence jobs and found no result payload, metadata bundle or
