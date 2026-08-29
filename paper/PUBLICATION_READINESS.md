@@ -1,5 +1,19 @@
 # Publication readiness audit
 
+The final 2026-08-29 family-matrix provenance pass checked locked MC dropout
+and the iid calendar global-bias mixture.  For locked MC dropout,
+`PAPER_DRAFT.md`, `CLAIM_LEDGER.md` C38, `REPRODUCIBILITY.md` and
+`LOCKED_MC_DROPOUT_RESULT_RECONCILIATION.md` consistently report only the
+trusted candidate identity and `overall_eligible=false`; none invents an
+unavailable family decision or effect size.  For the iid mixture, the
+manuscript, C37 and the reproducibility handoff agree that only the proper-score
+family fails, on fair CRPS `0.0584905850` to `0.0582878868`, paired date
+interval `[-0.00100456, 0.000700186]`, and ordinary CRPS `0.0621082810` to
+`0.0623775052`, while reliability, boundary, spatial/physical and operational
+families pass.  No provenance correction was warranted.  This audit adds no
+scientific evidence, does not promote the unavailable quantitative dropout
+payload and leaves publication status `NOT_READY`.
+
 The 2026-08-29 key-claim language audit independently compared the Abstract,
 Contributions, Limitations and Conclusion with all four normative blocker rows
 and the negative compact evidence.  It found that the most visible sections
