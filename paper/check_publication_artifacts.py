@@ -257,6 +257,54 @@ REQUIRED_FILES = (
     "test_validate_server_only_manifest.py",
 )
 
+MINIMUM_TIER_HANDOFF_INVENTORY = {
+    "conformal": {
+        "files": {
+            "NEXT_CONFORMAL_BASELINE_CONTRACT.md",
+            "validate_conformal_area_admission.py",
+            "test_validate_conformal_area_admission.py",
+        },
+        "suites": {"paper.test_validate_conformal_area_admission"},
+    },
+    "probabilistic_da": {
+        "files": {
+            "NEXT_PROBABILISTIC_DA_COMPARISON_CONTRACT.md",
+            "validate_probabilistic_da_admission.py",
+            "test_validate_probabilistic_da_admission.py",
+            "reconcile_probabilistic_da_admission.py",
+            "test_reconcile_probabilistic_da_admission.py",
+        },
+        "suites": {
+            "paper.test_validate_probabilistic_da_admission",
+            "paper.test_reconcile_probabilistic_da_admission",
+        },
+    },
+    "independent_deterministic": {
+        "files": {
+            "FROZEN_EVALUATION_HANDOFF.md",
+            "MINIMUM_TIER_COMPARISON_AUDIT.md",
+            "test_minimum_tier_comparison_audit.py",
+        },
+        "suites": {"paper.test_minimum_tier_comparison_audit"},
+    },
+}
+
+
+def validate_minimum_tier_handoff_inventory(
+    required_files: tuple[str, ...] = REQUIRED_FILES,
+    required_suites: tuple[str, ...] = REQUIRED_REGRESSION_SUITES,
+) -> None:
+    """Bind every minimum-tier route to its executable publication handoff."""
+    files = set(required_files)
+    suites = set(required_suites)
+    for route, inventory in MINIMUM_TIER_HANDOFF_INVENTORY.items():
+        missing_files = inventory["files"] - files
+        missing_suites = inventory["suites"] - suites
+        require(
+            not missing_files and not missing_suites,
+            f"minimum-tier handoff inventory is incomplete for {route}",
+        )
+
 REFERENCE_TRACEABILITY_ROWS = {
     1: ("10.48550/arXiv.2006.11239", "diffusion probabilistic models"),
     2: ("10.48550/arXiv.2210.02747", "Flow Matching"),
@@ -1888,6 +1936,7 @@ def validate_publication_status(readiness: str, frozen_handoff: str) -> str:
 
 
 def main() -> int:
+    validate_minimum_tier_handoff_inventory()
     missing = [name for name in REQUIRED_FILES if not (PAPER_DIR / name).is_file()]
     require(not missing, f"missing required publication files: {', '.join(missing)}")
 

@@ -9,6 +9,7 @@ from pathlib import Path
 
 from paper.check_publication_artifacts import (
     MINIMUM_TIER_ADMISSION_TRANSITION_ANCHORS,
+    MINIMUM_TIER_HANDOFF_INVENTORY,
     MINIMUM_TIER_CLAIM_CONSISTENCY_ANCHORS,
     MINIMUM_TIER_ROW,
     PAPER_DIR,
@@ -16,12 +17,14 @@ from paper.check_publication_artifacts import (
     READINESS_CLOSURE_ROUTE_ROW,
     READINESS_DECISION_SURFACE_ANCHORS,
     READINESS_STOP_GO_CROSS_ARTIFACT_ANCHORS,
+    REQUIRED_FILES,
     REQUIRED_REGRESSION_SUITES,
     SERVER_ONLY_COMMAND_INPUTS,
     validate_documented_regression_suites,
     validate_eligible_calibration_transition,
     validate_minimum_tier_key_claims,
     validate_minimum_tier_evidence_guards,
+    validate_minimum_tier_handoff_inventory,
     validate_minimum_tier_comparisons,
     validate_publication_status,
     validate_readiness_blockers,
@@ -149,6 +152,31 @@ class MinimumTierComparisonAuditTests(unittest.TestCase):
 
     def test_documented_regression_suites_match_executable_contract(self) -> None:
         validate_documented_regression_suites(self.reproducibility)
+
+    def test_minimum_tier_handoff_inventory_is_complete(self) -> None:
+        validate_minimum_tier_handoff_inventory()
+
+    def test_each_missing_handoff_file_fails_closed(self) -> None:
+        for route, inventory in MINIMUM_TIER_HANDOFF_INVENTORY.items():
+            for filename in inventory["files"]:
+                with self.subTest(route=route, filename=filename):
+                    required = tuple(name for name in REQUIRED_FILES if name != filename)
+                    with self.assertRaisesRegex(
+                        ValueError, f"inventory is incomplete for {route}"
+                    ):
+                        validate_minimum_tier_handoff_inventory(required_files=required)
+
+    def test_each_missing_handoff_suite_fails_closed(self) -> None:
+        for route, inventory in MINIMUM_TIER_HANDOFF_INVENTORY.items():
+            for suite in inventory["suites"]:
+                with self.subTest(route=route, suite=suite):
+                    required = tuple(
+                        name for name in REQUIRED_REGRESSION_SUITES if name != suite
+                    )
+                    with self.assertRaisesRegex(
+                        ValueError, f"inventory is incomplete for {route}"
+                    ):
+                        validate_minimum_tier_handoff_inventory(required_suites=required)
 
     def test_documented_regression_suite_omission_fails_closed(self) -> None:
         suite = REQUIRED_REGRESSION_SUITES[-1]
