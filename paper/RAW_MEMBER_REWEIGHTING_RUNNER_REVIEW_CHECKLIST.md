@@ -98,3 +98,12 @@ Every placeholder, null, missing field, non-`PASS` validation or non-empty
 literal reviewed mode and sole frozen source parameter. Scientific success
 still requires `overall_eligible=true`; a negative result closes this exact
 probability-mass mechanism without retuning.
+
+The local fail-closed handoff is executable as
+`python -m paper.validate_raw_member_reweighting_review REVIEW_JSON RUNNER_PY SYNTHETIC_RESULT`.
+It requires the exact record schema above, binds the runner, contract and
+synthetic-result bytes, checks the runner's pure construction surface against
+`raw_member_reweighting_reference.py`, detects substitution during admission,
+and emits `admission=GO` only with the reviewed literal mode. This check does
+not implement, name or launch a trusted mode; controller visibility and the
+independent review remain mandatory.
