@@ -305,6 +305,25 @@ def validate_minimum_tier_handoff_inventory(
             f"minimum-tier handoff inventory is incomplete for {route}",
         )
 
+
+def validate_required_publication_files(paper_dir: Path = PAPER_DIR) -> None:
+    """Bind terminal readiness to the complete publication artifact inventory."""
+    closure_contracts = {
+        contract for contract, _, _ in READINESS_CLOSURE_ROUTES.values()
+    }
+    missing_closure_contracts = sorted(
+        name for name in closure_contracts if not (paper_dir / name).is_file()
+    )
+    require(
+        not missing_closure_contracts,
+        "closure contract is missing: " + ", ".join(missing_closure_contracts),
+    )
+    missing = sorted(name for name in REQUIRED_FILES if not (paper_dir / name).is_file())
+    require(
+        not missing,
+        "missing required publication files: " + ", ".join(missing),
+    )
+
 REFERENCE_TRACEABILITY_ROWS = {
     1: ("10.48550/arXiv.2006.11239", "diffusion probabilistic models"),
     2: ("10.48550/arXiv.2210.02747", "Flow Matching"),
@@ -2123,8 +2142,12 @@ def validate_joint_readiness_transition(
     frozen_handoff: str,
     reference_traceability: str | None = None,
     figure_dir: Path | None = None,
+    artifact_dir: Path | None = None,
 ) -> str:
     """Validate scientific closures and publication surfaces as one transition."""
+    validate_required_publication_files(
+        PAPER_DIR if artifact_dir is None else artifact_dir
+    )
     validate_minimum_tier_publication_transition(
         manuscript, claim_ledger, readiness, audit, reproducibility
     )
@@ -2153,8 +2176,7 @@ def validate_joint_readiness_transition(
 
 def main() -> int:
     validate_minimum_tier_handoff_inventory()
-    missing = [name for name in REQUIRED_FILES if not (PAPER_DIR / name).is_file()]
-    require(not missing, f"missing required publication files: {', '.join(missing)}")
+    validate_required_publication_files()
 
     for name in PYTHON_FILES:
         source = (PAPER_DIR / name).read_text(encoding="utf-8")

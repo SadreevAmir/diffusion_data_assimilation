@@ -32,6 +32,7 @@ from paper.check_publication_artifacts import (
     validate_minimum_tier_handoff_inventory,
     validate_minimum_tier_comparisons,
     validate_publication_status,
+    validate_required_publication_files,
     validate_readiness_blockers,
     validate_server_only_command_inputs,
 )
@@ -768,6 +769,52 @@ class MinimumTierComparisonAuditTests(unittest.TestCase):
         manuscript, ledger, readiness, reproducibility, handoff = (
             self.fully_closed_surfaces()
         )
+
+    def test_joint_transition_rejects_incomplete_required_file_inventory(self) -> None:
+        manuscript, ledger, readiness, reproducibility, handoff = (
+            self.fully_closed_surfaces()
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            artifact_dir = Path(directory)
+            omitted = "LIMITATION_TRACEABILITY.md"
+            for name in REQUIRED_FILES:
+                if name != omitted:
+                    (artifact_dir / name).write_text("fixture", encoding="utf-8")
+            with self.assertRaisesRegex(
+                ValueError, "missing required publication files: LIMITATION_TRACEABILITY.md"
+            ):
+                validate_joint_readiness_transition(
+                    manuscript,
+                    ledger,
+                    readiness,
+                    self.audit,
+                    reproducibility,
+                    handoff,
+                    artifact_dir=artifact_dir,
+                )
+
+    def test_joint_transition_rejects_missing_closure_contract_file(self) -> None:
+        manuscript, ledger, readiness, reproducibility, handoff = (
+            self.fully_closed_surfaces()
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            artifact_dir = Path(directory)
+            omitted = "NEXT_CONFORMAL_BASELINE_CONTRACT.md"
+            for name in REQUIRED_FILES:
+                if name != omitted:
+                    (artifact_dir / name).write_text("fixture", encoding="utf-8")
+            with self.assertRaisesRegex(
+                ValueError, "closure contract is missing: NEXT_CONFORMAL_BASELINE_CONTRACT.md"
+            ):
+                validate_joint_readiness_transition(
+                    manuscript,
+                    ledger,
+                    readiness,
+                    self.audit,
+                    reproducibility,
+                    handoff,
+                    artifact_dir=artifact_dir,
+                )
         self.assertEqual(
             validate_joint_readiness_transition(
                 manuscript, ledger, readiness, self.audit, reproducibility, handoff
