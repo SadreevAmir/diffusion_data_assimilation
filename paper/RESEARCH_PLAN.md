@@ -218,6 +218,17 @@ has no feasible training scale. The frozen scale set and strata are not extended
 
 ## Evaluation
 
+### Active calibration mechanism
+
+The frozen joint spread--occurrence candidate completed and was rejected by the
+unchanged no-compensation rule. Its relative rank and fair-CRPS improvements do
+not compensate for failed absolute rank, boundary and spatial/physical
+criteria, and its grid is closed to retuning. The next mechanistically distinct
+development contract is `NEXT_RAW_MEMBER_REWEIGHTING_CONTRACT.md`: it changes
+only empirical probability mass among bitwise-copied raw scenarios. The design
+is frozen and activated, while execution remains unavailable until a literal
+reviewed mode passes the existing parity boundary.
+
 Marginal and finite-ensemble:
 
 - fair and empirical CRPS;

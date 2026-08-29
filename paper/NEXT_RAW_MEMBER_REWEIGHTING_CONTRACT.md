@@ -1,6 +1,6 @@
 # Frozen contingent method contract: purged analog rank reweighting of raw members
 
-Status: DESIGN_FROZEN_CONTINGENT_NO_RUNNER
+Status: ACTIVATED_DESIGN_FROZEN_NO_RUNNER
 
 ## Activation and claim role
 
@@ -10,6 +10,15 @@ by the unchanged no-compensation gate. It must not delay or replace that first
 test. The candidate asks a different question: is the learned-joint ensemble's
 reliability defect mainly a probability-mass error among already plausible raw
 scenarios, rather than a need to synthesize or geometrically alter scenarios?
+
+The activation condition is now met. The completed coherent anomaly-transport
+routes and the subsequent frozen joint spread--occurrence construction all
+report `overall_eligible=false`. The latter improves relative rank discrepancy
+but still fails absolute rank adequacy and creates boundary and spatial losses.
+This activates the exact contract below without changing any feature, analog,
+smoothing, sampling or gate choice. It does not authorize an invented mode: a
+literal reviewed server mode and independent parity remain required before a
+proposal can be decision-bearing.
 
 The raw learned-joint ensemble is the primary baseline. The completed coherent
 offset, analog-residual and whole-field anomaly-transport results are mechanism

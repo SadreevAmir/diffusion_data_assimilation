@@ -1,5 +1,17 @@
 # Publication readiness audit
 
+The 2026-08-29 joint spread--occurrence result review confirms 40/40 completed
+cases and `overall_eligible=false`. The candidate aggregate improves
+date-balanced rank total variation from `0.3566938377` to `0.1092186644` and
+fair CRPS from `0.0584905850` to `0.0575343944`, but absolute rank total
+variation and maximum-bin adequacy fail; proper-score, boundary and
+spatial/physical families also fail. The compact payload is not admitted as a
+quantitative publication evidence unit because its `gate.candidate_method`
+names a different method than its sole candidate aggregate. This fail-closed
+provenance decision leaves publication status `NOT_READY` and activates the
+already frozen raw-member probability-reweighting contract without authorizing
+an unimplemented mode or any scale/threshold retuning.
+
 The 2026-08-29 independent-deterministic closure-binding audit found that all
 four normative publication surfaces already required one compact-record
 SHA-256 identity, while `FROZEN_EVALUATION_HANDOFF.md` required only aligned
