@@ -3,7 +3,7 @@
 This ledger separates immutable evidence from hypotheses and planned results.
 Every manuscript claim must point to a row here before it is strengthened.
 
-Last audited: 2026-08-23.
+Last audited: 2026-08-29.
 
 External primary evidence state: RECONCILED_NEGATIVE
 

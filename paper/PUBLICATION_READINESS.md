@@ -1,5 +1,16 @@
 # Publication readiness audit
 
+The 2026-08-29 cross-surface evidence audit independently traced all four
+normative blocker states through `PAPER_DRAFT.md`, `CLAIM_LEDGER.md`,
+`MINIMUM_TIER_COMPARISON_AUDIT.md`, both linked figures and the compact-result
+values cited for the reconciled primary decision.  The scientific states and
+reported fair-CRPS and normalized-rank values agree.  The audit did find one
+publication-metadata mismatch: `CLAIM_LEDGER.md` still reported its audit date
+as 2026-08-23 despite containing the later C39 reconciliation and subsequent
+cross-artifact checks.  Its `Last audited` field is now 2026-08-29.  This fixes
+provenance freshness only; it creates no scientific evidence, closes none of
+the four blocker rows and leaves publication status `NOT_READY`.
+
 The dependency-limited score-aware boundary was rerun independently on
 2026-08-27 with the four documented reference, admission, compact-directory and
 reconciliation modules.  It ran 51 tests: 43 passed and eight were explicit
