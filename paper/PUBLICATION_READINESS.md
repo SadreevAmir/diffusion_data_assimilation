@@ -1185,3 +1185,16 @@ resampling. The dependent compact gate then recorded the exact frozen candidate
 This closes the dropout mechanism and activates the already frozen iid calendar
 global-bias fallback reported above; no second temperature, different dropout
 probability or different mask construction is admissible post hoc.
+
+The minimum-tier future-state reconciliation is now executable rather than
+prose-only. The unified validator admits both frozen positive and negative
+outcomes for `conformal` and `probabilistic_da`, plus positive and negative
+independent-strength deterministic outcomes, only when `PAPER_DRAFT.md`,
+`CLAIM_LEDGER.md` and this readiness record carry one identical 64-hex compact
+record identity. The comparison audit remains a frozen pre-result inventory;
+it cannot be rewritten into result evidence. Focused fixtures exercise all six
+valid transitions and reject a partial surface update, a mismatched digest and
+a label-only transition. This closes the previously identified executable
+future-state gap but supplies no new scientific evidence: the current guard
+rows and blocker matrix remain unchanged, so publication status remains
+`NOT_READY`.

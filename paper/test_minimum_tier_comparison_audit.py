@@ -377,6 +377,64 @@ class MinimumTierComparisonAuditTests(unittest.TestCase):
             self.manuscript, self.ledger, self.readiness, self.audit
         )
 
+    def transition_surfaces(self, route: str, status: str, marker: str) -> tuple[str, str, str]:
+        old_status, old_record, old_presentation = {
+            "conformal": ("MISSING", "NONE", "PRE_RESULT_ONLY"),
+            "probabilistic_da": ("MISSING", "NONE", "PRE_RESULT_ONLY"),
+            "independent_deterministic": (
+                "PRESENT_DEVELOPMENT_ONLY", "NONE", "DEVELOPMENT_ONLY"
+            ),
+        }[route]
+        old = f"| `{route}` | `{old_status}` | `{old_record}` | `{old_presentation}` |"
+        new = f"| `{route}` | `{status}` | `{marker}` | `DECISION_BEARING` |"
+        return tuple(
+            text.replace(old, new, 1)
+            for text in (self.manuscript, self.ledger, self.readiness)
+        )
+
+    def test_minimum_tier_positive_and_negative_transitions_are_executable(self) -> None:
+        cases = (
+            ("conformal", "CONFORMAL_USEFUL"),
+            ("conformal", "CONFORMAL_NEGATIVE"),
+            ("probabilistic_da", "PROBABILISTIC_DA_USEFUL"),
+            ("probabilistic_da", "PROBABILISTIC_DA_NEGATIVE"),
+            ("independent_deterministic", "PRESENT_INDEPENDENT"),
+            ("independent_deterministic", "INDEPENDENT_NEGATIVE"),
+        )
+        for index, (route, status) in enumerate(cases):
+            with self.subTest(route=route, status=status):
+                surfaces = self.transition_surfaces(route, status, f"{index + 1:064x}")
+                validate_minimum_tier_evidence_guards(*surfaces, self.audit)
+
+    def test_minimum_tier_partial_transition_fails_closed(self) -> None:
+        manuscript, _, _ = self.transition_surfaces(
+            "conformal", "CONFORMAL_USEFUL", "a" * 64
+        )
+        with self.assertRaisesRegex(ValueError, "not atomic"):
+            validate_minimum_tier_evidence_guards(
+                manuscript, self.ledger, self.readiness, self.audit
+            )
+
+    def test_minimum_tier_compact_identities_must_match(self) -> None:
+        manuscript, ledger, readiness = self.transition_surfaces(
+            "probabilistic_da", "PROBABILISTIC_DA_NEGATIVE", "b" * 64
+        )
+        ledger = ledger.replace("b" * 64, "c" * 64, 1)
+        with self.assertRaisesRegex(ValueError, "not atomic"):
+            validate_minimum_tier_evidence_guards(
+                manuscript, ledger, readiness, self.audit
+            )
+
+    def test_minimum_tier_label_only_transition_fails_closed(self) -> None:
+        old = "| `conformal` | `MISSING` | `NONE` | `PRE_RESULT_ONLY` |"
+        new = "| `conformal` | `CONFORMAL_NEGATIVE` | `NONE` | `DECISION_BEARING` |"
+        surfaces = tuple(
+            text.replace(old, new, 1)
+            for text in (self.manuscript, self.ledger, self.readiness)
+        )
+        with self.assertRaisesRegex(ValueError, "without compact evidence"):
+            validate_minimum_tier_evidence_guards(*surfaces, self.audit)
+
     def test_eligible_calibration_guard_passes_current_blocked_state(self) -> None:
         validate_eligible_calibration_transition(
             self.manuscript, self.ledger, self.readiness, self.reproducibility

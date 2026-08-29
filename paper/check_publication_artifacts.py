@@ -669,6 +669,20 @@ MINIMUM_TIER_EVIDENCE_GUARD_ROWS = {
         "PRESENT_DEVELOPMENT_ONLY", "NONE", "DEVELOPMENT_ONLY"
     ),
 }
+MINIMUM_TIER_FUTURE_STATES = {
+    "conformal": {
+        ("CONFORMAL_USEFUL", "DECISION_BEARING"),
+        ("CONFORMAL_NEGATIVE", "DECISION_BEARING"),
+    },
+    "probabilistic_da": {
+        ("PROBABILISTIC_DA_USEFUL", "DECISION_BEARING"),
+        ("PROBABILISTIC_DA_NEGATIVE", "DECISION_BEARING"),
+    },
+    "independent_deterministic": {
+        ("PRESENT_INDEPENDENT", "DECISION_BEARING"),
+        ("INDEPENDENT_NEGATIVE", "DECISION_BEARING"),
+    },
+}
 MINIMUM_TIER_EVIDENCE_GUARD_ROW = re.compile(
     r"^\| `(?P<route>conformal|probabilistic_da|independent_deterministic)` \| "
     r"`(?P<status>[A-Z_]+)` \| `(?P<record>NONE|[0-9a-f]{64})` \| "
@@ -786,6 +800,7 @@ def validate_minimum_tier_evidence_guards(
         "PUBLICATION_READINESS.md": readiness,
         "MINIMUM_TIER_COMPARISON_AUDIT.md": audit,
     }
+    observed_by_file: dict[str, dict[str, tuple[str, str, str]]] = {}
     for filename, text in documents.items():
         rows = list(MINIMUM_TIER_EVIDENCE_GUARD_ROW.finditer(text))
         observed = {
@@ -796,10 +811,31 @@ def validate_minimum_tier_evidence_guards(
             len(rows) == len(observed) == len(MINIMUM_TIER_EVIDENCE_GUARD_ROWS),
             f"{filename} minimum-tier evidence guard is incomplete or duplicated",
         )
-        require(
-            observed == MINIMUM_TIER_EVIDENCE_GUARD_ROWS,
-            f"{filename} contains a decision-bearing minimum-tier claim without compact evidence",
-        )
+        observed_by_file[filename] = observed
+
+    require(
+        observed_by_file["MINIMUM_TIER_COMPARISON_AUDIT.md"]
+        == MINIMUM_TIER_EVIDENCE_GUARD_ROWS,
+        "minimum-tier audit inventory must remain in its frozen pre-result state",
+    )
+    publication_states = [
+        observed_by_file[filename]
+        for filename in ("PAPER_DRAFT.md", "CLAIM_LEDGER.md", "PUBLICATION_READINESS.md")
+    ]
+    for observed in publication_states:
+        for route, state in observed.items():
+            if state == MINIMUM_TIER_EVIDENCE_GUARD_ROWS[route]:
+                continue
+            status, record, presentation = state
+            require(
+                record != "NONE"
+                and (status, presentation) in MINIMUM_TIER_FUTURE_STATES[route],
+                f"{route} contains a decision-bearing minimum-tier claim without compact evidence",
+            )
+    require(
+        publication_states[0] == publication_states[1] == publication_states[2],
+        "minimum-tier transition is not atomic across publication surfaces",
+    )
 
     matrix = re.search(
         r"^\| Conformal decision \| Probabilistic-DA decision \|.*?"
@@ -809,6 +845,7 @@ def validate_minimum_tier_evidence_guards(
     )
     require(matrix is not None, "manuscript pre-result outcome matrix is missing")
     outside_matrix = manuscript[: matrix.start()] + manuscript[matrix.end() :]
+    outside_matrix = MINIMUM_TIER_EVIDENCE_GUARD_ROW.sub("", outside_matrix)
     for label in (
         "CONFORMAL_USEFUL", "CONFORMAL_NEGATIVE",
         "PROBABILISTIC_DA_USEFUL", "PROBABILISTIC_DA_NEGATIVE",
