@@ -1,11 +1,14 @@
 # Rank-coherent result reconciliation
 
-Status: PRE_RESULT_NO_TRUSTED_MODE
+Status: RESULT_COMPLETED_AWAITING_COMBINED_ADMISSION
 
-This is a fail-closed downstream publication contract, not scientific evidence
-and not authorization to invent a mode. Reconciliation may begin only from the
-same `load_and_validate_combined` operation over the exact controller-visible
-admission JSON and decision-bearing compact directory.
+The reviewed server-CPU experiment `joint_rank_coherent_transport_valid` has
+completed.  Completion is execution evidence only: no metric, family decision
+or eligibility claim is admitted by this status line.  Scientific
+reconciliation may begin only from the same `load_and_validate_combined`
+operation over the exact controller-visible admission JSON and decision-bearing
+compact directory.  Until both inputs are available to that operation, all five
+publication surfaces remain unchanged and fail closed.
 
 ## Mutually exclusive scientific branches
 

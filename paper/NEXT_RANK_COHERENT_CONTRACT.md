@@ -1,6 +1,6 @@
 # Frozen next-method contract: purged rank-targeted coherent anomaly transport
 
-Status: DESIGN_FROZEN_NO_RUNNER
+Status: EXECUTED_RESULT_AWAITING_COMBINED_ADMISSION
 
 ## Claim role and hypothesis
 
@@ -87,18 +87,22 @@ evaluation.
 
 ## Execution and compact artifacts
 
-All construction and analysis must run on `server_cpu` from
-`source_experiment=joint_full_condition_validation_2022`. The future trusted
-runner must expose that sole parameter and the exact 40-case, ten-member
-envelope; the artifact policy is `summary_only`. It must return the complete
+All construction and analysis ran on `server_cpu` from
+`source_experiment=joint_full_condition_validation_2022` as experiment
+`joint_rank_coherent_transport_valid`. The reviewed trusted runner exposed that
+sole parameter and the exact 40-case, ten-member envelope; the artifact policy
+was `summary_only`. The decision-bearing compact result must contain the complete
 gate, aggregate raw/candidate metrics, paired uncertainty, fold selections and
 alphas, rank-target balance, projection diagnostics, member-spatial deltas and
 operational counts. No raw member, truth or anomaly field is retrieved.
 
-This contract intentionally has no experiment proposal: no currently
-implemented trusted mode implements it. Freezing the contract is the active
-autonomous research step; runner review is ordinary engineering work, not an
-external scientific blocker.
+The run completed under the reviewed mode
+`validation_existing_ensemble_purged_rank_targeted_coherent_anomaly_transport`.
+Completion alone is not scientific admission: no metric or gate flag may enter
+the manuscript until the exact controller-visible admission record and compact
+directory pass the frozen combined validator. A negative admitted result closes
+this exact mechanism without post-result tuning; a positive claim requires all
+five mandatory families and `overall_eligible=true`.
 
 The dependency-free review oracle `rank_coherent_reference.py` makes the exact
 non-circular purge, date/member tie ordering, complete-field pairing, frozen
@@ -138,10 +142,10 @@ Finally, every mandatory family flag must equal the conjunction of its complete,
 non-empty boolean criterion map. Negative fixtures reject aggregate-delta,
 paired-mean, spatial-decision and family-gate contradictions.
 
-The independent implementation admission test is frozen in
+The independent implementation admission test was frozen in
 `RANK_COHERENT_RUNNER_REVIEW_CHECKLIST.md`. Every item is mandatory: it requires
 exact interface and provenance, leakage-safe deterministic parity, complete-field
 candidate construction, compact-schema and no-compensation-gate checks, negative
 fixtures, a synthetic server dry run and a recorded independent review. Any
-unchecked or waived item is `NO_GO`; the checklist does not create a mode or
-authorize a launch.
+unchecked or waived item is `NO_GO`; the checklist alone does not admit the
+completed scientific result.
