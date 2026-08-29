@@ -185,6 +185,19 @@ weaken one transition on one surface at a time and fail closed. This is
 cross-artifact consistency evidence only: no new scientific result exists, no
 blocker closes and publication status remains `NOT_READY`.
 
+The 2026-08-28 admission-to-transition audit distinguishes the three remaining
+minimum-tier handoffs instead of treating admission as one generic event. A
+passing conformal admission record binds only the reviewed implementation and
+contains neither a scientific outcome nor a compact-result digest, so it cannot
+close that row. The probabilistic-DA row requires combined semantic admission
+and downstream reconciliation against the controller-retained compact-directory
+digest. The independent deterministic row has no local admission fixture and
+requires aligned compact comparator evidence with the frozen immutable
+identities. The unified checker now binds these exact route-specific boundaries,
+and three negative fixtures weaken them independently and fail closed. This
+closes a reproducibility handoff ambiguity only; all scientific blocker states
+remain unchanged and publication status remains `NOT_READY`.
+
 ## Independent audit snapshot
 
 The publication-readiness trigger was independently rerun against the current

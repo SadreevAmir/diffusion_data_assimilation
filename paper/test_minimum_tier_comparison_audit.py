@@ -8,6 +8,7 @@ import unittest
 from pathlib import Path
 
 from paper.check_publication_artifacts import (
+    MINIMUM_TIER_ADMISSION_TRANSITION_ANCHORS,
     MINIMUM_TIER_CLAIM_CONSISTENCY_ANCHORS,
     MINIMUM_TIER_ROW,
     PAPER_DIR,
@@ -291,6 +292,34 @@ class MinimumTierComparisonAuditTests(unittest.TestCase):
             set(READINESS_DECISION_SURFACE_ANCHORS),
             {"PAPER_DRAFT.md", "CLAIM_LEDGER.md"},
         )
+
+    def test_admission_transition_guards_cover_all_three_routes(self) -> None:
+        self.assertEqual(
+            set(MINIMUM_TIER_ADMISSION_TRANSITION_ANCHORS),
+            {
+                "NEXT_CONFORMAL_BASELINE_CONTRACT.md",
+                "NEXT_PROBABILISTIC_DA_COMPARISON_CONTRACT.md",
+                "FROZEN_EVALUATION_HANDOFF.md",
+            },
+        )
+
+    def test_each_weakened_admission_transition_boundary_fails_closed(self) -> None:
+        for filename, anchors in MINIMUM_TIER_ADMISSION_TRANSITION_ANCHORS.items():
+            with self.subTest(filename=filename), self.make_fixture(self.audit) as temporary:
+                fixture_dir = Path(temporary)
+                target = fixture_dir / filename
+                text = target.read_text(encoding="utf-8")
+                anchor = anchors[0]
+                self.assertIn(anchor, text)
+                target.write_text(
+                    text.replace(anchor, "Weakened admission transition boundary.", 1),
+                    encoding="utf-8",
+                )
+                with self.assertRaisesRegex(
+                    ValueError,
+                    "admission-to-transition boundary is incomplete or weakened",
+                ):
+                    validate_readiness_blockers(self.readiness, fixture_dir)
 
     def test_each_partial_publication_surface_update_fails_closed(self) -> None:
         for filename, anchors in READINESS_DECISION_SURFACE_ANCHORS.items():

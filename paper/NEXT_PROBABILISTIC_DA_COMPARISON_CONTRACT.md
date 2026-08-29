@@ -119,6 +119,9 @@ python3 paper/reconcile_probabilistic_da_admission.py \
 
 The second command rejects an outcome without the exact expected
 `compact_directory_sha256`; an outcome string alone is never reconciled.
+The probabilistic-DA evidence row can close only after combined admission and
+downstream reconciliation reproduce the controller-retained directory digest
+from the separately reviewed trusted runner.
 No raw backgrounds, analyses, observations or truths are retrieved. No currently
 admitted trusted mode implements this contract, so it must not be proposed under
 an invented identifier. Admission requires a separately reviewed runner that

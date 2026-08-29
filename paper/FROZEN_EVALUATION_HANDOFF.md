@@ -84,6 +84,9 @@ the outcome is a negative confirmatory result and claims must be narrowed.
 
 Independent-strength deterministic closure requires a frozen common-information comparison with aligned comparator evidence; development-only documentation cannot close that row.
 Eligible-calibration closure requires one frozen candidate to pass every mandatory no-compensation family; no partial metric improvement can close that blocker.
+No local admission fixture closes the independent deterministic row: closure
+requires the aligned compact comparator evidence and immutable identities in
+the trusted return package above.
 
 Before changing `Publication status`, update `PAPER_DRAFT.md`,
 `CLAIM_LEDGER.md`, `REPRODUCIBILITY.md`, `RESEARCH_PLAN.md` and

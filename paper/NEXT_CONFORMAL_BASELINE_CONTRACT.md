@@ -80,3 +80,6 @@ contract without deviations. The controller-visible admission record must pass
 publication commit, runner and synthetic-result hashes to the SHA-256 of this
 exact contract, requires `decision_bearing_validation=PASS`, and rejects any
 non-empty `deviations` list. A locally fabricated record is not review evidence.
+A passing admission record admits only the reviewed implementation identity; it
+does not contain a scientific outcome or compact result digest and therefore
+cannot close the conformal evidence row.

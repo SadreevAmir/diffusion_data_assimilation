@@ -550,6 +550,23 @@ READINESS_DECISION_SURFACE_ANCHORS = {
         "A new positive calibration claim requires one frozen candidate to pass every mandatory no-compensation family; partial metric improvement cannot promote the blocked row.",
     ),
 }
+MINIMUM_TIER_ADMISSION_TRANSITION_ANCHORS = {
+    "NEXT_CONFORMAL_BASELINE_CONTRACT.md": (
+        "A passing admission record admits only the reviewed implementation identity; it\n"
+        "does not contain a scientific outcome or compact result digest and therefore\n"
+        "cannot close the conformal evidence row.",
+    ),
+    "NEXT_PROBABILISTIC_DA_COMPARISON_CONTRACT.md": (
+        "The probabilistic-DA evidence row can close only after combined admission and\n"
+        "downstream reconciliation reproduce the controller-retained directory digest\n"
+        "from the separately reviewed trusted runner.",
+    ),
+    "FROZEN_EVALUATION_HANDOFF.md": (
+        "No local admission fixture closes the independent deterministic row: closure\n"
+        "requires the aligned compact comparator evidence and immutable identities in\n"
+        "the trusted return package above.",
+    ),
+}
 READINESS_BLOCKER_ROW = re.compile(
     r"^\| (?P<blocker>[^|]+?) \| `(?P<source>RESEARCH_PLAN\.md|MINIMUM_TIER_COMPARISON_AUDIT\.md)` \| "
     r"(?P<status>[A-Z_]+) \| (?P<closure>[^|]*?) \|$",
@@ -1780,6 +1797,12 @@ def validate_readiness_blockers(readiness: str, paper_dir: Path) -> None:
         require(
             all(anchor in text for anchor in anchors),
             f"publication decision transition is incomplete or weakened: {filename}",
+        )
+    for filename, anchors in MINIMUM_TIER_ADMISSION_TRANSITION_ANCHORS.items():
+        text = (paper_dir / filename).read_text(encoding="utf-8")
+        require(
+            all(anchor in text for anchor in anchors),
+            f"minimum-tier admission-to-transition boundary is incomplete or weakened: {filename}",
         )
     audit = (paper_dir / "MINIMUM_TIER_COMPARISON_AUDIT.md").read_text(
         encoding="utf-8"
