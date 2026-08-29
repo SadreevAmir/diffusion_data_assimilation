@@ -1,5 +1,14 @@
 # Publication readiness audit
 
+The 2026-08-29 current-snapshot provenance audit found that the unified checker
+already required and passed 83 publication files and 29 regression suites, but
+the undated `Current independent audit snapshot` and its trigger-specific rerun
+still described the superseded 79-file inventory as current. Those two current
+descriptions and the immediately preceding inventory-expansion summary now
+report 83 files; dated 79-file entries remain unchanged as audit history. No
+scientific result, blocker state or readiness decision changed. Publication
+status remains `NOT_READY`.
+
 The 2026-08-29 reproducibility-inventory audit found that the newly completed
 fail-closed raw-member reweighting review validator and its regression suite
 were described by the handoff checklist but were not mandatory inputs to the
@@ -209,12 +218,13 @@ payload after semantic validation and rejects in-admission substitution of any
 payload or directory member. This closes a local admission-parity
 gap only: no trusted mode has been admitted and the normative evidence row and
 publication status remain unchanged.
-The unified audit passed with 79 required files after this inventory expansion;
+The unified audit passed with 83 required files after the subsequent inventory
+expansion;
 earlier lower counts below are retained only as dated audit history.
 
 ## Current independent audit snapshot
 
-The current audit passed with 79 required files, two parseable linked figures,
+The current audit passed with 83 required files, two parseable linked figures,
 eight traceable references and 40 contiguous claim-ledger records. The
 immutable rank-coherent package separately
 passed its 13-file manifest check and all 26 focused prototype, adapter-parity,
@@ -229,7 +239,7 @@ contracts remain frozen but non-executable. No decision-bearing scientific row
 therefore changes, and publication status remains `NOT_READY`.
 
 The publication-readiness trigger was then independently repeated against this
-exact worktree state. The unified checker again passed with 79 required files,
+exact worktree state. The unified checker again passed with 83 required files,
 two parseable linked figures, eight traceable references and 40 contiguous
 claim-ledger records. A focused 61-test decision-surface suite covering
 conformal admission, claim-status consistency and the minimum-tier comparison
