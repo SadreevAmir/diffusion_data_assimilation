@@ -22,6 +22,7 @@ from paper.check_publication_artifacts import (
     SERVER_ONLY_COMMAND_INPUTS,
     validate_documented_regression_suites,
     validate_eligible_calibration_transition,
+    validate_joint_readiness_transition,
     validate_minimum_tier_key_claims,
     validate_minimum_tier_evidence_guards,
     validate_minimum_tier_handoff_inventory,
@@ -45,6 +46,62 @@ class MinimumTierComparisonAuditTests(unittest.TestCase):
             encoding="utf-8"
         )
         self.ledger = (PAPER_DIR / "CLAIM_LEDGER.md").read_text(encoding="utf-8")
+
+    def fully_closed_surfaces(self) -> tuple[str, str, str, str, str]:
+        manuscript, ledger, readiness = self.manuscript, self.ledger, self.readiness
+        for index, (route, status) in enumerate((
+            ("conformal", "CONFORMAL_USEFUL"),
+            ("probabilistic_da", "PROBABILISTIC_DA_NEGATIVE"),
+            ("independent_deterministic", "PRESENT_INDEPENDENT"),
+        )):
+            manuscript, ledger, readiness = self.transition_surfaces_from(
+                manuscript, ledger, readiness, route, status, f"{index + 1:064x}"
+            )
+        marker = "a" * 64
+        old = "| `eligible_calibration` | `MISSING_ELIGIBLE_RESULT` | `NONE` | `BLOCKED` |"
+        new = f"| `eligible_calibration` | `ELIGIBLE` | `{marker}` | `DECISION_BEARING` |"
+        manuscript, ledger, readiness, reproducibility = (
+            text.replace(old, new, 1)
+            for text in (manuscript, ledger, readiness, self.reproducibility)
+        )
+        manuscript += (
+            f"\nEligible calibration decision: `ELIGIBLE`; compact record: `{marker}`; "
+            "claim role: `DECISION_BEARING`.\n"
+        )
+        reproducibility += (
+            f"\nEligible calibration reproducibility identity: `{marker}`; "
+            "verification: `HASH_VERIFIED`.\n"
+        )
+        readiness = readiness.replace(
+            "| Eligible spatially preserving calibration | `RESEARCH_PLAN.md` | MISSING_ELIGIBLE_RESULT |",
+            "| Eligible spatially preserving calibration | `RESEARCH_PLAN.md` | ELIGIBLE |",
+            1,
+        ).replace(
+            "Publication status: NOT_READY", "Publication status: READY_FOR_HUMAN_REVIEW", 1
+        ).replace(
+            "Required scientific blockers: an eligible spatially preserving calibration and\n"
+            "the remaining minimum-tier comparisons",
+            "Required scientific blockers: none",
+            1,
+        )
+        handoff = (PAPER_DIR / "FROZEN_EVALUATION_HANDOFF.md").read_text(encoding="utf-8")
+        handoff = handoff.replace(
+            "Status: AUTHORIZED_ACTIVE_PENDING_COMPACT_RESULT",
+            "Status: COMPLETED_COMPACT_RESULT_RECONCILED",
+            1,
+        )
+        return manuscript, ledger, readiness, reproducibility, handoff
+
+    def transition_surfaces_from(
+        self, manuscript: str, ledger: str, readiness: str,
+        route: str, status: str, marker: str
+    ) -> tuple[str, str, str]:
+        originals = (self.manuscript, self.ledger, self.readiness)
+        self.manuscript, self.ledger, self.readiness = manuscript, ledger, readiness
+        try:
+            return self.transition_surfaces(route, status, marker)
+        finally:
+            self.manuscript, self.ledger, self.readiness = originals
 
     def make_fixture(self, audit: str) -> tempfile.TemporaryDirectory[str]:
         temporary = tempfile.TemporaryDirectory()
@@ -661,6 +718,55 @@ class MinimumTierComparisonAuditTests(unittest.TestCase):
         self.assertEqual(
             validate_publication_status(self.readiness, frozen_handoff), "NOT_READY"
         )
+
+    def test_joint_transition_accepts_only_complete_ready_matrix(self) -> None:
+        manuscript, ledger, readiness, reproducibility, handoff = (
+            self.fully_closed_surfaces()
+        )
+        self.assertEqual(
+            validate_joint_readiness_transition(
+                manuscript, ledger, readiness, self.audit, reproducibility, handoff
+            ),
+            "READY_FOR_HUMAN_REVIEW",
+        )
+
+    def test_joint_transition_rejects_ready_with_any_open_blocker(self) -> None:
+        manuscript, ledger, readiness, reproducibility, handoff = (
+            self.fully_closed_surfaces()
+        )
+        readiness = readiness.replace(
+            "| Conformal intervals | `MINIMUM_TIER_COMPARISON_AUDIT.md` | CONFORMAL_USEFUL |",
+            "| Conformal intervals | `MINIMUM_TIER_COMPARISON_AUDIT.md` | MISSING |",
+            1,
+        )
+        with self.assertRaisesRegex(ValueError, "readiness blocker row"):
+            validate_joint_readiness_transition(
+                manuscript, ledger, readiness, self.audit, reproducibility, handoff
+            )
+
+    def test_joint_transition_requires_none_blocker_declaration(self) -> None:
+        manuscript, ledger, readiness, reproducibility, handoff = (
+            self.fully_closed_surfaces()
+        )
+        readiness = readiness.replace(
+            "Required scientific blockers: none",
+            "Required scientific blockers: stale blocker",
+            1,
+        )
+        with self.assertRaisesRegex(ValueError, "requires no scientific blockers"):
+            validate_joint_readiness_transition(
+                manuscript, ledger, readiness, self.audit, reproducibility, handoff
+            )
+
+    def test_joint_transition_rejects_active_evaluation_handoff(self) -> None:
+        manuscript, ledger, readiness, reproducibility, _ = self.fully_closed_surfaces()
+        active_handoff = (PAPER_DIR / "FROZEN_EVALUATION_HANDOFF.md").read_text(
+            encoding="utf-8"
+        )
+        with self.assertRaisesRegex(ValueError, "active evaluation"):
+            validate_joint_readiness_transition(
+                manuscript, ledger, readiness, self.audit, reproducibility, active_handoff
+            )
 
     def test_readiness_cannot_claim_ready_with_open_blocker_matrix(self) -> None:
         frozen_handoff = (PAPER_DIR / "FROZEN_EVALUATION_HANDOFF.md").read_text(

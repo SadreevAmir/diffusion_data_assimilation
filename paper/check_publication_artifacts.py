@@ -2022,6 +2022,24 @@ def validate_publication_status(readiness: str, frozen_handoff: str) -> str:
     return status
 
 
+def validate_joint_readiness_transition(
+    manuscript: str,
+    claim_ledger: str,
+    readiness: str,
+    audit: str,
+    reproducibility: str,
+    frozen_handoff: str,
+) -> str:
+    """Validate all four scientific closures as one fail-closed transition."""
+    validate_minimum_tier_evidence_guards(
+        manuscript, claim_ledger, readiness, audit
+    )
+    validate_eligible_calibration_transition(
+        manuscript, claim_ledger, readiness, reproducibility
+    )
+    return validate_publication_status(readiness, frozen_handoff)
+
+
 def main() -> int:
     validate_minimum_tier_handoff_inventory()
     missing = [name for name in REQUIRED_FILES if not (PAPER_DIR / name).is_file()]
@@ -2538,7 +2556,14 @@ def main() -> int:
 
     validate_empirical_traceability(manuscript, PAPER_DIR)
 
-    status = validate_publication_status(readiness, frozen_handoff)
+    status = validate_joint_readiness_transition(
+        manuscript,
+        claim_ledger,
+        readiness,
+        (PAPER_DIR / "MINIMUM_TIER_COMPARISON_AUDIT.md").read_text(encoding="utf-8"),
+        reproducibility,
+        frozen_handoff,
+    )
 
     print(
         f"publication artifact audit passed: {len(REQUIRED_FILES)} files, "

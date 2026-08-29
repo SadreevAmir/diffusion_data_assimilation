@@ -1205,5 +1205,15 @@ matching readiness blocker row to carry that exact outcome state and derives
 `Publication status` from the entire blocker matrix. Focused negative fixtures
 reject an unchanged blocker row, a blocker closed with the wrong outcome and a
 premature ready declaration while any normative blocker remains unresolved.
+
+The joint-transition audit now exercises the only admissible terminal state as
+one transaction across all four normative blockers. It accepts
+`READY_FOR_HUMAN_REVIEW` only when every compact-evidence surface agrees, every
+readiness row carries its exact closure outcome, `Required scientific blockers`
+is literally `none`, and the frozen evaluation handoff no longer reports an
+active result. Focused negative fixtures independently reopen one row, retain a
+stale blocker declaration, and retain an active handoff. Thus no collection of
+partial closures can be mistaken for publication readiness, while the present
+scientific rows and `NOT_READY` status remain unchanged.
 Thus compact identity alone cannot create an editorially inconsistent closure;
 the current evidence rows are unchanged and status remains `NOT_READY`.
