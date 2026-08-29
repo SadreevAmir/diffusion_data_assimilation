@@ -703,7 +703,7 @@ revision cannot silently promote a rejected or unknown claim.
 | Publication scope and unsupported generalization claims | C9, C10, C17 |
 | Boundary-aware and mean-preserving postprocessors | C21, C22, C23, C24, C25, C26, C27, C28, C29 |
 | Structure-preserving and ensemble-diversity mechanisms | C30, C31, C32, C33, C34 |
-| Model-space, amended-policy and final development evidence | C35, C36, C37, C38 |
+| Model-space, amended-policy and final development evidence | C35, C36, C37, C38, C40 |
 | Independent primary result | C39 |
 
 ### Empirical evidence traceability
@@ -723,7 +723,7 @@ presentation object or compact source disappears.
 | C23, C24, C25 | Section 8 projected-spread table; Figure 2 | `REPRODUCIBILITY.md` | Exact mean-preservation ablation and no-compensation rejection |
 | C26, C27 | Section 8 open-logit table | `REPRODUCIBILITY.md` | Hard-cap ablation and residual boundary/member-spatial failure |
 | C28, C29 | Section 8 ZOIB-EMOS/ECC-Q table | `REPRODUCIBILITY.md` | Parametric boundary-atom comparator and joint-gate rejection |
-| C30, C31, C32, C33, C34, C35, C37 | Section 8 later-mechanism family matrix | `REPRODUCIBILITY.md` | Family-level frozen mechanism failure map |
+| C30, C31, C32, C33, C34, C35, C37, C40 | Section 8 later-mechanism family matrix and rank-first coherent anomaly transport subsection | `REPRODUCIBILITY.md` | Family-level frozen mechanism failure map and explicit rank-first rejection |
 | C36 | Section Amended primary decision policy | `AMENDED_PRIMARY_EVALUATION_CONTRACT.md` | Normative absolute-rank and truth-relative boundary decision rule |
 | C38 | Section 8 later-mechanism family matrix | `LOCKED_MC_DROPOUT_RESULT_RECONCILIATION.md` | Overall rejection only; no unsupported family effect sizes |
 | C39 | Independent primary result section and Section 8 independent-primary table | `EXTERNAL_PRIMARY_RESULT_RECONCILIATION.md` | Reconciled negative independent primary with superseded metrics excluded |

@@ -1071,7 +1071,7 @@ SCORE_AWARE_RECONCILIATION_ANCHORS = (
     "decision_bearing=True",
 )
 RANK_COHERENT_RECONCILIATION_ANCHORS = (
-    "Status: PRE_RESULT_NO_TRUSTED_MODE",
+    "Status: RESULT_COMPLETED_AWAITING_COMBINED_ADMISSION",
     "## Mutually exclusive scientific branches",
     "## Atomic publication update map",
     "## Fail-closed consistency rules",
@@ -1180,7 +1180,7 @@ AMENDED_PRIMARY_ANCHORS = {
 }
 PYTHON_FILES = tuple(name for name in REQUIRED_FILES if name.endswith(".py"))
 RANK_COHERENT_CONTRACT_ANCHORS = (
-    "Status: DESIGN_FROZEN_NO_RUNNER",
+    "Status: EXECUTED_RESULT_AWAITING_COMBINED_ADMISSION",
     "purged rank-targeted coherent anomaly transport",
     "five\n  contiguous eight-case holdouts",
     "non-circular three-case purge",
@@ -1189,7 +1189,7 @@ RANK_COHERENT_CONTRACT_ANCHORS = (
     "overall_eligible=true",
     "source_experiment=joint_full_condition_validation_2022",
     "summary_only",
-    "no currently\nimplemented trusted mode implements it",
+    "Completion alone is not scientific admission",
     "rank_coherent_reference.py",
     "exact `valid`, 40-case, ten-member, stride-five\ndevelopment envelope",
     "all five mandatory\nfamily flags are present as JSON booleans",
@@ -1197,7 +1197,7 @@ RANK_COHERENT_CONTRACT_ANCHORS = (
     "maximum mean error\nmust not exceed `1e-10`",
 )
 RAW_MEMBER_REWEIGHTING_CONTRACT_ANCHORS = (
-    "Status: DESIGN_FROZEN_CONTINGENT_NO_RUNNER",
+    "Status: ACTIVATED_DESIGN_FROZEN_NO_RUNNER",
     "activated only if the frozen\nwhole-field rank-coherent anomaly-transport candidate is completed and rejected",
     "five contiguous\n  eight-case holdouts",
     "non-circular three-case purge",
@@ -1281,7 +1281,7 @@ RANK_COHERENT_IMMUTABLE_DIGESTS = {
     "rank_coherent_reference.py":
         "d25095af94eb9e93c20e8495f9584c6f1d954c24dfa0a8b72ef65c51aeb1a170",
     "NEXT_RANK_COHERENT_CONTRACT.md":
-        "1489a68f914131c6b6ad545a413903f366d28f8570e8e40cc674db77282197d1",
+        "1781db33ae88b5128175b5df88cc4b173059711ac45f298e71b9ef603be0bcf8",
 }
 FIGURE_PATTERN = re.compile(r"!\[[^]]*\]\(([^)]+)\)")
 REFERENCE_PATTERN = re.compile(r"^(\d+)\. ", re.MULTILINE)
@@ -1290,7 +1290,7 @@ CLAIM_PATTERN = re.compile(r"^\| C(\d+) \|", re.MULTILINE)
 TRACEABILITY_HEADING = "### Claim-ledger traceability\n"
 TRACEABILITY_PATTERN = re.compile(r"\bC(\d+)\b")
 EMPIRICAL_TRACEABILITY_HEADING = "### Empirical evidence traceability\n"
-EMPIRICAL_CLAIM_IDS = set(range(3, 9)) | set(range(11, 40))
+EMPIRICAL_CLAIM_IDS = set(range(3, 9)) | set(range(11, 41))
 EMPIRICAL_TRACEABILITY_ROW = re.compile(
     r"^\| (?P<claims>C\d+(?:, C\d+)*) \| "
     r"(?P<presentation>[^|]+) \| `(?P<source>[^`]+)` \| (?P<role>[^|]+) \|$",
@@ -2291,7 +2291,11 @@ def main() -> int:
         "RANK_COHERENT_RESULT_RECONCILIATION.md is missing anchors: "
         + ", ".join(missing_rank_coherent_anchors),
     )
-    if "Status: PRE_RESULT_NO_TRUSTED_MODE" in rank_coherent_reconciliation:
+    if (
+        "Status: PRE_RESULT_NO_TRUSTED_MODE" in rank_coherent_reconciliation
+        or "Status: RESULT_COMPLETED_AWAITING_COMBINED_ADMISSION"
+        in rank_coherent_reconciliation
+    ):
         require(
             not any(re.search(r"^RANK_COHERENT_RESULT:", text, re.MULTILINE)
                     for text in (manuscript, claim_ledger, readiness, reproducibility,

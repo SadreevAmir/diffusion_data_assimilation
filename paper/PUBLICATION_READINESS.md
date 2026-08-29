@@ -1,5 +1,22 @@
 # Publication readiness audit
 
+The 2026-08-29 independent publication-readiness rerun exposed two stale
+fail-closed bindings in the current committed state.  Claim `C40` was present
+in the ledger and manuscript result subsection but absent from the manuscript's
+claim and empirical-evidence traceability tables, causing eleven downstream
+negative-path tests to stop at the wrong invariant.  The frozen rank-coherent
+contract also had a newer actual SHA-256 than the immutable manifest, handoff
+and checker recorded, while its execution and reconciliation files had already
+advanced to completed-but-unadmitted states that the unified checker and
+renderer did not recognize.  The traceability tables, exact digest bindings and
+unreconciled lifecycle-state guards are now synchronized.  No result, metric,
+threshold or gate decision changed, and completion still cannot be interpreted
+as scientific admission without the exact combined admission inputs.  The
+focused 99-test defect boundary and subsequent 14-test renderer/claim/manifest
+boundary passed.  The unified checker now passes with 79 required files, two
+figures, eight references and 40 claims at `NOT_READY`; `git diff --check`
+passes.  The four scientific blocker rows below remain unchanged.
+
 The 2026-08-29 joint spread--occurrence result review confirms 40/40 completed
 cases and `overall_eligible=false`. The candidate aggregate improves
 date-balanced rank total variation from `0.3566938377` to `0.1092186644` and

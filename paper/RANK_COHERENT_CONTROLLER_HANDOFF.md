@@ -26,7 +26,7 @@ comparison; the manifest is authoritative for the complete package.
 | `paper/rank_coherent_runner_prototype.py` | `b6b9b709c587d79625d0237b15c3e36f4e3404eef37ba0bbbe850875be95d86c` |
 | `paper/test_rank_coherent_runner_prototype.py` | `fbda1c1dee61f80ebb4b37562364c34be3268aa6c0c2e87b2d222d9e95b888e6` |
 | `paper/rank_coherent_reference.py` | `d25095af94eb9e93c20e8495f9584c6f1d954c24dfa0a8b72ef65c51aeb1a170` |
-| `paper/NEXT_RANK_COHERENT_CONTRACT.md` | `1489a68f914131c6b6ad545a413903f366d28f8570e8e40cc674db77282197d1` |
+| `paper/NEXT_RANK_COHERENT_CONTRACT.md` | `1781db33ae88b5128175b5df88cc4b173059711ac45f298e71b9ef603be0bcf8` |
 
 Recompute before review with:
 

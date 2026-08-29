@@ -24,7 +24,10 @@ RESULT_BLOCK = re.compile(
     r"<!-- RANK_COHERENT_RENDERED_RESULT_END -->\n?",
     re.DOTALL,
 )
-PRE_RESULT_STATUS = "Status: PRE_RESULT_NO_TRUSTED_MODE"
+UNRECONCILED_STATUSES = (
+    "Status: PRE_RESULT_NO_TRUSTED_MODE",
+    "Status: RESULT_COMPLETED_AWAITING_COMBINED_ADMISSION",
+)
 GUARD_ROW = re.compile(
     r"^\| `eligible_calibration` \| `(?:MISSING_ELIGIBLE_RESULT|ELIGIBLE)` \| "
     r"`(?:NONE|[0-9a-f]{64})` \| `(?:BLOCKED|DECISION_BEARING)` \|$",
@@ -120,10 +123,11 @@ def render_publication_documents(
     for path, text in base_documents.items():
         updated = RESULT_BLOCK.sub("\n", text)
         if path == reconciliation_path:
-            if PRE_RESULT_STATUS not in updated:
+            present_statuses = [status for status in UNRECONCILED_STATUSES if status in updated]
+            if len(present_statuses) != 1:
                 raise ValueError("reconciliation surface omits the pre-result status")
             status = "RECONCILED_POSITIVE" if overall else "RECONCILED_NEGATIVE"
-            updated = updated.replace(PRE_RESULT_STATUS, f"Status: {status}", 1)
+            updated = updated.replace(present_statuses[0], f"Status: {status}", 1)
         if overall and path.name in {
             "PAPER_DRAFT.md", "CLAIM_LEDGER.md", "REPRODUCIBILITY.md",
             "PUBLICATION_READINESS.md",
