@@ -3,7 +3,12 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from validate_coverage_occurrence_admission import EXPECTED, FAMILIES, SOURCE, admit
+from paper.validate_coverage_occurrence_admission import (
+    EXPECTED,
+    FAMILIES,
+    SOURCE,
+    admit,
+)
 
 
 class CoverageOccurrenceAdmissionTests(unittest.TestCase):

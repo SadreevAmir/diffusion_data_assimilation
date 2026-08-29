@@ -1,5 +1,16 @@
 # Publication readiness audit
 
+The 2026-08-29 coverage-admission reproducibility audit found that the
+decision-bearing joint validator, its regression suite and its reconciliation
+handoff existed but were not mandatory members of the unified publication
+inventory; the suite was also absent from the exact documented regression
+command.  All three files are now required and the suite is part of the
+executable handoff.  This closes a deletion/drift gap at the current atomic
+admission boundary only: it supplies neither missing compact payload, changes
+no family decision and leaves publication status `NOT_READY`.  The unified
+audit passed with 86 required files, two figures, eight references, 40 claims
+and 30 regression suites after this inventory expansion.
+
 The 2026-08-29 independent executable publication audit rechecked the current
 manuscript, claim ledger, figures, tables, compact-evidence guards and
 reproducibility boundary without relying on scheduler status.  The unified

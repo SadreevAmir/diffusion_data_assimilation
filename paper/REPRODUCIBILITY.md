@@ -616,7 +616,8 @@ python3 -m unittest -v \
   paper.test_validate_raw_member_reweighting_review \
   paper.test_score_aware_raw_reweighting_reference \
   paper.test_validate_score_aware_raw_reweighting_admission \
-  paper.test_validate_score_aware_compact_outputs
+  paper.test_validate_score_aware_compact_outputs \
+  paper.test_validate_coverage_occurrence_admission
 python3 paper/check_publication_artifacts.py
 ```
 

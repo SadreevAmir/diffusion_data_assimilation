@@ -44,6 +44,7 @@ REQUIRED_REGRESSION_SUITES = (
     "paper.test_score_aware_raw_reweighting_reference",
     "paper.test_validate_score_aware_raw_reweighting_admission",
     "paper.test_validate_score_aware_compact_outputs",
+    "paper.test_validate_coverage_occurrence_admission",
 )
 REGRESSION_COMMAND = re.compile(
     r"python3 -m unittest -v \\\n(?P<body>(?:  paper\.[a-z0-9_]+(?: \\\n|\n))+)",
@@ -256,6 +257,9 @@ REQUIRED_FILES = (
     "LATENT_TEMPERATURE_RESULT_RECONCILIATION.md",
     "LOCKED_MC_DROPOUT_RESULT_RECONCILIATION.md",
     "EXTERNAL_PRIMARY_RESULT_RECONCILIATION.md",
+    "COVERAGE_OCCURRENCE_RESULT_RECONCILIATION.md",
+    "validate_coverage_occurrence_admission.py",
+    "test_validate_coverage_occurrence_admission.py",
     "guidance_mixture_reference.py",
     "deep_ensemble_reference.py",
     "validate_server_only_manifest.py",
