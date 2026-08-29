@@ -81,6 +81,15 @@ The non-overlapping four-case-block interval is temporal sensitivity only.
   useful calibration.
 - Reliability failure means lower predicted scenario risk does not repair the
   ensemble probability distribution.
+- If every held-out case has source multiplicities `[1,1,1,1,1,1,1,1,1,1]`,
+  the deterministic finite-member realization is a mechanistic null action:
+  the candidate is only a permutation of the raw empirical ensemble, even when
+  its latent softmax weights are nonuniform.  In that branch an unchanged gate
+  rejects the fixed midpoint/systematic realization as insufficiently
+  informative; it must not be interpreted as evidence that the fitted risk
+  ordering itself was empirically tested.  A mixture of null-action and active
+  cases is reported through the already frozen multiplicities, unique-member
+  counts and ESS, without introducing a post-result activity threshold.
 - A source-copy or member-mask failure is an implementation/provenance failure.
 - A mean-field spatial/physical failure is scientific evidence that changed
   scenario frequencies damage the forecast distribution.

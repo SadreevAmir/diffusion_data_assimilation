@@ -151,6 +151,13 @@ class ScoreAwareRawReweightingReferenceTest(unittest.TestCase):
         self.assertEqual(result["source_multiplicities"], [1] * 10)
         self.assertAlmostEqual(result["effective_sample_size"], 10.0)
 
+    def test_nonuniform_weights_can_still_quantize_to_null_action(self):
+        result = select_raw_scenarios([0.02 * index for index in range(10)])
+        self.assertGreater(max(result["normalized_weights"]), min(result["normalized_weights"]))
+        self.assertEqual(result["source_multiplicities"], [1] * 10)
+        self.assertEqual(sorted(result["source_raw_member_indices"]), list(range(10)))
+        self.assertAlmostEqual(result["effective_sample_size"], 10.0)
+
     def test_lower_risk_receives_more_mass_with_deterministic_ties(self):
         result = select_raw_scenarios([0.0, 0.0] + [10.0] * 8)
         self.assertEqual(result["risk_ordered_raw_member_indices"], list(range(10)))
