@@ -1217,3 +1217,12 @@ partial closures can be mistaken for publication readiness, while the present
 scientific rows and `NOT_READY` status remain unchanged.
 Thus compact identity alone cannot create an editorially inconsistent closure;
 the current evidence rows are unchanged and status remains `NOT_READY`.
+
+The following independent publication audit found that the three minimum-tier
+compact identities were atomically guarded in the manuscript, claim ledger and
+readiness record but were absent from the reproducibility handoff. The exact
+three-row guard is now repeated in `REPRODUCIBILITY.md`, and the unified checker
+requires it to match the manuscript atomically. Focused fixtures accept the
+current missing/development-only state and reject an omitted identity row. This
+closes a reproducibility synchronization gap only: no compact result is created,
+all four scientific blockers remain open and status remains `NOT_READY`.

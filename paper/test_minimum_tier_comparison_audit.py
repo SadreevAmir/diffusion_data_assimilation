@@ -9,6 +9,7 @@ from pathlib import Path
 
 from paper.check_publication_artifacts import (
     MINIMUM_TIER_ADMISSION_TRANSITION_ANCHORS,
+    MINIMUM_TIER_EVIDENCE_GUARD_ROWS,
     MINIMUM_TIER_HANDOFF_INVENTORY,
     MINIMUM_TIER_CLAIM_CONSISTENCY_ANCHORS,
     MINIMUM_TIER_ROW,
@@ -25,6 +26,7 @@ from paper.check_publication_artifacts import (
     validate_joint_readiness_transition,
     validate_minimum_tier_key_claims,
     validate_minimum_tier_evidence_guards,
+    validate_minimum_tier_reproducibility_guards,
     validate_minimum_tier_handoff_inventory,
     validate_minimum_tier_comparisons,
     validate_publication_status,
@@ -47,22 +49,44 @@ class MinimumTierComparisonAuditTests(unittest.TestCase):
         )
         self.ledger = (PAPER_DIR / "CLAIM_LEDGER.md").read_text(encoding="utf-8")
 
+    def test_reproducibility_cannot_omit_minimum_tier_identity(self) -> None:
+        row = (
+            "| `probabilistic_da` | `MISSING` | `NONE` | `PRE_RESULT_ONLY` |"
+        )
+        mutated = self.reproducibility.replace(row, "", 1)
+        self.assertNotEqual(mutated, self.reproducibility)
+        with self.assertRaisesRegex(ValueError, "reproducibility guard is incomplete"):
+            validate_minimum_tier_reproducibility_guards(
+                self.manuscript, mutated
+            )
+
+    def test_reproducibility_minimum_tier_identities_match_manuscript(self) -> None:
+        validate_minimum_tier_reproducibility_guards(
+            self.manuscript, self.reproducibility
+        )
+
     def fully_closed_surfaces(self) -> tuple[str, str, str, str, str]:
         manuscript, ledger, readiness = self.manuscript, self.ledger, self.readiness
+        reproducibility = self.reproducibility
         for index, (route, status) in enumerate((
             ("conformal", "CONFORMAL_USEFUL"),
             ("probabilistic_da", "PROBABILISTIC_DA_NEGATIVE"),
             ("independent_deterministic", "PRESENT_INDEPENDENT"),
         )):
+            marker = f"{index + 1:064x}"
             manuscript, ledger, readiness = self.transition_surfaces_from(
-                manuscript, ledger, readiness, route, status, f"{index + 1:064x}"
+                manuscript, ledger, readiness, route, status, marker
             )
+            old_status, _, old_presentation = MINIMUM_TIER_EVIDENCE_GUARD_ROWS[route]
+            old = f"| `{route}` | `{old_status}` | `NONE` | `{old_presentation}` |"
+            new = f"| `{route}` | `{status}` | `{marker}` | `DECISION_BEARING` |"
+            reproducibility = reproducibility.replace(old, new, 1)
         marker = "a" * 64
         old = "| `eligible_calibration` | `MISSING_ELIGIBLE_RESULT` | `NONE` | `BLOCKED` |"
         new = f"| `eligible_calibration` | `ELIGIBLE` | `{marker}` | `DECISION_BEARING` |"
         manuscript, ledger, readiness, reproducibility = (
             text.replace(old, new, 1)
-            for text in (manuscript, ledger, readiness, self.reproducibility)
+            for text in (manuscript, ledger, readiness, reproducibility)
         )
         manuscript += (
             f"\nEligible calibration decision: `ELIGIBLE`; compact record: `{marker}`; "

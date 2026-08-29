@@ -557,6 +557,16 @@ conformal and probabilistic DA are the only `MISSING` result rows, whereas the
 deterministic comparison is `PRESENT_DEVELOPMENT_ONLY`. It remains a blocker for
 the main comparison table without being misreported as a third absent family.
 
+The exact minimum-tier compact identities below are part of the reproducibility
+handoff. They must change atomically with the manuscript, claim ledger and
+readiness record; `NONE` forbids a decision-bearing presentation.
+
+| Route | Evidence status | Compact evidence record SHA-256 | Allowed presentation |
+|---|---|---|---|
+| `conformal` | `MISSING` | `NONE` | `PRE_RESULT_ONLY` |
+| `probabilistic_da` | `MISSING` | `NONE` | `PRE_RESULT_ONLY` |
+| `independent_deterministic` | `PRESENT_DEVELOPMENT_ONLY` | `NONE` | `DEVELOPMENT_ONLY` |
+
 | `eligible_calibration` | `MISSING_ELIGIBLE_RESULT` | `NONE` | `BLOCKED` |
 
 The positive eligible-calibration row uses a separate four-surface compact

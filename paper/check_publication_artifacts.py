@@ -898,6 +898,32 @@ def validate_minimum_tier_evidence_guards(
             label not in outside_matrix,
             f"decision-bearing label {label} appears outside the pre-result matrix",
         )
+
+
+def validate_minimum_tier_reproducibility_guards(
+    manuscript: str, reproducibility: str
+) -> None:
+    """Bind minimum-tier compact identities to the reproducibility handoff."""
+    observed_by_file: dict[str, dict[str, tuple[str, str, str]]] = {}
+    for filename, text in {
+        "PAPER_DRAFT.md": manuscript,
+        "REPRODUCIBILITY.md": reproducibility,
+    }.items():
+        rows = list(MINIMUM_TIER_EVIDENCE_GUARD_ROW.finditer(text))
+        observed = {
+            row["route"]: (row["status"], row["record"], row["presentation"])
+            for row in rows
+        }
+        require(
+            len(rows) == len(observed) == len(MINIMUM_TIER_EVIDENCE_GUARD_ROWS),
+            f"{filename} reproducibility guard is incomplete or duplicated",
+        )
+        observed_by_file[filename] = observed
+    require(
+        observed_by_file["PAPER_DRAFT.md"]
+        == observed_by_file["REPRODUCIBILITY.md"],
+        "minimum-tier reproducibility transition is not atomic",
+    )
 EXTERNAL_PRIMARY_HANDOFF_ANCHORS = {
     "PUBLICATION_READINESS.md": (
         "External primary evidence state: RECONCILED_NEGATIVE",
@@ -2034,6 +2060,7 @@ def validate_joint_readiness_transition(
     validate_minimum_tier_evidence_guards(
         manuscript, claim_ledger, readiness, audit
     )
+    validate_minimum_tier_reproducibility_guards(manuscript, reproducibility)
     validate_eligible_calibration_transition(
         manuscript, claim_ledger, readiness, reproducibility
     )
@@ -2064,6 +2091,10 @@ def main() -> int:
     )
 
     reproducibility = (PAPER_DIR / "REPRODUCIBILITY.md").read_text(encoding="utf-8")
+    validate_minimum_tier_reproducibility_guards(
+        (PAPER_DIR / "PAPER_DRAFT.md").read_text(encoding="utf-8"),
+        reproducibility,
+    )
     validate_documented_regression_suites(reproducibility)
     validate_server_only_command_inputs(reproducibility)
     validate_eligible_calibration_transition(
