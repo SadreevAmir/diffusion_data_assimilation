@@ -1,5 +1,16 @@
 # Publication readiness audit
 
+The 2026-08-29 key-claim language audit independently compared the Abstract,
+Contributions, Limitations and Conclusion with all four normative blocker rows
+and the negative compact evidence.  It found that the most visible sections
+named the two wholly missing comparison families but left the deterministic
+background/3D-Var comparison's development-only evidence strength implicit.
+The Abstract, Contributions and Conclusion now state that boundary explicitly;
+no result, metric or blocker state changed.  The focused minimum-tier,
+limitation-traceability and claim-status suite passed 96 tests.  The subsequent
+unified checker passed with 79 required files, two figures, eight references and
+39 claims at status `NOT_READY`, and `git diff --check` passed.
+
 The 2026-08-29 end-to-end reproducibility audit executed the complete two-command
 handoff documented in `REPRODUCIBILITY.md`, rather than relying on static command
 inspection.  The documented 27-suite list exactly matches

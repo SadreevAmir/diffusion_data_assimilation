@@ -76,7 +76,9 @@ select an inactive correction. The contribution is therefore an auditable
 failure map and a fail-closed evaluation protocol, not a successful calibrated
 ensemble, an independent generalization claim or superiority to a deterministic
 method. Conformal intervals and the probabilistic DA baseline such as EnKF/LETKF
-remain missing, so the minimum strong domain/SciML baseline tier remains incomplete.
+remain missing, while the deterministic background/3D-Var comparison remains
+development-only rather than independent-strength evidence. The minimum strong
+domain/SciML baseline tier remains incomplete.
 
 ## 1. Introduction
 
@@ -146,8 +148,10 @@ The present validation study contributes:
    claim that all calibration families have been exhausted.
 
 Conformal intervals and the probabilistic DA baseline such as EnKF/LETKF remain
-missing. Consequently, the minimum strong domain/SciML baseline tier remains
-incomplete; the contributions above must not be read as baseline-complete.
+missing, while the deterministic background/3D-Var comparison remains
+development-only rather than independent-strength evidence. Consequently, the
+minimum strong domain/SciML baseline tier remains incomplete; the contributions
+above must not be read as baseline-complete.
 
 The methods and gates were frozen from validation evidence. The completed
 independent primary supplies a negative falsification for one frozen candidate,
@@ -761,9 +765,11 @@ improve selected reliability diagnostics, but none satisfies the joint
 no-compensation calibration gate. The single independent primary is likewise
 negative, so the paper does not claim a calibrated learned-joint ensemble or
 independent superiority. Conformal intervals and the probabilistic DA baseline
-such as EnKF/LETKF remain missing; therefore the minimum strong domain/SciML
-baseline tier remains incomplete. These two absent comparisons are separate
-from calibration eligibility and cannot compensate for any failed gate family.
+such as EnKF/LETKF remain missing, while the deterministic background/3D-Var
+comparison remains development-only rather than independent-strength evidence;
+the minimum strong domain/SciML baseline tier remains incomplete.
+These three comparison blockers are separate from calibration eligibility and
+cannot compensate for any failed gate family.
 
 ## Ethics and competing interests
 
