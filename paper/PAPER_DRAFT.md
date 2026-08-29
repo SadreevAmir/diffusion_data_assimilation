@@ -553,7 +553,10 @@ The observation values are M2M truth sampled under real satellite geometry, not
 direct satellite SIC retrievals. Coverage is aggregated pointwise and does not
 establish casewise or fieldwise coverage. Clipping complicates bounded mean
 comparisons, and residual upper-tail undercoverage remains. No independent
-comparison with 3D-Var is claimed. Generalization across checkpoints, seeds,
+comparison with 3D-Var is claimed; conformal intervals and a probabilistic DA
+baseline such as EnKF/LETKF are also missing. These comparison gaps leave the
+minimum strong domain/SciML baseline tier incomplete and cannot compensate for
+a failed calibration-gate family. Generalization across checkpoints, seeds,
 ensemble sizes, regions or observation systems remains unverified.
 
 ## 8. Evidence table for the frozen mechanism claim

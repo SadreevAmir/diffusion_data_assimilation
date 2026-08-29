@@ -25,6 +25,15 @@ limitation-traceability and claim-status suite passed 96 tests.  The subsequent
 unified checker passed with 79 required files, two figures, eight references and
 39 claims at status `NOT_READY`, and `git diff --check` passed.
 
+The 2026-08-29 remaining-blocker language audit found one concrete asymmetry:
+Abstract and Conclusion named all three incomplete minimum-tier comparison
+rows, while Limitations named only the independent 3D-Var gap. Limitations now
+also states that conformal intervals and a probabilistic DA baseline such as
+EnKF/LETKF are missing, that the minimum strong domain/SciML baseline tier is
+incomplete, and that comparison completeness cannot compensate for a failed
+calibration-gate family. This is an editorial traceability correction only; all
+four normative evidence states and publication status remain unchanged.
+
 The 2026-08-29 end-to-end reproducibility audit executed the complete two-command
 handoff documented in `REPRODUCIBILITY.md`, rather than relying on static command
 inspection.  The documented 27-suite list exactly matches
