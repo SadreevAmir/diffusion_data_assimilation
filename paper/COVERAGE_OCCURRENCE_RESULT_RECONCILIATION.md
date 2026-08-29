@@ -2,6 +2,21 @@
 
 Status: PRE_RESULT_COMPACT_PAYLOAD_PENDING
 
+Controller-visible inspection on 2026-08-29 found no local compact JSON whose
+filename or path contains either exact experiment identity. The controller
+reports both jobs as `summary_ready`, but that scheduler fact is deliberately
+not admitted as a family decision. Consequently no gate Boolean, effect size or
+scientific outcome has been copied to a publication surface.
+
+Exact blocker: the publication worktree lacks the two immutable compact gate
+records consumed by `validate_coverage_occurrence_admission.py`. The minimum
+recovery is evidence delivery, not recomputation: materialize the existing
+`gate_decision.json` bytes from each completed server result root into the
+controller-visible compact-artifact channel. Do not rerun either forty-case
+calculation. Once both files are visible, pass their actual paths together to
+the command below; the validator will bind their bytes by SHA-256 and fail
+closed on any schema, identity or conjunction defect.
+
 This handoff covers the completed trusted jobs
 `joint_coverage_occurrence_threshold_valid` and
 `joint_coverage_occurrence_joint_rank_valid`. Their completion status is not a
