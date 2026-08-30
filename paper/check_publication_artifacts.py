@@ -217,6 +217,7 @@ REQUIRED_FILES = (
     "RAW_MEMBER_REWEIGHTING_RESULT_RECONCILIATION.md",
     "NEXT_SCORE_AWARE_RAW_REWEIGHTING_CONTRACT.md",
     "NEXT_CASEWISE_SAFETY_SELECTOR_CONTRACT.md",
+    "CASEWISE_SAFETY_SELECTOR_RUNNER_REVIEW_CHECKLIST.md",
     "casewise_safety_selector_reference.py",
     "validate_casewise_safety_selector_semantics.py",
     "validate_casewise_safety_selector_compact_outputs.py",

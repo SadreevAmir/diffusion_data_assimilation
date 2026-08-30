@@ -652,6 +652,16 @@ compact-payload admission; the command rereads both inputs before returning and
 fails if either changed. The reconciliation marker must copy these emitted
 identities, not recompute or manually infer them in a later step.
 
+The contingent casewise safety selector has a separate outcome-agnostic review
+handoff in `CASEWISE_SAFETY_SELECTOR_RUNNER_REVIEW_CHECKLIST.md`. Before a
+proposal, one independent admission operation must bind the literal
+executor-visible mode, trusted runner, frozen contract, independent reference
+and exact compact validator identities. Local semantic parity or an unbound
+registration record is not execution authority. The eventual proposal retains
+the sole frozen source parameter, `server_cpu`, `summary_only` and the complete
+forty-case, ten-member envelope; success still requires both actions and the
+literal conjunction of all five gate families.
+
 Before any future literal score-aware mode can become decision-bearing, its
 reviewed runner and exact admission JSON must pass semantic parity with the
 frozen oracle:

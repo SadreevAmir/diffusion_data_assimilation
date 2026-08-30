@@ -1,5 +1,17 @@
 # Publication readiness audit
 
+The 2026-08-30 casewise-selector review-handoff audit found that the frozen
+contract, independent runner/reference and exact compact validator were not yet
+bound by one outcome-agnostic independent-review checklist. The new
+`CASEWISE_SAFETY_SELECTOR_RUNNER_REVIEW_CHECKLIST.md` now fixes the sole
+interface, fold/purge and policy parity, exact four-file evidence boundary,
+negative paths and atomic admission identity required before a literal trusted
+proposal. It does not create or name an executor mode, authorize execution or
+supply a scientific result. The checklist is now mandatory publication
+inventory and the reproducibility handoff cites it; status remains `NOT_READY`.
+The unified audit passed with 97 required files, two deterministic figures,
+eight references and 40 claims at `NOT_READY`.
+
 The latest 2026-08-30 admission-boundary audit freezes and tests the exact
 field-level schemas for the casewise selector's four compact files:
 `case_selection.json`, `aggregate_selection.json`, `paired_uncertainty.json`
