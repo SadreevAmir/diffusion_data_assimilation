@@ -23,6 +23,29 @@ casewise-safety-selector handoff is the mechanistically distinct contingent
 route. Local runner parity, scheduler completion and unsigned compact files are
 not scientific admission.
 
+## Latest publication-trigger resolution (2026-08-30)
+
+An independent read of the manuscript, claim ledger, deterministic figures,
+minimum-tier matrix, compact-evidence boundaries and reproducibility handoff
+found no supportable promotion beyond the status above. The unified
+fail-closed audit passed with 108 required files, two deterministic figures,
+eight references and 40 claims. A separately invoked focused boundary covering
+claim status, compact schemas, empirical traceability, figure determinism,
+immutable identities, limitation and reference traceability, the minimum-tier
+matrix and score-aware reconciliation passed all 141 tests; `git diff --check`
+also passed before this entry was added.
+
+This is a verified negative readiness decision, not an idle scientific state.
+No controller-visible implemented mode currently names the frozen score-aware
+contract, so substituting an adjacent implemented calibration would either
+repeat a closed mechanism or violate the reviewed identity. The next trigger
+is exact: rerun the atomic score-aware admission with the independently trusted
+publication commit and literal controller-visible mode. Only
+`admission=GO`, `decision_bearing_validation=PASS`, `deviations=[]` and
+`proposal_authorized=true` permit the dependency-free server-CPU proposal.
+Until that record exists, the repository remains internally auditable but is
+not ready for human submission review.
+
 For a human audit, read `PAPER_DRAFT.md` for the narrative,
 `CLAIM_LEDGER.md` for claim-level provenance, `REPRODUCIBILITY.md` for exact
 commands and evidence boundaries, and the two generated files in `figures/`
