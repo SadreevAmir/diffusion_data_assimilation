@@ -1,7 +1,10 @@
 # Frozen contingent contract: leave-one-observation-out scenario likelihood reweighting
 
-Status: `FROZEN_PRE_REVIEW`. This document does not name or authorize an
-executor mode. It freezes the next mechanistically distinct calibration test
+Status: `FROZEN_LOCAL_EXECUTABLE_NO_GO`. This document does not name or authorize
+an executor mode. The local copy-only runner, exact four-file compact validator,
+negative fixtures and atomic admission adapter are implemented and tested, but
+no literal controller-visible mode or trusted-runner identity is bound. It
+freezes the next mechanistically distinct calibration test
 after the score-aware raw-scenario route and the casewise safety selector have
 returned trusted negative gates. No result from either route may change this
 contract.
@@ -141,3 +144,7 @@ Before execution, independent review must bind a literal controller-visible
 mode, publication commit, trusted-runner identity, compact schemas and a
 decision-bearing validator with `deviations=[]`. Until then the contract remains
 pre-review engineering work and must not appear in an experiment proposal.
+
+The executable local handoff is `OBSERVATION_LIKELIHOOD_LOCAL_HANDOFF.json`.
+Its `admission=NO_GO` is intentional and may change only through the single
+fail-closed operation in `validate_observation_likelihood_admission.py`.

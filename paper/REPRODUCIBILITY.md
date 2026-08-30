@@ -748,3 +748,20 @@ spatial/physical families fail. Candidate/raw fair CRPS is
 from `0.3566938377` to `0.1969742919`, but every absolute rank-histogram
 adequacy flag remains false. The frozen alpha set, folds, purge and thresholds
 must not be altered after this result.
+# Observation-likelihood local admission boundary
+
+The frozen copy-only implementation is split across
+`observation_likelihood_reweighting_runner.py`,
+`observation_likelihood_reweighting_server_adapter.py`,
+`validate_observation_likelihood_compact_outputs.py`, and
+`validate_observation_likelihood_admission.py`. Run its outcome-independent
+regression and negative-fixture suite with:
+
+```bash
+python3 -m unittest paper.test_weighted_rank_cell_reference paper.test_observation_likelihood_admission
+```
+
+`OBSERVATION_LIKELIHOOD_LOCAL_HANDOFF.json` remains `NO_GO` until one atomic
+admission binds a literal reviewed mode, immutable identities, a complete
+four-file compact directory, `decision_bearing_validation=PASS`, and
+`deviations=[]`.

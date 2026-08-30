@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "status": "LOCAL_EXECUTABLE_HANDOFF_NOT_ADMISSION",
+  "admission": "NO_GO",
+  "reviewed_mode": null,
+  "publication_commit": "0ccce0ba0cc43c71a61f3994a7a56bf03ffbd8ee",
+  "source_experiment": "joint_full_condition_validation_2022",
+  "resource_kind": "server_cpu",
+  "artifact_policy": "summary_only",
+  "compact_files": [
+    "case_weights.json",
+    "aggregate_weights.json",
+    "paired_uncertainty.json",
+    "gate_decision.json"
+  ],
+  "compact_directory_sha256": null,
+  "decision_bearing_validation": null,
+  "deviations": null,
+  "artifact_sha256": {
+    "NEXT_OBSERVATION_LIKELIHOOD_REWEIGHTING_CONTRACT.md": "520b54206f5a295f2888c1f4523c5e2beab0c285e000f6c8e085c46851de27f5",
+    "weighted_rank_cell_reference.py": "2c1e9a9e1620ef7382e7fc05a213607417a922f0c40d2e012e0243919a439232",
+    "observation_likelihood_reweighting_runner.py": "3c18b720211aa6d13b4f09a8b3b15b529f499e9b1dbe4cf788f5d500a2692e23",
+    "observation_likelihood_reweighting_server_adapter.py": "e00453d2981ec7792ea5153eca1234db5d5ff9e61fff87dead08b6836bc7b5cd",
+    "validate_observation_likelihood_compact_outputs.py": "aecf898a7a5bed3acb3b594156a36e2e034719fd5c4089b2f1a06a42ed6cc0da",
+    "validate_observation_likelihood_admission.py": "65b4b91dc8c6309561dc4eeb55b3ec0c8a6f5680de86993586c50c843c84bb2e",
+    "test_observation_likelihood_admission.py": "02400f4b5807c07dcdf500142b9f63cd7a7aeb9f30f785a31ac4f6f713e216ee"
+  },
+  "focused_check": {
+    "command": "python3 -m unittest paper.test_weighted_rank_cell_reference paper.test_observation_likelihood_admission",
+    "result": "PASS",
+    "tests_run": 8
+  },
+  "proposal_authorized": false,
+  "next_atomic_operation": "Bind one controller-visible literal reviewed_mode, publication commit, trusted runner SHA-256, frozen contract and rank-reference SHA-256 values, complete four-file compact directory SHA-256, decision_bearing_validation=PASS and deviations=[] through validate_observation_likelihood_admission.py."
+}
