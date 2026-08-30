@@ -31,6 +31,19 @@ audit trail; it is provenance, not a second readiness decision.
 
 ## Current independent audit snapshot (2026-08-30)
 
+The latest contract-level audit repaired the observation-likelihood route's
+reliability definition against the actual local `M+1`-bin rank implementation.
+The new weighted rank coordinate is exactly fixture-identical at equal weights,
+including duplicated members and boundary truths, and conserves one soft count
+for unequal weights without member resampling. The focused oracle and
+publication-consistency checks pass: audit passed with 108 required files,
+two deterministic figures, eight references and 40 claims.
+This closes only `RELIABILITY_EQUAL_WEIGHT_PARITY_UNSPECIFIED`: the route still
+has no literal controller-visible mode, trusted-runner identity or compact
+decision record, so admission remains `NO_GO`. The repository remains
+`NOT_READY` because no jointly eligible calibration and none of the missing
+minimum-tier decision records were created.
+
 The latest independent publication-surface recheck executed the unified
 artifact checker and the focused claim-status, compact-schema,
 empirical-traceability, deterministic-figure, immutable-identity,

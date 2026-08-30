@@ -53,6 +53,7 @@ REQUIRED_REGRESSION_SUITES = (
     "paper.test_casewise_safety_selector_runner_prototype",
     "paper.test_validate_casewise_safety_selector_compact_outputs",
     "paper.test_validate_casewise_safety_selector_admission",
+    "paper.test_weighted_rank_cell_reference",
 )
 REGRESSION_COMMAND = re.compile(
     r"python3 -m unittest -v \\\n(?P<body>(?:  paper\.[a-z0-9_]+(?: \\\n|\n))+)",
@@ -211,6 +212,10 @@ REQUIRED_FILES = (
     "NEXT_METHOD_CONTRACT.md",
     "NEXT_RANK_COHERENT_CONTRACT.md",
     "NEXT_RAW_MEMBER_REWEIGHTING_CONTRACT.md",
+    "NEXT_OBSERVATION_LIKELIHOOD_REWEIGHTING_CONTRACT.md",
+    "OBSERVATION_LIKELIHOOD_REWEIGHTING_INDEPENDENT_REVIEW.md",
+    "weighted_rank_cell_reference.py",
+    "test_weighted_rank_cell_reference.py",
     "raw_member_reweighting_reference.py",
     "test_raw_member_reweighting_reference.py",
     "raw_member_reweighting_runner.py",

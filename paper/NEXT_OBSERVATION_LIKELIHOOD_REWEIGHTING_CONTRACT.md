@@ -72,16 +72,33 @@ This reduces exactly to the existing equal-weight fair CRPS at `w_m=0.1`.
 `s2 >= 1` is operational failure.  Ordinary weighted CRPS uses the same first
 term and denominator `2` rather than `2*(1-s2)` in the pairwise term.
 
-Finite-ensemble reliability is evaluated from the weighted randomized PIT,
-not by pretending that unequal weights are ten exchangeable equal-mass ranks.
-At each verified scalar, let `W_lt` be the total weight of members strictly
-below truth and `W_eq` the total weight exactly equal to truth.  Freeze
-`u = W_lt + U*W_eq`, where `U` uses the unchanged common gate seed and indexing
-contract.  The common absolute-uniformity, centering, range-coverage and
-inner-coverage thresholds are applied to these `u` values with their existing
-date-balanced aggregation.  The raw baseline is evaluated by the identical
-formula with `w_m=0.1`.  Missing tie randomization, equal-rank substitution or
-member resampling is an implementation failure.
+Finite-ensemble reliability uses one weighted extension of the existing
+`M+1`-bin randomized-rank gate, not a continuous PIT and not member resampling.
+At each verified scalar let `W_lt` be the total weight strictly below truth,
+`W_eq` the total weight exactly equal to truth, and `K_eq` the number of exactly
+equal members.  Draw the unchanged seeded integer `J` uniformly from
+`{0,...,K_eq}` (so `J=0` when `K_eq=0`) under the common gate indexing rule and
+freeze the weighted rank coordinate
+
+```text
+r_w = M*W_lt                                      if K_eq = 0
+r_w = M*(W_lt + (J/K_eq)*W_eq)                    otherwise.
+```
+
+Deposit one count into the existing bins `0,...,M`: an integral `r_w` contributes
+one to that bin; otherwise it contributes `ceil(r_w)-r_w` to `floor(r_w)` and
+`r_w-floor(r_w)` to `ceil(r_w)`.  Thus every scalar contributes exactly one
+count without sampling a member.  At `w_m=1/M`, `M*W_lt` is the number below,
+`M*W_eq=K_eq`, and `r_w=below+J`, exactly the integer returned by the existing
+gate, including below-minimum, between-member, duplicated-member, exact-zero,
+exact-one and above-maximum cases.  The raw histogram is therefore
+fixture-identical, not merely scale-equivalent.  The common absolute-uniformity
+and centering thresholds apply to the same `M+1` bins; attainable range and
+inner coverage continue to use the unchanged weighted-CDF/order-statistic
+definitions and are not inferred from `r_w`.  Missing inclusive tie
+randomization, hard rounding of fractional counts or member resampling is an
+implementation failure.  `weighted_rank_cell_reference.py` is the independent
+executable oracle for this definition.
 
 ## Falsifiable prediction and decision
 

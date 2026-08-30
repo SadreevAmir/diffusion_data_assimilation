@@ -624,9 +624,18 @@ python3 -m unittest -v \
   paper.test_validate_casewise_safety_selector_semantics \
   paper.test_casewise_safety_selector_runner_prototype \
   paper.test_validate_casewise_safety_selector_compact_outputs \
-  paper.test_validate_casewise_safety_selector_admission
+  paper.test_validate_casewise_safety_selector_admission \
+  paper.test_weighted_rank_cell_reference
 python3 paper/check_publication_artifacts.py
 ```
+
+The observation-likelihood route remains pre-admission. Its executable
+`weighted_rank_cell_reference.py` oracle and focused fixtures bind the revised
+reliability definition to the existing equal-weight `M+1`-bin rank gate,
+including duplicate-member and boundary ties. The independent review records
+`decision_bearing_validation=PASS` and `deviations=[]` for this mathematical
+specification only. No literal controller-visible mode, trusted runner,
+compact-result schema or scientific result is thereby admitted.
 
 The rank-coherent path has a separate executable downstream reconciliation
 boundary in `RANK_COHERENT_RESULT_RECONCILIATION.md`. It invokes combined

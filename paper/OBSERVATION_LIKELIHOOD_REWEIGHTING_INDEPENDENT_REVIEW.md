@@ -1,6 +1,6 @@
 # Independent review: observation-likelihood scenario reweighting
 
-Status: `NOT_READY_RELIABILITY_DEVIATION`
+Status: `RELIABILITY_SPECIFICATION_PASS_PRE_ADMISSION`
 
 Reviewed artifact:
 `NEXT_OBSERVATION_LIKELIHOOD_REWEIGHTING_CONTRACT.md`.
@@ -15,49 +15,43 @@ fair-CRPS expression are mathematically identified.  In particular, at
 `1/(2*M*(M-1)) * sum_m sum_n |x_m-x_n|`, as required by the existing fair
 finite-ensemble score.
 
-The reliability definition does not yet establish the claimed parity with the
-unchanged finite-ensemble randomized-rank gate.  For continuous truth with no
-exact member tie, the frozen expression
+The revised reliability definition now establishes parity with the unchanged
+finite-ensemble randomized-rank gate.  Direct inspection of the authoritative
+local implementation found that the existing gate randomizes only exact ties:
 
 ```text
-u = W_lt + U*W_eq
+less + rng.integers(0, ties + 1)
 ```
 
-has `W_eq=0`, so it removes randomization entirely.  At equal weights it emits
-the discrete values `0, 0.1, ..., 1` rather than explicitly reproducing the
-existing randomized rank-cell mapping.  Therefore the sentence claiming that
-the raw baseline is evaluated by an identical unchanged gate is not proven by
-the contract and cannot be accepted as runner parity.
+The new coordinate is `M*W_lt` without ties and
+`M*(W_lt+(J/K_eq)*W_eq)` with the same inclusive integer tie draw.  With equal
+weights this simplifies exactly to `less+J`.  Fractional unequal-weight ranks
+deposit one mass-preserving soft count across adjacent existing bins; no member
+is resampled and no new random source is introduced.
 
 ## Decision-bearing deviation
 
 ```text
-decision_bearing_validation=FAIL
-deviations=["RELIABILITY_EQUAL_WEIGHT_PARITY_UNSPECIFIED"]
+decision_bearing_validation=PASS
+deviations=[]
 ```
 
-Admission remains `NO_GO`.  Before trusted-runner review, the contract must
-define one weighted rank-cell transform that:
+The focused oracle fixtures establish all requested specification properties:
 
-1. reduces algebraically and fixture-by-fixture to the current randomized-rank
-   implementation when all ten weights equal `0.1`;
-2. specifies below-minimum, between-member, exact-tie and above-maximum cases;
-3. binds the unchanged seed and indexing rule without adding a tuning
-   parameter;
-4. is checked against the existing equal-weight implementation on synthetic
-   fixtures, including duplicated members and boundary truths; and
-5. states whether the existing absolute-uniformity and coverage thresholds are
-   valid on the resulting scale.  If not, the method must be described as a new
-   reliability diagnostic and cannot inherit the old gate thresholds.
+1. exact one-hot parity at all eleven equal-weight ranks;
+2. inclusive tie parity for duplicated members and truths at both boundaries;
+3. explicit below-minimum, between-member and above-maximum behavior;
+4. one-count conservation for fractional unequal-weight coordinates; and
+5. fail-closed handling of invalid weights, draws, members and truths.
 
-No runner, mode, compact schema or proposal should be registered from the
-reviewed revision until this deviation is closed with
-`decision_bearing_validation=PASS` and `deviations=[]`.
+This closes the mathematical deviation only.  Admission remains `NO_GO`
+because no independent trusted-runner identity, compact schema, publication
+commit or literal controller-visible mode is bound.  No experiment proposal is
+authorized by this review.
 
 ## Publication consequence
 
-This finding does not reject likelihood reweighting as a mechanism.  It rejects
-only the current decision rule: a positive or negative result under a changed
-reliability scale would not support the intended no-compensation claim.  The
-proper-score formula and copy-only boundary/spatial invariants remain suitable
-for the next revision.
+Likelihood reweighting remains a pre-result mechanism.  The revision makes its
+rank decision comparable to the raw baseline without claiming that local
+specification parity is scientific evidence.  Publication use still requires
+atomic independent admission and a trusted compact result.
