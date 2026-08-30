@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "status": "LOCAL_PARITY_HANDOFF_NOT_ADMISSION",
+  "admission": "NO_GO",
+  "reviewed_mode": null,
+  "source_experiment": "joint_full_condition_validation_2022",
+  "resource_kind": "server_cpu",
+  "artifact_policy": "summary_only",
+  "artifact_sha256": {
+    "NEXT_CASEWISE_SAFETY_SELECTOR_CONTRACT.md": "bbe8947f0cd1ab680f0168d2a382cf4eab3690b97d671b2690f703a0d4d80e65",
+    "casewise_safety_selector_reference.py": "397caa040e1f7ee921adbbc2e15f56915c85befbbc8000c14fca15926b4ee765",
+    "casewise_safety_selector_runner_prototype.py": "c0cac1dda63ba2b1c48095701fc88aa16623350b75d3223b2e530cfd5efb2014",
+    "validate_casewise_safety_selector_compact_outputs.py": "fd134262998c000b923fe0dc280f888a5b436d47457b9524e18980513fb7728e",
+    "validate_casewise_safety_selector_semantics.py": "1018d77aaec837aa314f1f8cc77c1e3622ae355b28773c93a2e99df622d178ca",
+    "CASEWISE_SAFETY_SELECTOR_RUNNER_REVIEW_CHECKLIST.md": "45bfc9c38f752da910a7b0b26f50c2cd4fecc6cc631e0b37caf61d534e684d58"
+  },
+  "focused_check": {
+    "command": "python3 -m unittest paper.test_casewise_safety_selector_runner_prototype paper.test_validate_casewise_safety_selector_compact_outputs paper.test_validate_casewise_safety_selector_semantics",
+    "result": "PASS",
+    "tests_run": 16,
+    "tests_skipped": 3
+  },
+  "independent_review_required": true,
+  "proposal_authorized": false,
+  "next_atomic_operation": "Bind a controller-visible literal reviewed_mode, publication commit, trusted runner SHA-256, frozen artifact SHA-256 values, synthetic dry-run result SHA-256, decision_bearing_validation=PASS and deviations=[] in one fail-closed admission operation."
+}
