@@ -14,14 +14,13 @@ decision-bearing closures:
 | Probabilistic-DA comparator | `MISSING` | `MINIMUM_TIER_COMPARISON_AUDIT.md` |
 | Independent-strength deterministic comparison | `PRESENT_DEVELOPMENT_ONLY` | `MINIMUM_TIER_COMPARISON_AUDIT.md` |
 
-The shortest admissible next scientific decision is the frozen score-aware
-raw-scenario reweighting route in
-`NEXT_SCORE_AWARE_RAW_REWEIGHTING_CONTRACT.md`. It must not be proposed until
-one literal controller-visible reviewed mode passes the combined fail-closed
-admission operation. If that result is negative, the already frozen
-casewise-safety-selector handoff is the mechanistically distinct contingent
-route. Local runner parity, scheduler completion and unsigned compact files are
-not scientific admission.
+The current priority is the running calendar-residual CFM baseline followed by
+its already frozen absolute calibration evaluation. Early training loss is not
+selection evidence. A scientifically valid negative gate may select at most one
+natural conditional-generative follow-up through the first-match diagnostic
+rules in `RESIDUAL_CFM_FOLLOWUP_DECISION_CONTRACT.md`; no sweep or return to the
+older score-aware post-hoc proposal is admissible. Local runner parity,
+scheduler completion and unsigned compact files are not scientific admission.
 
 ## Latest publication-trigger resolution (2026-08-31)
 

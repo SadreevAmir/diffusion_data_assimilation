@@ -51,6 +51,11 @@ the residual-distribution calibration claim; a proper-score failure means the
 learned increment law is not predictively useful; a boundary or spatial failure
 attributes rejection to physical-field reconstruction rather than rank quality.
 
+Any scientifically valid negative verdict is routed by the pre-result,
+first-match rules in `RESIDUAL_CFM_FOLLOWUP_DECISION_CONTRACT.md`. Those rules
+permit at most one diagnostically supported natural conditional-generative
+follow-up and prohibit a sweep or selection from early training loss.
+
 ## Compact outputs required from the trusted gate
 
 The gate must emit aggregate metrics, per-date compact metrics, paired
