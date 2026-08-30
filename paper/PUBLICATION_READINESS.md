@@ -1,5 +1,16 @@
 # Publication readiness audit
 
+The 2026-08-30 idle-recovery audit found no controller-visible v2 review record
+for the active score-aware route, so no trusted proposal could be emitted. To
+keep the calibration mission continuous without inventing a mode, the new
+`NEXT_CASEWISE_SAFETY_SELECTOR_CONTRACT.md` freezes the next contingent,
+mechanistically distinct CPU test. A purged forecast-only policy chooses whole
+cases between raw and the already fixed mean-preserving projected-spread
+ensemble under an immutable joint-loss and action margin; success still requires
+all five no-compensation families and a non-degenerate action policy. The
+publication inventory audit passed with 89 required files. This is pre-result
+design work only and status remains `NOT_READY`.
+
 The 2026-08-30 research-route consistency audit found that the current
 manuscript, claim ledger and readiness record treated score-aware raw-scenario
 reweighting as the active frozen calibration mechanism, while

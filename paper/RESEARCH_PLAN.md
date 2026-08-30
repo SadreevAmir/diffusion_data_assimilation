@@ -26,6 +26,15 @@ evidence. Execution remains fail closed until one controller-visible literal
 mode and its exact identities pass the independent combined admission; no mode
 name may be inferred from the local implementation.
 
+`NEXT_CASEWISE_SAFETY_SELECTOR_CONTRACT.md` freezes the mechanistically distinct
+contingent route after a scientifically negative score-aware result. It does not
+reweight scenarios: a purged forecast-only ridge policy chooses, once per held-
+out case, between the complete raw ensemble and the complete already-fixed
+mean-preserving projected-spread ensemble. Its fixed joint-loss penalties and
+conservative action margin test whether the projected-spread failure is confined
+to forecast-identifiable regimes. It has no trusted mode, runner or result and
+cannot bypass the active score-aware route.
+
 ## Primary evaluation closed without selection
 
 The single frozen independent primary has completed through the exact permitted

@@ -213,6 +213,7 @@ REQUIRED_FILES = (
     "test_validate_raw_member_reweighting_review.py",
     "RAW_MEMBER_REWEIGHTING_RESULT_RECONCILIATION.md",
     "NEXT_SCORE_AWARE_RAW_REWEIGHTING_CONTRACT.md",
+    "NEXT_CASEWISE_SAFETY_SELECTOR_CONTRACT.md",
     "SCORE_AWARE_RESULT_RECONCILIATION.md",
     "RANK_COHERENT_RESULT_RECONCILIATION.md",
     "rank_coherent_result_reconciliation.py",
