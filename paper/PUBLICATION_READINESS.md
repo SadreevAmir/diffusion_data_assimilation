@@ -1,5 +1,32 @@
 # Publication readiness audit
 
+## Current independent audit snapshot (2026-08-30)
+
+The current disposable-worktree audit is fail-closed and publication-facing.
+`paper/check_publication_artifacts.py` passed from a clean invocation with 100
+required files, two deterministic figures, eight references and 40 claims;
+all 40 `test_publication_*.py` tests passed, and `git diff --check` passed.
+Direct inspection of `PAPER_DRAFT.md`, `CLAIM_LEDGER.md`, both generated
+figures and `REPRODUCIBILITY.md` found no unsupported promotion of a completed
+scheduler job.  The manuscript and ledger consistently describe the corrected
+independent primary as negative and retain
+`eligible_calibration=MISSING_ELIGIBLE_RESULT`.
+
+This audit also searched the publication worktree for the two decision inputs
+needed by the completed rank-coherent route.  The local validators, frozen
+manifest, handoff and reconciliation code are present, but neither a filled
+controller-visible review record nor a decision-bearing compact result
+directory is present.  Scheduler completion is therefore not scientific
+admission, and repeating the completed computation is prohibited.  No
+currently selectable trusted mode closes the three remaining minimum-tier
+rows (`conformal`, `probabilistic_da`, and independent-strength deterministic
+comparison), so inventing a proposal would weaken rather than complete the
+frozen paper scope.  The next decision operation remains literal combined
+admission when both exact rank-coherent inputs become available; a positive
+five-family conjunction is reconciled atomically, while a negative conjunction
+closes that mechanism without retuning.  Publication status remains
+`NOT_READY`.
+
 The 2026-08-30 trigger-specific independent re-audit reran the unified
 publication checker from the current disposable worktree and inspected the
 manuscript, claim ledger, both deterministic figures, compact-evidence guards,
