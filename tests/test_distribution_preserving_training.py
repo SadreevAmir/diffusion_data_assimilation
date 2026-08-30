@@ -11,12 +11,56 @@ import torch
 from torch.utils.data import DataLoader
 
 from assim_lib.config import TrainingConfig
+from assim_lib.calendar_residual_cfm_evaluator import (
+    GATE_MODE,
+    SAMPLING_MODE,
+    frozen_gate_contract,
+    resolve_completed_checkpoint,
+    sampling_argv,
+)
 from assim_lib.data import M2MForecastDataset, calendar_feature_values, previous_calendar_date
 from assim_lib.trainer import UNetTrainer
 from assim_lib.transforms import make_conditioned_model_input
 
 
 class CalendarPairingTests(unittest.TestCase):
+    def test_trusted_contract_freezes_absolute_rank_gate(self):
+        contract = frozen_gate_contract()
+        self.assertEqual(contract["sampling_mode"], SAMPLING_MODE)
+        self.assertEqual(contract["gate_mode"], GATE_MODE)
+        rank = contract["reliability"]
+        self.assertEqual(rank["bins"], 11)
+        self.assertEqual(rank["tv_to_uniform_max"], 0.10)
+        self.assertEqual(rank["max_bin_deviation_max"], 0.03)
+        self.assertEqual(rank["normalized_mean_rank_range"], [0.45, 0.55])
+        self.assertEqual(rank["coverage_absolute_error_max"], 0.05)
+        self.assertTrue(contract["decision"]["no_compensation"])
+
+    def test_checkpoint_is_resolved_only_from_completed_metadata(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            training = root / "training"
+            training.mkdir()
+            checkpoint = training / "ema_last_model.pth"
+            checkpoint.write_bytes(b"frozen checkpoint")
+            digest = __import__("hashlib").sha256(checkpoint.read_bytes()).hexdigest()
+            metadata = {
+                "experiment_id": "siconc_calendar_residual_cfm_training_retry1",
+                "status": "completed",
+                "training_run_dir": str(training),
+                "checkpoint": "ema_last_model.pth",
+                "checkpoint_sha256": digest,
+                "publication_commit": "a" * 40,
+            }
+            resolved = resolve_completed_checkpoint(metadata, dependency_root=root)
+            argv = sampling_argv(resolved, root / "sampling")
+            self.assertEqual(resolved.checkpoint_sha256, digest)
+            self.assertIn("--checkpoint-name", argv)
+            self.assertNotIn("shell", argv)
+            metadata["status"] = "running"
+            with self.assertRaisesRegex(ValueError, "not completed"):
+                resolve_completed_checkpoint(metadata, dependency_root=root)
+
     def test_frozen_evaluation_uses_validation_and_unchanged_sampling(self):
         root = Path(__file__).resolve().parents[1]
         payload = json.loads(

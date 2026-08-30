@@ -2,6 +2,15 @@
 
 Status: PREPARED_NOT_EXECUTED
 
+Trusted boundary: sampling uses literal mode
+`validation_siconc_calendar_residual_cfm_sampling`; the dependent audit uses
+`validation_siconc_calendar_residual_cfm_gate`. The sampler accepts no run path
+from a proposal. It resolves `ema_last_model.pth` only from completed compact
+metadata for `siconc_calendar_residual_cfm_training_retry1`, requires its recorded
+SHA-256 to match the regular file inside that dependency root, and passes a typed
+argument vector to the evaluator. The legacy free-form `RUN_DIR` launcher is
+fail-closed.
+
 ## Scientific question
 
 The candidate is the unchanged final-EMA conditional flow trained for the
@@ -51,3 +60,13 @@ and absolute decisions, attainable range and inner coverage, `analysis_crps`,
 boundary diagnostics, Brier scores, IIEE, edge, area, extent, and
 mean/member/local variograms. The paired date bootstrap is inferential; the
 non-overlapping four-date-block interval is temporal sensitivity only.
+
+The rank contract is frozen before outcome: 11 bins, equal-date aggregation,
+fixed-seed randomized ties, TV-to-uniform at most 0.10, maximum bin deviation at
+most 0.03, normalized mean rank in [0.45, 0.55] with the fixed non-circular
+four-case block interval containing 0.5, and absolute errors at most 0.05 for
+attainable 9/11 range and 7/11 inner coverage. Boundary probabilities are
+truth-referenced at thresholds 0, 0.15, 0.90, 0.95 and 0.99. Exact-one and
+at-least-0.999 masses are diagnostics rather than hard vetoes. Spatial evidence
+uses pooled-member semivariograms and a proper local variogram score; it does not
+use a worst-individual-member gate.

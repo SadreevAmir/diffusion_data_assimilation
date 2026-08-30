@@ -1,0 +1,12 @@
+{
+  "sampling_mode": "validation_siconc_calendar_residual_cfm_sampling",
+  "gate_mode": "validation_siconc_calendar_residual_cfm_gate",
+  "source_experiment": "siconc_calendar_residual_cfm_training_retry1",
+  "dataset_split": "valid",
+  "start_date": "2022-01-01",
+  "end_date": "2022-07-15",
+  "stride_days": 5,
+  "cases": 40,
+  "ensemble_size": 10,
+  "artifact_policy": "summary_only"
+}
