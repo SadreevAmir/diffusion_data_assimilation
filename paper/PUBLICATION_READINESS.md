@@ -1,5 +1,20 @@
 # Publication readiness audit
 
+The 2026-08-30 independent publication-readiness audit cross-checked the
+manuscript, claim ledger, both publication figures, normative evidence matrix,
+compact-evidence guards and reproducibility handoff against the current
+worktree rather than scheduler completion states.  Full discovery passed 292
+tests with eight explicit dependency-only skips in the minimal local runtime;
+the unified checker then passed with 88 required files, two figures, eight
+references and 40 claims at `NOT_READY`, and `git diff --check` passed.  All
+four publication surfaces agree on the remaining scientific boundary:
+`eligible_calibration=MISSING_ELIGIBLE_RESULT`, `conformal=MISSING`,
+`probabilistic_da=MISSING`, and
+`independent_deterministic=PRESENT_DEVELOPMENT_ONLY`.  No available compact
+record closes any of these rows, so this audit updates provenance without
+promoting an operationally completed job or weakening the minimum strong
+domain/SciML scope.
+
 The 2026-08-30 independent adapter-boundary audit found that the immutable
 `ReviewedModeInventory` was tested in isolation but the executable
 `construct_case` path still accepted a caller-supplied `admission=GO` dictionary
