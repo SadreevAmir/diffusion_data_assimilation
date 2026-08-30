@@ -1,5 +1,20 @@
 # Publication readiness audit
 
+The 2026-08-30 independent cross-surface audit rechecked the current manuscript,
+claim ledger, both generated figures, compact-payload schemas, empirical claim
+traceability, limitation coverage and reference traceability rather than relying
+on scheduler state.  The focused 35-test publication boundary passed, as did
+`git diff --check`.  Manual inspection found no unsupported positive promotion:
+the manuscript, ledger and reproducibility handoff consistently retain the
+reconciled negative primary and the four unresolved normative rows.  The audit
+therefore does not declare readiness.  The nearest scientific gap remains an
+eligible no-compensation calibration; the next frozen score-aware raw-scenario
+route has a tested local reference runner but still has no controller-visible
+reviewed literal mode, so no trusted experiment can be proposed from this
+snapshot.  This entry records a fresh independent audit without weakening the
+minimum strong domain/SciML scope or converting local engineering evidence into
+a scientific result.
+
 The 2026-08-30 independent publication-readiness audit cross-checked the
 manuscript, claim ledger, both publication figures, normative evidence matrix,
 compact-evidence guards and reproducibility handoff against the current
