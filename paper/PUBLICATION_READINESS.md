@@ -1,5 +1,34 @@
 # Publication readiness audit
 
+## Human-review decision index
+
+**Current verdict: NOT_READY.** The repository is internally consistent and
+reproducible at its current evidence boundary, but it is not ready for
+submission review because the frozen minimum paper scope still lacks four
+decision-bearing closures:
+
+| Required closure | Current state | Authoritative surface |
+|---|---|---|
+| Jointly eligible calibration | `MISSING_ELIGIBLE_RESULT` | `CLAIM_LEDGER.md` minimum-tier evidence guard |
+| Conformal comparator | `MISSING` | `MINIMUM_TIER_COMPARISON_AUDIT.md` |
+| Probabilistic-DA comparator | `MISSING` | `MINIMUM_TIER_COMPARISON_AUDIT.md` |
+| Independent-strength deterministic comparison | `PRESENT_DEVELOPMENT_ONLY` | `MINIMUM_TIER_COMPARISON_AUDIT.md` |
+
+The shortest admissible next scientific decision is the frozen score-aware
+raw-scenario reweighting route in
+`NEXT_SCORE_AWARE_RAW_REWEIGHTING_CONTRACT.md`. It must not be proposed until
+one literal controller-visible reviewed mode passes the combined fail-closed
+admission operation. If that result is negative, the already frozen
+casewise-safety-selector handoff is the mechanistically distinct contingent
+route. Local runner parity, scheduler completion and unsigned compact files are
+not scientific admission.
+
+For a human audit, read `PAPER_DRAFT.md` for the narrative,
+`CLAIM_LEDGER.md` for claim-level provenance, `REPRODUCIBILITY.md` for exact
+commands and evidence boundaries, and the two generated files in `figures/`
+for the current visual summary. The dated material below is an append-only
+audit trail; it is provenance, not a second readiness decision.
+
 ## Current independent audit snapshot (2026-08-30)
 
 The current disposable-worktree audit is fail-closed and publication-facing.
