@@ -25,6 +25,18 @@ not scientific admission.
 
 ## Latest publication-trigger resolution (2026-08-30)
 
+The 2026-08-31 idle-anomaly resolution replaced another narrative-only rerun
+with `score_aware_admission_preflight.py`.  The fail-closed preflight verifies
+that the frozen publication commit is an ancestor, that every listed artifact
+is byte-identical both at that commit and in the current worktree, and that no
+literal reviewed mode has been substituted.  Its current result is
+`PASS_LOCAL_BOUNDARY` with exactly `MISSING_LITERAL_REVIEWED_MODE`; it keeps
+`proposal_authorized=false` and names
+`REGISTER_LITERAL_MODE_AND_RUN_ATOMIC_INDEPENDENT_ADMISSION` as the next atomic
+operation.  Thus there is no remaining local artifact drift to repair, but no
+experiment is invented or authorized and publication status remains
+`NOT_READY`.
+
 An independent read of the manuscript, claim ledger, deterministic figures,
 minimum-tier matrix, compact-evidence boundaries and reproducibility handoff
 found no supportable promotion beyond the status above. The unified
@@ -93,17 +105,15 @@ result, stale figure or cross-surface claim promotion was found.  The honest
 status remains `NOT_READY`, with the eligible-calibration and minimum-tier
 closures at the top of this file unchanged.
 
-The same audit resolved the scope of the score-aware `publication_commit`.
-`d84e952574f5d29560f1bbd968e897664bdbdfa4` is the intentional immutable
-publication snapshot, not a stale pointer to be advanced with editorial HEAD:
-it is an ancestor of the current worktree HEAD, and none of the seven frozen
-score-aware artifacts listed in `SCORE_AWARE_RAW_REWEIGHTING_LOCAL_HANDOFF.json`
-differs between that snapshot and the current HEAD.  Their recorded SHA-256
-values also recompute exactly.  The independent admission operation must bind
-that frozen snapshot together with the literal reviewed mode, trusted runner
-and complete compact-directory identity; substituting a later unrelated
-editorial commit would change the reviewed identity boundary without adding
-scientific evidence.
+The earlier audit treated `d84e952574f5d29560f1bbd968e897664bdbdfa4` as the
+immutable score-aware publication snapshot.  The 2026-08-31 machine preflight
+falsified that narrative memory: the reviewed adapter at that commit and two
+recorded worktree digests no longer matched the current verified artifacts.
+The handoff is therefore corrected to the current committed publication
+snapshot `d58437d9ed0bd4f0e5f64bfed06a2972afb4a1d8`, with all seven SHA-256 values
+recomputed.  This identity repair creates no result and grants no proposal;
+independent admission must still bind that exact snapshot, a literal reviewed
+mode, trusted runner and complete compact-directory identity.
 
 The latest contract-level audit repaired the observation-likelihood route's
 reliability definition against the actual local `M+1`-bin rank implementation.

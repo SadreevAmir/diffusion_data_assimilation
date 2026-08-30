@@ -3,7 +3,7 @@
   "status": "LOCAL_PARITY_HANDOFF_NOT_ADMISSION",
   "admission": "NO_GO",
   "reviewed_mode": null,
-  "publication_commit": "d84e952574f5d29560f1bbd968e897664bdbdfa4",
+  "publication_commit": "d58437d9ed0bd4f0e5f64bfed06a2972afb4a1d8",
   "source_experiment": "joint_full_condition_validation_2022",
   "resource_kind": "server_cpu",
   "artifact_policy": "summary_only",
@@ -22,8 +22,8 @@
     "score_aware_raw_reweighting_runner.py": "45caff84836c2d02a54ad78b06416f68e4cbf38cb4846b33c31c4e03231df44e",
     "score_aware_raw_reweighting_server_adapter.py": "782ee1db47eed3bbe9f411a943a0b1947308c05bbc1ded8fbf62f3184a54e34d",
     "validate_score_aware_compact_outputs.py": "1d94d37e2ca9708ea0fd9daf22b4043fcc707745d4251b6e6d080d3129e839df",
-    "validate_score_aware_raw_reweighting_admission.py": "99372f1489017bfe1a38fcac1dc3daa3d675ede4ddb81776dbf268b13dfc7a22",
-    "SCORE_AWARE_RAW_REWEIGHTING_RUNNER_REVIEW_CHECKLIST.md": "774eeccad38f6087d527234ae2a780aef0c1fd5efa1259caf4a675e61b75c186"
+    "validate_score_aware_raw_reweighting_admission.py": "c30cc0d00b45a2a3210d514e14512c757a9f8ca4277bcc033f9ee5a6a7958f53",
+    "SCORE_AWARE_RAW_REWEIGHTING_RUNNER_REVIEW_CHECKLIST.md": "5fff479ad7f307be9e0096dd5439c4a1bbd51ba8d4cbdaf2f9ac72901634a42f"
   },
   "focused_check": {
     "command": "python3 -m unittest paper.test_score_aware_raw_reweighting_reference paper.test_score_aware_raw_reweighting_runner paper.test_score_aware_raw_reweighting_server_adapter paper.test_validate_score_aware_compact_outputs paper.test_validate_score_aware_raw_reweighting_admission",
