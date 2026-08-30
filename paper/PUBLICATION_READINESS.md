@@ -1,5 +1,15 @@
 # Publication readiness audit
 
+The 2026-08-30 score-aware review-handoff audit found that the current frozen
+mechanism already had a deterministic runner, independent reference, compact
+directory validator and atomic v2 admission validator, but no dedicated review
+checklist bound those exact surfaces.  The new
+`SCORE_AWARE_RAW_REWEIGHTING_RUNNER_REVIEW_CHECKLIST.md` now fixes the sole
+interface, leakage-safe ridge and selection parity, four-file compact boundary,
+scientific gate, negative fixtures and atomic identity handoff required from an
+independent trusted review.  This is pre-result engineering evidence only: it
+does not name an executor mode, authorize a proposal or change `NOT_READY`.
+
 The 2026-08-30 trigger-specific independent audit reran the unified publication
 checker and the complete `test_publication_*.py` boundary from the current
 worktree.  The checker passed with 88 required files, two generated figures,
