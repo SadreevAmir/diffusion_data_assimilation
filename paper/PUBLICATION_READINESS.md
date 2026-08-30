@@ -1,5 +1,19 @@
 # Publication readiness audit
 
+The 2026-08-30 casewise-selector runner audit added a separate deterministic
+prototype for the frozen purged folds, scalar joint loss, training-only SVD
+ridge prediction and conservative whole-case action rule. Its focused suite
+checks full semantic parity against the independent reference, exact margin
+ties, non-circular edge purges, non-finite rejection and zero-variance training
+failure. The prototype and suite are mandatory publication inventory members,
+and the suite is included in the exact reproducibility command. The focused
+boundary passes eight executable tests with two explicit NumPy-only skips in
+the minimal runtime. This is local pre-admission engineering evidence: it does
+not create a reviewed literal mode, validate the not-yet-reviewed four-file
+compact schema or supply a scientific result.
+The unified audit passed with 94 required files, two figures, eight references
+and 40 claims at `NOT_READY`.
+
 The 2026-08-30 casewise-selector reproducibility audit found that the frozen
 contract was mandatory but its new independent reference, semantic validator
 and focused regression suite were not part of the unified publication
