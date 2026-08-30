@@ -1,5 +1,19 @@
 # Publication readiness audit
 
+The latest trigger-specific independent audit reran the unified publication
+checker, the complete `test_publication_*.py` surface and `git diff --check`
+from the current disposable worktree.  The checker passed with 97 required
+files, two deterministic figures, eight references and 40 claims; all 38
+publication-surface tests passed without skips.  This confirms that the
+manuscript, claim ledger, compact-schema guards, figures, limitation and
+reference traceability, immutable identities and reproducibility inventory are
+internally consistent.  It does not supply a jointly eligible calibration or
+close the missing minimum-tier comparators.  No available trusted mode directly
+implements those missing comparisons, and the frozen casewise selector still
+lacks an independently registered controller-visible literal mode.  Therefore
+no unsupported experiment is proposed and publication status remains
+`NOT_READY`.
+
 The 2026-08-30 casewise-selector review-handoff audit found that the frozen
 contract, independent runner/reference and exact compact validator were not yet
 bound by one outcome-agnostic independent-review checklist. The new
