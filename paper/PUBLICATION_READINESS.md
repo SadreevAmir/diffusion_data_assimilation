@@ -31,6 +31,24 @@ audit trail; it is provenance, not a second readiness decision.
 
 ## Current independent audit snapshot (2026-08-30)
 
+The trigger-specific publication audit reran the unified fail-closed checker
+from the disposable worktree and the focused claim-status, compact-schema,
+empirical-traceability, deterministic-figure, immutable-identity,
+limitation-traceability, reference-traceability and minimum-tier suites.  The
+unified audit passed with 108 required files, two deterministic figures, eight
+references and 40 claims; all 128 focused tests passed and `git diff --check`
+passed before this note was added.  Direct comparison of the three frozen
+reweighting contracts also corrected a narrative-ordering risk: the
+observation-likelihood route is explicitly contingent on negative trusted
+results from both score-aware raw-scenario reweighting and the casewise safety
+selector.  Its newer local implementation therefore does not supersede the
+score-aware route as the next scientific decision.  All three handoffs remain
+`NO_GO` without a literal controller-visible reviewed mode, so none can be
+proposed under the currently implemented executor identifiers.  No unsupported
+result, stale figure or cross-surface claim promotion was found.  The honest
+status remains `NOT_READY`, with the eligible-calibration and minimum-tier
+closures at the top of this file unchanged.
+
 The latest contract-level audit repaired the observation-likelihood route's
 reliability definition against the actual local `M+1`-bin rank implementation.
 The new weighted rank coordinate is exactly fixture-identical at equal weights,
