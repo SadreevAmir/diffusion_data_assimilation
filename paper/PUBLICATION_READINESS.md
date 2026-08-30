@@ -36,11 +36,12 @@ disposable worktree after direct inspection of the manuscript, claim ledger,
 generated figures, minimum-tier evidence inventory, compact handoffs and
 reproducibility commands. The unified fail-closed checker passed with 108
 required files, two deterministic figures, eight references and 40 claims.
-The complete `test_publication_*.py` boundary passed all 40 tests. The focused
-minimum-tier, score-aware admission, compact-schema and reconciliation boundary
-passed 131 tests, with four explicit skips caused only by unavailable optional
-local dependencies; `git diff --check` also passed. The manuscript, ledger and
-reproducibility handoff retain the identical
+The complete regression boundary embedded in the unified checker passed. A
+separate focused rerun of the claim-status, compact-schema, empirical and
+limitation traceability, deterministic-figure, immutable-identity,
+reference-traceability, minimum-tier and score-aware reconciliation suites
+passed 141 tests without failures or skips; `git diff --check` also passed. The
+manuscript, ledger and reproducibility handoff retain the identical
 `eligible_calibration=MISSING_ELIGIBLE_RESULT` guard, while the minimum-tier
 audit still records two missing comparator families and a development-only
 deterministic comparison. The score-aware handoff remains fail closed with
