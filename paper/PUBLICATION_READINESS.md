@@ -49,6 +49,18 @@ result, stale figure or cross-surface claim promotion was found.  The honest
 status remains `NOT_READY`, with the eligible-calibration and minimum-tier
 closures at the top of this file unchanged.
 
+The same audit resolved the scope of the score-aware `publication_commit`.
+`d84e952574f5d29560f1bbd968e897664bdbdfa4` is the intentional immutable
+publication snapshot, not a stale pointer to be advanced with editorial HEAD:
+it is an ancestor of the current worktree HEAD, and none of the seven frozen
+score-aware artifacts listed in `SCORE_AWARE_RAW_REWEIGHTING_LOCAL_HANDOFF.json`
+differs between that snapshot and the current HEAD.  Their recorded SHA-256
+values also recompute exactly.  The independent admission operation must bind
+that frozen snapshot together with the literal reviewed mode, trusted runner
+and complete compact-directory identity; substituting a later unrelated
+editorial commit would change the reviewed identity boundary without adding
+scientific evidence.
+
 The latest contract-level audit repaired the observation-likelihood route's
 reliability definition against the actual local `M+1`-bin rank implementation.
 The new weighted rank coordinate is exactly fixture-identical at equal weights,
