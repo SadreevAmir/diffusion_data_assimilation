@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import ast
 import hashlib
+import json
 import re
 import subprocess
 import sys
@@ -218,6 +219,7 @@ REQUIRED_FILES = (
     "NEXT_SCORE_AWARE_RAW_REWEIGHTING_CONTRACT.md",
     "NEXT_CASEWISE_SAFETY_SELECTOR_CONTRACT.md",
     "CASEWISE_SAFETY_SELECTOR_RUNNER_REVIEW_CHECKLIST.md",
+    "CASEWISE_SAFETY_SELECTOR_LOCAL_HANDOFF.json",
     "casewise_safety_selector_reference.py",
     "validate_casewise_safety_selector_semantics.py",
     "validate_casewise_safety_selector_compact_outputs.py",
@@ -280,6 +282,47 @@ REQUIRED_FILES = (
     "validate_server_only_manifest.py",
     "test_validate_server_only_manifest.py",
 )
+
+CASEWISE_LOCAL_HANDOFF_ARTIFACTS = (
+    "NEXT_CASEWISE_SAFETY_SELECTOR_CONTRACT.md",
+    "casewise_safety_selector_reference.py",
+    "casewise_safety_selector_runner_prototype.py",
+    "validate_casewise_safety_selector_compact_outputs.py",
+    "validate_casewise_safety_selector_semantics.py",
+    "CASEWISE_SAFETY_SELECTOR_RUNNER_REVIEW_CHECKLIST.md",
+)
+
+
+def validate_casewise_local_handoff(paper_dir: Path = PAPER_DIR) -> None:
+    """Keep the pre-admission selector handoff fail closed and identity bound."""
+    path = paper_dir / "CASEWISE_SAFETY_SELECTOR_LOCAL_HANDOFF.json"
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    require(payload.get("schema_version") == 1, "casewise handoff schema drift")
+    require(
+        payload.get("status") == "LOCAL_PARITY_HANDOFF_NOT_ADMISSION"
+        and payload.get("admission") == "NO_GO"
+        and payload.get("reviewed_mode") is None
+        and payload.get("proposal_authorized") is False,
+        "casewise local handoff must remain fail closed",
+    )
+    require(
+        payload.get("source_experiment") == "joint_full_condition_validation_2022"
+        and payload.get("resource_kind") == "server_cpu"
+        and payload.get("artifact_policy") == "summary_only",
+        "casewise local handoff execution contract drift",
+    )
+    identities = payload.get("artifact_sha256")
+    require(
+        isinstance(identities, dict)
+        and tuple(identities) == CASEWISE_LOCAL_HANDOFF_ARTIFACTS,
+        "casewise local handoff identity inventory drift",
+    )
+    for name in CASEWISE_LOCAL_HANDOFF_ARTIFACTS:
+        actual = hashlib.sha256((paper_dir / name).read_bytes()).hexdigest()
+        require(
+            identities[name] == actual,
+            f"{name} casewise local handoff digest mismatch",
+        )
 
 MINIMUM_TIER_HANDOFF_INVENTORY = {
     "conformal": {
@@ -2247,6 +2290,7 @@ def main() -> int:
     validate_minimum_tier_handoff_inventory()
     validate_required_publication_files()
     validate_required_python_artifacts()
+    validate_casewise_local_handoff()
 
     manuscript = (PAPER_DIR / "PAPER_DRAFT.md").read_text(encoding="utf-8")
     claim_ledger = (PAPER_DIR / "CLAIM_LEDGER.md").read_text(encoding="utf-8")

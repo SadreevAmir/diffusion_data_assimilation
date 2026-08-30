@@ -1,10 +1,11 @@
 # Publication readiness audit
 
-The latest trigger-specific independent audit reran the unified publication
-checker, the complete `test_publication_*.py` surface and `git diff --check`
-from the current disposable worktree.  The checker passed with 97 required
-files, two deterministic figures, eight references and 40 claims; all 38
-publication-surface tests passed without skips.  This confirms that the
+The latest trigger-specific independent audit made the machine-readable
+casewise-selector handoff mandatory and added a fail-closed identity validator.
+It checks the pre-admission `NO_GO` state, execution contract, exact six-file
+inventory and every recorded SHA-256; focused positive and single-file-drift
+fixtures pass. The unified audit passed with 98 required files, two
+deterministic figures, eight references and 40 claims. This confirms that the
 manuscript, claim ledger, compact-schema guards, figures, limitation and
 reference traceability, immutable identities and reproducibility inventory are
 internally consistent.  It does not supply a jointly eligible calibration or
