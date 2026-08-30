@@ -24,41 +24,18 @@ scheduler completion and unsigned compact files are not scientific admission.
 
 ## Latest publication-trigger resolution (2026-08-31)
 
-The idle recovery also closed the local atomicity gap between independent
-admission and proposal construction.  `authorize_score_aware_proposal.py` now
-invokes the existing combined semantic/compact admission in-process and emits
-the frozen request only from its typed `admission=GO` result.  The emitted
-request inherits the admitted literal mode and fixes the sole source parameter,
-development envelope, ten members, `server_cpu` and `summary_only`; an unbound
-JSON mapping, `NO_GO`, review failure or any deviation fails closed.  This does
-not register a mode or authorize the current handoff: focused tests pass, while
-the fresh preflight still returns exactly `MISSING_LITERAL_REVIEWED_MODE` and
-`proposal_authorized=false`.  It does make the next controller-side operation
-genuinely atomic once the literal reviewed mode is independently supplied.
-
-The 2026-08-31 idle-anomaly resolution replaced another narrative-only rerun
-with `score_aware_admission_preflight.py`.  The fail-closed preflight verifies
-that the frozen publication commit is an ancestor, that every listed artifact
-is byte-identical both at that commit and in the current worktree, and that no
-literal reviewed mode has been substituted.  Its current result is
-`PASS_LOCAL_BOUNDARY` with exactly `MISSING_LITERAL_REVIEWED_MODE`; it keeps
-`proposal_authorized=false` and names
-`REGISTER_LITERAL_MODE_AND_RUN_ATOMIC_INDEPENDENT_ADMISSION` as the next atomic
-operation.  Thus there is no remaining local artifact drift to repair, but no
-experiment is invented or authorized and publication status remains
-`NOT_READY`.
-
-The publication-readiness trigger was then independently rerun from the current
-worktree on 2026-08-31.  The unified fail-closed audit again passed its complete
-embedded regression boundary with 108 required files, two deterministic
-figures, eight references and 40 claims.  A fresh score-aware preflight again
-returned `PASS_LOCAL_BOUNDARY`, `proposal_authorized=false` and only
-`MISSING_LITERAL_REVIEWED_MODE`; `git diff --check` also passed before this
-entry was added.  This rerun found no manuscript, claim-ledger, figure, compact-
-schema or reproducibility defect that can be repaired locally.  It therefore
-does not weaken the minimum paper scope or manufacture an experiment proposal:
-the exact next scientific event remains the atomic independent admission named
-above.
+Independent inspection found a stale routing conflict in this index: its first
+paragraph named the running calendar-residual CFM line, while later paragraphs
+still called an older score-aware admission the next scientific event.  The
+normative decision is now unambiguous.  The active training, its frozen
+final-EMA sampling and the full no-compensation gate form the current scientific
+line; early training diagnostics are not selection evidence, and no parallel
+calibration proposal is authorized.  A negative compact verdict may activate
+at most one first-match branch from
+`RESIDUAL_CFM_FOLLOWUP_DECISION_CONTRACT.md`; a positive verdict activates
+claim, figure, table and reproducibility reconciliation.  The score-aware
+material below remains an append-only record of an earlier route, not a pending
+proposal or current dependency.
 
 An independent read of the manuscript, claim ledger, deterministic figures,
 minimum-tier matrix, compact-evidence boundaries and reproducibility handoff
@@ -71,15 +48,17 @@ matrix and score-aware reconciliation passed all 141 tests; `git diff --check`
 also passed before this entry was added.
 
 This is a verified negative readiness decision, not an idle scientific state.
-No controller-visible implemented mode currently names the frozen score-aware
-contract, so substituting an adjacent implemented calibration would either
-repeat a closed mechanism or violate the reviewed identity. The next trigger
-is exact: rerun the atomic score-aware admission with the independently trusted
-publication commit and literal controller-visible mode. Only
-`admission=GO`, `decision_bearing_validation=PASS`, `deviations=[]` and
-`proposal_authorized=true` permit the dependency-free server-CPU proposal.
-Until that record exists, the repository remains internally auditable but is
-not ready for human submission review.
+The current decision-bearing line is the running calendar-residual CFM training
+and its frozen final-EMA sampling and no-compensation evaluation.  No additional
+calibration proposal is admissible while that line is active.  After a
+scientifically valid compact verdict, `overall_eligible=true` triggers
+publication reconciliation; `overall_eligible=false` triggers at most the first
+matching natural follow-up in `RESIDUAL_CFM_FOLLOWUP_DECISION_CONTRACT.md`.
+The older score-aware admission route is retained below only as historical
+provenance and is not the current next action.  Until one candidate passes every
+mandatory family and the remaining minimum-tier closures are resolved, the
+repository remains internally auditable but is not ready for human submission
+review.
 
 For a human audit, read `PAPER_DRAFT.md` for the narrative,
 `CLAIM_LEDGER.md` for claim-level provenance, `REPRODUCIBILITY.md` for exact
