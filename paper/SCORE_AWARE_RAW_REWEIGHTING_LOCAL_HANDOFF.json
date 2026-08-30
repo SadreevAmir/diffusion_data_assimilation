@@ -3,9 +3,19 @@
   "status": "LOCAL_PARITY_HANDOFF_NOT_ADMISSION",
   "admission": "NO_GO",
   "reviewed_mode": null,
+  "publication_commit": "d84e952574f5d29560f1bbd968e897664bdbdfa4",
   "source_experiment": "joint_full_condition_validation_2022",
   "resource_kind": "server_cpu",
   "artifact_policy": "summary_only",
+  "compact_files": [
+    "case_selection.json",
+    "aggregate_selection.json",
+    "paired_uncertainty.json",
+    "gate_decision.json"
+  ],
+  "compact_directory_sha256": null,
+  "decision_bearing_validation": null,
+  "deviations": null,
   "artifact_sha256": {
     "NEXT_SCORE_AWARE_RAW_REWEIGHTING_CONTRACT.md": "214f135d443db28897433a2be865dcda119bb7616bc2e43c7d603ca4323c3357",
     "score_aware_raw_reweighting_reference.py": "7d8e05bf66fb73cd72d4feb989a99a727c840fca4e80fb561fccbe47be0a84a0",
