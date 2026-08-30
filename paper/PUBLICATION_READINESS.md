@@ -1,5 +1,23 @@
 # Publication readiness audit
 
+The 2026-08-30 trigger-specific independent re-audit reran the unified
+publication checker from the current disposable worktree and inspected the
+manuscript, claim ledger, both deterministic figures, compact-evidence guards,
+minimum-tier contracts and reproducibility handoff.  The checker passed with
+100 required files, two figures, eight references and 40 claims, while
+retaining `NOT_READY`.  This is the correct scientific state: the conformal and
+probabilistic-DA rows still have frozen but unadmitted contracts, the
+independent-strength deterministic row remains development-only, and no
+admitted compact record establishes a jointly eligible calibration.  The
+completed `joint_rank_coherent_transport_valid` run is not proposed again:
+its scheduler completion remains non-decision-bearing until the exact combined
+admission operation succeeds on the controller-visible review record and
+compact directory.  A positive admitted conjunction is integrated atomically;
+a negative conjunction closes only that mechanism and leaves the already
+frozen casewise safety selector as the next contingent admission path.  No
+editorial inconsistency, missing figure, unsupported claim promotion or local
+reproducibility defect was found to justify weakening the minimum paper scope.
+
 The latest trigger-specific audit adds the casewise selector's atomic admission
 validator and negative fixtures to the mandatory publication surface. One
 operation now binds a literal reviewed mode, publication commit, trusted-runner
