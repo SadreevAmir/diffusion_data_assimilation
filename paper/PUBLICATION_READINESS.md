@@ -31,6 +31,23 @@ audit trail; it is provenance, not a second readiness decision.
 
 ## Current independent audit snapshot (2026-08-30)
 
+The latest independent publication-surface recheck executed the unified
+artifact checker and the focused claim-status, compact-schema,
+empirical-traceability, deterministic-figure, immutable-identity,
+limitation-traceability, reference-traceability and minimum-tier suites from
+the disposable worktree.  All 128 focused tests passed and `git diff --check`
+passed.  Direct cross-surface inspection confirmed the identical fail-closed
+`eligible_calibration=MISSING_ELIGIBLE_RESULT` status in the manuscript, claim
+ledger and reproducibility handoff; the minimum-tier audit still records the
+conformal and probabilistic-DA comparisons as missing, and the score-aware
+handoff still records `reviewed_mode=null`.  Thus this fresh check supplies no
+basis for promoting a scheduler completion or local parity result into
+scientific evidence.  The repository remains internally reproducible at its
+current evidence boundary but is `NOT_READY`; the next decision-bearing action
+remains the frozen score-aware experiment only after one atomic independent
+admission record binds a literal executor-visible mode and all required
+identities.
+
 The current disposable-worktree audit is fail-closed and publication-facing.
 `paper/check_publication_artifacts.py` passed from a clean invocation with 104
 required files, two deterministic figures, eight references and 40 claims;
