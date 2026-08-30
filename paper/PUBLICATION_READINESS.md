@@ -1,5 +1,17 @@
 # Publication readiness audit
 
+The 2026-08-30 research-route consistency audit found that the current
+manuscript, claim ledger and readiness record treated score-aware raw-scenario
+reweighting as the active frozen calibration mechanism, while
+`RESEARCH_PLAN.md` still named the already completed analog-rank raw-member
+route as active.  The plan now records the analog-rank result as closed and
+binds the active route to `NEXT_SCORE_AWARE_RAW_REWEIGHTING_CONTRACT.md`, its
+training-fold-only risk construction and the exact combined v2 admission
+boundary.  It explicitly distinguishes local runner/reference parity from a
+controller-visible reviewed literal mode.  This repairs the scientific handoff
+without inventing a mode or result; all normative blocker rows and publication
+status remain unchanged.
+
 The 2026-08-30 score-aware review-handoff audit found that the current frozen
 mechanism already had a deterministic runner, independent reference, compact
 directory validator and atomic v2 admission validator, but no dedicated review

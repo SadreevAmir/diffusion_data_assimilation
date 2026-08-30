@@ -11,14 +11,20 @@ amplitude feasibility and the unchanged no-compensation gate. It has no trusted
 runner or scientific result yet; it neither reopens the completed independent
 evaluation nor permits tuning of the closed postprocessors.
 
-`NEXT_RAW_MEMBER_REWEIGHTING_CONTRACT.md` freezes the contingent mechanism if
-that whole-field transport is completed and rejected. It changes only the
-empirical probability mass assigned to exact raw complete-member fields using
-purged forecast-only analog truth ranks. It is mechanistically distinct from
-moving anomaly fields: exact source-field and boundary-mask identity are hard
-invariants, while rank, proper-score and mean-field physical effects remain
-decision-bearing. It has no trusted mode and must not be proposed before its
-activation condition.
+`NEXT_RAW_MEMBER_REWEIGHTING_CONTRACT.md` froze the next contingent mechanism
+after whole-field transport. That analog-rank construction has since completed
+and failed the unchanged no-compensation gate; it is no longer the active
+development route.
+
+`NEXT_SCORE_AWARE_RAW_REWEIGHTING_CONTRACT.md` freezes the active tertiary
+mechanism. It estimates memberwise proper-score risk from training-fold-only
+forecast descriptors, changes only empirical probability mass among bitwise
+copied raw scenarios, and leaves source fields and boundary masks invariant.
+Its local runner, independent reference, compact validator and combined v2
+admission validator are pre-result engineering surfaces, not scientific
+evidence. Execution remains fail closed until one controller-visible literal
+mode and its exact identities pass the independent combined admission; no mode
+name may be inferred from the local implementation.
 
 ## Primary evaluation closed without selection
 
@@ -223,11 +229,15 @@ has no feasible training scale. The frozen scale set and strata are not extended
 The frozen joint spread--occurrence candidate completed and was rejected by the
 unchanged no-compensation rule. Its relative rank and fair-CRPS improvements do
 not compensate for failed absolute rank, boundary and spatial/physical
-criteria, and its grid is closed to retuning. The next mechanistically distinct
-development contract is `NEXT_RAW_MEMBER_REWEIGHTING_CONTRACT.md`: it changes
-only empirical probability mass among bitwise-copied raw scenarios. The design
-is frozen and activated, while execution remains unavailable until a literal
-reviewed mode passes the existing parity boundary.
+criteria, and its grid is closed to retuning. The subsequent analog-rank raw-
+member reweighting mechanism also completed and failed the same gate. The
+active mechanistically distinct contract is therefore
+`NEXT_SCORE_AWARE_RAW_REWEIGHTING_CONTRACT.md`: it predicts held-out member risk
+from leakage-safe training-fold data and changes only the frequencies of
+bitwise-copied raw scenarios. The design and result-reconciliation map are
+frozen. A proposal is admissible only after one controller-visible literal mode
+passes the combined v2 admission with exact runner, reference, contract and
+compact-directory identities; local parity cannot substitute for that record.
 
 Marginal and finite-ensemble:
 
