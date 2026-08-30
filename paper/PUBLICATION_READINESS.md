@@ -1,5 +1,16 @@
 # Publication readiness audit
 
+The 2026-08-30 full executable publication audit independently ran test
+discovery across the complete publication package before invoking the unified
+artifact checker.  All 276 discovered tests completed successfully; eight
+numerical fixtures were explicit dependency-only skips because NumPy is absent
+from the minimal local runtime.  The subsequent unified checker passed with 86
+required files, two figures, eight references and 40 claims at `NOT_READY`, and
+`git diff --check` passed.  This broader snapshot supersedes the narrower
+39-test snapshot below as the current executable audit, while leaving its
+historical result intact.  It supplies no missing coverage--occurrence compact
+record and changes no family decision, claim or blocker state.
+
 The 2026-08-30 publication-readiness rerun independently searched the disposable
 worktree for the two decision-bearing coverage--occurrence
 `gate_decision.json` records and found neither payload.  It then executed the
