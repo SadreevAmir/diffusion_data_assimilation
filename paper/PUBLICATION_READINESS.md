@@ -395,6 +395,19 @@ report 83 files; dated 79-file entries remain unchanged as audit history. No
 scientific result, blocker state or readiness decision changed. Publication
 status remains `NOT_READY`.
 
+The subsequent score-aware dispatch audit adds the pure runner and its
+fail-closed server adapter to the mandatory publication inventory. Combined
+admission now emits one atomic `admission=GO` payload binding the literal
+reviewed mode, publication commit, runner, contract, independent reference,
+admission record and exact four-file compact directory. The adapter admits only
+that payload, the sole frozen source parameter, the exact forty-case ten-member
+CPU envelope and `summary_only`; schema drift, mode substitution and mutable
+inventory entries fail closed. Focused tests pass in the minimal environment,
+with numerical construction checks skipped only when NumPy is unavailable. The
+audit passed with 104 required files. This is local engineering evidence only:
+it neither registers a controller mode nor creates a scientific result, and
+publication status remains `NOT_READY`.
+
 ## Independent publication-surface audit (2026-08-30)
 
 This audit independently rechecked the current manuscript, claim ledger,

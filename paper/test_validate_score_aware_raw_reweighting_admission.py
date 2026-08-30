@@ -153,6 +153,10 @@ class AdmissionTests(unittest.TestCase):
             else:
                 result = load_and_validate(path, REFERENCE, directory)
                 self.assertEqual(result.reviewed_mode, record(REFERENCE, directory)["reviewed_mode"])
+                self.assertEqual(result.admission, "GO")
+                self.assertEqual(result.publication_commit, "a" * 40)
+                self.assertEqual(result.runner_sha256, digest(REFERENCE))
+                self.assertEqual(result.compact_directory_sha256, directory_sha256(directory))
 
     def test_combined_admission_identity_drives_reconciled_marker(self):
         directory = self.compact_directory()

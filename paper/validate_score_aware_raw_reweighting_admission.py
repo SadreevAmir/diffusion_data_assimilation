@@ -49,7 +49,12 @@ CASE_ID_VECTORS = (
 class AdmissionResult:
     """Identities produced by the same fail-closed operation that admits a run."""
 
+    admission: str
     reviewed_mode: str
+    publication_commit: str
+    runner_sha256: str
+    contract_sha256: str
+    reference_sha256: str
     admission_record_sha256: str
     compact_directory_sha256: str
 
@@ -203,7 +208,12 @@ def load_and_validate(record_path: Path, runner: Path, compact_directory: Path) 
     if record_path.read_bytes() != admitted_record_bytes:
         raise ValueError("admission record changed during combined admission")
     return AdmissionResult(
+        admission="GO",
         reviewed_mode=mode,
+        publication_commit=record["publication_commit"],
+        runner_sha256=record["runner_sha256"],
+        contract_sha256=record["contract_sha256"],
+        reference_sha256=record["reference_sha256"],
         admission_record_sha256=admitted_record_digest,
         compact_directory_sha256=admitted_digest,
     )
