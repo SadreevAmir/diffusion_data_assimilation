@@ -41,20 +41,22 @@ scheduler job.  The manuscript and ledger consistently describe the corrected
 independent primary as negative and retain
 `eligible_calibration=MISSING_ELIGIBLE_RESULT`.
 
-This audit also searched the publication worktree for the two decision inputs
-needed by the completed rank-coherent route.  The local validators, frozen
-manifest, handoff and reconciliation code are present, but neither a filled
-controller-visible review record nor a decision-bearing compact result
-directory is present.  Scheduler completion is therefore not scientific
-admission, and repeating the completed computation is prohibited.  No
-currently selectable trusted mode closes the three remaining minimum-tier
-rows (`conformal`, `probabilistic_da`, and independent-strength deterministic
+This audit also checked the publication handoff against the latest durable
+decision state.  The completed `joint_rank_coherent_transport_valid` route is
+closed as negative publication evidence and must not be computed again; the
+older append-only entries below document its pre-admission history rather than
+the current queue.  Its decision-bearing compact payload is not present in this
+worktree, so this local audit does not invent effect sizes or promote a new
+claim from scheduler status.  The current calibration continuation is instead
+the frozen score-aware raw-scenario reweighting route.  Its local handoff binds
+the contract, reference, runner, server adapter and both validators, but remains
+fail closed until an independent review atomically records one literal
+controller-visible `reviewed_mode`, the required identities,
+`decision_bearing_validation=PASS` and `deviations=[]`.  No currently
+selectable trusted mode closes the three remaining minimum-tier rows
+(`conformal`, `probabilistic_da`, and independent-strength deterministic
 comparison), so inventing a proposal would weaken rather than complete the
-frozen paper scope.  The next decision operation remains literal combined
-admission when both exact rank-coherent inputs become available; a positive
-five-family conjunction is reconciled atomically, while a negative conjunction
-closes that mechanism without retuning.  Publication status remains
-`NOT_READY`.
+frozen paper scope.  Publication status remains `NOT_READY`.
 
 The 2026-08-30 trigger-specific independent re-audit reran the unified
 publication checker from the current disposable worktree and inspected the
@@ -66,13 +68,14 @@ probabilistic-DA rows still have frozen but unadmitted contracts, the
 independent-strength deterministic row remains development-only, and no
 admitted compact record establishes a jointly eligible calibration.  The
 completed `joint_rank_coherent_transport_valid` run is not proposed again:
-its scheduler completion remains non-decision-bearing until the exact combined
-admission operation succeeds on the controller-visible review record and
-compact directory.  A positive admitted conjunction is integrated atomically;
-a negative conjunction closes only that mechanism and leaves the already
-frozen casewise safety selector as the next contingent admission path.  No
-editorial inconsistency, missing figure, unsupported claim promotion or local
-reproducibility defect was found to justify weakening the minimum paper scope.
+the latest durable decision closes it as negative, while the absent local
+decision-bearing payload prevents unsupported quantitative reconstruction.
+The next executable scientific proposal is the score-aware route only after
+its combined admission emits literal `GO`; a trusted negative score-aware gate
+then activates the already frozen casewise safety selector as the
+mechanistically distinct contingent path.  No missing figure, unsupported claim
+promotion or local reproducibility defect was found to justify weakening the
+minimum paper scope.
 
 The latest trigger-specific audit adds the casewise selector's atomic admission
 validator and negative fixtures to the mandatory publication surface. One
