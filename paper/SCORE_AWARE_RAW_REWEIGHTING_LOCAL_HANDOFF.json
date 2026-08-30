@@ -20,15 +20,15 @@
     "NEXT_SCORE_AWARE_RAW_REWEIGHTING_CONTRACT.md": "214f135d443db28897433a2be865dcda119bb7616bc2e43c7d603ca4323c3357",
     "score_aware_raw_reweighting_reference.py": "7d8e05bf66fb73cd72d4feb989a99a727c840fca4e80fb561fccbe47be0a84a0",
     "score_aware_raw_reweighting_runner.py": "45caff84836c2d02a54ad78b06416f68e4cbf38cb4846b33c31c4e03231df44e",
-    "score_aware_raw_reweighting_server_adapter.py": "0ae7fe6eb4dc616b51c0cebba20559be8a6d8c64244761133f807b722b7e062e",
+    "score_aware_raw_reweighting_server_adapter.py": "782ee1db47eed3bbe9f411a943a0b1947308c05bbc1ded8fbf62f3184a54e34d",
     "validate_score_aware_compact_outputs.py": "1d94d37e2ca9708ea0fd9daf22b4043fcc707745d4251b6e6d080d3129e839df",
-    "validate_score_aware_raw_reweighting_admission.py": "2f906f9f9d2456e1faac09238de4436a4120d3d5c6ae703360793ba64edf7223",
+    "validate_score_aware_raw_reweighting_admission.py": "99372f1489017bfe1a38fcac1dc3daa3d675ede4ddb81776dbf268b13dfc7a22",
     "SCORE_AWARE_RAW_REWEIGHTING_RUNNER_REVIEW_CHECKLIST.md": "774eeccad38f6087d527234ae2a780aef0c1fd5efa1259caf4a675e61b75c186"
   },
   "focused_check": {
     "command": "python3 -m unittest paper.test_score_aware_raw_reweighting_reference paper.test_score_aware_raw_reweighting_runner paper.test_score_aware_raw_reweighting_server_adapter paper.test_validate_score_aware_compact_outputs paper.test_validate_score_aware_raw_reweighting_admission",
     "result": "PASS",
-    "tests_run": 49,
+    "tests_run": 50,
     "tests_skipped": 14
   },
   "independent_review_required": true,

@@ -57,6 +57,8 @@ class AdmissionResult:
     reference_sha256: str
     admission_record_sha256: str
     compact_directory_sha256: str
+    decision_bearing_validation: str
+    deviations: tuple[()]
 
 
 def _sha256(path: Path) -> str:
@@ -216,6 +218,8 @@ def load_and_validate(record_path: Path, runner: Path, compact_directory: Path) 
         reference_sha256=record["reference_sha256"],
         admission_record_sha256=admitted_record_digest,
         compact_directory_sha256=admitted_digest,
+        decision_bearing_validation=record["decision_bearing_validation"],
+        deviations=tuple(record["deviations"]),
     )
 
 

@@ -157,6 +157,8 @@ class AdmissionTests(unittest.TestCase):
                 self.assertEqual(result.publication_commit, "a" * 40)
                 self.assertEqual(result.runner_sha256, digest(REFERENCE))
                 self.assertEqual(result.compact_directory_sha256, directory_sha256(directory))
+                self.assertEqual(result.decision_bearing_validation, "PASS")
+                self.assertEqual(result.deviations, ())
 
     def test_combined_admission_identity_drives_reconciled_marker(self):
         directory = self.compact_directory()

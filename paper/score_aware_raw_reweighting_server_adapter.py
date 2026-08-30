@@ -44,8 +44,14 @@ def validate_admission(admission: object, requested_mode: str) -> None:
         ("admission_record_sha256", 64),
         ("compact_directory_sha256", 64),
     )
-    if set(admission) != {"admission", "reviewed_mode", *(key for key, _ in identities)}:
+    required = {
+        "admission", "reviewed_mode", "decision_bearing_validation", "deviations",
+        *(key for key, _ in identities),
+    }
+    if set(admission) != required:
         raise ValueError("admission payload has schema drift")
+    if admission["decision_bearing_validation"] != "PASS" or admission["deviations"] not in ([], ()):
+        raise ValueError("adapter requires PASS with no deviations")
     for key, length in identities:
         value = admission.get(key)
         if not isinstance(value, str) or len(value) != length or any(

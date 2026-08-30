@@ -34,6 +34,8 @@ def admission(mode=MODE):
         "reference_sha256": "d" * 64,
         "admission_record_sha256": "e" * 64,
         "compact_directory_sha256": "f" * 64,
+        "decision_bearing_validation": "PASS",
+        "deviations": [],
     }
 
 
@@ -85,6 +87,17 @@ class ServerAdapterTests(unittest.TestCase):
             inventory.register(changed)
         with self.assertRaises(KeyError):
             inventory.resolve(MODE + "_other")
+
+    def test_review_decision_cannot_be_dropped_or_waived(self):
+        missing = admission(); missing.pop("decision_bearing_validation")
+        with self.assertRaisesRegex(ValueError, "schema drift"):
+            validate_request(request(), missing)
+        failed = admission(); failed["decision_bearing_validation"] = "FAIL"
+        with self.assertRaisesRegex(ValueError, "PASS with no deviations"):
+            validate_request(request(), failed)
+        waived = admission(); waived["deviations"] = ["waiver"]
+        with self.assertRaisesRegex(ValueError, "PASS with no deviations"):
+            validate_request(request(), waived)
 
     def test_dispatch_copies_only_selected_raw_members(self):
         if np is None:
