@@ -1,5 +1,18 @@
 # Publication readiness audit
 
+The 2026-08-30 publication-readiness rerun independently searched the disposable
+worktree for the two decision-bearing coverage--occurrence
+`gate_decision.json` records and found neither payload.  It then executed the
+unified publication checker against the unchanged evidence boundary; the audit
+passed with 86 required files, two figures, eight references and 40 claims at
+`NOT_READY`.  A focused 39-test boundary covering joint occurrence admission,
+claim status, compact schemas, empirical traceability, figure generation,
+limitations and references also passed.  These checks confirm that the current
+manuscript and handoff fail closed rather than inferring family outcomes from
+the two `summary_ready` scheduler states.  The fastest scientific transition
+remains delivery and atomic admission of the two existing immutable compact
+records; rerunning either completed calculation would add no evidence.
+
 The 2026-08-29 coverage-admission reproducibility audit found that the
 decision-bearing joint validator, its regression suite and its reconciliation
 handoff existed but were not mandatory members of the unified publication
@@ -273,7 +286,7 @@ with a different digest, is rejected. This closes the local admission-to-
 reconciliation identity gap without changing the scientific evidence row or
 the not-ready status below.
 
-Audit date: 2026-08-29
+Audit date: 2026-08-30
 
 Publication status: NOT_READY
 
