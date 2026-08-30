@@ -105,8 +105,11 @@ It requires the exact record schema above, binds the runner, contract and
 synthetic-result bytes, requires the parsed synthetic result to equal the
 runner's deterministic outcome-agnostic dry-run record, checks the runner's
 pure construction surface against `raw_member_reweighting_reference.py`,
-detects substitution during admission, and emits `admission=GO` only with the
-reviewed literal mode. This check does not implement, name or launch a trusted
+detects substitution of the review record, runner, contract or synthetic result
+during the combined admission operation, and emits `admission=GO` only with the
+reviewed literal mode. It snapshots and rechecks those same artifact identities
+around payload construction, so a post-validation substitution cannot be paired
+with stale verified digests. This check does not implement, name or launch a trusted
 mode; controller visibility and the independent review remain mandatory.
 
 Admission semantic parity also checks the exact five contiguous holdouts,

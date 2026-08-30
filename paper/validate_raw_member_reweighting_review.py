@@ -171,11 +171,16 @@ def validate_record(
 def load_and_validate(record_path: Path, runner: Path, synthetic_result: Path) -> str:
     record_bytes = record_path.read_bytes()
     runner_digest = _sha256(runner)
+    contract_digest = _sha256(CONTRACT)
     synthetic_digest = _sha256(synthetic_result)
     mode = validate_record(json.loads(record_bytes.decode("utf-8")), runner, synthetic_result)
     if record_path.read_bytes() != record_bytes:
         raise ValueError("review record changed during admission")
-    if _sha256(runner) != runner_digest or _sha256(synthetic_result) != synthetic_digest:
+    if (
+        _sha256(runner) != runner_digest
+        or _sha256(CONTRACT) != contract_digest
+        or _sha256(synthetic_result) != synthetic_digest
+    ):
         raise ValueError("reviewed artifact changed during admission")
     return mode
 
@@ -185,18 +190,28 @@ def build_admission_payload(
 ) -> dict[str, str]:
     """Return one self-contained admission object with every verified identity."""
     record_bytes = record_path.read_bytes()
+    artifact_digests = {
+        "runner_sha256": _sha256(runner),
+        "contract_sha256": _sha256(CONTRACT),
+        "synthetic_result_sha256": _sha256(synthetic_result),
+    }
     record = json.loads(record_bytes.decode("utf-8"))
     mode = load_and_validate(record_path, runner, synthetic_result)
     if record_path.read_bytes() != record_bytes:
         raise ValueError("review record changed while building admission payload")
+    current_digests = {
+        "runner_sha256": _sha256(runner),
+        "contract_sha256": _sha256(CONTRACT),
+        "synthetic_result_sha256": _sha256(synthetic_result),
+    }
+    if current_digests != artifact_digests:
+        raise ValueError("reviewed artifact changed while building admission payload")
     return {
         "reviewed_mode": mode,
         "admission": "GO",
         "review_record_sha256": hashlib.sha256(record_bytes).hexdigest(),
         "publication_commit": record["publication_commit"],
-        "runner_sha256": record["runner_sha256"],
-        "contract_sha256": record["contract_sha256"],
-        "synthetic_result_sha256": record["synthetic_result_sha256"],
+        **artifact_digests,
     }
 
 

@@ -6,6 +6,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from paper.validate_raw_member_reweighting_review import (
     CONTRACT,
@@ -147,6 +148,33 @@ class ReviewAdmissionTests(unittest.TestCase):
                 "validation_reviewed_raw_member_reweighting",
             )
 
+    def test_contract_substitution_during_combined_admission_fails_closed(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            contract = root / "contract.md"
+            contract.write_bytes(CONTRACT.read_bytes())
+            synthetic = root / "synthetic.json"
+            write_valid_synthetic(synthetic)
+            record_path = root / "review.json"
+            record = valid_record(RUNNER, synthetic)
+            record["contract_sha256"] = digest(contract)
+            record_path.write_text(json.dumps(record, sort_keys=True), encoding="utf-8")
+
+            original_validate_synthetic = validate_synthetic_result
+
+            def mutate_contract(runner: Path, result: Path) -> None:
+                original_validate_synthetic(runner, result)
+                contract.write_text("substituted\n", encoding="utf-8")
+
+            with patch(
+                "paper.validate_raw_member_reweighting_review.CONTRACT", contract
+            ), patch(
+                "paper.validate_raw_member_reweighting_review.validate_synthetic_result",
+                side_effect=mutate_contract,
+            ):
+                with self.assertRaisesRegex(ValueError, "reviewed artifact changed"):
+                    load_and_validate(record_path, RUNNER, synthetic)
+
     def test_admission_payload_carries_every_verified_identity(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -166,6 +194,34 @@ class ReviewAdmissionTests(unittest.TestCase):
                 "synthetic_result_sha256",
             ):
                 self.assertEqual(payload[key], record[key])
+
+    def test_artifact_substitution_before_payload_emission_fails_closed(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            synthetic = root / "synthetic.json"
+            write_valid_synthetic(synthetic)
+            record_path = root / "review.json"
+            record_path.write_text(
+                json.dumps(valid_record(RUNNER, synthetic), sort_keys=True),
+                encoding="utf-8",
+            )
+            original_load = load_and_validate
+
+            def mutate_after_validation(
+                record: Path, runner: Path, result: Path
+            ) -> str:
+                mode = original_load(record, runner, result)
+                result.write_text("{}\n", encoding="utf-8")
+                return mode
+
+            with patch(
+                "paper.validate_raw_member_reweighting_review.load_and_validate",
+                side_effect=mutate_after_validation,
+            ):
+                with self.assertRaisesRegex(
+                    ValueError, "changed while building admission payload"
+                ):
+                    build_admission_payload(record_path, RUNNER, synthetic)
 
     def test_synthetic_result_must_match_runner_and_remain_non_decision_bearing(self):
         with tempfile.TemporaryDirectory() as temporary:

@@ -1616,3 +1616,16 @@ case-index ordering under an exact distance tie. Focused negative fixtures
 reject both purge drift and reversed analog ordering before `admission=GO`.
 This remains local engineering evidence: it does not register a trusted mode,
 open any evaluation data or change publication status from `NOT_READY`.
+
+The 2026-08-30 atomic-binding audit closes the remaining local substitution
+windows in the combined review operation and payload emission. The validator
+now snapshots and rechecks the frozen contract digest alongside the review
+record, runner and synthetic result, then rechecks every artifact identity
+immediately before emitting the self-contained payload. Focused negative
+fixtures mutate the contract during synthetic verification and mutate the
+synthetic result after validation; both deterministically receive `NO_GO`. The
+complete raw-member review/runner/adapter boundary now passes 29 focused tests,
+Python compilation and whitespace validation. This is still local engineering
+evidence only: no controller-visible literal trusted mode or independently
+signed review record exists, no experiment is admissible, and publication
+status remains `NOT_READY`.
