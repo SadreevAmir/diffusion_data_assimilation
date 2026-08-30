@@ -1,6 +1,6 @@
 # Raw-member reweighting trusted-runner review checklist
 
-Status: REVIEW_CONTRACT_READY_NO_IMPLEMENTED_MODE
+Status: LOCAL_ADAPTER_READY_NO_TRUSTED_MODE
 
 This outcome-agnostic checklist binds a future trusted implementation to
 `NEXT_RAW_MEMBER_REWEIGHTING_CONTRACT.md`. It does not authorize a mode name or
@@ -114,3 +114,12 @@ the literal `reviewed_mode`, it carries the SHA-256 of the exact review record,
 the reviewed publication commit and the verified runner, contract and synthetic
 result SHA-256 identities. A downstream proposal must consume those emitted
 bindings atomically; rereading an unbound review file is not equivalent.
+
+The publication worktree now also contains the outcome-agnostic executor
+boundary `raw_member_reweighting_server_adapter.py`. It accepts the sole frozen
+parameter and exact CPU/validation/envelope/summary contract, delegates candidate
+construction unchanged, and registers at most one immutable literal mode from a
+self-contained `admission=GO` payload. It deliberately contains no literal
+production mode, filesystem access, sealed-data loader or controller mutation.
+Thus its focused tests establish adapter fail-closed behavior, but do not satisfy
+the unchecked independent-review items above and do not make a proposal admissible.

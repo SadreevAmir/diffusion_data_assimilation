@@ -1556,3 +1556,13 @@ updates. It forbids a repeated computation, compensating interpretation or
 activation of score-aware reweighting without two admitted negative gates and a
 literal reviewed mode. This closes an autonomous result-integration gap while
 publication status remains `NOT_READY`.
+
+The 2026-08-30 raw-member integration continuation adds a fail-closed local
+server-adapter boundary and focused inventory tests. The adapter accepts only
+the frozen CPU envelope, sole source parameter and `summary_only`, binds dispatch
+to all identities in one `admission=GO` payload, and refuses mode substitution
+or inventory mutation. It contains no project-data loader, controller change or
+invented production mode. The focused 25-test suite passes, but no independent
+review or trusted executor registration exists yet; therefore this is engineering
+evidence only, creates no scientific result, and publication status remains
+`NOT_READY`.
