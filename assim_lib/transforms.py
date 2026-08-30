@@ -61,9 +61,19 @@ def make_conditioned_model_input(
             f"Expected background_mask shape {tuple(background.shape)}, got {tuple(background_mask.shape)}"
         )
     background_mask = background_mask.to(device=state.device, dtype=state.dtype)
-    water_condition = first_mask_channel(water_mask, state, "water_mask")
+    if water_mask.ndim != 4:
+        raise ValueError(f"Expected water_mask [B,C,H,W], got shape {tuple(water_mask.shape)}")
+    if water_mask.shape[0] != state.shape[0] or water_mask.shape[-2:] != state.shape[-2:]:
+        raise ValueError(
+            "Expected water_mask batch/spatial shape "
+            f"{(state.shape[0], *state.shape[-2:])}, got "
+            f"{(water_mask.shape[0], *water_mask.shape[-2:])}"
+        )
+    if water_mask.shape[1] < 1:
+        raise ValueError("Expected water_mask to contain at least the physical water-domain channel")
+    static_conditioning = water_mask.to(device=state.device, dtype=state.dtype)
     return torch.cat(
-        [state, grid, background, background_mask, obs_values, obs_mask, water_condition],
+        [state, grid, background, background_mask, obs_values, obs_mask, static_conditioning],
         dim=1,
     )
 

@@ -56,6 +56,18 @@ def main(config: dict, config_dir: Path):
     train_dataset = build_dataset(data_config, split="train")
     _debug(f"building valid dataset: {data_config.get('dataset_name')}")
     valid_dataset = build_dataset(data_config, split="valid")
+    expected_in_channels = getattr(train_dataset, "conditioned_input_channels", None)
+    if expected_in_channels is not None and train_config.in_channels != expected_in_channels:
+        raise ValueError(
+            f"Model in_channels={train_config.in_channels} does not match dataset-conditioned "
+            f"input channels={expected_in_channels}"
+        )
+    expected_out_channels = len(getattr(train_dataset, "indices", ()))
+    if expected_out_channels and train_config.out_channels != expected_out_channels:
+        raise ValueError(
+            f"Model out_channels={train_config.out_channels} does not match dataset fields="
+            f"{expected_out_channels}"
+        )
     _debug(f"dataset sizes train={len(train_dataset)} valid={len(valid_dataset)}")
     train_loader = build_dataloader(
         train_dataset,
@@ -94,6 +106,10 @@ def main(config: dict, config_dir: Path):
         experiment_config=config,
         model_config=model_config_raw,
         data_config=data_config,
+        dataset_provenance={
+            "train": train_dataset.provenance(),
+            "valid": valid_dataset.provenance(),
+        },
         dashboard_dataset=valid_dataset,
     )
     _debug("starting training loop")

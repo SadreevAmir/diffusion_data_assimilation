@@ -57,6 +57,7 @@ class UNetTrainer:
         experiment_config=None,
         model_config=None,
         data_config=None,
+        dataset_provenance=None,
         dashboard_dataset=None,
     ):
         self.config = config
@@ -98,6 +99,7 @@ class UNetTrainer:
                 "sample_metrics_values_space": "physical",
                 "concentration_clipping": "[0, 1]" if "siconc" in self.fields else None,
                 "data_config": jsonable(self.data_config),
+                "dataset_provenance": jsonable(dataset_provenance or {}),
                 "training_config": jsonable(asdict(config)),
                 "experiment_config": jsonable(experiment_config) if experiment_config is not None else None,
                 "model_config": jsonable(model_config) if model_config is not None else None,
@@ -313,6 +315,16 @@ class UNetTrainer:
         denom = mask.sum().clamp(min=1.0)
         return (F.mse_loss(pred, target, reduction="none") * mask).sum() / denom
 
+    def _flow_matching_loss(
+        self,
+        pred: torch.Tensor,
+        target: torch.Tensor,
+        batch: dict[str, torch.Tensor],
+    ) -> torch.Tensor:
+        if self.config.loss_domain == "valid":
+            return self._masked_mse(pred, target, batch["valid_mask"])
+        return F.mse_loss(pred, target)
+
     @staticmethod
     def _masked_smoothness_loss(pred: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
         mask = mask.expand_as(pred)
@@ -491,7 +503,7 @@ class UNetTrainer:
                     obs_mask=obs_mask,
                 )
                 v_pred = self.model(model_input, timesteps * 1000, return_dict=False)[0]
-                loss_full = F.mse_loss(v_pred, v_real)
+                loss_full = self._flow_matching_loss(v_pred, v_real, batch)
 
                 total_full += self.accelerator.gather_for_metrics(loss_full).mean().item()
 
@@ -1311,6 +1323,9 @@ class UNetTrainer:
         global_step = 0
         _debug(f"training start epochs={self.config.num_epochs} train_batches={len(self.train_dataloader)}")
         for epoch in range(self.config.num_epochs):
+            train_dataset = getattr(self.train_dataloader, "dataset", None)
+            if hasattr(train_dataset, "set_epoch"):
+                train_dataset.set_epoch(epoch)
             self.model.train()
             _debug(f"epoch {epoch} start")
             progress_bar = tqdm(
@@ -1338,7 +1353,7 @@ class UNetTrainer:
                         obs_mask=obs_mask,
                     )
                     v_pred = self.model(model_input, timesteps * 1000, return_dict=False)[0]
-                    loss_full = F.mse_loss(v_pred, v_real)
+                    loss_full = self._flow_matching_loss(v_pred, v_real, batch)
                     loss_obs = torch.zeros_like(loss_full)
                     loss_smooth = torch.zeros_like(loss_full)
                     loss = loss_full

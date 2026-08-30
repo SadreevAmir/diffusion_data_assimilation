@@ -1,0 +1,17 @@
+{
+  "project_name": "m2m_distribution_calibration",
+  "task_name": "siconc_calendar_residual_cfm_v1",
+  "data_config": "../data/m2m_siconc_calendar_residual_1y.json",
+  "model_config": "../methods/siconc_calendar_residual_cfm.json",
+  "clearml": {
+    "enabled": false,
+    "tags": [
+      "siconc_only",
+      "calendar_exact_pairing",
+      "residual_flow_matching",
+      "valid_domain_loss",
+      "season_conditioning"
+    ],
+    "upload_checkpoints": false
+  }
+}
