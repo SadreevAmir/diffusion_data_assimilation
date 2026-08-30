@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from collections.abc import Iterable, Mapping
 from datetime import date, timedelta
 from pathlib import Path
@@ -37,6 +38,37 @@ THREEDVAR_MAIN_200D_SPLITS = {
         "obs_end_day": "2023-07-19",
     },
 }
+
+
+def previous_calendar_date(value: date) -> date | None:
+    """Return the same month/day in the preceding year.
+
+    February 29 has no exact calendar counterpart in a non-leap preceding
+    year and is deliberately omitted instead of being silently shifted.
+    """
+    try:
+        return value.replace(year=value.year - 1)
+    except ValueError:
+        return None
+
+
+def calendar_feature_values(target_date: date, hour: int, names: Iterable[str]) -> tuple[float, ...]:
+    """Build cyclic calendar features without a post-February leap-year phase shift."""
+    values: list[float] = []
+    for name in names:
+        if name == "day_of_year":
+            if target_date.month == 2 and target_date.day == 29:
+                day_index = 58.5
+            else:
+                reference = date(2001, target_date.month, target_date.day)
+                day_index = float((reference - date(2001, 1, 1)).days)
+            angle = 2.0 * np.pi * day_index / 365.0
+        elif name == "hour":
+            angle = 2.0 * np.pi * (int(hour) % 24) / 24.0
+        else:
+            raise ValueError(f"Unknown calendar feature: {name!r}")
+        values.extend((float(np.sin(angle)), float(np.cos(angle))))
+    return tuple(values)
 
 
 def validate_temporal_split_protocol(config: Mapping) -> None:
@@ -214,16 +246,24 @@ class M2MForecastDataset(Dataset):
         if self.hour_mode not in ("fixed", "all"):
             raise ValueError(f"Unknown hour_mode={self.hour_mode!r}; expected 'fixed' or 'all'")
         self.hours_per_day = 24 if self.hour_mode == "all" else 1
+        self.calendar_features = tuple(self.config.get("calendar_features", ()))
+        unexpected_calendar_features = set(self.calendar_features) - {"day_of_year", "hour"}
+        if unexpected_calendar_features:
+            raise ValueError(f"Unknown calendar_features: {sorted(unexpected_calendar_features)}")
         self.observed_channels = [int(v) for v in self.config.get("observed_channels", [0])]
         self.assimilation_range = int(self.config.get("assimilation_range", 1))
         self.obs_shift = max(0, self.assimilation_range - 1)
         split_seed_offset = {"train": 0, "valid": 10000, "test": 20000}.get(split, 30000)
         self.seed = int(self.config.get("seed", 1234)) + split_seed_offset
+        self.resample_observation_masks_each_epoch = bool(
+            self.config.get("resample_observation_masks_each_epoch", False)
+        )
+        self._epoch = torch.zeros((), dtype=torch.int64).share_memory_()
         self.background_strategy = str(self.config.get("background_strategy", "indexed"))
-        if self.background_strategy not in ("indexed", "year_ago_jitter"):
+        if self.background_strategy not in ("indexed", "year_ago_jitter", "calendar_year_ago"):
             raise ValueError(
                 f"Unknown background_strategy={self.background_strategy!r}; "
-                "expected 'indexed' or 'year_ago_jitter'"
+                "expected 'indexed', 'year_ago_jitter', or 'calendar_year_ago'"
             )
         self.background_year_offset_days = int(self.config.get("background_year_offset_days", 365))
         self.background_jitter_days = int(self.config.get("background_jitter_days", 7))
@@ -231,18 +271,26 @@ class M2MForecastDataset(Dataset):
         preds_dir = Path(self.config["dataset_dir"]) / "preds"
         lead = self.config.get("lead_time_hours", None)
         records = forecast_records(preds_dir, None if lead is None else int(lead))
+        self.background_start = as_date(self.config["back_start_day"])
+        self.background_end = as_date(self.config["back_end_day"])
+        self.target_start = as_date(self.config["obs_start_day"])
+        self.target_end = as_date(self.config["obs_end_day"])
         self.back_data = records_in_range(
             records,
-            as_date(self.config["back_start_day"]),
-            as_date(self.config["back_end_day"]),
+            self.background_start,
+            self.background_end,
         )
 
-        obs_start = as_date(self.config["obs_start_day"]) - timedelta(days=self.obs_shift)
-        obs_end = as_date(self.config["obs_end_day"]) + timedelta(days=1)
+        obs_start = self.target_start - timedelta(days=self.obs_shift)
+        obs_end = self.target_end + timedelta(days=1)
         self.obs_data = records_in_range(records, obs_start, obs_end)
         if len(self.back_data) == 0 or len(self.obs_data) == 0:
             raise ValueError("No forecast records selected for M2M date ranges")
-        if len(self.obs_data) < len(self.back_data) + self.obs_shift:
+        indexed_range_too_short = (
+            self.background_strategy == "indexed"
+            and len(self.obs_data) < len(self.back_data) + self.obs_shift
+        )
+        if indexed_range_too_short:
             raise ValueError(
                 "Observation/target date range is too short for background range and assimilation_range"
             )
@@ -250,8 +298,39 @@ class M2MForecastDataset(Dataset):
         self.sral_records = self._load_sral_records()
         self.records_by_date = {record.date: record for record in records}
         self._sorted_record_dates = sorted(self.records_by_date.keys())
+        self.calendar_pairs = (
+            self._build_calendar_pairs() if self.background_strategy == "calendar_year_ago" else []
+        )
         self.base_valid_mask = self._load_base_valid_mask()
         self._validate_observation_mask_config()
+
+    def _build_calendar_pairs(self):
+        pairs = []
+        for target_record in self.obs_data:
+            if not self.target_start <= target_record.date <= self.target_end:
+                continue
+            background_date = previous_calendar_date(target_record.date)
+            if background_date is None or not self.background_start <= background_date <= self.background_end:
+                continue
+            background_record = self.records_by_date.get(background_date)
+            if background_record is not None:
+                pairs.append((background_record, target_record))
+        if not pairs:
+            raise ValueError("No exact previous-calendar-year background/target pairs are available")
+        return pairs
+
+    def set_epoch(self, epoch: int) -> None:
+        if int(epoch) < 0:
+            raise ValueError(f"epoch must be non-negative, got {epoch}")
+        self._epoch.fill_(int(epoch))
+
+    def _rng_for_index(self, idx: int, *, stream: int = 0) -> np.random.Generator:
+        epoch = (
+            int(self._epoch.item())
+            if self.split == "train" and self.resample_observation_masks_each_epoch
+            else 0
+        )
+        return np.random.default_rng(np.random.SeedSequence([self.seed, int(idx), epoch, int(stream)]))
 
     def _validate_observation_mask_config(self) -> None:
         mask_config = self.config.get("observation_mask", {})
@@ -304,12 +383,51 @@ class M2MForecastDataset(Dataset):
         return out
 
     def _num_days(self) -> int:
+        if self.background_strategy == "calendar_year_ago":
+            return len(self.calendar_pairs)
         if self.background_strategy == "year_ago_jitter":
             return max(len(self.obs_data) - self.obs_shift, 0)
         return len(self.back_data)
 
     def __len__(self):
         return self._num_days() * self.hours_per_day
+
+    @property
+    def conditioned_input_channels(self) -> int:
+        field_channels = len(self.indices)
+        static_channels = 1 + 2 * len(self.calendar_features)
+        return 5 * field_channels + 2 + static_channels
+
+    def provenance(self) -> dict:
+        if self.background_strategy == "calendar_year_ago":
+            pair_lines = [
+                f"{background.date.isoformat()},{target.date.isoformat()}\n"
+                for background, target in self.calendar_pairs
+            ]
+            target_candidates = sum(
+                self.target_start <= record.date <= self.target_end for record in self.obs_data
+            )
+            first_target = self.calendar_pairs[0][1].date.isoformat()
+            last_target = self.calendar_pairs[-1][1].date.isoformat()
+        else:
+            pair_lines = []
+            target_candidates = self._num_days()
+            first_target = None
+            last_target = None
+        return {
+            "split": self.split,
+            "background_strategy": self.background_strategy,
+            "num_pairs": self._num_days(),
+            "target_candidates": int(target_candidates),
+            "dropped_target_dates": int(target_candidates - self._num_days()),
+            "first_target_date": first_target,
+            "last_target_date": last_target,
+            "pair_manifest_sha256": (
+                hashlib.sha256("".join(pair_lines).encode("utf-8")).hexdigest() if pair_lines else None
+            ),
+            "calendar_features": list(self.calendar_features),
+            "resample_observation_masks_each_epoch": self.resample_observation_masks_each_epoch,
+        }
 
     def _resolve_index(self, idx: int) -> tuple[int, int]:
         day_idx, hour_in_day = divmod(int(idx), self.hours_per_day)
@@ -325,7 +443,11 @@ class M2MForecastDataset(Dataset):
         next_date = None
         stride = timedelta(days=max(int(stride_days), 1))
         for day_idx in range(self._num_days()):
-            target_date = self.obs_data[day_idx + self.obs_shift].date
+            target_date = (
+                self.calendar_pairs[day_idx][1].date
+                if self.background_strategy == "calendar_year_ago"
+                else self.obs_data[day_idx + self.obs_shift].date
+            )
             if next_date is not None and target_date < next_date:
                 continue
             indices.append(day_idx * self.hours_per_day)
@@ -543,7 +665,7 @@ class M2MForecastDataset(Dataset):
         closest = min(options, key=lambda d: abs((d - target).days))
         return self.records_by_date[closest]
 
-    def _select_background_record(self, target_date, idx: int, day_idx: int):
+    def _select_background_record(self, target_date, idx: int, day_idx: int, rng=None):
         if self.background_strategy == "indexed":
             return self.back_data[day_idx], (target_date - self.back_data[day_idx].date).days
         base = target_date - timedelta(days=self.background_year_offset_days)
@@ -560,7 +682,8 @@ class M2MForecastDataset(Dataset):
                 )
             candidates = [fallback]
         if self.split == "train":
-            choice = int(np.random.randint(len(candidates)))
+            rng = self._rng_for_index(idx, stream=0) if rng is None else rng
+            choice = int(rng.integers(len(candidates)))
         else:
             rng = np.random.default_rng((self.seed + idx) & 0xFFFFFFFF)
             choice = int(rng.integers(len(candidates)))
@@ -569,8 +692,15 @@ class M2MForecastDataset(Dataset):
 
     def __getitem__(self, idx):
         day_idx, hour = self._resolve_index(idx)
-        target_record = self.obs_data[day_idx + self.obs_shift]
-        back_record, background_offset_days = self._select_background_record(target_record.date, idx, day_idx)
+        observation_rng = self._rng_for_index(idx, stream=1)
+        if self.background_strategy == "calendar_year_ago":
+            back_record, target_record = self.calendar_pairs[day_idx]
+            background_offset_days = (target_record.date - back_record.date).days
+        else:
+            target_record = self.obs_data[day_idx + self.obs_shift]
+            back_record, background_offset_days = self._select_background_record(
+                target_record.date, idx, day_idx
+            )
         background, _ = prepare_model_field(
             field_at_hour(back_record.path, hour, self.indices),
             None,
@@ -589,11 +719,10 @@ class M2MForecastDataset(Dataset):
         )
         valid_mask = self.base_valid_mask.clone()
 
-        rng = np.random.default_rng(self.seed + idx)
         mask_config = self.config.get("observation_mask", {})
         mask_kind = mask_config.get("kind", "generated_track")
         if mask_kind == "sral_tracks":
-            conditioning_kind = self._selected_sral_conditioning(mask_config, rng)
+            conditioning_kind = self._selected_sral_conditioning(mask_config, observation_rng)
             if conditioning_kind == "sral_tracks":
                 obs_values, obs_mask, obs_diagnostics = self._sral_track_observations(
                     target_record.date,
@@ -605,7 +734,7 @@ class M2MForecastDataset(Dataset):
                     truth,
                     valid_mask,
                     mask_config,
-                    rng,
+                    observation_rng,
                 )
             else:
                 obs_values, obs_mask, obs_diagnostics = self._empty_observations(
@@ -613,23 +742,36 @@ class M2MForecastDataset(Dataset):
                     empty_obs_days=self.assimilation_range,
                 )
         else:
-            spatial_mask = _make_mask(self.image_size, valid_mask, self.config, rng, mask_config=mask_config)
+            spatial_mask = _make_mask(
+                self.image_size,
+                valid_mask,
+                self.config,
+                observation_rng,
+                mask_config=mask_config,
+            )
             spatial_mask = spatial_mask * valid_mask[0]
             obs_values, obs_mask = make_observation_tensors(truth, spatial_mask, self.observed_channels)
             obs_diagnostics = self._observation_diagnostics(mask_kind, obs_mask, valid_mask)
 
+        feature_values = calendar_feature_values(target_record.date, hour, self.calendar_features)
+        static_conditions = [self.base_valid_mask[:1]]
+        static_conditions.extend(
+            torch.full((1, *self.image_size), value, dtype=torch.float32) for value in feature_values
+        )
         return {
             "truth": truth,
             "background": background,
             "obs_values": obs_values,
             "obs_mask": obs_mask,
             "valid_mask": valid_mask,
-            "water_mask": self.base_valid_mask[:1],
+            "water_mask": torch.cat(static_conditions, dim=0),
             "meta": {
                 "case_id": f"{target_record.date.isoformat()}_h{hour:02d}",
                 "background_date": back_record.date.isoformat(),
                 "target_date": target_record.date.isoformat(),
                 "background_offset_days": int(background_offset_days),
+                "background_strategy": self.background_strategy,
+                "calendar_feature_values": list(feature_values),
                 "hour": hour,
                 "background_path": str(back_record.path),
                 "target_path": str(target_record.path),

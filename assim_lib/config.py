@@ -55,6 +55,7 @@ class TrainingConfig:
     training_objective: str = "flow"
     timestep_sampler: str = "uniform"
     timestep_beta_params: tuple[float, float] = (2.0, 1.0)
+    loss_domain: str = "full"
     obs_loss_weight: float = 0.1
     smoothness_loss_weight: float = 0.0
     background_dropout_probability: float = 0.0
@@ -156,6 +157,8 @@ class TrainingConfig:
             raise ValueError(f"Unknown training_objective={self.training_objective!r}")
         if self.timestep_sampler not in {"uniform", "beta"}:
             raise ValueError(f"Unknown timestep_sampler={self.timestep_sampler!r}")
+        if self.loss_domain not in {"full", "valid"}:
+            raise ValueError(f"Unknown loss_domain={self.loss_domain!r}; expected 'full' or 'valid'")
         if self.sample_start_mode not in {"noise", "background", "bridge"}:
             raise ValueError(f"Unknown sample_start_mode={self.sample_start_mode!r}")
         if self.training_objective == "residual_flow" and self.sample_start_mode == "bridge":
