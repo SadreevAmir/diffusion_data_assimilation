@@ -1,6 +1,6 @@
 # Frozen contingent method contract: score-aware raw-scenario reweighting
 
-Status: DESIGN_FROZEN_TERTIARY_NO_RUNNER
+Status: DESIGN_FROZEN_TERTIARY_REFERENCE_RUNNER_READY
 
 ## Activation and scientific question
 
@@ -137,3 +137,10 @@ There is intentionally no experiment proposal or invented mode identifier.
 Admission requires a literal trusted mode plus independent parity and fail-closed
 checks.  This document freezes the mechanism before either prerequisite result
 is known.
+
+The dependency-light construction surface is
+`score_aware_raw_reweighting_runner.py`.  It accepts no runtime tuning fields,
+fits only from supplied training rows, copies complete selected raw fields and
+emits exact source/mask invariants.  Its synthetic result is explicitly
+non-decision-bearing.  This local surface supports future independent parity
+review; it does not register a trusted mode or authorize execution.
