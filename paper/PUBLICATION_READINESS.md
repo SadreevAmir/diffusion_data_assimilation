@@ -3,7 +3,7 @@
 ## Current independent audit snapshot (2026-08-30)
 
 The current disposable-worktree audit is fail-closed and publication-facing.
-`paper/check_publication_artifacts.py` passed from a clean invocation with 100
+`paper/check_publication_artifacts.py` passed from a clean invocation with 104
 required files, two deterministic figures, eight references and 40 claims;
 all 40 `test_publication_*.py` tests passed, and `git diff --check` passed.
 Direct inspection of `PAPER_DRAFT.md`, `CLAIM_LEDGER.md`, both generated
@@ -31,7 +31,7 @@ The 2026-08-30 trigger-specific independent re-audit reran the unified
 publication checker from the current disposable worktree and inspected the
 manuscript, claim ledger, both deterministic figures, compact-evidence guards,
 minimum-tier contracts and reproducibility handoff.  The checker passed with
-100 required files, two figures, eight references and 40 claims, while
+104 required files, two figures, eight references and 40 claims, while
 retaining `NOT_READY`.  This is the correct scientific state: the conformal and
 probabilistic-DA rows still have frozen but unadmitted contracts, the
 independent-strength deterministic row remains development-only, and no
