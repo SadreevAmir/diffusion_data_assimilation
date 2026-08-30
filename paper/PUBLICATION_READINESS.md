@@ -1,5 +1,19 @@
 # Publication readiness audit
 
+The 2026-08-30 trigger-specific independent audit reran the unified publication
+checker and the complete `test_publication_*.py` boundary from the current
+worktree.  The checker passed with 88 required files, two generated figures,
+eight references and 40 claims at `NOT_READY`; all 38 publication-surface tests
+passed.  Direct comparison of `PAPER_DRAFT.md`, `CLAIM_LEDGER.md`, the two
+figures and `REPRODUCIBILITY.md` found no positive promotion of the reconciled
+negative primary and no disagreement in the minimum-tier matrix.  This is an
+internal-consistency result, not scientific closure: no compact record reports
+an eligible no-compensation calibration, and the conformal and probabilistic-DA
+rows remain missing.  The fastest decision-bearing contingent route remains
+the frozen score-aware raw-scenario reweighting mechanism, but this snapshot
+contains no controller-visible reviewed literal mode for it; an unavailable
+mode is not represented as a trusted proposal or as an external dependency.
+
 The 2026-08-30 independent cross-surface audit rechecked the current manuscript,
 claim ledger, both generated figures, compact-payload schemas, empirical claim
 traceability, limitation coverage and reference traceability rather than relying
