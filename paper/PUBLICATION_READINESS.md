@@ -25,6 +25,18 @@ not scientific admission.
 
 ## Latest publication-trigger resolution (2026-08-31)
 
+The idle recovery also closed the local atomicity gap between independent
+admission and proposal construction.  `authorize_score_aware_proposal.py` now
+invokes the existing combined semantic/compact admission in-process and emits
+the frozen request only from its typed `admission=GO` result.  The emitted
+request inherits the admitted literal mode and fixes the sole source parameter,
+development envelope, ten members, `server_cpu` and `summary_only`; an unbound
+JSON mapping, `NO_GO`, review failure or any deviation fails closed.  This does
+not register a mode or authorize the current handoff: focused tests pass, while
+the fresh preflight still returns exactly `MISSING_LITERAL_REVIEWED_MODE` and
+`proposal_authorized=false`.  It does make the next controller-side operation
+genuinely atomic once the literal reviewed mode is independently supplied.
+
 The 2026-08-31 idle-anomaly resolution replaced another narrative-only rerun
 with `score_aware_admission_preflight.py`.  The fail-closed preflight verifies
 that the frozen publication commit is an ancestor, that every listed artifact
