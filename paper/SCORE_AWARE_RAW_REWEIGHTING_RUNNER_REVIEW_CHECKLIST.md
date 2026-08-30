@@ -18,6 +18,10 @@ satisfies every item below with no deviation.
   `score-aware-raw-reweighting-admission-v2` and binds the reviewed publication
   commit plus exact SHA-256 identities for the trusted runner, frozen contract,
   independent reference and complete compact directory.
+- [ ] The combined admission receives the trusted publication commit and the
+  controller's literal visible-mode set out of band.  It rejects a record whose
+  commit differs or whose `reviewed_mode` is absent from that exact set; a
+  `validation_` prefix alone is never evidence of implementation.
 
 ## Leakage-safe score model and selection parity
 
@@ -71,7 +75,8 @@ satisfies every item below with no deviation.
 The independent reviewer supplies exactly one JSON record with the v2 schema
 required by `validate_score_aware_raw_reweighting_admission.py`.  The combined
 admission command must validate the record, trusted runner and complete compact
-directory in one process and emit the literal `reviewed_mode` together with the
+directory in one process, while receiving the trusted publication commit and
+controller-visible mode set as explicit required inputs, and emit the literal `reviewed_mode` together with the
 record, publication commit and four verified artifact identities.  The proposal
 must consume that emitted payload atomically; rereading an unbound review file
 is not equivalent.

@@ -71,17 +71,25 @@ def _require_digest(value: object, name: str) -> str:
     return value
 
 
-def validate_record(record: object, runner: Path, compact_directory: Path) -> str:
+def validate_record(
+    record: object,
+    runner: Path,
+    compact_directory: Path,
+    expected_publication_commit: str,
+    controller_visible_modes: frozenset[str],
+) -> str:
     if not isinstance(record, dict) or set(record) != REQUIRED_KEYS:
         raise ValueError("admission record must be one exact-schema JSON object")
     if record["schema_version"] != "score-aware-raw-reweighting-admission-v2":
         raise ValueError("unsupported admission schema_version")
     mode = record["reviewed_mode"]
-    if not isinstance(mode, str) or not mode.startswith("validation_") or not mode.strip():
-        raise ValueError("reviewed_mode must be one literal validation mode")
+    if not isinstance(mode, str) or mode not in controller_visible_modes:
+        raise ValueError("reviewed_mode must be one controller-visible literal mode")
     commit = record["publication_commit"]
     if not isinstance(commit, str) or len(commit) != 40 or any(c not in "0123456789abcdef" for c in commit):
         raise ValueError("publication_commit must be one lowercase 40-hex identity")
+    if commit != expected_publication_commit:
+        raise ValueError("publication_commit does not match the trusted publication identity")
     if record["deviations"] != []:
         raise ValueError("deviations must be an empty list")
     if record["decision_bearing_validation"] != "PASS":
@@ -197,12 +205,24 @@ def validate_semantic_parity(runner: Path) -> None:
     _assert_nested_close(module.predict_member_risks(actual_model, heldout), reference.predict_member_risks(expected_model, heldout), "prediction")
 
 
-def load_and_validate(record_path: Path, runner: Path, compact_directory: Path) -> AdmissionResult:
+def load_and_validate(
+    record_path: Path,
+    runner: Path,
+    compact_directory: Path,
+    expected_publication_commit: str,
+    controller_visible_modes: frozenset[str],
+) -> AdmissionResult:
     admitted_record_bytes = record_path.read_bytes()
     record = json.loads(admitted_record_bytes.decode("utf-8"))
     admitted_record_digest = hashlib.sha256(admitted_record_bytes).hexdigest()
     admitted_digest = directory_sha256(compact_directory)
-    mode = validate_record(record, runner, compact_directory)
+    mode = validate_record(
+        record,
+        runner,
+        compact_directory,
+        expected_publication_commit,
+        controller_visible_modes,
+    )
     validate_semantic_parity(runner)
     validate_directory(compact_directory)
     if directory_sha256(compact_directory) != admitted_digest:
@@ -228,8 +248,16 @@ def main() -> None:
     parser.add_argument("record", type=Path)
     parser.add_argument("runner", type=Path)
     parser.add_argument("compact_directory", type=Path)
+    parser.add_argument("--expected-publication-commit", required=True)
+    parser.add_argument("--controller-visible-mode", action="append", required=True)
     args = parser.parse_args()
-    result = load_and_validate(args.record, args.runner, args.compact_directory)
+    result = load_and_validate(
+        args.record,
+        args.runner,
+        args.compact_directory,
+        args.expected_publication_commit,
+        frozenset(args.controller_visible_mode),
+    )
     print(json.dumps(result.__dict__, sort_keys=True))
 
 

@@ -40,6 +40,10 @@ def record(runner: Path, compact_directory: Path) -> dict[str, object]:
     }
 
 
+EXPECTED_COMMIT = "a" * 40
+VISIBLE_MODES = frozenset({"validation_reviewed_score_aware_raw_reweighting"})
+
+
 class AdmissionTests(unittest.TestCase):
     def test_numpy_scalar_is_compared_as_a_number(self):
         if reference.np is None:
@@ -133,14 +137,25 @@ class AdmissionTests(unittest.TestCase):
     def test_record_binds_all_three_artifacts_and_rejects_deviations(self):
         directory = self.compact_directory()
         good = record(REFERENCE, directory)
-        self.assertEqual(validate_record(good, REFERENCE, directory), good["reviewed_mode"])
+        self.assertEqual(
+            validate_record(good, REFERENCE, directory, EXPECTED_COMMIT, VISIBLE_MODES),
+            good["reviewed_mode"],
+        )
         for key in ("runner_sha256", "contract_sha256", "reference_sha256", "compact_directory_sha256"):
             bad = dict(good); bad[key] = "0" * 64
             with self.assertRaisesRegex(ValueError, key):
-                validate_record(bad, REFERENCE, directory)
+                validate_record(bad, REFERENCE, directory, EXPECTED_COMMIT, VISIBLE_MODES)
         bad = dict(good); bad["deviations"] = ["waiver"]
         with self.assertRaisesRegex(ValueError, "empty list"):
-            validate_record(bad, REFERENCE, directory)
+            validate_record(bad, REFERENCE, directory, EXPECTED_COMMIT, VISIBLE_MODES)
+
+    def test_record_rejects_untrusted_commit_and_nonvisible_mode(self):
+        directory = self.compact_directory()
+        good = record(REFERENCE, directory)
+        with self.assertRaisesRegex(ValueError, "trusted publication identity"):
+            validate_record(good, REFERENCE, directory, "b" * 40, VISIBLE_MODES)
+        with self.assertRaisesRegex(ValueError, "controller-visible literal mode"):
+            validate_record(good, REFERENCE, directory, EXPECTED_COMMIT, frozenset())
 
     def test_full_boundary_never_admits_without_semantic_parity(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -149,9 +164,11 @@ class AdmissionTests(unittest.TestCase):
             path.write_text(json.dumps(record(REFERENCE, directory)), encoding="utf-8")
             if reference.np is None:
                 with self.assertRaisesRegex(RuntimeError, "numpy is required"):
-                    load_and_validate(path, REFERENCE, directory)
+                    load_and_validate(
+                        path, REFERENCE, directory, EXPECTED_COMMIT, VISIBLE_MODES
+                    )
             else:
-                result = load_and_validate(path, REFERENCE, directory)
+                result = load_and_validate(path, REFERENCE, directory, EXPECTED_COMMIT, VISIBLE_MODES)
                 self.assertEqual(result.reviewed_mode, record(REFERENCE, directory)["reviewed_mode"])
                 self.assertEqual(result.admission, "GO")
                 self.assertEqual(result.publication_commit, "a" * 40)
@@ -168,7 +185,7 @@ class AdmissionTests(unittest.TestCase):
             with patch(
                 "paper.validate_score_aware_raw_reweighting_admission.validate_semantic_parity"
             ):
-                result = load_and_validate(path, REFERENCE, directory)
+                result = load_and_validate(path, REFERENCE, directory, EXPECTED_COMMIT, VISIBLE_MODES)
             self.assertEqual(result.admission_record_sha256, digest(path))
             marker = (
                 "SCORE_AWARE_RESULT: status=RECONCILED_NEGATIVE; "
@@ -201,7 +218,7 @@ class AdmissionTests(unittest.TestCase):
                 "paper.validate_score_aware_raw_reweighting_admission.validate_semantic_parity"
             ):
                 with self.assertRaisesRegex(ValueError, "admission record changed"):
-                    load_and_validate(path, REFERENCE, directory)
+                    load_and_validate(path, REFERENCE, directory, EXPECTED_COMMIT, VISIBLE_MODES)
 
     def test_post_admission_file_substitution_fails_closed(self):
         directory = self.compact_directory()
@@ -210,7 +227,7 @@ class AdmissionTests(unittest.TestCase):
         document = json.loads(gate.read_text(encoding="utf-8"))
         gate.write_text(json.dumps(document, indent=2), encoding="utf-8")
         with self.assertRaisesRegex(ValueError, "compact_directory_sha256"):
-            validate_record(frozen, REFERENCE, directory)
+            validate_record(frozen, REFERENCE, directory, EXPECTED_COMMIT, VISIBLE_MODES)
 
     def test_substitution_after_semantic_admission_fails_closed(self):
         directory = self.compact_directory()
@@ -229,7 +246,7 @@ class AdmissionTests(unittest.TestCase):
                 side_effect=mutate_after_semantic,
             ):
                 with self.assertRaisesRegex(ValueError, "changed during combined admission"):
-                    load_and_validate(path, REFERENCE, directory)
+                    load_and_validate(path, REFERENCE, directory, EXPECTED_COMMIT, VISIBLE_MODES)
 
 
 if __name__ == "__main__":
