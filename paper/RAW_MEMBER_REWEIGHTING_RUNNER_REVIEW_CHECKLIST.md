@@ -109,6 +109,13 @@ detects substitution during admission, and emits `admission=GO` only with the
 reviewed literal mode. This check does not implement, name or launch a trusted
 mode; controller visibility and the independent review remain mandatory.
 
+Admission semantic parity also checks the exact five contiguous holdouts,
+non-circular three-case purge, training-population feature scaling, ten unique
+analog selections and deterministic case-index ordering for an exact distance
+tie. A reviewed runner with drift in any of these upstream construction steps
+cannot reach `admission=GO`, even if its downstream rank-selection helpers still
+match the oracle.
+
 The successful JSON payload is self-contained: alongside `admission=GO` and
 the literal `reviewed_mode`, it carries the SHA-256 of the exact review record,
 the reviewed publication commit and the verified runner, contract and synthetic

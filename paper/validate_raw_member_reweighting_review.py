@@ -52,6 +52,8 @@ def validate_semantic_parity(runner: Path) -> None:
     """Require the reviewed runner's pure construction surface to match the oracle."""
     module = _load_runner(runner)
     for name in (
+        "purged_folds",
+        "standardize_and_select_analogs",
         "analog_rank_probabilities",
         "systematic_rank_positions",
         "selection_diagnostics",
@@ -60,6 +62,38 @@ def validate_semantic_parity(runner: Path) -> None:
     ):
         if not callable(getattr(module, name, None)):
             raise ValueError(f"runner lacks callable {name}")
+
+    expected_folds = []
+    for fold in range(5):
+        start = fold * 8
+        holdout = tuple(range(start, start + 8))
+        excluded = set(holdout)
+        excluded.update(range(max(0, start - 3), start))
+        excluded.update(range(start + 8, min(40, start + 11)))
+        training = tuple(index for index in range(40) if index not in excluded)
+        expected_folds.append((holdout, training))
+    if module.purged_folds() != tuple(expected_folds):
+        raise ValueError("runner folds or non-circular purge diverge from frozen contract")
+
+    # Each training row varies in every feature, while indices 7 and 11 are an
+    # exact distance tie.  Population rather than sample scaling is exercised;
+    # deterministic ordering must prefer the smaller case index.
+    training_features = {
+        index: [
+            float(index),
+            float(index * index),
+            float(index % 3),
+            float((index + 1) % 4),
+            float(index % 5),
+            float((2 * index + 1) % 7),
+        ]
+        for index in range(12)
+    }
+    training_features[11] = list(training_features[7])
+    target_features = list(training_features[7])
+    selected = module.standardize_and_select_analogs(target_features, training_features)
+    if len(selected) != 10 or selected[:2] != [7, 11] or len(set(selected)) != 10:
+        raise ValueError("runner analog selection, scaling or tie order diverges")
 
     rank_vectors = (
         [(index + 0.5) / 10 for index in range(10)],

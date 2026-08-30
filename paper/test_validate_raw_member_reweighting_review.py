@@ -49,22 +49,50 @@ def write_valid_synthetic(path: Path) -> None:
 
 
 class ReviewAdmissionTests(unittest.TestCase):
-    def test_reference_satisfies_semantic_surface(self):
-        validate_semantic_parity(REFERENCE)
+    def test_reference_alone_is_not_an_admission_complete_runner(self):
+        with self.assertRaisesRegex(ValueError, "lacks callable purged_folds"):
+            validate_semantic_parity(REFERENCE)
 
     def test_separate_runner_satisfies_semantic_surface(self):
         validate_semantic_parity(RUNNER)
 
     def test_oracle_drift_fails_closed(self):
-        source = REFERENCE.read_text(encoding="utf-8").replace(
+        source = RUNNER.read_text(encoding="utf-8").replace(
+            "from .raw_member_reweighting_reference import (",
+            "from paper.raw_member_reweighting_reference import (",
+        ).replace(
             "return positions\n\n\ndef selection_diagnostics",
             "return list(reversed(positions))\n\n\ndef selection_diagnostics",
         )
+        # Override the imported helper inside the reviewed runner copy so the
+        # mutation exercises downstream oracle parity, not module discovery.
+        source += "\nconstruct_selection = lambda ranks, means: {**__import__('paper.raw_member_reweighting_reference', fromlist=['construct_selection']).construct_selection(ranks, means), 'selected_rank_positions': list(reversed(__import__('paper.raw_member_reweighting_reference', fromlist=['construct_selection']).construct_selection(ranks, means)['selected_rank_positions']))}\n"
         with tempfile.TemporaryDirectory() as temporary:
             runner = Path(temporary) / "runner.py"
             runner.write_text(source, encoding="utf-8")
             with self.assertRaisesRegex(ValueError, "diverges"):
                 validate_semantic_parity(runner)
+
+    def test_fold_or_analog_semantic_drift_fails_closed(self):
+        source = RUNNER.read_text(encoding="utf-8")
+        mutations = (
+            (
+                "PURGE = 3",
+                "PURGE = 2",
+                "folds or non-circular purge diverge",
+            ),
+            (
+                "sorted(distances)[:MEMBERS]",
+                "sorted(distances, reverse=True)[:MEMBERS]",
+                "analog selection, scaling or tie order diverges",
+            ),
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            for index, (old, new, message) in enumerate(mutations):
+                runner = Path(temporary) / f"runner_{index}.py"
+                runner.write_text(source.replace(old, new), encoding="utf-8")
+                with self.assertRaisesRegex(ValueError, message):
+                    validate_semantic_parity(runner)
 
     def test_exact_record_and_artifact_bindings(self):
         with tempfile.TemporaryDirectory() as temporary:

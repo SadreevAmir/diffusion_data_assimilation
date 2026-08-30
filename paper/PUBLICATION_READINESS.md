@@ -1578,3 +1578,11 @@ invented production mode. The focused 25-test suite passes, but no independent
 review or trusted executor registration exists yet; therefore this is engineering
 evidence only, creates no scientific result, and publication status remains
 `NOT_READY`.
+
+The following semantic-parity audit closes an upstream admission gap: the
+review validator now checks the exact contiguous folds, non-circular purge,
+training-population feature scaling, unique analog count and deterministic
+case-index ordering under an exact distance tie. Focused negative fixtures
+reject both purge drift and reversed analog ordering before `admission=GO`.
+This remains local engineering evidence: it does not register a trusted mode,
+open any evaluation data or change publication status from `NOT_READY`.
