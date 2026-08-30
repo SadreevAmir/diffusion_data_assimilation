@@ -31,6 +31,23 @@ audit trail; it is provenance, not a second readiness decision.
 
 ## Current independent audit snapshot (2026-08-30)
 
+The publication-readiness trigger was independently rerun against the current
+disposable worktree after direct inspection of the manuscript, claim ledger,
+generated figures, minimum-tier evidence inventory, compact handoffs and
+reproducibility commands.  The unified fail-closed checker passed with 108
+required files, two deterministic figures, eight references and 40 claims;
+`git diff --check` also passed.  The manuscript, ledger and reproducibility
+handoff retain the identical
+`eligible_calibration=MISSING_ELIGIBLE_RESULT` guard, while the minimum-tier
+audit still records two missing comparator families and a development-only
+deterministic comparison.  The score-aware handoff remains fail closed with
+`admission=NO_GO`, `reviewed_mode=null` and `proposal_authorized=false`, so this
+audit neither invents an executor mode nor promotes local parity to scientific
+evidence.  No stale figure, unsupported table entry, compact-schema mismatch or
+reproducibility defect was found.  The status therefore remains honestly
+`NOT_READY`; the next decision-bearing action is still the atomic independent
+score-aware admission operation described below.
+
 The trigger-specific publication audit reran the unified fail-closed checker
 from the disposable worktree and the focused claim-status, compact-schema,
 empirical-traceability, deterministic-figure, immutable-identity,
