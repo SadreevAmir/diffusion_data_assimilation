@@ -1,5 +1,19 @@
 # Publication readiness audit
 
+The 2026-08-30 independent casewise-selector admission audit executed the exact
+semantic-validator command from `REPRODUCIBILITY.md` in the current minimal
+runtime.  It failed closed before a decision-bearing ridge comparison because
+NumPy is unavailable, so this snapshot records neither `GO` nor scientific
+admission.  A separate 45-test publication and selector boundary passed with
+two explicit NumPy-only skips: claim-status consistency, compact-payload
+schemas, empirical and limitation traceability, deterministic figure
+generation, reference traceability, pure-Python selector parity, purge edges,
+non-finite rejection and conservative margin ties all remain intact.
+`git diff --check` also passes.  The exact next decision remains the documented
+NumPy-backed semantic command; until it returns literal `GO` together with a
+controller-visible reviewed mode, no selector experiment is admissible and
+publication status remains `NOT_READY`.
+
 The 2026-08-30 casewise-selector runner audit added a separate deterministic
 prototype for the frozen purged folds, scalar joint loss, training-only SVD
 ridge prediction and conservative whole-case action rule. Its focused suite
