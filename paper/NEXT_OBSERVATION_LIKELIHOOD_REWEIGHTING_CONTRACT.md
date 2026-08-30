@@ -16,15 +16,26 @@ member score uses only observation-space predictive consistency; unlike the
 casewise selector, it produces one weighted distribution rather than choosing
 between two complete ensembles.
 
-For each held-out case, each observed track location is scored by a
-leave-one-observation-out predictive density: reconstruct the member value at
-that location using the otherwise unchanged conditioning context with that
-single observation masked, and evaluate the withheld observation under a
-fixed Gaussian kernel mixture centred on the ten reconstructed member values.
-The member log score is the sum of these withheld-location log densities. The
-candidate member probabilities are the normalized exponentials of these ten
-scores after subtraction of their maximum. This is a diagnostic reallocation
-of probability among raw scenarios, not a new assimilation claim.
+For each held-out case and observed track location, reconstruct all ten member
+values using the otherwise unchanged conditioning context with that single
+observation masked.  Member `m` receives the component log likelihood of the
+withheld value under a Gaussian centred on member `m`'s reconstruction.  The
+common training-fold bandwidth is defined below.  This is deliberately not the
+log density of the equally weighted ten-component mixture: that density would
+be identical for every member and could not identify scenario probabilities.
+
+For withheld locations `j=1,...,J`, reconstructed values `x_mj`, observations
+`y_j` and training-fold bandwidth `h`, freeze
+
+```text
+ell_m = sum_j [-0.5 * ((y_j - x_mj) / h)^2 - log(h) - 0.5*log(2*pi)]
+w_m   = exp(ell_m - max_k ell_k) / sum_k exp(ell_k - max_l ell_l).
+```
+
+The candidate is the weighted empirical distribution on the ten unchanged raw
+fields.  No resampling is used for scoring or diagnostics.  This is a
+diagnostic reallocation of probability among raw scenarios, not a new
+assimilation claim.
 
 ## Leakage and frozen computation
 
@@ -45,6 +56,32 @@ of probability among raw scenarios, not a new assimilation claim.
   exact-one and `>=0.999` masks must be byte-identical between source and
   candidate artifacts. Report the ten probabilities and effective sample size
   per case in compact form; retrieve no raw arrays.
+
+## Weighted score and reliability definitions
+
+All candidate metrics consume the weights directly.  For member values `x_m`,
+truth `y`, normalized non-negative weights `w_m`, and
+`s2=sum_m(w_m^2)`, the frozen finite-ensemble fair CRPS is
+
+```text
+sum_m w_m * abs(x_m-y)
+- sum_m sum_n w_m*w_n*abs(x_m-x_n) / (2*(1-s2)).
+```
+
+This reduces exactly to the existing equal-weight fair CRPS at `w_m=0.1`.
+`s2 >= 1` is operational failure.  Ordinary weighted CRPS uses the same first
+term and denominator `2` rather than `2*(1-s2)` in the pairwise term.
+
+Finite-ensemble reliability is evaluated from the weighted randomized PIT,
+not by pretending that unequal weights are ten exchangeable equal-mass ranks.
+At each verified scalar, let `W_lt` be the total weight of members strictly
+below truth and `W_eq` the total weight exactly equal to truth.  Freeze
+`u = W_lt + U*W_eq`, where `U` uses the unchanged common gate seed and indexing
+contract.  The common absolute-uniformity, centering, range-coverage and
+inner-coverage thresholds are applied to these `u` values with their existing
+date-balanced aggregation.  The raw baseline is evaluated by the identical
+formula with `w_m=0.1`.  Missing tie randomization, equal-rank substitution or
+member resampling is an implementation failure.
 
 ## Falsifiable prediction and decision
 
