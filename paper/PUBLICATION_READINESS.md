@@ -23,7 +23,7 @@ casewise-safety-selector handoff is the mechanistically distinct contingent
 route. Local runner parity, scheduler completion and unsigned compact files are
 not scientific admission.
 
-## Latest publication-trigger resolution (2026-08-30)
+## Latest publication-trigger resolution (2026-08-31)
 
 The 2026-08-31 idle-anomaly resolution replaced another narrative-only rerun
 with `score_aware_admission_preflight.py`.  The fail-closed preflight verifies
@@ -36,6 +36,18 @@ literal reviewed mode has been substituted.  Its current result is
 operation.  Thus there is no remaining local artifact drift to repair, but no
 experiment is invented or authorized and publication status remains
 `NOT_READY`.
+
+The publication-readiness trigger was then independently rerun from the current
+worktree on 2026-08-31.  The unified fail-closed audit again passed its complete
+embedded regression boundary with 108 required files, two deterministic
+figures, eight references and 40 claims.  A fresh score-aware preflight again
+returned `PASS_LOCAL_BOUNDARY`, `proposal_authorized=false` and only
+`MISSING_LITERAL_REVIEWED_MODE`; `git diff --check` also passed before this
+entry was added.  This rerun found no manuscript, claim-ledger, figure, compact-
+schema or reproducibility defect that can be repaired locally.  It therefore
+does not weaken the minimum paper scope or manufacture an experiment proposal:
+the exact next scientific event remains the atomic independent admission named
+above.
 
 An independent read of the manuscript, claim ledger, deterministic figures,
 minimum-tier matrix, compact-evidence boundaries and reproducibility handoff
