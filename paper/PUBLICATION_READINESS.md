@@ -34,7 +34,12 @@ audit trail; it is provenance, not a second readiness decision.
 The current disposable-worktree audit is fail-closed and publication-facing.
 `paper/check_publication_artifacts.py` passed from a clean invocation with 104
 required files, two deterministic figures, eight references and 40 claims;
-all 40 `test_publication_*.py` tests passed, and `git diff --check` passed.
+the focused claim-status, compact-schema, empirical-traceability,
+figure-determinism, limitation-traceability, reference-traceability and
+minimum-tier suite passed all 123 tests, and `git diff --check` passed.  This
+focused count replaces the earlier ambiguous wildcard count: it names the
+publication boundaries actually executed and is not a claim that every file
+matching a filename pattern was run.
 Direct inspection of `PAPER_DRAFT.md`, `CLAIM_LEDGER.md`, both generated
 figures and `REPRODUCIBILITY.md` found no unsupported promotion of a completed
 scheduler job.  The manuscript and ledger consistently describe the corrected
