@@ -6,15 +6,11 @@ OUTPUT_DIR="${OUTPUT_DIR:?OUTPUT_DIR is required}"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
 CUDA_DEVICE="${CUDA_DEVICE:-0}"
 CANONICAL_CONFIG="$REPO_DIR/config/experiments/train_siconc_calendar_residual_cfm.json"
-CONFIG="${CONFIG:-$CANONICAL_CONFIG}"
+CONFIG="$CANONICAL_CONFIG"
 RUNTIME_CONFIG="$OUTPUT_DIR/runtime_training_config.json"
 TRAINING_DIR="$OUTPUT_DIR/training"
 STATUS_PATH="$OUTPUT_DIR/run_status.json"
 
-if [[ "$CONFIG" != "$CANONICAL_CONFIG" ]]; then
-  echo "[calendar-residual-cfm] CONFIG must be the immutable canonical experiment" >&2
-  exit 2
-fi
 if [[ ! "$CUDA_DEVICE" =~ ^[0-9]+$ ]]; then
   echo "[calendar-residual-cfm] exactly one numeric CUDA device is required" >&2
   exit 2
