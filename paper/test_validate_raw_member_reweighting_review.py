@@ -14,7 +14,9 @@ from paper.validate_raw_member_reweighting_review import (
     load_and_validate,
     validate_record,
     validate_semantic_parity,
+    validate_synthetic_result,
 )
+from paper.raw_member_reweighting_runner import synthetic_result as runner_synthetic_result
 
 
 REFERENCE = Path(__file__).with_name("raw_member_reweighting_reference.py")
@@ -39,6 +41,13 @@ def valid_record(runner: Path, synthetic: Path) -> dict[str, object]:
     }
 
 
+def write_valid_synthetic(path: Path) -> None:
+    path.write_text(
+        json.dumps(runner_synthetic_result(), sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+
 class ReviewAdmissionTests(unittest.TestCase):
     def test_reference_satisfies_semantic_surface(self):
         validate_semantic_parity(REFERENCE)
@@ -60,7 +69,7 @@ class ReviewAdmissionTests(unittest.TestCase):
     def test_exact_record_and_artifact_bindings(self):
         with tempfile.TemporaryDirectory() as temporary:
             synthetic = Path(temporary) / "synthetic.json"
-            synthetic.write_text('{"status":"PASS"}\n', encoding="utf-8")
+            write_valid_synthetic(synthetic)
             record = valid_record(RUNNER, synthetic)
             self.assertEqual(
                 validate_record(record, RUNNER, synthetic), record["reviewed_mode"]
@@ -74,7 +83,7 @@ class ReviewAdmissionTests(unittest.TestCase):
     def test_every_placeholder_and_nonpass_state_is_no_go(self):
         with tempfile.TemporaryDirectory() as temporary:
             synthetic = Path(temporary) / "synthetic.json"
-            synthetic.write_text("{}", encoding="utf-8")
+            write_valid_synthetic(synthetic)
             good = valid_record(RUNNER, synthetic)
             mutations = (
                 ("reviewed_mode", "<literal implemented trusted mode>"),
@@ -99,7 +108,7 @@ class ReviewAdmissionTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             synthetic = root / "synthetic.json"
-            synthetic.write_text('{"status":"PASS"}\n', encoding="utf-8")
+            write_valid_synthetic(synthetic)
             record_path = root / "review.json"
             record_path.write_text(
                 json.dumps(valid_record(RUNNER, synthetic), sort_keys=True),
@@ -114,7 +123,7 @@ class ReviewAdmissionTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             synthetic = root / "synthetic.json"
-            synthetic.write_text('{"status":"PASS"}\n', encoding="utf-8")
+            write_valid_synthetic(synthetic)
             record_path = root / "review.json"
             record = valid_record(RUNNER, synthetic)
             record_path.write_text(json.dumps(record, sort_keys=True), encoding="utf-8")
@@ -129,6 +138,29 @@ class ReviewAdmissionTests(unittest.TestCase):
                 "synthetic_result_sha256",
             ):
                 self.assertEqual(payload[key], record[key])
+
+    def test_synthetic_result_must_match_runner_and_remain_non_decision_bearing(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            synthetic = Path(temporary) / "synthetic.json"
+            write_valid_synthetic(synthetic)
+            validate_synthetic_result(RUNNER, synthetic)
+            for mutation in (
+                {"decision_bearing": True},
+                {"project_data_metrics_emitted": True},
+                {"unexpected_metric": 0.123},
+            ):
+                bad = runner_synthetic_result()
+                bad.update(mutation)
+                synthetic.write_text(json.dumps(bad), encoding="utf-8")
+                with self.assertRaisesRegex(ValueError, "synthetic result"):
+                    validate_synthetic_result(RUNNER, synthetic)
+
+    def test_synthetic_result_must_be_json(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            synthetic = Path(temporary) / "synthetic.json"
+            synthetic.write_text("not-json", encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "UTF-8 JSON"):
+                validate_synthetic_result(RUNNER, synthetic)
 
 
 if __name__ == "__main__":

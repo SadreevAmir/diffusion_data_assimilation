@@ -1,13 +1,17 @@
 # Publication readiness audit
 
 The 2026-08-30 raw-member implementation audit added a separate deterministic
-runner surface and six focused tests for the frozen interface, purged folds,
+runner surface and focused tests for the frozen interface, purged folds,
 training-only analog selection, complete-field copying and fail-closed input
 validation.  The admission regression now checks this runner against the
 independent construction oracle instead of treating the oracle as the runner.
-The focused 18-test boundary passed.  The unified audit passed with 88 required files
-while retaining `NOT_READY`: no independent review record, controller-visible
-literal mode or scientific result is inferred from the local synthetic check.
+An independent follow-up found that admission bound the synthetic-result digest
+without validating its contents; the validator now requires exact equality to
+the runner's deterministic dry-run record and explicitly rejects decision-bearing
+or project-data metric output.  The focused 24-test boundary passed.  The
+unified audit passed with 88 required files while retaining `NOT_READY`: no
+independent review record, controller-visible literal mode or scientific result
+is inferred from the local synthetic check.
 
 The 2026-08-30 full executable publication audit independently ran test
 discovery across the complete publication package before invoking the unified

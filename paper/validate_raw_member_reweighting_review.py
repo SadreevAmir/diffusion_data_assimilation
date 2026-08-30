@@ -80,6 +80,25 @@ def validate_semantic_parity(runner: Path) -> None:
             raise ValueError("runner construction diverges from frozen oracle")
 
 
+def validate_synthetic_result(runner: Path, synthetic_result: Path) -> None:
+    """Require the bound dry run to be the runner's exact outcome-agnostic record."""
+    module = _load_runner(runner)
+    build_synthetic = getattr(module, "synthetic_result", None)
+    if not callable(build_synthetic):
+        raise ValueError("runner lacks callable synthetic_result")
+    try:
+        actual = json.loads(synthetic_result.read_text(encoding="utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise ValueError("synthetic result must be one UTF-8 JSON record") from error
+    expected = build_synthetic()
+    if actual != expected:
+        raise ValueError("synthetic result diverges from reviewed runner dry run")
+    if actual.get("decision_bearing") is not False:
+        raise ValueError("synthetic result must not be decision-bearing")
+    if actual.get("project_data_metrics_emitted") is not False:
+        raise ValueError("synthetic result must not emit project-data metrics")
+
+
 def validate_record(
     record: object, runner: Path, synthetic_result: Path
 ) -> str:
@@ -111,6 +130,7 @@ def validate_record(
         if not isinstance(value, str) or not value.strip() or "<" in value or ">" in value:
             raise ValueError(f"{key} must be one exact non-placeholder string")
     validate_semantic_parity(runner)
+    validate_synthetic_result(runner, synthetic_result)
     return mode
 
 

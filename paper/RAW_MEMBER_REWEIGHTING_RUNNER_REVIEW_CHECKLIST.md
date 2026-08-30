@@ -102,11 +102,12 @@ probability-mass mechanism without retuning.
 The local fail-closed handoff is executable as
 `python -m paper.validate_raw_member_reweighting_review REVIEW_JSON RUNNER_PY SYNTHETIC_RESULT`.
 It requires the exact record schema above, binds the runner, contract and
-synthetic-result bytes, checks the runner's pure construction surface against
-`raw_member_reweighting_reference.py`, detects substitution during admission,
-and emits `admission=GO` only with the reviewed literal mode. This check does
-not implement, name or launch a trusted mode; controller visibility and the
-independent review remain mandatory.
+synthetic-result bytes, requires the parsed synthetic result to equal the
+runner's deterministic outcome-agnostic dry-run record, checks the runner's
+pure construction surface against `raw_member_reweighting_reference.py`,
+detects substitution during admission, and emits `admission=GO` only with the
+reviewed literal mode. This check does not implement, name or launch a trusted
+mode; controller visibility and the independent review remain mandatory.
 
 The successful JSON payload is self-contained: alongside `admission=GO` and
 the literal `reviewed_mode`, it carries the SHA-256 of the exact review record,
