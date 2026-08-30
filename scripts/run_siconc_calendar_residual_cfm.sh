@@ -5,6 +5,7 @@ REPO_DIR="${REPO_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
 OUTPUT_DIR="${OUTPUT_DIR:?OUTPUT_DIR is required}"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
 CUDA_DEVICE="${CUDA_DEVICE:-0}"
+EXPERIMENT_ID="${EXPERIMENT_ID:-siconc_calendar_residual_cfm_training_v1}"
 CANONICAL_CONFIG="$REPO_DIR/config/experiments/train_siconc_calendar_residual_cfm.json"
 CONFIG="$CANONICAL_CONFIG"
 RUNTIME_CONFIG="$OUTPUT_DIR/runtime_training_config.json"
@@ -36,7 +37,7 @@ path = pathlib.Path(sys.argv[1])
 payload = {
     "status": sys.argv[2],
     "updated_at": datetime.now(timezone.utc).isoformat(),
-    "experiment_id": "siconc_calendar_residual_cfm_training_v1",
+    "experiment_id": os.environ["EXPERIMENT_ID"],
     "detail": sys.argv[3],
 }
 temporary = path.with_suffix(path.suffix + ".tmp")
@@ -89,6 +90,7 @@ PY
 
 cd "$REPO_DIR"
 export CUDA_VISIBLE_DEVICES="$CUDA_DEVICE"
+export EXPERIMENT_ID
 export PYTHONDONTWRITEBYTECODE=1
 write_status "running" "training"
 "$PYTHON_BIN" -m assim_lib.main --config "$RUNTIME_CONFIG"
@@ -115,7 +117,7 @@ commit = subprocess.check_output(
     ["git", "-C", str(repository), "rev-parse", "HEAD"], text=True
 ).strip()
 payload = {
-    "experiment_id": "siconc_calendar_residual_cfm_training_v1",
+    "experiment_id": os.environ["EXPERIMENT_ID"],
     "created_at": datetime.now(timezone.utc).isoformat(),
     "publication_commit": commit,
     "training_run_dir": str(training),
