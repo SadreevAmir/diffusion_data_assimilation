@@ -1,5 +1,17 @@
 # Frozen next generative-method contract: clean-checkpoint deep ensemble
 
+Status: FROZEN_BUT_NOT_SELECTABLE_ON_MEASURED_WALL_CLOCK
+
+This contract is retained as a reproducible scientific design, not as an active
+fallback.  The subsequently measured training throughput was approximately 40
+seconds per batch over 3,255 batches per epoch.  Under the frozen forty-epoch,
+three-seed construction, training would therefore take months rather than the
+earlier planning estimate.  It must not be proposed as a fast route to the
+current calibration decision.  Reactivation requires a controller-attested
+change in measured throughput that preserves the scientific contract; reducing
+epochs, seeds, or training coverage after observing the calibration failures is
+not permitted.
+
 ## Decision context and scientific role
 
 The fixed independent-CFG guidance mixture is complete and rejected by the
