@@ -3,7 +3,15 @@
 This ledger separates immutable evidence from hypotheses and planned results.
 Every manuscript claim must point to a row here before it is strengthened.
 
-Last audited: 2026-08-30.
+Last audited: 2026-08-31.
+
+Current decision boundary: the running calendar-residual CFM training is not
+empirical evidence.  Only its frozen final-EMA sampling and complete compact
+no-compensation gate may change claim status.  Until that record exists, the
+`eligible_calibration` guard below remains `MISSING_ELIGIBLE_RESULT`; a negative
+record may activate at most one first-match branch from
+`RESIDUAL_CFM_FOLLOWUP_DECISION_CONTRACT.md` and cannot revive an older
+post-hoc route.
 
 External primary evidence state: RECONCILED_NEGATIVE
 
