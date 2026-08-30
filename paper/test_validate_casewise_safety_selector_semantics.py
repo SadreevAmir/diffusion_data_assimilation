@@ -5,13 +5,20 @@ import unittest
 from pathlib import Path
 
 from paper import casewise_safety_selector_reference as reference
-from paper.validate_casewise_safety_selector_semantics import validate_semantic_parity
+from paper.validate_casewise_safety_selector_semantics import _close, validate_semantic_parity
 
 
 REFERENCE = Path(reference.__file__)
 
 
 class CasewiseSelectorSemanticTests(unittest.TestCase):
+    def test_numpy_scalar_is_compared_as_a_number(self):
+        if reference.np is None:
+            self.skipTest("numpy is not installed")
+        _close(reference.np.float64(0.25), reference.np.float64(0.25), "scalar")
+        with self.assertRaisesRegex(ValueError, "scalar diverges"):
+            _close(reference.np.float64(0.3), reference.np.float64(0.25), "scalar")
+
     def divergent(self, old, new):
         source = REFERENCE.read_text(encoding="utf-8").replace(old, new)
         temporary = tempfile.TemporaryDirectory()

@@ -8,6 +8,7 @@ import hashlib
 import importlib.util
 import json
 import math
+import numbers
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -105,15 +106,19 @@ def _assert_nested_close(actual, expected, label: str) -> None:
             raise ValueError(f"{label} schema diverges from reference")
         for key in expected:
             _assert_nested_close(actual[key], expected[key], f"{label}.{key}")
-    elif isinstance(expected, (list, tuple)) or hasattr(expected, "shape"):
+    elif isinstance(expected, numbers.Real):
+        if not isinstance(actual, numbers.Real) or not math.isclose(
+            float(actual), float(expected), rel_tol=1e-12, abs_tol=1e-12
+        ):
+            raise ValueError(f"{label} diverges from reference")
+    elif isinstance(expected, (list, tuple)) or (
+        hasattr(expected, "shape") and len(expected.shape) > 0
+    ):
         left, right = list(actual), list(expected)
         if len(left) != len(right):
             raise ValueError(f"{label} length diverges from reference")
         for index, (a, e) in enumerate(zip(left, right)):
             _assert_nested_close(a, e, f"{label}[{index}]")
-    elif isinstance(expected, float):
-        if not isinstance(actual, (int, float)) or not math.isclose(float(actual), expected, rel_tol=1e-12, abs_tol=1e-12):
-            raise ValueError(f"{label} diverges from reference")
     elif actual != expected:
         raise ValueError(f"{label} diverges from reference")
 

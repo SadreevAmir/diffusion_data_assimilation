@@ -12,6 +12,7 @@ from paper import score_aware_raw_reweighting_reference as reference
 from paper.validate_score_aware_raw_reweighting_admission import (
     CONTRACT,
     REFERENCE,
+    _assert_nested_close,
     load_and_validate,
     validate_record,
     validate_semantic_parity,
@@ -40,6 +41,13 @@ def record(runner: Path, compact_directory: Path) -> dict[str, object]:
 
 
 class AdmissionTests(unittest.TestCase):
+    def test_numpy_scalar_is_compared_as_a_number(self):
+        if reference.np is None:
+            self.skipTest("numpy is not installed")
+        _assert_nested_close(reference.np.float64(0.25), reference.np.float64(0.25), "scalar")
+        with self.assertRaisesRegex(ValueError, "scalar diverges"):
+            _assert_nested_close(reference.np.float64(0.3), reference.np.float64(0.25), "scalar")
+
     def compact_directory(self) -> Path:
         return CompactDirectoryTests.write(self, valid_payloads())
 

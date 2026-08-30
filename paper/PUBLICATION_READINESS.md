@@ -1,5 +1,22 @@
 # Publication readiness audit
 
+The later 2026-08-30 NumPy-backed casewise-selector audit supersedes the
+dependency-only semantic snapshot below.  The exact frozen command completed
+with literal `GO` after repairing a verifier-only scalar-dispatch defect:
+zero-dimensional `numpy.float64` values had incorrectly entered the sequence
+branch before any numerical comparison.  The comparator now treats real
+scalars numerically at the unchanged `1e-12` tolerance, and a negative
+regression fixture rejects a changed NumPy scalar.  Both focused suites pass
+all 11 tests without skips, the standalone command prints `GO`, and
+`git diff --check` passes.  This establishes local semantic parity for folds,
+loss, margin, SVD ridge fit and prediction; it is not scientific evidence and
+does not create an executable trusted mode.  The next admission work is exact:
+register one independently reviewed controller-visible literal mode, freeze
+the field-level schemas for `case_selection.json`, `aggregate_selection.json`,
+`paired_uncertainty.json` and `gate_decision.json`, and require a fail-closed
+validator with negative fixtures before any proposal.  Until that work exists
+and a compact gate is positive, publication status remains `NOT_READY`.
+
 The 2026-08-30 trigger-specific independent publication audit reran the exact
 unified artifact checker and the complete `test_publication_*.py` boundary from
 the current disposable worktree.  The checker passed with 94 required files,

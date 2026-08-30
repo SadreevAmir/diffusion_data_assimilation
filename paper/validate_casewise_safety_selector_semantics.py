@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import math
+import numbers
 from pathlib import Path
 
 try:
@@ -29,14 +30,18 @@ def _close(actual, expected, label):
             raise ValueError(f"{label} schema diverges from reference")
         for key in expected:
             _close(actual[key], expected[key], f"{label}.{key}")
-    elif isinstance(expected, (list, tuple)) or hasattr(expected, "shape"):
+    elif isinstance(expected, numbers.Real):
+        if not isinstance(actual, numbers.Real) or not math.isclose(
+            float(actual), float(expected), rel_tol=1e-12, abs_tol=1e-12
+        ):
+            raise ValueError(f"{label} diverges from reference")
+    elif isinstance(expected, (list, tuple)) or (
+        hasattr(expected, "shape") and len(expected.shape) > 0
+    ):
         if len(actual) != len(expected):
             raise ValueError(f"{label} length diverges from reference")
         for index, (left, right) in enumerate(zip(actual, expected)):
             _close(left, right, f"{label}[{index}]")
-    elif isinstance(expected, float):
-        if not isinstance(actual, (int, float)) or not math.isclose(float(actual), expected, rel_tol=1e-12, abs_tol=1e-12):
-            raise ValueError(f"{label} diverges from reference")
     elif actual != expected:
         raise ValueError(f"{label} diverges from reference")
 
