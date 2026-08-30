@@ -1,11 +1,16 @@
 # Publication readiness audit
 
-The latest trigger-specific independent audit made the machine-readable
-casewise-selector handoff mandatory and added a fail-closed identity validator.
-It checks the pre-admission `NO_GO` state, execution contract, exact six-file
-inventory and every recorded SHA-256; focused positive and single-file-drift
-fixtures pass. The unified audit passed with 98 required files, two
-deterministic figures, eight references and 40 claims. This confirms that the
+The latest trigger-specific audit adds the casewise selector's atomic admission
+validator and negative fixtures to the mandatory publication surface. One
+operation now binds a literal reviewed mode, publication commit, trusted-runner
+SHA-256, the exact six frozen artifact SHA-256 values and the synthetic four-file
+directory SHA-256; it admits only `decision_bearing_validation=PASS` with
+`deviations=[]`, while retaining the pre-admission handoff at `NO_GO`. Focused
+admission and immutable-identity checks pass all 14 tests. In the minimal local
+runtime the complete SVD-ridge comparison remains deliberately fail closed when
+NumPy is unavailable; no local fixture creates a trusted mode or scientific
+result. The unified audit passed with 100 required files, two deterministic
+figures, eight references and 40 claims. This confirms that the
 manuscript, claim ledger, compact-schema guards, figures, limitation and
 reference traceability, immutable identities and reproducibility inventory are
 internally consistent.  It does not supply a jointly eligible calibration or

@@ -621,7 +621,8 @@ python3 -m unittest -v \
   paper.test_validate_coverage_occurrence_admission \
   paper.test_validate_casewise_safety_selector_semantics \
   paper.test_casewise_safety_selector_runner_prototype \
-  paper.test_validate_casewise_safety_selector_compact_outputs
+  paper.test_validate_casewise_safety_selector_compact_outputs \
+  paper.test_validate_casewise_safety_selector_admission
 python3 paper/check_publication_artifacts.py
 ```
 
