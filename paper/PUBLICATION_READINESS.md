@@ -1,5 +1,17 @@
 # Publication readiness audit
 
+The 2026-08-30 independent adapter-boundary audit found that the immutable
+`ReviewedModeInventory` was tested in isolation but the executable
+`construct_case` path still accepted a caller-supplied `admission=GO` dictionary
+directly.  That bypass meant registration was not actually a dispatch
+precondition.  The adapter now resolves the requested literal mode from the
+registered immutable inventory before request validation or construction and
+rejects both an empty inventory and a direct admission dictionary.  The focused
+15-test adapter/review boundary and `git diff --check` pass.  This closes a local
+integration bypass only: it neither records an independent trusted review nor
+creates a controller-visible literal mode or scientific result.  Publication
+status therefore remains `NOT_READY`.
+
 The 2026-08-30 raw-member implementation audit added a separate deterministic
 runner surface and focused tests for the frozen interface, purged folds,
 training-only analog selection, complete-field copying and fail-closed input

@@ -92,7 +92,12 @@ class ReviewedModeInventory:
         return dict(self._entry[1])
 
 
-def construct_case(request: FrozenRequest, admission: object, ranks, means, fields):
-    """Validate dispatch before delegating unchanged deterministic construction."""
+def construct_case(
+    inventory: ReviewedModeInventory, request: FrozenRequest, ranks, means, fields
+):
+    """Resolve reviewed dispatch before delegating deterministic construction."""
+    if not isinstance(inventory, ReviewedModeInventory):
+        raise ValueError("dispatch requires the reviewed mode inventory")
+    admission = inventory.resolve(request.mode)
     validate_request(request, admission)
     return runner.construct_case(ranks, means, fields)

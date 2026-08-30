@@ -48,6 +48,11 @@ def request(**changes):
 
 
 class ServerAdapterTests(unittest.TestCase):
+    def reviewed_inventory(self):
+        inventory = ReviewedModeInventory()
+        inventory.register(admission())
+        return inventory
+
     def test_exact_reviewed_request_is_accepted(self):
         validate_request(request(), admission())
 
@@ -85,10 +90,21 @@ class ServerAdapterTests(unittest.TestCase):
         ranks = [0.0] * 10
         means = list(range(10))
         raw = [[[index / 10]] for index in range(10)]
-        candidate, diagnostics = construct_case(request(), admission(), ranks, means, raw)
+        candidate, diagnostics = construct_case(
+            self.reviewed_inventory(), request(), ranks, means, raw
+        )
         self.assertEqual(len(candidate), 10)
         self.assertTrue(diagnostics["exact_source_copy"])
         self.assertTrue(all(diagnostics["mask_invariants"].values()))
+
+    def test_dispatch_rejects_unregistered_or_direct_admission(self):
+        ranks = [0.0] * 10
+        means = list(range(10))
+        raw = [[[index / 10]] for index in range(10)]
+        with self.assertRaises(KeyError):
+            construct_case(ReviewedModeInventory(), request(), ranks, means, raw)
+        with self.assertRaises(ValueError):
+            construct_case(admission(), request(), ranks, means, raw)
 
 
 if __name__ == "__main__":

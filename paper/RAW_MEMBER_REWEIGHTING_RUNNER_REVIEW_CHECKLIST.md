@@ -117,9 +117,11 @@ bindings atomically; rereading an unbound review file is not equivalent.
 
 The publication worktree now also contains the outcome-agnostic executor
 boundary `raw_member_reweighting_server_adapter.py`. It accepts the sole frozen
-parameter and exact CPU/validation/envelope/summary contract, delegates candidate
-construction unchanged, and registers at most one immutable literal mode from a
-self-contained `admission=GO` payload. It deliberately contains no literal
+parameter and exact CPU/validation/envelope/summary contract, registers at most
+one immutable literal mode from a self-contained `admission=GO` payload, and
+permits construction only after resolving that mode from the same inventory.
+Direct admission dictionaries and unregistered modes cannot reach construction.
+It deliberately contains no literal
 production mode, filesystem access, sealed-data loader or controller mutation.
 Thus its focused tests establish adapter fail-closed behavior, but do not satisfy
 the unchecked independent-review items above and do not make a proposal admissible.
