@@ -74,12 +74,17 @@ server-only case data nor changes any comparison row above.
 The independent primary in C39 is also negative, but it is not counted as an
 additional development calibration candidate and does not repair a missing
 minimum-tier row. The superseded primary recovery is excluded from this audit.
-Consequently the eligible-calibration blocker remains open, and the next
-mechanistically distinct score-aware raw-scenario reweighting route remains a
-frozen pre-result contract only: its trusted mode is not among the implemented
-executor interfaces, so it must not be proposed under an invented identifier.
-This conclusion preserves every existing evidence row and forbids rerunning or
-retuning a rejected mechanism merely to create activity.
+Consequently the eligible-calibration blocker remains open.  The current
+decision-bearing line is the running calendar-residual CFM training followed by
+its frozen final-EMA sampling and full no-compensation gate.  Early training
+diagnostics are not selection evidence, and no parallel calibration route is
+admissible while that line is active.  A scientifically valid negative compact
+verdict may activate at most the first matching branch in
+`RESIDUAL_CFM_FOLLOWUP_DECISION_CONTRACT.md`; the older score-aware
+raw-scenario reweighting material remains historical pre-result provenance and
+is not the current next action.  This conclusion preserves every existing
+evidence row and forbids rerunning or retuning a rejected mechanism merely to
+create activity.
 
 ## Decision-bearing evidence guard
 
