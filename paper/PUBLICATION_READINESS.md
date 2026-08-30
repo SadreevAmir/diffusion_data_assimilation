@@ -1,5 +1,17 @@
 # Publication readiness audit
 
+The 2026-08-30 casewise-selector reproducibility audit found that the frozen
+contract was mandatory but its new independent reference, semantic validator
+and focused regression suite were not part of the unified publication
+inventory. All three executable surfaces are now required, and the exact
+documented regression command includes the semantic suite. This closes a
+deletion/drift gap for the contingent mechanism only: it does not create a
+controller-visible reviewed mode, provide a scientific result or change any
+normative blocker. The unified audit passed with 92 required files, two
+figures, eight references and 40 claims at `NOT_READY`; the focused semantic
+suite passes four tests with one explicit dependency-only skip in the minimal
+runtime, and `git diff --check` passes.
+
 The 2026-08-30 independent executable handoff audit reran the unified
 publication checker and full local test discovery from the current worktree.
 The checker passed with 89 required files, two generated figures, eight

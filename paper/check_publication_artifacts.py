@@ -46,6 +46,7 @@ REQUIRED_REGRESSION_SUITES = (
     "paper.test_validate_score_aware_raw_reweighting_admission",
     "paper.test_validate_score_aware_compact_outputs",
     "paper.test_validate_coverage_occurrence_admission",
+    "paper.test_validate_casewise_safety_selector_semantics",
 )
 REGRESSION_COMMAND = re.compile(
     r"python3 -m unittest -v \\\n(?P<body>(?:  paper\.[a-z0-9_]+(?: \\\n|\n))+)",
@@ -214,6 +215,9 @@ REQUIRED_FILES = (
     "RAW_MEMBER_REWEIGHTING_RESULT_RECONCILIATION.md",
     "NEXT_SCORE_AWARE_RAW_REWEIGHTING_CONTRACT.md",
     "NEXT_CASEWISE_SAFETY_SELECTOR_CONTRACT.md",
+    "casewise_safety_selector_reference.py",
+    "validate_casewise_safety_selector_semantics.py",
+    "test_validate_casewise_safety_selector_semantics.py",
     "SCORE_AWARE_RESULT_RECONCILIATION.md",
     "RANK_COHERENT_RESULT_RECONCILIATION.md",
     "rank_coherent_result_reconciliation.py",
