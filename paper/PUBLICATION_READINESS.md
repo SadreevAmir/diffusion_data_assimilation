@@ -1,5 +1,23 @@
 # Publication readiness audit
 
+The latest 2026-08-30 admission-boundary audit freezes and tests the exact
+field-level schemas for the casewise selector's four compact files:
+`case_selection.json`, `aggregate_selection.json`, `paired_uncertainty.json`
+and `gate_decision.json`.  The validator recomputes contiguous fold and
+non-circular purge membership, the conservative action-margin decision,
+cross-case source identities, action counts, paired point estimates, the
+predeclared proper-score threshold, policy non-degeneracy, operational validity
+and the five-family conjunction.  Focused negative fixtures reject changed
+margins/actions, purge membership, source hashes, aggregate counts, uncertainty,
+gate Booleans, extra fields and extra files.  All 16 selector-boundary tests
+pass in the current minimal runtime with three explicit NumPy-only skips; the
+new suite and both executable files are mandatory publication inventory.  This
+closes the locally autonomous compact-schema gap without creating a trusted
+mode or scientific result.  A controller-visible independently reviewed
+literal mode is still absent, so publication status remains `NOT_READY`.
+The unified audit passed with 96 required files, two deterministic figures,
+eight references and 40 claims at `NOT_READY`.
+
 The later 2026-08-30 NumPy-backed casewise-selector audit supersedes the
 dependency-only semantic snapshot below.  The exact frozen command completed
 with literal `GO` after repairing a verifier-only scalar-dispatch defect:
