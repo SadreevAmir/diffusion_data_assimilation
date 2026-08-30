@@ -34,17 +34,20 @@ audit trail; it is provenance, not a second readiness decision.
 The publication-readiness trigger was independently rerun against the current
 disposable worktree after direct inspection of the manuscript, claim ledger,
 generated figures, minimum-tier evidence inventory, compact handoffs and
-reproducibility commands.  The unified fail-closed checker passed with 108
-required files, two deterministic figures, eight references and 40 claims;
-`git diff --check` also passed.  The manuscript, ledger and reproducibility
-handoff retain the identical
+reproducibility commands. The unified fail-closed checker passed with 108
+required files, two deterministic figures, eight references and 40 claims.
+The complete `test_publication_*.py` boundary passed all 40 tests. The focused
+minimum-tier, score-aware admission, compact-schema and reconciliation boundary
+passed 131 tests, with four explicit skips caused only by unavailable optional
+local dependencies; `git diff --check` also passed. The manuscript, ledger and
+reproducibility handoff retain the identical
 `eligible_calibration=MISSING_ELIGIBLE_RESULT` guard, while the minimum-tier
 audit still records two missing comparator families and a development-only
-deterministic comparison.  The score-aware handoff remains fail closed with
+deterministic comparison. The score-aware handoff remains fail closed with
 `admission=NO_GO`, `reviewed_mode=null` and `proposal_authorized=false`, so this
 audit neither invents an executor mode nor promotes local parity to scientific
-evidence.  No stale figure, unsupported table entry, compact-schema mismatch or
-reproducibility defect was found.  The status therefore remains honestly
+evidence. No stale figure, unsupported table entry, compact-schema mismatch or
+reproducibility defect was found. The status therefore remains honestly
 `NOT_READY`; the next decision-bearing action is still the atomic independent
 score-aware admission operation described below.
 
