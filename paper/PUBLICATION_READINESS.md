@@ -1,5 +1,18 @@
 # Publication readiness audit
 
+The 2026-08-30 independent executable handoff audit reran the unified
+publication checker and full local test discovery from the current worktree.
+The checker passed with 89 required files, two generated figures, eight
+references and 40 claims at `NOT_READY`; all 299 executable tests passed and 12
+numerical fixtures were explicit dependency-only skips in the minimal local
+runtime.  Cross-surface status anchors remain fail closed: the manuscript,
+claim ledger and reproducibility handoff all retain
+`eligible_calibration=MISSING_ELIGIBLE_RESULT`, and no scheduler completion or
+local runner parity is promoted to scientific admission.  This snapshot
+improves the reproducibility handoff only.  It supplies no controller-visible
+v2 review record or eligible compact result, does not authorize an unavailable
+mode and leaves publication status `NOT_READY`.
+
 The 2026-08-30 idle-recovery audit found no controller-visible v2 review record
 for the active score-aware route, so no trusted proposal could be emitted. To
 keep the calibration mission continuous without inventing a mode, the new
