@@ -395,6 +395,43 @@ report 83 files; dated 79-file entries remain unchanged as audit history. No
 scientific result, blocker state or readiness decision changed. Publication
 status remains `NOT_READY`.
 
+## Independent publication-surface audit (2026-08-30)
+
+This audit independently rechecked the current manuscript, claim ledger,
+figures and tables, compact-evidence handoffs and reproducibility surface. It
+does not infer scientific evidence from scheduler completion and does not alter
+any gate decision.
+
+- **Manuscript and claims.** `PAPER_DRAFT.md` and `CLAIM_LEDGER.md` agree that
+  the independent primary and every reconciled calibration candidate are
+  negative under their applicable no-compensation gate. The draft presents an
+  auditable failure map rather than claiming an eligible calibrated ensemble.
+- **Figures and tables.** Both cited SVG figures exist and are described as
+  development-mechanism summaries. The manuscript tables expose the missing
+  conformal and probabilistic-DA rows and the development-only deterministic
+  comparison instead of silently omitting them. No additional figure can close
+  those evidence gaps without a decision-bearing compact result.
+- **Compact evidence.** Numeric claims are routed through the named compact
+  reconciliation records. Scheduler completion for unreconciled jobs is not
+  promoted to a scientific outcome. Superseded primary metrics remain excluded.
+- **Reproducibility.** `REPRODUCIBILITY.md` carries the same minimum-tier guard
+  states as the manuscript and claim ledger, identifies server-only artifacts,
+  and preserves the distinction between executable local review code and a
+  controller-visible implemented mode.
+
+The fastest defensible next scientific step is therefore not a repeated
+calibration run or an adjacent parameter point. The two missing minimum-tier
+comparisons require their already frozen contracts to become reviewed trusted
+modes before an experiment is admissible. In parallel, the strongest frozen
+calibration continuation remains score-aware raw-scenario reweighting, followed
+by the casewise safety selector only after a trusted negative score-aware gate.
+Neither route has an allowed implemented mode in the current executor surface,
+so this audit records exact readiness state without fabricating a proposal.
+
+Publication status remains `NOT_READY`. The normative blockers remain the
+eligible-calibration row, both missing minimum-tier comparison rows and the
+independent-strength deterministic-comparison row in the blocker matrix above.
+
 The 2026-08-29 reproducibility-inventory audit found that the newly completed
 fail-closed raw-member reweighting review validator and its regression suite
 were described by the handoff checklist but were not mandatory inputs to the
