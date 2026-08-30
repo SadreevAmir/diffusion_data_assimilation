@@ -1545,7 +1545,7 @@ CALIBRATION_CONTRACT_ANCHORS = {
         "no_feasible_training_scale=true",
         "source_experiment=joint_full_condition_validation_2022",
         "no_compensation_across_families=true",
-        "Design frozen locally; no experiment has been launched.",
+        "The frozen design has been executed by the reviewed trusted server CPU runner.",
     ),
     "RESEARCH_PLAN.md": (
         "NEXT_BASELINE_CONTRACT.md",

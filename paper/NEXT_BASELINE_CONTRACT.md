@@ -167,7 +167,11 @@ these compact outputs or use a separately reviewed exact artifact request.
 
 ## Execution status
 
-Design frozen locally; no experiment has been launched. Execution requires code
-review and registration of a trusted server CPU runner implementing this exact
-contract. The earlier ZOIB-EMOS/ECC-Q result remains an immutable negative
-baseline in `REPRODUCIBILITY.md`, `CLAIM_LEDGER.md` and the manuscript.
+The frozen design has been executed by the reviewed trusted server CPU runner.
+The compact gate reports an inactive held-out correction: all three
+finite-ensemble reliability criteria, both fair-CRPS criteria and all-fold
+training feasibility fail, while the exact boundary, mask, mean and spatial
+invariants pass. The scale set, strata, folds and thresholds remain frozen; this
+route must not be rerun or densified. The earlier ZOIB-EMOS/ECC-Q result remains
+an immutable negative baseline in `REPRODUCIBILITY.md`, `CLAIM_LEDGER.md` and
+the manuscript.

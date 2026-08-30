@@ -184,7 +184,8 @@ zero mask and transferred scales must not be tuned after this result.
 
 ## Frozen ZOIB-EMOS/ECC-Q handoff
 
-The previously frozen design has been executed by the reviewed server runner: a
+The previously frozen design was executed as
+`joint_zoib_eccq_valid_retry1` by the reviewed server runner: a
 date-balanced ZOIB-EMOS marginal model with
 exactly 13 fitted coefficients, five purged contiguous cross-fitting folds and
 deterministic ECC-Q reconstruction. Its sole runtime parameter was
