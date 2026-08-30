@@ -1,5 +1,21 @@
 # Publication readiness audit
 
+The 2026-08-30 trigger-specific independent publication audit reran the exact
+unified artifact checker and the complete `test_publication_*.py` boundary from
+the current disposable worktree.  The checker passed with 94 required files,
+two deterministic figures, eight references and 40 claims at `NOT_READY`; all
+38 publication-surface tests passed without skips.  The tests independently
+cover claim-status consistency, compact-payload schemas, empirical and
+limitation traceability, deterministic figure generation, immutable identities
+and reference traceability.  This fresh snapshot finds no autonomous editorial
+or reproducibility defect to repair and does not promote any completed job into
+scientific evidence.  The normative rows remain fail closed: no compact record
+contains a jointly eligible calibration, and the minimum-tier conformal,
+probabilistic-DA and independent-strength deterministic comparisons remain
+unclosed.  Because the active casewise route still lacks both NumPy-backed
+semantic `GO` and a controller-visible reviewed literal mode, no trusted
+experiment is proposed and publication status remains `NOT_READY`.
+
 The 2026-08-30 independent casewise-selector admission audit executed the exact
 semantic-validator command from `REPRODUCIBILITY.md` in the current minimal
 runtime.  It failed closed before a decision-bearing ridge comparison because
