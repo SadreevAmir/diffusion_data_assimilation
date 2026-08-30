@@ -7,9 +7,12 @@ External primary evidence state: RECONCILED_NEGATIVE
 `NEXT_RANK_COHERENT_CONTRACT.md` freezes the next mechanistically distinct
 development test. It targets case-level rank dispersion by transporting whole
 member-anomaly fields from purged forecast-only analogs, with training-only
-amplitude feasibility and the unchanged no-compensation gate. It has no trusted
-runner or scientific result yet; it neither reopens the completed independent
-evaluation nor permits tuning of the closed postprocessors.
+amplitude feasibility and the unchanged no-compensation gate. The reviewed
+server-CPU run has completed, but scheduler completion is not scientific
+evidence: the result remains fail closed until the controller-visible review
+record and decision-bearing compact directory pass the exact combined
+admission. It neither reopens the completed independent evaluation nor permits
+tuning of the closed postprocessors.
 
 `NEXT_RAW_MEMBER_REWEIGHTING_CONTRACT.md` froze the next contingent mechanism
 after whole-field transport. That analog-rank construction has since completed
@@ -32,8 +35,10 @@ reweight scenarios: a purged forecast-only ridge policy chooses, once per held-
 out case, between the complete raw ensemble and the complete already-fixed
 mean-preserving projected-spread ensemble. Its fixed joint-loss penalties and
 conservative action margin test whether the projected-spread failure is confined
-to forecast-identifiable regimes. It has no trusted mode, runner or result and
-cannot bypass the active score-aware route.
+to forecast-identifiable regimes. Its local reference runner, compact-output
+validator and admission boundary are pre-result engineering surfaces only; it
+has no controller-visible trusted mode or scientific result and cannot bypass
+the active score-aware route.
 
 ## Primary evaluation closed without selection
 
