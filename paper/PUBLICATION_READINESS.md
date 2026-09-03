@@ -24,6 +24,35 @@ boundary is recorded in `CALENDAR_RESIDUAL_CFM_RESULT_RECONCILIATION.md`.
 
 ## Latest publication-trigger resolution (2026-09-03)
 
+### Independent recheck at the current worktree boundary
+
+The publication trigger was resolved against the files currently present in
+the disposable worktree, rather than by carrying forward the previous audit
+narrative.  Direct cross-reading of `PAPER_DRAFT.md`, `CLAIM_LEDGER.md`, both
+generated figures, `MINIMUM_TIER_COMPARISON_AUDIT.md`, the compact-evidence
+guards and `REPRODUCIBILITY.md` found the same fail-closed boundary on every
+normative surface: `eligible_calibration=MISSING_ELIGIBLE_RESULT`, conformal
+and probabilistic-DA outcomes are `MISSING`, and the independent deterministic
+comparison remains `PRESENT_DEVELOPMENT_ONLY`.  No completed negative method is
+described as a pending run or promoted to an eligible result.
+
+The unified executable audit passed with 108 required files, two deterministic
+figures, eight references and 40 claims and returned `status=NOT_READY`.
+`git diff --check` passed before this entry was added.  A separate focused
+`pytest` invocation could not start because the available local interpreter
+does not provide the `pytest` package; this is recorded as a local-runtime
+limitation, not converted into a scientific result, readiness waiver or
+external blocker.  The unified checker already executes the repository's
+mandatory regression boundary, so its successful result is the current
+machine-verifiable audit evidence.
+
+This recheck therefore makes no experiment proposal under an invented mode and
+does not weaken the minimum paper tier.  The fastest decision-bearing next step
+remains independent admission of the already frozen conformal comparator under
+a literal controller-visible trusted mode.  Until such a mode exists, the
+repository is internally auditable at its evidence boundary but remains
+`NOT_READY` for human submission review.
+
 Independent inspection found that this index still described the
 calendar-residual CFM training, final-EMA sampling and gate as active after the
 decision-bearing reconciliation above had already recorded their completed
