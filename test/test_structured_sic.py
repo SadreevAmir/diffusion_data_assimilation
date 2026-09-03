@@ -12,59 +12,103 @@ from assim_lib.structured_sic import (
 class LaggedConditioningTest(unittest.TestCase):
     def test_channels_keep_lags_age_and_provenance_separate(self):
         background = torch.stack(
-            (torch.full((1, 2, 2), 0.25), torch.full((1, 2, 2), 0.60)), dim=1
+            (
+                torch.full((1, 2, 2), 0.25),
+                torch.full((1, 2, 2), 0.60),
+                torch.full((1, 2, 2), 0.40),
+            ),
+            dim=1,
         )
-        values = torch.tensor([[[[0.5, 0.0], [0.0, 0.0]], [[0.0, 0.0], [0.8, 0.0]]]])
-        masks = torch.tensor([[[[1.0, 0.0], [0.0, 0.0]], [[0.0, 0.0], [1.0, 0.0]]]])
+        values = torch.tensor(
+            [[[[0.5, 0.0], [0.0, 0.0]], [[0.0, 0.0], [0.8, 0.0]], [[0.0, 0.3], [0.0, 0.0]]]]
+        )
+        masks = torch.tensor(
+            [[[[1.0, 0.0], [0.0, 0.0]], [[0.0, 0.0], [1.0, 0.0]], [[0.0, 1.0], [0.0, 0.0]]]]
+        )
         result = make_lagged_observation_channels(
-            background, values, masks, torch.tensor([[0.0, 2.0]]), torch.tensor([[0.0, 1.0]])
+            background,
+            values,
+            masks,
+            torch.tensor([[0.0, 1.0, 2.0]]),
+            torch.tensor([[0.0, 1.0, 0.0]]),
         )
-        self.assertEqual(result.shape, (1, 12, 2, 2))
-        first, second = result[:, :6], result[:, 6:]
+        self.assertEqual(result.shape, (1, 18, 2, 2))
+        first, second, third = result[:, :6], result[:, 6:12], result[:, 12:]
         self.assertAlmostEqual(first[0, 0, 0, 0].item(), 0.25)
         self.assertEqual(first[0, 3, 0, 0].item(), 0.0)
         self.assertEqual(first[0, 4, 0, 0].item(), 1.0)
         self.assertEqual(first[0, 5, 0, 0].item(), 0.0)
         self.assertAlmostEqual(second[0, 0, 1, 0].item(), 0.20)
-        self.assertEqual(second[0, 3, 1, 0].item(), 2.0)
+        self.assertEqual(second[0, 3, 1, 0].item(), 1.0)
         self.assertEqual(second[0, 4, 1, 0].item(), 0.0)
         self.assertEqual(second[0, 5, 1, 0].item(), 1.0)
+        self.assertAlmostEqual(third[0, 0, 0, 1].item(), -0.10)
+        self.assertEqual(third[0, 3, 0, 1].item(), 2.0)
+        self.assertEqual(third[0, 4, 0, 1].item(), 1.0)
+        self.assertEqual(third[0, 5, 0, 1].item(), 0.0)
         self.assertTrue(torch.all(first[0, :, 0, 1] == 0))
 
     def test_invalid_provenance_fails_closed(self):
         with self.assertRaisesRegex(ValueError, "provenance"):
             make_lagged_observation_channels(
-                torch.zeros(1, 1, 1, 1),
-                torch.zeros(1, 1, 1, 1),
-                torch.ones(1, 1, 1, 1),
-                torch.zeros(1, 1),
-                torch.full((1, 1), 2.0),
+                torch.zeros(1, 3, 1, 1),
+                torch.zeros(1, 3, 1, 1),
+                torch.ones(1, 3, 1, 1),
+                torch.tensor([[0.0, 1.0, 2.0]]),
+                torch.full((1, 3), 2.0),
             )
 
     def test_current_background_cannot_be_broadcast_over_lags(self):
         with self.assertRaisesRegex(ValueError, "background_trajectory"):
             make_lagged_observation_channels(
                 torch.zeros(1, 1, 1, 1),
+                torch.zeros(1, 3, 1, 1),
+                torch.ones(1, 3, 1, 1),
+                torch.tensor([[0.0, 1.0, 2.0]]),
+                torch.zeros(1, 3),
+            )
+
+    def test_lag_count_and_age_order_fail_closed(self):
+        with self.assertRaisesRegex(ValueError, "exactly three lags"):
+            make_lagged_observation_channels(
+                torch.zeros(1, 2, 1, 1),
                 torch.zeros(1, 2, 1, 1),
                 torch.ones(1, 2, 1, 1),
                 torch.tensor([[0.0, 1.0]]),
                 torch.zeros(1, 2),
             )
+        with self.assertRaisesRegex(ValueError, r"exactly \[0,1,2\]"):
+            make_lagged_observation_channels(
+                torch.zeros(1, 3, 1, 1),
+                torch.zeros(1, 3, 1, 1),
+                torch.ones(1, 3, 1, 1),
+                torch.tensor([[0.0, 2.0, 1.0]]),
+                torch.zeros(1, 3),
+            )
 
     def test_non_finite_lagged_inputs_fail_closed(self):
-        finite = torch.zeros(1, 1, 1, 1)
-        metadata = torch.zeros(1, 1)
+        finite = torch.zeros(1, 3, 1, 1)
+        ages = torch.tensor([[0.0, 1.0, 2.0]])
+        provenance = torch.zeros(1, 3)
         with self.assertRaisesRegex(ValueError, "finite"):
             make_lagged_observation_channels(
-                torch.full_like(finite, float("nan")), finite, finite, metadata, metadata
+                torch.full_like(finite, float("nan")), finite, finite, ages, provenance
             )
         with self.assertRaisesRegex(ValueError, "finite"):
             make_lagged_observation_channels(
-                finite, torch.full_like(finite, float("inf")), finite, metadata, metadata
+                finite, torch.full_like(finite, float("inf")), finite, ages, provenance
             )
         with self.assertRaisesRegex(ValueError, "finite"):
             make_lagged_observation_channels(
-                finite, finite, finite, torch.full_like(metadata, float("nan")), metadata
+                finite, finite, torch.full_like(finite, float("nan")), ages, provenance
+            )
+        with self.assertRaisesRegex(ValueError, "finite"):
+            make_lagged_observation_channels(
+                finite, finite, finite, torch.full_like(ages, float("nan")), provenance
+            )
+        with self.assertRaisesRegex(ValueError, "finite"):
+            make_lagged_observation_channels(
+                finite, finite, finite, ages, torch.full_like(provenance, float("inf"))
             )
 
 

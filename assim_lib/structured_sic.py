@@ -31,6 +31,8 @@ def make_lagged_observation_channels(
         raise ValueError("values and masks must have identical [B,L,H,W] shape")
     if background_trajectory.shape != values.shape:
         raise ValueError("background_trajectory must have the same [B,L,H,W] shape as values")
+    if values.shape[1] != 3:
+        raise ValueError("the corrected contract requires exactly three lags")
     expected_metadata = values.shape[:2]
     if ages_days.shape != expected_metadata or provenance.shape != expected_metadata:
         raise ValueError("ages_days and provenance must have shape [B,L]")
@@ -44,6 +46,9 @@ def make_lagged_observation_channels(
         raise ValueError("masks must be binary")
     if not torch.all(ages_days >= 0):
         raise ValueError("ages_days cannot be negative")
+    expected_ages = torch.arange(3, device=ages_days.device, dtype=ages_days.dtype).expand_as(ages_days)
+    if not torch.equal(ages_days, expected_ages):
+        raise ValueError("ages_days must be exactly [0,1,2] for every batch item")
     if not torch.all((provenance == 0) | (provenance == 1)):
         raise ValueError("provenance must be binary: real=0, synthetic=1")
 
