@@ -51,6 +51,22 @@ class LaggedConditioningTest(unittest.TestCase):
                 torch.zeros(1, 2),
             )
 
+    def test_non_finite_lagged_inputs_fail_closed(self):
+        finite = torch.zeros(1, 1, 1, 1)
+        metadata = torch.zeros(1, 1)
+        with self.assertRaisesRegex(ValueError, "finite"):
+            make_lagged_observation_channels(
+                torch.full_like(finite, float("nan")), finite, finite, metadata, metadata
+            )
+        with self.assertRaisesRegex(ValueError, "finite"):
+            make_lagged_observation_channels(
+                finite, torch.full_like(finite, float("inf")), finite, metadata, metadata
+            )
+        with self.assertRaisesRegex(ValueError, "finite"):
+            make_lagged_observation_channels(
+                finite, finite, finite, torch.full_like(metadata, float("nan")), metadata
+            )
+
 
 class BoundedRepresentationTest(unittest.TestCase):
     def test_round_trip_preserves_zero_and_interior(self):
@@ -68,6 +84,8 @@ class BoundedRepresentationTest(unittest.TestCase):
             decode_zero_inflated_sic(torch.tensor([1.0]), torch.tensor([1.01]))
         with self.assertRaisesRegex(ValueError, "strictly positive"):
             decode_zero_inflated_sic(torch.tensor([1.0]), torch.tensor([0.0]))
+        with self.assertRaisesRegex(ValueError, "absent atoms"):
+            decode_zero_inflated_sic(torch.tensor([0.0]), torch.tensor([0.1]))
 
     def test_out_of_range_training_target_fails_closed(self):
         with self.assertRaisesRegex(ValueError, r"\[0,1\]"):

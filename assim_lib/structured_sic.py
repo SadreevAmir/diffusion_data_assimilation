@@ -34,6 +34,12 @@ def make_lagged_observation_channels(
     expected_metadata = values.shape[:2]
     if ages_days.shape != expected_metadata or provenance.shape != expected_metadata:
         raise ValueError("ages_days and provenance must have shape [B,L]")
+    if not torch.all(torch.isfinite(background_trajectory)) or not torch.all(torch.isfinite(values)):
+        raise ValueError("background_trajectory and values must be finite")
+    if not torch.all(torch.isfinite(masks)) or not torch.all(torch.isfinite(ages_days)):
+        raise ValueError("masks and ages_days must be finite")
+    if not torch.all(torch.isfinite(provenance)):
+        raise ValueError("provenance must be finite")
     if not torch.all((masks == 0) | (masks == 1)):
         raise ValueError("masks must be binary")
     if not torch.all(ages_days >= 0):
@@ -86,6 +92,8 @@ def decode_zero_inflated_sic(
         raise ValueError("occurrence_atom must be binary")
     if not torch.all((positive_intensity >= 0) & (positive_intensity <= 1)):
         raise ValueError("positive_intensity must lie in [0,1]")
+    if not torch.all((occurrence_atom == 1) | (positive_intensity == 0)):
+        raise ValueError("absent atoms require zero intensity")
     if not torch.all((occurrence_atom == 0) | (positive_intensity > 0)):
         raise ValueError("present atoms require strictly positive intensity")
     return torch.where(occurrence_atom.bool(), positive_intensity, torch.zeros_like(positive_intensity))
