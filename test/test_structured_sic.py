@@ -58,6 +58,27 @@ class LaggedConditioningTest(unittest.TestCase):
                 torch.full((1, 3), 2.0),
             )
 
+    def test_non_binary_mask_and_negative_age_fail_closed(self):
+        finite = torch.zeros(1, 3, 1, 1)
+        ages = torch.tensor([[0.0, 1.0, 2.0]])
+        provenance = torch.zeros(1, 3)
+        with self.assertRaisesRegex(ValueError, "masks must be binary"):
+            make_lagged_observation_channels(
+                finite,
+                finite,
+                torch.full_like(finite, 0.5),
+                ages,
+                provenance,
+            )
+        with self.assertRaisesRegex(ValueError, "cannot be negative"):
+            make_lagged_observation_channels(
+                finite,
+                finite,
+                torch.ones_like(finite),
+                torch.tensor([[0.0, -1.0, 2.0]]),
+                provenance,
+            )
+
     def test_current_background_cannot_be_broadcast_over_lags(self):
         with self.assertRaisesRegex(ValueError, "background_trajectory"):
             make_lagged_observation_channels(
@@ -134,6 +155,14 @@ class BoundedRepresentationTest(unittest.TestCase):
     def test_out_of_range_training_target_fails_closed(self):
         with self.assertRaisesRegex(ValueError, r"\[0,1\]"):
             encode_zero_inflated_sic(torch.tensor([-0.01, 0.5]))
+
+    def test_non_finite_encoded_coordinates_fail_closed(self):
+        with self.assertRaisesRegex(ValueError, "finite"):
+            encode_zero_inflated_sic(torch.tensor([float("nan")]))
+        with self.assertRaisesRegex(ValueError, "finite"):
+            decode_zero_inflated_sic(
+                torch.tensor([1.0]), torch.tensor([float("inf")])
+            )
 
 
 if __name__ == "__main__":
