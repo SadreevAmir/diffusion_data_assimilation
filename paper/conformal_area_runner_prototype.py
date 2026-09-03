@@ -3,7 +3,10 @@
 from __future__ import annotations
 import argparse,csv,json,os
 from pathlib import Path
-from conformal_area_reference import ARTIFACT_POLICY,evaluate,validate_interface
+try:
+    from .conformal_area_reference import ARTIFACT_POLICY,evaluate,validate_interface
+except ImportError:
+    from conformal_area_reference import ARTIFACT_POLICY,evaluate,validate_interface
 
 def run(source_path: Path, output_dir: Path, source_experiment: str) -> None:
     validate_interface({"source_experiment":source_experiment},ARTIFACT_POLICY)

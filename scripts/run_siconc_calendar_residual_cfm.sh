@@ -79,7 +79,6 @@ payload["training"] = {
     **payload.get("training", {}),
     "base_output_dir": str(output),
     "run_name": "training",
-    "clearml_enabled": False,
 }
 temporary = destination.with_suffix(destination.suffix + ".tmp")
 temporary.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
