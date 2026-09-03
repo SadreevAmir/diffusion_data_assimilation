@@ -1,6 +1,6 @@
-# Provenance-aware occurrence–intensity CFM: frozen sentinel contract
+# Provenance-aware occurrence–intensity CFM: corrected representation contract
 
-Status: LOCAL_CORRECTNESS_READY_MODE_NOT_ADMITTED
+Status: P0_CORRECTED_INDEPENDENT_READMISSION_REQUIRED
 
 ## Scientific hypothesis
 
@@ -12,6 +12,10 @@ separate fields (innovation, observed value, mask, age, real provenance and
 synthetic provenance), while SIC is generated as occurrence plus bounded
 conditional intensity.  No generated concentration is hard-clipped.
 
+The earlier sentinel is withdrawn and must not be admitted or launched. Age
+channels are only a cheap conditional ablation; they are not a substitute for a
+likelihood-consistent fixed-lag trajectory smoother.
+
 The primary protocol uses real tracks only. Synthetic tracks are prohibited in
 primary training and sentinel selection; they may appear only in one separately
 labelled augmentation ablation after the primary sentinel passes.
@@ -20,20 +24,28 @@ labelled augmentation ablation after the primary sentinel passes.
 
 - Lag order is exactly current, one-day old, two-days old; age fields are
   respectively 0, 1 and 2 on observed pixels and zero elsewhere.
+- Innovation at day `t-k` is exactly `y_{t-k} - b_{t-k}` under its finite mask.
+  Passing only current `b_t` for multiple lags is a shape error, not broadcast.
 - Provenance is one-hot real/synthetic on every observed pixel and zero outside
   each lag mask. Values and innovations are zero outside their own mask.
-- Occurrence is `SIC > 0.15`. Positive intensity is represented by an open
-  sigmoid map from `(0.15,1)`; absence decodes to exact zero. Arbitrary finite
-  model logits decode inside `[0,1]` without output clipping.
+- Occurrence is the physical atom `A=1{SIC>0}`. The representation preserves
+  every `0<SIC<=0.15` exactly. The `0.15` threshold exists only as the derived
+  established-ice diagnostic/event and never controls encode/decode.
+- The auditable primitive stores bounded conditional intensity directly and is
+  exactly invertible on `[0,1]`. It has no epsilon clip. A later anamorphosis may
+  be admitted only with an explicit generalized inverse or distributional
+  transform that preserves the boundary atoms.
 - Any non-binary mask/provenance, negative age, non-finite target or target
   outside `[0,1]` fails before training.
 - Every training run must fail closed unless `clearml.enabled=true`; its task
   records data/model hashes, protocol (`primary_real` or `synthetic_ablation`),
   seed, checkpoints, train/validation curves and sentinel artifacts.
 
-## Eight-case sentinel
+## Withdrawn sentinel
 
-Use one visible GPU and exactly eight predeclared validation cases spanning
+The prior eight-case sentinel is not admissible and must not run. Its numerical
+criteria below are retained only as historical design context pending independent
+readmission of corrected code. It had proposed eight predeclared validation cases spanning
 low/high ice area and sparse/dense real-track coverage, selected from training
 metadata without reading their truth fields. Train only the short predeclared
 budget; do not choose an epoch from sentinel rank metrics. Compare against the
@@ -71,6 +83,6 @@ retraining protocol is required.
 
 No trusted executor mode currently names this method. Local code and tests are
 not a scientific result and do not authorize training. Admission requires an
-independently reviewed literal mode implementing this exact contract; runtime
+independent repeat audit and then an independently reviewed literal mode implementing this exact contract; runtime
 parameters must not expose scientific choices. Retrieval defaults to
 `summary_only`, with only the eight named sentinel panels additionally selected.
