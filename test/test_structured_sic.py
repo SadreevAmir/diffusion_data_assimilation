@@ -10,6 +10,53 @@ from assim_lib.structured_sic import (
 
 
 class LaggedConditioningTest(unittest.TestCase):
+    def test_exact_lag_major_layout_for_every_batch_and_pixel(self):
+        background = torch.tensor(
+            [
+                [[[0.1, 0.2]], [[0.3, 0.4]], [[0.5, 0.6]]],
+                [[[0.6, 0.5]], [[0.4, 0.3]], [[0.2, 0.1]]],
+            ]
+        )
+        values = torch.tensor(
+            [
+                [[[0.2, 0.8]], [[0.7, 0.1]], [[0.9, 0.4]]],
+                [[[0.1, 0.7]], [[0.8, 0.2]], [[0.3, 0.9]]],
+            ]
+        )
+        masks = torch.tensor(
+            [
+                [[[1.0, 0.0]], [[1.0, 1.0]], [[0.0, 1.0]]],
+                [[[0.0, 1.0]], [[1.0, 0.0]], [[1.0, 1.0]]],
+            ]
+        )
+        ages = torch.tensor([[0.0, 1.0, 2.0], [0.0, 1.0, 2.0]])
+        provenance = torch.tensor([[0.0, 1.0, 0.0], [1.0, 0.0, 1.0]])
+
+        result = make_lagged_observation_channels(
+            background, values, masks, ages, provenance
+        )
+
+        expected_lags = []
+        for lag in range(3):
+            mask = masks[:, lag]
+            synthetic = provenance[:, lag, None, None] * mask
+            expected_lags.append(
+                torch.stack(
+                    (
+                        (values[:, lag] - background[:, lag]) * mask,
+                        values[:, lag] * mask,
+                        mask,
+                        ages[:, lag, None, None] * mask,
+                        mask - synthetic,
+                        synthetic,
+                    ),
+                    dim=1,
+                )
+            )
+        expected = torch.cat(expected_lags, dim=1)
+
+        self.assertTrue(torch.equal(result, expected))
+
     def test_channels_keep_lags_age_and_provenance_separate(self):
         background = torch.stack(
             (
