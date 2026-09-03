@@ -22,20 +22,18 @@ decisions and the regime-aware branch lacks its required decision fields, so it
 fails closed rather than inviting post-hoc reconstruction. The exact evidence
 boundary is recorded in `CALENDAR_RESIDUAL_CFM_RESULT_RECONCILIATION.md`.
 
-## Latest publication-trigger resolution (2026-08-31)
+## Latest publication-trigger resolution (2026-09-03)
 
-Independent inspection found a stale routing conflict in this index: its first
-paragraph named the running calendar-residual CFM line, while later paragraphs
-still called an older score-aware admission the next scientific event.  The
-normative decision is now unambiguous.  The active training, its frozen
-final-EMA sampling and the full no-compensation gate form the current scientific
-line; early training diagnostics are not selection evidence, and no parallel
-calibration proposal is authorized.  A negative compact verdict may activate
-at most one first-match branch from
-`RESIDUAL_CFM_FOLLOWUP_DECISION_CONTRACT.md`; a positive verdict activates
-claim, figure, table and reproducibility reconciliation.  The score-aware
-material below remains an append-only record of an earlier route, not a pending
-proposal or current dependency.
+Independent inspection found that this index still described the
+calendar-residual CFM training, final-EMA sampling and gate as active after the
+decision-bearing reconciliation above had already recorded their completed
+negative result.  The stale routing language is removed from the normative
+surface.  The frozen first-match follow-up router authorizes no branch for the
+reported family decisions, so neither that model nor an older score-aware route
+is a pending proposal.  The next decision-bearing publication task is the first
+independently admitted minimum-tier comparator, beginning with the frozen
+conformal row; until its admission record contains a literal controller-visible
+mode, proposing it under another identifier would be invalid.
 
 An independent read of the manuscript, claim ledger, deterministic figures,
 minimum-tier matrix, compact-evidence boundaries and reproducibility handoff
@@ -47,18 +45,15 @@ immutable identities, limitation and reference traceability, the minimum-tier
 matrix and score-aware reconciliation passed all 141 tests; `git diff --check`
 also passed before this entry was added.
 
-This is a verified negative readiness decision, not an idle scientific state.
-The current decision-bearing line is the running calendar-residual CFM training
-and its frozen final-EMA sampling and no-compensation evaluation.  No additional
-calibration proposal is admissible while that line is active.  After a
-scientifically valid compact verdict, `overall_eligible=true` triggers
-publication reconciliation; `overall_eligible=false` triggers at most the first
-matching natural follow-up in `RESIDUAL_CFM_FOLLOWUP_DECISION_CONTRACT.md`.
-The older score-aware admission route is retained below only as historical
-provenance and is not the current next action.  Until one candidate passes every
-mandatory family and the remaining minimum-tier closures are resolved, the
-repository remains internally auditable but is not ready for human submission
-review.
+This is a verified negative readiness decision, not evidence of an unfinished
+local publication audit.  The manuscript, claim ledger, figures and
+reproducibility handoff are synchronized at the present evidence boundary; the
+remaining work is decision-bearing scientific execution, not narrative repair.
+The older score-aware admission route and calendar-residual CFM routing notes
+below are retained only as historical provenance and are not current actions.
+Until one candidate passes every mandatory family and the remaining minimum-tier
+closures are resolved, the repository remains internally auditable but is not
+ready for human submission review.
 
 For a human audit, read `PAPER_DRAFT.md` for the narrative,
 `CLAIM_LEDGER.md` for claim-level provenance, `REPRODUCIBILITY.md` for exact
