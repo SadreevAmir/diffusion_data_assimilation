@@ -14,13 +14,13 @@ decision-bearing closures:
 | Probabilistic-DA comparator | `MISSING` | `MINIMUM_TIER_COMPARISON_AUDIT.md` |
 | Independent-strength deterministic comparison | `PRESENT_DEVELOPMENT_ONLY` | `MINIMUM_TIER_COMPARISON_AUDIT.md` |
 
-The current priority is the running calendar-residual CFM baseline followed by
-its already frozen absolute calibration evaluation. Early training loss is not
-selection evidence. A scientifically valid negative gate may select at most one
-natural conditional-generative follow-up through the first-match diagnostic
-rules in `RESIDUAL_CFM_FOLLOWUP_DECISION_CONTRACT.md`; no sweep or return to the
-older score-aware post-hoc proposal is admissible. Local runner parity,
-scheduler completion and unsigned compact files are not scientific admission.
+The calendar-residual CFM final-EMA evaluation is complete and negative. It
+passes proper-and-mean skill but fails coverage, absolute rank reliability,
+truth-relative events and spatial distribution. The frozen first-match router
+selects no natural follow-up: three branches contradict the reported family
+decisions and the regime-aware branch lacks its required decision fields, so it
+fails closed rather than inviting post-hoc reconstruction. The exact evidence
+boundary is recorded in `CALENDAR_RESIDUAL_CFM_RESULT_RECONCILIATION.md`.
 
 ## Latest publication-trigger resolution (2026-08-31)
 

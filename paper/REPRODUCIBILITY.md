@@ -749,6 +749,18 @@ spatial/physical families fail. Candidate/raw fair CRPS is
 from `0.3566938377` to `0.1969742919`, but every absolute rank-histogram
 adequacy flag remains false. The frozen alpha set, folds, purge and thresholds
 must not be altered after this result.
+
+## Completed calendar-residual CFM handoff
+
+`siconc_calendar_residual_cfm_gate_valid` completed 40/40 cases. Its compact
+aggregate and status record `overall_eligible=false`. Proper-and-mean skill
+passes; coverage, randomized-rank, truth-relative-event and spatial-
+distribution families fail. Reconciliation uses only the aggregate, per-case
+compact metrics and completion status; it does not read raw members. The frozen
+router is fail closed as documented in
+`CALENDAR_RESIDUAL_CFM_RESULT_RECONCILIATION.md`: no branch may be reconstructed
+from metrics absent from the admitted compact schema, and no model or threshold
+is tuned after the result.
 # Observation-likelihood local admission boundary
 
 The frozen copy-only implementation is split across

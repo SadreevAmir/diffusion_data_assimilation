@@ -786,6 +786,14 @@ the minimum strong domain/SciML baseline tier remains incomplete.
 These three comparison blockers are separate from calibration eligibility and
 cannot compensate for any failed gate family.
 
+The final-EMA calendar-residual CFM provides an additional negative natural-
+generative result. Its proper-and-mean-skill family passes, but coverage,
+absolute randomized-rank reliability, truth-relative event calibration and
+member-spatial distribution fail. In particular, rank total variation is
+`0.1986093`, normalized mean rank is `0.6108636`, and the attainable member-
+range coverage error is `0.0999832`. The pre-result router authorizes no
+follow-up from this compact record, and no post-result tuning is reported.
+
 ## Ethics and competing interests
 
 The study uses model fields and satellite-footprint geometry and involves no
