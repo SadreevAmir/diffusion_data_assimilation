@@ -74,17 +74,18 @@ server-only case data nor changes any comparison row above.
 The independent primary in C39 is also negative, but it is not counted as an
 additional development calibration candidate and does not repair a missing
 minimum-tier row. The superseded primary recovery is excluded from this audit.
-Consequently the eligible-calibration blocker remains open.  The current
-decision-bearing line is the running calendar-residual CFM training followed by
-its frozen final-EMA sampling and full no-compensation gate.  Early training
-diagnostics are not selection evidence, and no parallel calibration route is
-admissible while that line is active.  A scientifically valid negative compact
-verdict may activate at most the first matching branch in
-`RESIDUAL_CFM_FOLLOWUP_DECISION_CONTRACT.md`; the older score-aware
-raw-scenario reweighting material remains historical pre-result provenance and
-is not the current next action.  This conclusion preserves every existing
-evidence row and forbids rerunning or retuning a rejected mechanism merely to
-create activity.
+Consequently the eligible-calibration blocker remains open.  The
+calendar-residual CFM final-EMA sampling and full no-compensation gate are
+complete and negative; `CALENDAR_RESIDUAL_CFM_RESULT_RECONCILIATION.md` records
+the decision boundary.  Its proper-and-mean-skill family passes, while coverage,
+absolute rank reliability, truth-relative events and spatial distribution fail.
+The frozen first-match router authorizes no follow-up: three branches contradict
+the reported family decisions, and the regime-aware branch lacks its required
+decision fields and therefore fails closed.  The next publication task is to
+close the first independently admitted decision-bearing row in the minimum-tier
+matrix, not to rerun, retune or reconstruct a calendar-residual CFM branch after
+the result.  The older score-aware raw-scenario reweighting material remains
+historical pre-result provenance and is not the current next action.
 
 ## Decision-bearing evidence guard
 

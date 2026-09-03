@@ -167,6 +167,22 @@ class MinimumTierComparisonAuditTests(unittest.TestCase):
     def test_current_comparison_map_passes(self) -> None:
         validate_minimum_tier_comparisons(PAPER_DIR)
 
+    def test_completed_cfm_line_is_not_described_as_running(self) -> None:
+        self.assertNotIn(
+            "decision-bearing line is the running calendar-residual CFM",
+            self.audit,
+        )
+        self.assertIn(
+            "calendar-residual CFM final-EMA sampling and full no-compensation gate are\n"
+            "complete and negative",
+            self.audit,
+        )
+        self.assertIn(
+            "first independently admitted decision-bearing row in the minimum-tier\n"
+            "matrix",
+            self.audit,
+        )
+
     def test_weakened_conformal_stop_go_fails_closed(self) -> None:
         with self.make_fixture(self.audit) as temporary:
             fixture_dir = Path(temporary)
