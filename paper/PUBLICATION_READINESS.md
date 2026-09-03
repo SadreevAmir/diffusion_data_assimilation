@@ -38,13 +38,14 @@ described as a pending run or promoted to an eligible result.
 
 The unified executable audit passed with 108 required files, two deterministic
 figures, eight references and 40 claims and returned `status=NOT_READY`.
-`git diff --check` passed before this entry was added.  A separate focused
-`pytest` invocation could not start because the available local interpreter
-does not provide the `pytest` package; this is recorded as a local-runtime
-limitation, not converted into a scientific result, readiness waiver or
-external blocker.  The unified checker already executes the repository's
-mandatory regression boundary, so its successful result is the current
-machine-verifiable audit evidence.
+A separate standard-library `unittest` invocation then exercised the focused
+claim-status, compact-schema, empirical-traceability, figure-determinism,
+immutable-identity, limitation-traceability, reference-traceability,
+minimum-tier and score-aware-reconciliation boundary: all 142 tests passed in
+9.614 seconds without failures or skips.  This command does not depend on the
+locally unavailable `pytest` package and therefore replaces the earlier
+environment-limitation statement with directly reproducible evidence.
+`git diff --check` passed before this entry was added.
 
 This recheck therefore makes no experiment proposal under an invented mode and
 does not weaken the minimum paper tier.  The fastest decision-bearing next step
