@@ -432,6 +432,31 @@ class E1RealDataAuditTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "differs from its sealed hash"):
                 validate_compact_audit(CONFIG, root / "output")
 
+    def test_validator_rejects_extra_panel_from_reused_output_directory(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            run_real_data_audit(
+                CONFIG, root / "output", dataset_builder=lambda config, split: FakeDataset(root)
+            )
+            extra = root / "output" / "panels" / "stale_previous_attempt.png"
+            extra.write_bytes(next((root / "output" / "panels").glob("*.png")).read_bytes())
+            with self.assertRaisesRegex(ValueError, "inventory must match"):
+                validate_compact_audit(CONFIG, root / "output")
+
+    def test_validator_rejects_panel_reassigned_to_another_case(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            run_real_data_audit(
+                CONFIG, root / "output", dataset_builder=lambda config, split: FakeDataset(root)
+            )
+            path = root / "output" / "per_case_audit.json"
+            payload = json.loads(path.read_text())
+            payload[0]["panel"] = payload[1]["panel"]
+            payload[0]["panel_sha256"] = payload[1]["panel_sha256"]
+            path.write_text(json.dumps(payload))
+            with self.assertRaisesRegex(ValueError, "not bound to its frozen case"):
+                validate_compact_audit(CONFIG, root / "output")
+
     def test_validator_rejects_geographic_landmark_drift(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

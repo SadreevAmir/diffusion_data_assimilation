@@ -122,6 +122,14 @@ def validate_compact_audit(config_path: Path, output: Path) -> str:
     if manifest_landmarks != FROZEN_LANDMARKS:
         raise ValueError("manifest landmarks differ from the frozen geographic anchors")
     expected_ids = [case["case_id"] for case in manifest_cases]
+    expected_panels = {
+        f"panels/{case_id}_truth_background_lag_masks.png" for case_id in expected_ids
+    }
+    actual_panels = {
+        path.relative_to(output).as_posix() for path in (output / "panels").glob("*.png")
+    }
+    if actual_panels != expected_panels:
+        raise ValueError("compact orientation panel inventory must match the frozen cases exactly")
     if [case.get("case_id") for case in cases] != expected_ids:
         raise ValueError("audited identities differ from the frozen manifest")
     if [entry.get("case_id") for entry in inventory] != expected_ids:
@@ -220,7 +228,10 @@ def validate_compact_audit(config_path: Path, output: Path) -> str:
                 or lag["footprint_pixels"] <= 0
             ):
                 raise ValueError("real lag footprint must be non-empty")
-        panel = output / case["panel"]
+        expected_panel = f"panels/{case['case_id']}_truth_background_lag_masks.png"
+        if case["panel"] != expected_panel:
+            raise ValueError("compact orientation panel path is not bound to its frozen case")
+        panel = output / expected_panel
         if not panel.is_file() or _png_dimensions(panel) != (1816, 320):
             raise ValueError("compact orientation panel has invalid geometry")
         if not _is_sha256(case["panel_sha256"]):
