@@ -16,6 +16,23 @@ REQUEST_KEYS = {
     "rejection_response", "pass_scope", "launch_authorized",
 }
 RESPONSE_KEYS = {"decision", "failed_checks", "failed_tests"}
+EXPECTED_REQUEST_IDENTITIES = {
+    "reviewed_mode": "occurrence_intensity_e1_engineering_sentinel",
+    "config": "config/experiments/occurrence_intensity_e1_sentinel.json",
+    "runner": "scripts/run_occurrence_intensity_e1_sentinel.sh",
+    "implementation": ["assim_lib/structured_sic.py", "assim_lib/occurrence_intensity_e1.py"],
+    "tests": ["test/test_structured_sic.py", "test/test_occurrence_intensity_e1.py"],
+    "required_checks": [
+        "nan_safe_observed_masking", "complete_occurrence_law",
+        "zero_intensity_auxiliary_law", "train_only_exact_one_policy",
+        "split_geometry_value_provenance", "engineering_only_eight_case_sentinel",
+        "clearml_required",
+    ],
+    "required_test_command": (
+        "python -m unittest discover -s test -p 'test_structured_sic.py' && "
+        "python -m unittest discover -s test -p 'test_occurrence_intensity_e1.py'"
+    ),
+}
 
 
 def _object(path: Path) -> Mapping[str, Any]:
@@ -30,15 +47,13 @@ def validate_request(request: Mapping[str, Any]) -> None:
         raise ValueError("admission request keys must be exact")
     if request["decision"] != "PENDING_INDEPENDENT_REVIEW":
         raise ValueError("request is not pending independent review")
-    if request["reviewed_mode"] != "occurrence_intensity_e1_engineering_sentinel":
-        raise ValueError("unexpected reviewed_mode")
+    for key, expected in EXPECTED_REQUEST_IDENTITIES.items():
+        if request[key] != expected:
+            raise ValueError(f"unexpected {key}")
     if request["launch_authorized"] is not False:
         raise ValueError("admission request must not authorize launch")
     if request["pass_scope"] != "independent_admission_only_not_launch_authorization":
         raise ValueError("unexpected pass_scope")
-    checks = request["required_checks"]
-    if not isinstance(checks, list) or not checks or not all(isinstance(x, str) and x for x in checks):
-        raise ValueError("required_checks must be a non-empty string list")
     if request["accepted_response"] != {"decision": "PASS", "failed_checks": [], "failed_tests": []}:
         raise ValueError("accepted_response contract drift")
     rejection = request["rejection_response"]

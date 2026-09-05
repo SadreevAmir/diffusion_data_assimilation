@@ -26,6 +26,20 @@ class E1HandoffTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "rank gate"):
             validate_config(config)
 
+    def test_channel_layout_and_schema_cannot_drift(self):
+        config = json.loads(CONFIG.read_text())
+        config["dataset"]["channel_layout_per_lag"][0] = "value"
+        with self.assertRaisesRegex(ValueError, "channel_layout_per_lag"):
+            validate_config(config)
+        config = json.loads(CONFIG.read_text())
+        config["dataset"]["unreviewed"] = True
+        with self.assertRaisesRegex(ValueError, "dataset keys must be exact"):
+            validate_config(config)
+        config = json.loads(CONFIG.read_text())
+        config["unreviewed"] = True
+        with self.assertRaisesRegex(ValueError, "config keys must be exact"):
+            validate_config(config)
+
 
 if __name__ == "__main__":
     unittest.main()

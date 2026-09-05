@@ -47,6 +47,17 @@ class OccurrenceIntensityE1AdmissionTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "must not authorize launch"):
             validate_request(changed)
 
+    def test_request_identities_and_checklist_cannot_drift(self):
+        for key in ("config", "runner", "implementation", "tests", "required_checks", "required_test_command"):
+            changed = copy.deepcopy(REQUEST)
+            if isinstance(changed[key], list):
+                changed[key] = list(reversed(changed[key]))
+            else:
+                changed[key] += ".changed"
+            with self.subTest(key=key):
+                with self.assertRaisesRegex(ValueError, f"unexpected {key}"):
+                    validate_request(changed)
+
 
 if __name__ == "__main__":
     unittest.main()

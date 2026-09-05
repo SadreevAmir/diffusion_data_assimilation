@@ -24,6 +24,19 @@ boundary is recorded in `CALENDAR_RESIDUAL_CFM_RESULT_RECONCILIATION.md`.
 
 ## Latest method-admission boundary (2026-09-05)
 
+The E1 admission boundary now validates the complete frozen handoff rather than
+only selected fields.  `validate_config` rejects extra top-level or dataset
+keys and binds the exact project, task, three-lag ordering and eight-field
+`channel_layout_per_lag`; the response validator binds the literal config,
+runner, implementation, test, checklist and test-command identities.  New
+negative tests exercise every added drift guard.  The admission suite passed
+6 tests and the config handoff suite passed 3 tests.  The tensor-dependent
+structured-SIC suite could not run in this local interpreter because `torch`
+is unavailable; its implementation was not changed.  The unified publication
+audit still passed with 108 files, 2 figures, 8 references and 40 claims and
+retained `NOT_READY`.  This is an engineering admission hardening only: it
+creates neither an independent E1 response nor launch authorization.
+
 The separate post-E1 trusted-executor mapping surface is now frozen in
 `OCCURRENCE_INTENSITY_E2_MAPPING_REVIEW.md`.  It requires a literal clean E1
 response before review, maps the three lag-matched backgrounds and innovations,
