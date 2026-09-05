@@ -24,6 +24,15 @@ boundary is recorded in `CALENDAR_RESIDUAL_CFM_RESULT_RECONCILIATION.md`.
 
 ## Latest method-admission boundary (2026-09-05)
 
+The separate post-E1 trusted-executor mapping surface is now frozen in
+`OCCURRENCE_INTENSITY_E2_MAPPING_REVIEW.md`.  It requires a literal clean E1
+response before review, maps the three lag-matched backgrounds and innovations,
+forbids runtime scientific choices, fixes the paired compact evidence and
+conjunctive E2 decision, and requires an atomic controller-visible identity
+record with no deviations.  It does not claim an implemented mode or authorize
+a launch.  This removes ambiguity from the contingent E2 review while leaving
+`NOT_READY` and `eligible_calibration=MISSING_ELIGIBLE_RESULT` unchanged.
+
 The contingent E1--E4 route is now fully predeclared.  The terminal E4
 coherent-uncertainty-source mechanism is frozen in
 `NEXT_OCCURRENCE_INTENSITY_E4_CONTRACT.md`: it retrieves ten complete
