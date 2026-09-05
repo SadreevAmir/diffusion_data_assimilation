@@ -271,6 +271,47 @@ class E1RealDataAuditTest(unittest.TestCase):
                     dataset_builder=lambda config, split: DriftedValidDomainDataset(root),
                 )
 
+    def test_runner_rejects_runtime_forecast_source_drift_after_pretruth_seal(self):
+        class DriftedRuntimeForecastDataset(FakeDataset):
+            def __getitem__(self, index):
+                item = super().__getitem__(index)
+                day, _ = divmod(index, 24)
+                target = self.obs_data[day].date
+                lagged = target.fromordinal(target.toordinal() - 1)
+                replacement = self.records_by_date[lagged].path.with_name("replacement.npy")
+                np.save(replacement, np.zeros((2, 24, 4, 4), dtype=np.float32))
+                self.records_by_date[lagged].path = replacement
+                return item
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            with self.assertRaisesRegex(ValueError, "runtime forecast source differs"):
+                run_real_data_audit(
+                    CONFIG,
+                    root / "output",
+                    dataset_builder=lambda config, split: DriftedRuntimeForecastDataset(root),
+                )
+
+    def test_runner_rejects_runtime_sral_source_drift_after_pretruth_seal(self):
+        class DriftedRuntimeSralDataset(FakeDataset):
+            def __getitem__(self, index):
+                item = super().__getitem__(index)
+                day, _ = divmod(index, 24)
+                target = self.obs_data[day].date
+                replacement = self.sral_records[target][0].with_name("replacement_sral.npy")
+                np.save(replacement, np.ones((4, 4), dtype=np.float32))
+                self.sral_records[target] = [replacement]
+                return item
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            with self.assertRaisesRegex(ValueError, "runtime SRAL sources differ"):
+                run_real_data_audit(
+                    CONFIG,
+                    root / "output",
+                    dataset_builder=lambda config, split: DriftedRuntimeSralDataset(root),
+                )
+
     def test_validator_rejects_zero_footprint_count(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

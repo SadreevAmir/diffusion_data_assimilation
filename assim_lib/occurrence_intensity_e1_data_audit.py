@@ -176,6 +176,34 @@ def _lag_background(dataset: Any, target_date: date, hour: int, lag: int) -> tup
     return field[0], Path(record.path)
 
 
+def _verify_runtime_sources(dataset: Any, target: date, sealed_source: dict[str, Any]) -> None:
+    """Bind post-truth runtime reads to the corresponding pre-truth source seal."""
+    lag = int(sealed_source["lag"])
+    source_date = target - timedelta(days=lag)
+    record = dataset.records_by_date.get(source_date)
+    if record is None:
+        raise ValueError(f"missing sealed runtime forecast source for lag={lag}")
+    forecast_path = Path(record.path)
+    if (
+        record.date != source_date
+        or forecast_path.resolve() != Path(sealed_source["forecast_path"]).resolve()
+        or sha256_file(forecast_path) != sealed_source["forecast_sha256"]
+    ):
+        raise ValueError(f"runtime forecast source differs from pre-truth seal for lag={lag}")
+
+    runtime_sral_paths = [Path(path) for path in dataset.sral_records.get(source_date, [])]
+    sealed_sral_paths = [Path(path) for path in sealed_source["sral_paths"]]
+    if (
+        len(runtime_sral_paths) != len(sealed_sral_paths)
+        or any(
+            actual.resolve() != sealed.resolve()
+            for actual, sealed in zip(runtime_sral_paths, sealed_sral_paths)
+        )
+        or [sha256_file(path) for path in runtime_sral_paths] != sealed_source["sral_sha256"]
+    ):
+        raise ValueError(f"runtime SRAL sources differ from pre-truth seal for lag={lag}")
+
+
 def run_real_data_audit(
     config_path: str | Path, output_dir: str | Path, *,
     dataset_builder: Callable[[dict[str, Any], str], Any] = build_dataset,
@@ -265,7 +293,8 @@ def run_real_data_audit(
             raise ValueError("truth is non-finite inside the valid domain")
         lag_masks, backgrounds, background_sources = [], [], []
         lag_rows = []
-        for lag in config["lags_days"]:
+        for lag, sealed_source in zip(config["lags_days"], sealed_case["sources"]):
+            _verify_runtime_sources(dataset, target, sealed_source)
             mask = dataset.sral_spatial_mask(
                 target, day_offsets=[lag], transform_index=config["sral_transform_index"]
             )
