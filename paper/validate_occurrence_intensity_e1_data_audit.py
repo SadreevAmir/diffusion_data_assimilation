@@ -83,6 +83,8 @@ def _png_grayscale_pixels(path: Path) -> tuple[int, int, bytes]:
     if payload[:8] != b"\x89PNG\r\n\x1a\n":
         raise ValueError("missing or invalid compact orientation panel")
     offset, width, height, compressed = 8, None, None, bytearray()
+    seen_ihdr = False
+    seen_iend = False
     while offset < len(payload):
         if offset + 12 > len(payload):
             raise ValueError("truncated compact orientation panel")
@@ -92,15 +94,29 @@ def _png_grayscale_pixels(path: Path) -> tuple[int, int, bytes]:
         if end > len(payload):
             raise ValueError("truncated compact orientation panel chunk")
         chunk = payload[offset + 8:offset + 8 + length]
+        expected_crc = struct.unpack(">I", payload[offset + 8 + length:end])[0]
+        if zlib.crc32(kind + chunk) != expected_crc:
+            raise ValueError("orientation panel contains a PNG chunk with invalid CRC")
         if kind == b"IHDR":
+            if seen_ihdr or offset != 8:
+                raise ValueError("orientation panel has invalid IHDR placement")
             if len(chunk) != 13 or chunk[8:] != bytes((8, 0, 0, 0, 0)):
                 raise ValueError("orientation panel must use frozen 8-bit grayscale encoding")
             width, height = struct.unpack(">II", chunk[:8])
+            seen_ihdr = True
         elif kind == b"IDAT":
+            if not seen_ihdr or seen_iend:
+                raise ValueError("orientation panel has invalid IDAT placement")
             compressed.extend(chunk)
         elif kind == b"IEND":
+            if length != 0 or seen_iend:
+                raise ValueError("orientation panel has invalid IEND chunk")
+            seen_iend = True
+            offset = end
             break
         offset = end
+    if not seen_iend or offset != len(payload):
+        raise ValueError("orientation panel has missing or trailing PNG content")
     if width is None or height is None or not compressed:
         raise ValueError("orientation panel is missing required PNG chunks")
     try:
