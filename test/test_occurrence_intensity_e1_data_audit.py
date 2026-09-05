@@ -2,6 +2,7 @@ import hashlib
 import json
 import tempfile
 import unittest
+from unittest import mock
 from datetime import date
 from pathlib import Path
 from types import SimpleNamespace
@@ -9,6 +10,7 @@ from types import SimpleNamespace
 import numpy as np
 import torch
 
+import assim_lib.occurrence_intensity_e1_data_audit as audit_module
 from assim_lib.occurrence_intensity_e1_data_audit import (
     run_real_data_audit, validate_audit_config, validate_case_manifest,
 )
@@ -116,6 +118,25 @@ class E1RealDataAuditTest(unittest.TestCase):
                 ],
             )
             self.assertEqual(validate_compact_audit(CONFIG, root / "output"), "E1_REAL_DATA_AUDIT_PASS")
+
+    def test_runner_publishes_completion_marker_last_and_atomically(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            published = []
+
+            def recording_write(path, payload):
+                published.append(path.name)
+                return original_write(path, payload)
+
+            original_write = audit_module._write_json_atomic
+            with mock.patch.object(audit_module, "_write_json_atomic", side_effect=recording_write):
+                run_real_data_audit(
+                    CONFIG, root / "output", dataset_builder=lambda config, split: FakeDataset(root)
+                )
+            self.assertEqual(
+                published, ["metadata.json", "per_case_audit.json", "run_status.json"]
+            )
+            self.assertEqual(list((root / "output").glob(".*.tmp")), [])
 
     def test_validator_rejects_future_leakage(self):
         with tempfile.TemporaryDirectory() as directory:

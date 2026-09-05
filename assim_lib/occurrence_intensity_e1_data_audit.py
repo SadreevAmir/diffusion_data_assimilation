@@ -50,6 +50,19 @@ def sha256_file(path: str | Path) -> str:
     return digest.hexdigest()
 
 
+def _write_json_atomic(path: Path, payload: Any) -> None:
+    """Publish one compact JSON artifact without exposing a partial document."""
+    temporary = path.with_name(f".{path.name}.tmp")
+    try:
+        temporary.write_text(
+            json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
+        temporary.replace(path)
+    finally:
+        if temporary.exists():
+            temporary.unlink()
+
+
 def validate_audit_config(config: dict[str, Any]) -> None:
     if set(config) != CONFIG_KEYS:
         raise ValueError("E1 data-audit config keys must be exact")
@@ -313,7 +326,13 @@ def run_real_data_audit(
             "background_lag2", "mask_lag2",
         ],
     }
-    payloads = {"run_status.json": status, "metadata.json": metadata, "per_case_audit.json": per_case}
-    for name, payload in payloads.items():
-        (output / name).write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    # Evidence must be durable before the completion marker becomes visible.
+    # Each replace is atomic within the output directory, so readers never see
+    # a partially serialized compact JSON document.
+    for name, payload in (
+        ("metadata.json", metadata),
+        ("per_case_audit.json", per_case),
+        ("run_status.json", status),
+    ):
+        _write_json_atomic(output / name, payload)
     return {"run_status": status, "metadata": metadata, "per_case_audit": per_case}
