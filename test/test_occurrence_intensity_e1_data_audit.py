@@ -148,6 +148,45 @@ class E1RealDataAuditTest(unittest.TestCase):
                     dataset_builder=lambda config, split: MissingLagDataset(root),
                 )
 
+    def test_runner_rejects_empty_sral_inventory_before_truth_read(self):
+        class EmptyInventoryDataset(FakeDataset):
+            def __init__(self, root):
+                super().__init__(root)
+                first_case = json.loads(MANIFEST.read_text())["cases"][0]
+                self.sral_records[date.fromisoformat(first_case["target_date"])] = []
+
+            def __getitem__(self, index):
+                raise AssertionError("truth must not be read before source inventory is complete")
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            with self.assertRaisesRegex(ValueError, "missing pre-truth SRAL source metadata"):
+                run_real_data_audit(
+                    CONFIG,
+                    root / "output",
+                    dataset_builder=lambda config, split: EmptyInventoryDataset(root),
+                )
+
+    def test_runner_rejects_forecast_record_date_drift_before_truth_read(self):
+        class DriftedRecordDataset(FakeDataset):
+            def __init__(self, root):
+                super().__init__(root)
+                first_case = json.loads(MANIFEST.read_text())["cases"][0]
+                target = date.fromisoformat(first_case["target_date"])
+                self.records_by_date[target].date = target.fromordinal(target.toordinal() - 1)
+
+            def __getitem__(self, index):
+                raise AssertionError("truth must not be read before source dates are verified")
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            with self.assertRaisesRegex(ValueError, "forecast record date differs"):
+                run_real_data_audit(
+                    CONFIG,
+                    root / "output",
+                    dataset_builder=lambda config, split: DriftedRecordDataset(root),
+                )
+
     def test_validator_rejects_zero_footprint_count(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

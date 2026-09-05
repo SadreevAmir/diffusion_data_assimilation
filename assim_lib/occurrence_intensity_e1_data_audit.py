@@ -198,10 +198,19 @@ def run_real_data_audit(
         target = date.fromisoformat(case["target_date"])
         sources = []
         for lag in config["lags_days"]:
-            record = dataset.records_by_date.get(target - timedelta(days=lag))
+            source_date = target - timedelta(days=lag)
+            record = dataset.records_by_date.get(source_date)
             if record is None:
                 raise ValueError(f"missing pre-truth source metadata for {case['case_id']} lag={lag}")
-            sral_paths = dataset.sral_records.get(target - timedelta(days=lag), [])
+            if record.date != source_date:
+                raise ValueError(
+                    f"forecast record date differs from requested lag for {case['case_id']} lag={lag}"
+                )
+            sral_paths = dataset.sral_records.get(source_date, [])
+            if not sral_paths:
+                raise ValueError(
+                    f"missing pre-truth SRAL source metadata for {case['case_id']} lag={lag}"
+                )
             sources.append({
                 "lag": lag, "date": record.date.isoformat(),
                 "forecast_path": str(record.path),
