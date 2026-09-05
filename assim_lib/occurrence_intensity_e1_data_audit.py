@@ -276,7 +276,8 @@ def run_real_data_audit(
         panel_fields = [truth]
         for background, mask in zip(backgrounds, lag_masks):
             panel_fields.extend((background, mask))
-        _png(panels_dir / panel_name, _panel(panel_fields))
+        panel_path = panels_dir / panel_name
+        _png(panel_path, _panel(panel_fields))
         per_case.append({
             "case_id": case["case_id"], "coverage_slot": case["coverage_slot"],
             "target_date": case["target_date"], "hour": case["hour"],
@@ -284,6 +285,7 @@ def run_real_data_audit(
             "lag_specific_backgrounds": len(set(background_sources)) == 3,
             "co_registered_shape": list(truth.shape), "orientation_landmarks": landmark_values,
             "lags": lag_rows, "panel": f"panels/{panel_name}",
+            "panel_sha256": sha256_file(panel_path),
         })
     status = {
         "status": "completed", "mode": MODE, "resource_kind": "server_cpu", "cases": 8,

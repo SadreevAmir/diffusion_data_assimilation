@@ -238,6 +238,36 @@ class E1RealDataAuditTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "one-to-one with hashes"):
                 validate_compact_audit(CONFIG, root / "output")
 
+    def test_validator_rejects_resealed_source_hash_not_matching_file(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            run_real_data_audit(
+                CONFIG, root / "output", dataset_builder=lambda config, split: FakeDataset(root)
+            )
+            path = root / "output" / "metadata.json"
+            payload = json.loads(path.read_text())
+            payload["source_inventory"][0]["sources"][0]["forecast_sha256"] = "0" * 64
+            inventory_bytes = json.dumps(
+                payload["source_inventory"], sort_keys=True, separators=(",", ":")
+            ).encode()
+            payload["source_inventory_sha256"] = hashlib.sha256(inventory_bytes).hexdigest()
+            path.write_text(json.dumps(payload))
+            with self.assertRaisesRegex(ValueError, "does not match its sealed hash"):
+                validate_compact_audit(CONFIG, root / "output")
+
+    def test_validator_rejects_panel_mutation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            run_real_data_audit(
+                CONFIG, root / "output", dataset_builder=lambda config, split: FakeDataset(root)
+            )
+            panel = next((root / "output" / "panels").glob("*.png"))
+            payload = bytearray(panel.read_bytes())
+            payload[-1] ^= 1
+            panel.write_bytes(payload)
+            with self.assertRaisesRegex(ValueError, "differs from its sealed hash"):
+                validate_compact_audit(CONFIG, root / "output")
+
     def test_validator_rejects_geographic_landmark_drift(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

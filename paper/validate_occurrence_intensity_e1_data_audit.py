@@ -153,6 +153,9 @@ def validate_compact_audit(config_path: Path, output: Path) -> str:
                 raise ValueError("invalid forecast source hash")
             if not isinstance(source["forecast_path"], str) or not source["forecast_path"]:
                 raise ValueError("forecast source path must be explicit")
+            forecast_path = Path(source["forecast_path"])
+            if not forecast_path.is_file() or hashlib.sha256(forecast_path.read_bytes()).hexdigest() != source["forecast_sha256"]:
+                raise ValueError("forecast source path does not match its sealed hash")
             sral_paths = source["sral_paths"]
             sral_hashes = source["sral_sha256"]
             if (
@@ -165,10 +168,15 @@ def validate_compact_audit(config_path: Path, output: Path) -> str:
                 or len(sral_paths) != len(sral_hashes)
             ):
                 raise ValueError("each lag must bind explicit real SRAL paths one-to-one with hashes")
+            for sral_path_text, sral_hash in zip(sral_paths, sral_hashes):
+                sral_path = Path(sral_path_text)
+                if not sral_path.is_file() or hashlib.sha256(sral_path.read_bytes()).hexdigest() != sral_hash:
+                    raise ValueError("SRAL source path does not match its sealed hash")
     for case, manifest_case in zip(cases, manifest_cases):
         if set(case) != {
             "case_id", "coverage_slot", "target_date", "hour", "truth_finite_on_valid_domain",
             "lag_specific_backgrounds", "co_registered_shape", "orientation_landmarks", "lags", "panel",
+            "panel_sha256",
         }:
             raise ValueError("per-case keys must be exact")
         for identity_key in ("case_id", "coverage_slot", "target_date", "hour"):
@@ -215,6 +223,10 @@ def validate_compact_audit(config_path: Path, output: Path) -> str:
         panel = output / case["panel"]
         if not panel.is_file() or _png_dimensions(panel) != (1816, 320):
             raise ValueError("compact orientation panel has invalid geometry")
+        if not _is_sha256(case["panel_sha256"]):
+            raise ValueError("compact orientation panel hash is invalid")
+        if hashlib.sha256(panel.read_bytes()).hexdigest() != case["panel_sha256"]:
+            raise ValueError("compact orientation panel differs from its sealed hash")
     return "E1_REAL_DATA_AUDIT_PASS"
 
 
