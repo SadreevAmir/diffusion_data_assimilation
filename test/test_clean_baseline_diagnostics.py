@@ -1,8 +1,16 @@
+import json
 import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
 import numpy as np
 
-from assim_lib.clean_baseline_diagnostics import fair_crps_sum, tie_aware_rank_counts
+from assim_lib.clean_baseline_diagnostics import (
+    fair_crps_sum,
+    make_comparison_panels,
+    reconcile_case_inputs,
+    tie_aware_rank_counts,
+)
 
 
 class CleanBaselineDiagnosticsTest(unittest.TestCase):
@@ -35,6 +43,65 @@ class CleanBaselineDiagnosticsTest(unittest.TestCase):
         valid = np.ones_like(truth, dtype=bool)
         with self.assertRaisesRegex(ValueError, "non-finite"):
             tie_aware_rank_counts(ensemble, truth, valid)
+
+    def test_fixed_comparison_rejects_different_observation_conditions(self):
+        with TemporaryDirectory() as root:
+            candidate = Path(root) / "candidate"
+            reference = Path(root) / "reference"
+            output = Path(root) / "panels"
+            candidate.mkdir()
+            reference.mkdir()
+            base = {
+                "analysis_ensemble": np.zeros((2, 1, 2, 2), dtype=np.float32),
+                "truth": np.zeros((1, 2, 2), dtype=np.float32),
+                "background": np.zeros((1, 2, 2), dtype=np.float32),
+                "obs_values": np.zeros((1, 2, 2), dtype=np.float32),
+                "obs_mask": np.zeros((1, 2, 2), dtype=bool),
+                "valid_mask": np.ones((1, 2, 2), dtype=bool),
+                "fields": np.asarray(["siconc"]),
+            }
+            np.savez_compressed(candidate / "0000_2022-01-02_h23.npz", **base)
+            changed = dict(base)
+            changed["obs_mask"] = base["obs_mask"].copy()
+            changed["obs_mask"][0, 0, 0] = True
+            np.savez_compressed(reference / "0000_2022-01-02_h23.npz", **changed)
+
+            with self.assertRaisesRegex(ValueError, "observation masks differ"):
+                make_comparison_panels(
+                    candidate,
+                    reference,
+                    output,
+                    case_orders=(0,),
+                    member_ids=(0, 1),
+                )
+
+    def test_all_case_reconciliation_rejects_hidden_condition_mismatch(self):
+        with TemporaryDirectory() as root:
+            candidate = Path(root) / "candidate" / "samples"
+            reference = Path(root) / "reference" / "samples"
+            candidate.mkdir(parents=True)
+            reference.mkdir(parents=True)
+            cases = [{"case_order": 0, "dataset_index": 0, "target_date": "2022-01-02", "hour": 23}]
+            (candidate.parent / "metadata.json").write_text(json.dumps({"cases": cases}))
+            (reference.parent / "metadata.json").write_text(json.dumps({"cases": cases}))
+            base = {
+                "analysis_ensemble": np.zeros((2, 1, 2, 2), dtype=np.float32),
+                "truth": np.zeros((1, 2, 2), dtype=np.float32),
+                "background": np.zeros((1, 2, 2), dtype=np.float32),
+                "obs_values": np.zeros((1, 2, 2), dtype=np.float32),
+                "obs_mask": np.zeros((1, 2, 2), dtype=bool),
+                "valid_mask": np.ones((1, 2, 2), dtype=bool),
+                "fields": np.asarray(["siconc"]),
+            }
+            filename = "0000_2022-01-02_h23.npz"
+            np.savez_compressed(candidate / filename, **base)
+            changed = dict(base)
+            changed["truth"] = base["truth"].copy()
+            changed["truth"][0, 1, 1] = 0.5
+            np.savez_compressed(reference / filename, **changed)
+
+            with self.assertRaisesRegex(ValueError, "truth differs"):
+                reconcile_case_inputs(candidate, reference)
 
 
 if __name__ == "__main__":

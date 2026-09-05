@@ -285,6 +285,66 @@ def _sample_inventory(sample_dir: Path) -> dict[str, Path]:
     return inventory
 
 
+def _arrays_equal(left: np.ndarray, right: np.ndarray) -> bool:
+    left = np.asarray(left)
+    right = np.asarray(right)
+    if left.shape != right.shape or left.dtype != right.dtype:
+        return False
+    if left.dtype.kind in "fc":
+        return bool(np.array_equal(left, right, equal_nan=True))
+    return bool(np.array_equal(left, right))
+
+
+def reconcile_case_inputs(candidate_dir: Path, reference_dir: Path) -> list[str]:
+    """Fail closed unless every candidate/reference condition is exactly paired."""
+    candidate = _sample_inventory(candidate_dir)
+    reference = _sample_inventory(reference_dir)
+    dates = sorted(candidate)
+    if set(candidate) != set(reference):
+        raise ValueError("candidate and accepted-reference dates differ")
+
+    candidate_metadata_path = candidate_dir.parent / "metadata.json"
+    reference_metadata_path = reference_dir.parent / "metadata.json"
+    if not candidate_metadata_path.is_file() or not reference_metadata_path.is_file():
+        raise ValueError("candidate/reference evaluation metadata is missing")
+    candidate_cases = json.loads(candidate_metadata_path.read_text()).get("cases")
+    reference_cases = json.loads(reference_metadata_path.read_text()).get("cases")
+    if not isinstance(candidate_cases, list) or not isinstance(reference_cases, list):
+        raise ValueError("candidate/reference case metadata is malformed")
+    if candidate_cases != reference_cases:
+        raise ValueError("candidate/reference case order or metadata differs")
+    if len(candidate_cases) != len(dates):
+        raise ValueError("evaluation metadata and saved sample counts differ")
+
+    condition_keys = (
+        "fields",
+        "truth",
+        "background",
+        "obs_values",
+        "obs_mask",
+        "valid_mask",
+    )
+    for target_date in dates:
+        candidate_path = candidate[target_date]
+        reference_path = reference[target_date]
+        if candidate_path.name != reference_path.name:
+            raise ValueError(f"candidate/reference case order or id differs on {target_date}")
+        with (
+            np.load(candidate_path, allow_pickle=False) as candidate_payload,
+            np.load(reference_path, allow_pickle=False) as reference_payload,
+        ):
+            if candidate_payload["analysis_ensemble"].shape[0] != reference_payload[
+                "analysis_ensemble"
+            ].shape[0]:
+                raise ValueError(f"candidate/reference ensemble sizes differ on {target_date}")
+            for key in condition_keys:
+                if key not in candidate_payload or key not in reference_payload:
+                    raise ValueError(f"candidate/reference {key} is missing on {target_date}")
+                if not _arrays_equal(candidate_payload[key], reference_payload[key]):
+                    raise ValueError(f"candidate/reference {key} differs on {target_date}")
+    return dates
+
+
 def make_comparison_panels(
     candidate_dir: Path,
     reference_dir: Path,
@@ -317,16 +377,22 @@ def make_comparison_panels(
                 ensemble = np.asarray(payload["analysis_ensemble"][:, channel], dtype=np.float64)
                 truth = np.asarray(payload["truth"][channel], dtype=np.float64)
                 background = np.asarray(payload["background"][channel], dtype=np.float64)
+                obs_values = np.asarray(payload["obs_values"][channel], dtype=np.float64)
+                obs_mask = np.asarray(payload["obs_mask"][channel], dtype=bool)
                 valid = np.asarray(payload["valid_mask"][channel], dtype=bool)
             if any(member < 0 or member >= ensemble.shape[0] for member in member_ids):
                 raise ValueError("fixed visual member id is outside the ensemble")
-            rows.append((label, ensemble, truth, background, valid))
-        if not np.array_equal(rows[0][4], rows[1][4]):
+            rows.append((label, ensemble, truth, background, obs_values, obs_mask, valid))
+        if not np.array_equal(rows[0][6], rows[1][6]):
             raise ValueError(f"candidate/reference valid masks differ on {target_date}")
         if not np.array_equal(rows[0][2], rows[1][2]):
             raise ValueError(f"candidate/reference truth arrays differ on {target_date}")
         if not np.array_equal(rows[0][3], rows[1][3]):
             raise ValueError(f"candidate/reference background arrays differ on {target_date}")
+        if not np.array_equal(rows[0][5], rows[1][5]):
+            raise ValueError(f"candidate/reference observation masks differ on {target_date}")
+        if not np.array_equal(rows[0][4], rows[1][4]):
+            raise ValueError(f"candidate/reference observation values differ on {target_date}")
 
         titles = ["truth", "background", *(f"member {member}" for member in member_ids), "mean", "std"]
         figure, axes = plt.subplots(
@@ -341,7 +407,7 @@ def make_comparison_panels(
             "native array orientation (row 0 at top), identical SIC scale [0,1]",
             fontsize=15,
         )
-        for row_index, (label, ensemble, truth, background, valid) in enumerate(rows):
+        for row_index, (label, ensemble, truth, background, _, _, valid) in enumerate(rows):
             values = [truth, background]
             values.extend(ensemble[member] for member in member_ids)
             values.extend((ensemble.mean(axis=0), ensemble.std(axis=0)))
@@ -427,6 +493,7 @@ def analyze(
     case_orders: tuple[int, ...] = (0, 2, 4, 6),
     member_ids: tuple[int, ...] = (0, 3, 6, 9),
 ) -> dict[str, Any]:
+    paired_dates = reconcile_case_inputs(candidate_dir, reference_dir)
     candidate_metrics = evaluate_sample_directory(candidate_dir)
     reference_metrics = evaluate_sample_directory(reference_dir)
     if candidate_metrics["cases"] != reference_metrics["cases"]:
@@ -446,7 +513,22 @@ def analyze(
     )
     comparison_keys = ("fair_crps", "ordinary_crps", "ensemble_mean_rmse", "ensemble_mean_bias")
     summary = {
-        "schema_version": "clean-baseline-comparison-v1",
+        "schema_version": "clean-baseline-comparison-v2",
+        "paired_case_evidence": {
+            "status": "passed",
+            "dates": paired_dates,
+            "checks": [
+                "case_order_and_metadata",
+                "case_id",
+                "ensemble_size",
+                "fields",
+                "truth",
+                "background",
+                "obs_values",
+                "obs_mask",
+                "valid_mask",
+            ],
+        },
         "candidate": candidate_metrics,
         "accepted_reference": reference_metrics,
         "candidate_minus_reference": {
