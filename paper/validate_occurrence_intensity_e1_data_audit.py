@@ -45,9 +45,29 @@ FROZEN_CONFIG = {
     ],
 }
 
+FROZEN_SELECTION_RULE = (
+    "eight_fixed_temporal_coverage_slots_from_forecast_and_sral_metadata_only"
+)
+
 
 def _load(path: Path) -> Any:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _validate_manifest_contract(manifest: Any) -> None:
+    """Independently enforce pre-truth case selection in compact evidence."""
+    if not isinstance(manifest, dict) or set(manifest) != {
+        "selection_rule", "truth_values_consulted", "cases", "orientation_landmarks",
+    }:
+        raise ValueError("case manifest keys must match the frozen selection contract")
+    if manifest["selection_rule"] != FROZEN_SELECTION_RULE:
+        raise ValueError("case manifest uses an unreviewed selection rule")
+    if manifest["truth_values_consulted"] is not False:
+        raise ValueError("case manifest does not prove pre-truth selection")
+    if manifest["cases"] != FROZEN_CASES:
+        raise ValueError("manifest cases differ from the frozen eight-case selection")
+    if manifest["orientation_landmarks"] != FROZEN_LANDMARKS:
+        raise ValueError("manifest landmarks differ from the frozen geographic anchors")
 
 
 def _png_dimensions(path: Path) -> tuple[int, int]:
@@ -209,12 +229,9 @@ def validate_compact_audit(config_path: Path, output: Path) -> str:
     if not isinstance(cases, list) or len(cases) != 8:
         raise ValueError("per-case audit must contain exactly eight cases")
     manifest = _load(manifest_path)
+    _validate_manifest_contract(manifest)
     manifest_cases = manifest["cases"]
     manifest_landmarks = manifest["orientation_landmarks"]
-    if manifest_cases != FROZEN_CASES:
-        raise ValueError("manifest cases differ from the frozen eight-case selection")
-    if manifest_landmarks != FROZEN_LANDMARKS:
-        raise ValueError("manifest landmarks differ from the frozen geographic anchors")
     expected_ids = [case["case_id"] for case in manifest_cases]
     expected_panels = {
         f"panels/{case_id}_truth_background_lag_masks.png" for case_id in expected_ids

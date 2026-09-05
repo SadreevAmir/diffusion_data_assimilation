@@ -16,7 +16,10 @@ import assim_lib.occurrence_intensity_e1_data_audit as audit_module
 from assim_lib.occurrence_intensity_e1_data_audit import (
     run_real_data_audit, validate_audit_config, validate_case_manifest,
 )
-from paper.validate_occurrence_intensity_e1_data_audit import validate_compact_audit
+from paper.validate_occurrence_intensity_e1_data_audit import (
+    _validate_manifest_contract,
+    validate_compact_audit,
+)
 
 CONFIG = Path("config/experiments/occurrence_intensity_e1_data_audit.json")
 MANIFEST = Path("paper/OCCURRENCE_INTENSITY_E1_REAL_CASES.json")
@@ -106,6 +109,18 @@ class E1RealDataAuditTest(unittest.TestCase):
         manifest["orientation_landmarks"][0]["row"] += 1
         with self.assertRaisesRegex(ValueError, "frozen geographic anchors"):
             validate_case_manifest(manifest)
+
+    def test_compact_validator_rejects_resealed_truth_dependent_manifest(self):
+        manifest = json.loads(MANIFEST.read_text())
+        manifest["truth_values_consulted"] = True
+        with self.assertRaisesRegex(ValueError, "pre-truth selection"):
+            _validate_manifest_contract(manifest)
+
+    def test_compact_validator_rejects_resealed_selection_rule_drift(self):
+        manifest = json.loads(MANIFEST.read_text())
+        manifest["selection_rule"] = "eight_cases_selected_after_truth_review"
+        with self.assertRaisesRegex(ValueError, "unreviewed selection rule"):
+            _validate_manifest_contract(manifest)
 
     def test_runner_uses_dataset_and_emits_valid_compact_contract(self):
         with tempfile.TemporaryDirectory() as directory:
