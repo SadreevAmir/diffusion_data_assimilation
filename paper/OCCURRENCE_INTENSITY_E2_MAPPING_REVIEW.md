@@ -36,9 +36,14 @@ to repair of the named invariant and repetition of the unchanged admission.
 
 ## Trajectory and likelihood mapping
 
-- [ ] The state contains exactly `b_t`, `b_{t-1}` and `b_{t-2}` in that order.
+- [ ] The generated state contains exactly `b_t`, `b_{t-1}` and `b_{t-2}` in
+  that order; E1 lag-specific exogenous backgrounds remain conditioning inputs
+  and are not misrepresented as a generated trajectory.
 - [ ] Every innovation is computed as `y_{t-k} - b_{t-k}` under its matching
   finite mask; broadcasting `b_t` across lags fails closed.
+- [ ] The reviewed adapter is parity-tested against
+  `assim_lib.occurrence_intensity_e2.apply_operators_at_own_time`, including
+  distinct operators at each lag and NaN-safe masked observations.
 - [ ] Each lag preserves the accepted E1 eight-field ordering, physical
   occurrence atom, bounded conditional intensity, geometry/value provenance,
   masks and both orientation landmarks bit-for-bit.

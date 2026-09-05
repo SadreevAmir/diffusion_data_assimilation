@@ -17,10 +17,12 @@ mode identifier.
 
 ## Falsifiable hypothesis and paper role
 
-Relative to the accepted E1 age-only occurrence--intensity model, an explicit
-fixed-lag background trajectory with lag-matched likelihood innovations adds
-temporally coherent assimilation information.  The paper claim is supported
-only if E2 improves held-out observed-footprint innovation RMSE by at least 10%
+Relative to accepted E1, which uses lag-matched *exogenous background* fields
+to construct finite conditioning innovations but generates only the current
+state, E2 generates an explicit three-time state trajectory and evaluates each
+likelihood operator at its own generated time.  This adds temporally coherent
+assimilation information rather than merely adding age channels.  The paper
+claim is supported only if E2 improves held-out observed-footprint innovation RMSE by at least 10%
 while preserving proper-score and off-track safety constraints.  A failure is
 publishable evidence that age metadata is not an adequate proxy for a
 likelihood-consistent smoother and that this fixed-lag construction adds no
@@ -28,18 +30,26 @@ defensible temporal benefit.
 
 ## Immutable scientific intervention
 
-- The state contains exactly the current background and the two preceding
-  daily backgrounds, ordered current, one-day old, two-days old.
+- The generated state contains exactly the current state and the two preceding
+  daily states, ordered current, one-day old, two-days old.  This is distinct
+  from E1's lag-specific exogenous background fields used in conditioning.
 - Each observation innovation is evaluated only against its matching
   background frame: `y_{t-k} - b_{t-k}` under the corresponding finite mask.
   Broadcasting the current background across lags is a hard failure.
 - The eight provenance-aware fields per lag, physical occurrence atom
   `A=1{SIC>0}`, bounded conditional intensity, channel ordering, masks and
   orientation landmarks are bit-for-bit the accepted E1 definitions.
+- The publication-side correctness oracle is
+  `assim_lib.occurrence_intensity_e2.apply_operators_at_own_time`; it accepts an
+  explicit `[B,3,C,H,W]` generated trajectory and fails closed on a broadcast
+  current-state surrogate, operator-count drift, invalid shapes or non-finite
+  observed values.  It is not a runner and does not authorize computation.
 - E1 and E2 use the same frozen training inventory, held-out case identities,
   preprocessing, optimizer, update budget, checkpoint rule, initialisation
   seeds and ten-member sampling schedule.  The only scientific difference is
-  replacement of age-only conditioning by the explicit lag-matched trajectory.
+  generation of the explicit lagged state trajectory and evaluation of the
+  matching observation operator at each generated time; E1 conditioning stays
+  unchanged.
 - Primary training uses real tracks only.  Synthetic tracks, truth-derived
   tracks, hard output clipping, epsilon clipping and outcome-time model or
   checkpoint selection are prohibited.

@@ -665,6 +665,21 @@ report 83 files; dated 79-file entries remain unchanged as audit history. No
 scientific result, blocker state or readiness decision changed. Publication
 status remains `NOT_READY`.
 
+The 2026-09-05 temporal-mapping audit found and removed an ambiguity between E1
+and E2. E1 already uses lag-specific exogenous background fields to construct
+its conditioning innovations, but it generates only the current state; E2 is
+now stated precisely as generation of a three-time state trajectory followed by
+application of each likelihood operator to its matching generated state. The
+new publication-side oracle `apply_operators_at_own_time` fails closed on a
+broadcast current-state surrogate, wrong operator count, invalid shapes,
+non-finite generated states or non-finite observed pixels, and zeros all masked
+outputs without NaN leakage. Python compilation and the six focused E1
+admission-validator tests pass. The three torch-dependent E2 oracle tests are
+present but cannot execute in the available local interpreters because none
+contains torch; they remain mandatory independent-environment checks. This is
+pre-admission engineering evidence only, creates no trusted mode or scientific
+result, and publication status remains `NOT_READY`.
+
 The 2026-09-05 E1 runtime audit reviewed the latest 25 commits and found that the
 existing handoff stopped at pure representation primitives and admission JSON.
 The publication worktree now contains one executable eight-case engineering
