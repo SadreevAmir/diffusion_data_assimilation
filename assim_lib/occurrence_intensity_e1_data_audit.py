@@ -204,7 +204,9 @@ def run_real_data_audit(
             sral_paths = dataset.sral_records.get(target - timedelta(days=lag), [])
             sources.append({
                 "lag": lag, "date": record.date.isoformat(),
+                "forecast_path": str(record.path),
                 "forecast_sha256": sha256_file(record.path),
+                "sral_paths": [str(path) for path in sral_paths],
                 "sral_sha256": [sha256_file(path) for path in sral_paths],
             })
         source_inventory.append({"case_id": case["case_id"], "sources": sources})

@@ -26,6 +26,23 @@ FROZEN_LANDMARKS = [
     {"name": "western_arctic_grid_landmark", "row": 32, "column": 32},
     {"name": "greenland_sector_grid_landmark", "row": 287, "column": 223},
 ]
+FROZEN_CONFIG = {
+    "mode": MODE,
+    "project_name": "generative-sea-ice-da",
+    "task_name": "occurrence-intensity-e1-real-data-audit",
+    "clearml": {"enabled": True},
+    "resource_kind": "server_cpu",
+    "dataset_config": "config/data/m2m_2f_1y.json",
+    "dataset_split": "valid",
+    "case_manifest": "paper/OCCURRENCE_INTENSITY_E1_REAL_CASES.json",
+    "lags_days": [0, 1, 2],
+    "sral_transform_index": 11,
+    "observed_channel": 0,
+    "artifact_policy": "selected_artifacts",
+    "selected_artifacts": [
+        "run_status.json", "metadata.json", "per_case_audit.json", "panels/*.png",
+    ],
+}
 
 
 def _load(path: Path) -> Any:
@@ -49,10 +66,8 @@ def _is_sha256(value: Any) -> bool:
 
 def validate_compact_audit(config_path: Path, output: Path) -> str:
     config = _load(config_path)
-    if config.get("dataset_config") != "config/data/m2m_2f_1y.json":
-        raise ValueError("dataset config path differs from the frozen audit contract")
-    if config.get("case_manifest") != "paper/OCCURRENCE_INTENSITY_E1_REAL_CASES.json":
-        raise ValueError("case manifest path differs from the frozen audit contract")
+    if config != FROZEN_CONFIG:
+        raise ValueError("config differs from the complete frozen audit contract")
     status = _load(output / "run_status.json")
     metadata = _load(output / "metadata.json")
     cases = _load(output / "per_case_audit.json")
@@ -122,7 +137,9 @@ def validate_compact_audit(config_path: Path, output: Path) -> str:
             raise ValueError("per-case audit must contain exactly three lag rows")
         target_date = date.fromisoformat(audit_case.get("target_date", ""))
         for source, audit_lag, expected_lag in zip(sources, audit_lags, (0, 1, 2)):
-            if set(source) != {"lag", "date", "forecast_sha256", "sral_sha256"}:
+            if set(source) != {
+                "lag", "date", "forecast_path", "forecast_sha256", "sral_paths", "sral_sha256",
+            }:
                 raise ValueError("source inventory lag keys must be exact")
             expected_date = (target_date - timedelta(days=expected_lag)).isoformat()
             if (
@@ -134,13 +151,20 @@ def validate_compact_audit(config_path: Path, output: Path) -> str:
                 raise ValueError("source inventory lag/date differs from the per-case audit")
             if not _is_sha256(source["forecast_sha256"]):
                 raise ValueError("invalid forecast source hash")
+            if not isinstance(source["forecast_path"], str) or not source["forecast_path"]:
+                raise ValueError("forecast source path must be explicit")
+            sral_paths = source["sral_paths"]
             sral_hashes = source["sral_sha256"]
             if (
-                not isinstance(sral_hashes, list)
+                not isinstance(sral_paths, list)
+                or not sral_paths
+                or not all(isinstance(item, str) and item for item in sral_paths)
+                or not isinstance(sral_hashes, list)
                 or not sral_hashes
                 or not all(_is_sha256(item) for item in sral_hashes)
+                or len(sral_paths) != len(sral_hashes)
             ):
-                raise ValueError("each lag must bind at least one real SRAL source hash")
+                raise ValueError("each lag must bind explicit real SRAL paths one-to-one with hashes")
     for case, manifest_case in zip(cases, manifest_cases):
         if set(case) != {
             "case_id", "coverage_slot", "target_date", "hour", "truth_finite_on_valid_domain",

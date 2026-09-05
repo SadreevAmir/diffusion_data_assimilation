@@ -175,7 +175,7 @@ class E1RealDataAuditTest(unittest.TestCase):
             ).encode()
             payload["source_inventory_sha256"] = hashlib.sha256(inventory_bytes).hexdigest()
             path.write_text(json.dumps(payload))
-            with self.assertRaisesRegex(ValueError, "at least one real SRAL source hash"):
+            with self.assertRaisesRegex(ValueError, "one-to-one with hashes"):
                 validate_compact_audit(CONFIG, root / "output")
 
     def test_validator_rejects_case_metadata_drift(self):
@@ -202,6 +202,40 @@ class E1RealDataAuditTest(unittest.TestCase):
             payload["dataset_config_sha256"] = "0" * 64
             path.write_text(json.dumps(payload))
             with self.assertRaisesRegex(ValueError, "frozen dataset config"):
+                validate_compact_audit(CONFIG, root / "output")
+
+    def test_validator_rejects_rehashed_complete_config_drift(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            run_real_data_audit(
+                CONFIG, root / "output", dataset_builder=lambda config, split: FakeDataset(root)
+            )
+            drifted_config = root / "drifted_config.json"
+            payload = json.loads(CONFIG.read_text())
+            payload["sral_transform_index"] = 10
+            drifted_config.write_text(json.dumps(payload))
+            metadata_path = root / "output" / "metadata.json"
+            metadata = json.loads(metadata_path.read_text())
+            metadata["config_sha256"] = hashlib.sha256(drifted_config.read_bytes()).hexdigest()
+            metadata_path.write_text(json.dumps(metadata))
+            with self.assertRaisesRegex(ValueError, "complete frozen audit contract"):
+                validate_compact_audit(drifted_config, root / "output")
+
+    def test_validator_rejects_source_path_hash_cardinality_drift(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            run_real_data_audit(
+                CONFIG, root / "output", dataset_builder=lambda config, split: FakeDataset(root)
+            )
+            path = root / "output" / "metadata.json"
+            payload = json.loads(path.read_text())
+            payload["source_inventory"][0]["sources"][0]["sral_paths"].append("unbound.npy")
+            inventory_bytes = json.dumps(
+                payload["source_inventory"], sort_keys=True, separators=(",", ":")
+            ).encode()
+            payload["source_inventory_sha256"] = hashlib.sha256(inventory_bytes).hexdigest()
+            path.write_text(json.dumps(payload))
+            with self.assertRaisesRegex(ValueError, "one-to-one with hashes"):
                 validate_compact_audit(CONFIG, root / "output")
 
     def test_validator_rejects_geographic_landmark_drift(self):
