@@ -26,6 +26,20 @@ CONFIG_KEYS = {
     "sral_transform_index", "observed_channel", "artifact_policy", "selected_artifacts",
 }
 OUTPUT_FILES = ("run_status.json", "metadata.json", "per_case_audit.json")
+FROZEN_CASES = [
+    {"case_id": "2022-01-01_h23", "target_date": "2022-01-01", "hour": 23, "coverage_slot": "winter_early"},
+    {"case_id": "2022-01-26_h23", "target_date": "2022-01-26", "hour": 23, "coverage_slot": "winter_late"},
+    {"case_id": "2022-02-25_h23", "target_date": "2022-02-25", "hour": 23, "coverage_slot": "spring_early"},
+    {"case_id": "2022-03-22_h23", "target_date": "2022-03-22", "hour": 23, "coverage_slot": "spring_late"},
+    {"case_id": "2022-04-21_h23", "target_date": "2022-04-21", "hour": 23, "coverage_slot": "melt_early"},
+    {"case_id": "2022-05-16_h23", "target_date": "2022-05-16", "hour": 23, "coverage_slot": "melt_mid"},
+    {"case_id": "2022-06-15_h23", "target_date": "2022-06-15", "hour": 23, "coverage_slot": "melt_late"},
+    {"case_id": "2022-07-15_h23", "target_date": "2022-07-15", "hour": 23, "coverage_slot": "summer_early"},
+]
+FROZEN_LANDMARKS = [
+    {"name": "western_arctic_grid_landmark", "row": 32, "column": 32},
+    {"name": "greenland_sector_grid_landmark", "row": 287, "column": 223},
+]
 
 
 def sha256_file(path: str | Path) -> str:
@@ -45,7 +59,9 @@ def validate_audit_config(config: dict[str, Any]) -> None:
         "task_name": "occurrence-intensity-e1-real-data-audit",
         "clearml": {"enabled": True},
         "resource_kind": "server_cpu",
+        "dataset_config": "config/data/m2m_2f_1y.json",
         "dataset_split": "valid",
+        "case_manifest": "paper/OCCURRENCE_INTENSITY_E1_REAL_CASES.json",
         "lags_days": [0, 1, 2],
         "sral_transform_index": 11,
         "observed_channel": 0,
@@ -69,6 +85,8 @@ def validate_case_manifest(manifest: dict[str, Any]) -> None:
     cases = manifest["cases"]
     if not isinstance(cases, list) or len(cases) != 8:
         raise ValueError("E1 real-case manifest must contain exactly eight cases")
+    if cases != FROZEN_CASES:
+        raise ValueError("E1 real-case identities or coverage slots differ from the frozen selection")
     if len({case.get("case_id") for case in cases}) != 8:
         raise ValueError("E1 case identifiers must be unique")
     for case in cases:
@@ -82,6 +100,8 @@ def validate_case_manifest(manifest: dict[str, Any]) -> None:
     landmarks = manifest["orientation_landmarks"]
     if not isinstance(landmarks, list) or len(landmarks) != 2:
         raise ValueError("exactly two orientation landmarks are required")
+    if landmarks != FROZEN_LANDMARKS:
+        raise ValueError("E1 orientation landmarks differ from the frozen geographic anchors")
     for landmark in landmarks:
         if set(landmark) != {"name", "row", "column"}:
             raise ValueError("orientation landmark keys must be exact")

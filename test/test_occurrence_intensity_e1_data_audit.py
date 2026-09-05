@@ -85,6 +85,21 @@ class E1RealDataAuditTest(unittest.TestCase):
         validate_audit_config(json.loads(CONFIG.read_text()))
         validate_case_manifest(json.loads(MANIFEST.read_text()))
 
+    def test_runner_rejects_structurally_valid_case_identity_drift(self):
+        manifest = json.loads(MANIFEST.read_text())
+        manifest["cases"][0] = {
+            "case_id": "2022-01-06_h23", "target_date": "2022-01-06", "hour": 23,
+            "coverage_slot": "winter_early",
+        }
+        with self.assertRaisesRegex(ValueError, "frozen selection"):
+            validate_case_manifest(manifest)
+
+    def test_runner_rejects_structurally_valid_landmark_drift(self):
+        manifest = json.loads(MANIFEST.read_text())
+        manifest["orientation_landmarks"][0]["row"] += 1
+        with self.assertRaisesRegex(ValueError, "frozen geographic anchors"):
+            validate_case_manifest(manifest)
+
     def test_runner_uses_dataset_and_emits_valid_compact_contract(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

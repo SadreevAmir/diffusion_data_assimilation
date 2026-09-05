@@ -12,6 +12,20 @@ import struct
 from typing import Any
 
 MODE = "occurrence_intensity_e1_real_data_audit"
+FROZEN_CASES = [
+    {"case_id": "2022-01-01_h23", "target_date": "2022-01-01", "hour": 23, "coverage_slot": "winter_early"},
+    {"case_id": "2022-01-26_h23", "target_date": "2022-01-26", "hour": 23, "coverage_slot": "winter_late"},
+    {"case_id": "2022-02-25_h23", "target_date": "2022-02-25", "hour": 23, "coverage_slot": "spring_early"},
+    {"case_id": "2022-03-22_h23", "target_date": "2022-03-22", "hour": 23, "coverage_slot": "spring_late"},
+    {"case_id": "2022-04-21_h23", "target_date": "2022-04-21", "hour": 23, "coverage_slot": "melt_early"},
+    {"case_id": "2022-05-16_h23", "target_date": "2022-05-16", "hour": 23, "coverage_slot": "melt_mid"},
+    {"case_id": "2022-06-15_h23", "target_date": "2022-06-15", "hour": 23, "coverage_slot": "melt_late"},
+    {"case_id": "2022-07-15_h23", "target_date": "2022-07-15", "hour": 23, "coverage_slot": "summer_early"},
+]
+FROZEN_LANDMARKS = [
+    {"name": "western_arctic_grid_landmark", "row": 32, "column": 32},
+    {"name": "greenland_sector_grid_landmark", "row": 287, "column": 223},
+]
 
 
 def _load(path: Path) -> Any:
@@ -35,6 +49,10 @@ def _is_sha256(value: Any) -> bool:
 
 def validate_compact_audit(config_path: Path, output: Path) -> str:
     config = _load(config_path)
+    if config.get("dataset_config") != "config/data/m2m_2f_1y.json":
+        raise ValueError("dataset config path differs from the frozen audit contract")
+    if config.get("case_manifest") != "paper/OCCURRENCE_INTENSITY_E1_REAL_CASES.json":
+        raise ValueError("case manifest path differs from the frozen audit contract")
     status = _load(output / "run_status.json")
     metadata = _load(output / "metadata.json")
     cases = _load(output / "per_case_audit.json")
@@ -84,6 +102,10 @@ def validate_compact_audit(config_path: Path, output: Path) -> str:
     manifest = _load(manifest_path)
     manifest_cases = manifest["cases"]
     manifest_landmarks = manifest["orientation_landmarks"]
+    if manifest_cases != FROZEN_CASES:
+        raise ValueError("manifest cases differ from the frozen eight-case selection")
+    if manifest_landmarks != FROZEN_LANDMARKS:
+        raise ValueError("manifest landmarks differ from the frozen geographic anchors")
     expected_ids = [case["case_id"] for case in manifest_cases]
     if [case.get("case_id") for case in cases] != expected_ids:
         raise ValueError("audited identities differ from the frozen manifest")
