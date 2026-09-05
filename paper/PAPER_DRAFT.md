@@ -571,6 +571,14 @@ minimum strong domain/SciML baseline tier incomplete and cannot compensate for
 a failed calibration-gate family. Generalization across checkpoints, seeds,
 ensemble sizes, regions or observation systems remains unverified.
 
+A separate occurrence--intensity programme (E1--E4) is fully predeclared but
+has produced no empirical result. E1 is an independently admitted engineering
+control; only a literal pass can route to separately reviewed E2, E3 and E4
+executors. E2 tests lag-consistent temporal assimilation, E3 tests atom-aware
+interior calibration, and E4 tests complete-field analog uncertainty. None has
+a controller-visible trusted mode, and their frozen contracts neither authorize
+a launch nor change any result, claim or readiness status reported here.
+
 ## 8. Evidence table for the frozen mechanism claim
 
 | Diagnostic | Raw ensemble | Cross-fitted correction | Interpretation |

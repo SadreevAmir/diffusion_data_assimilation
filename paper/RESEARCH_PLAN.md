@@ -4,6 +4,17 @@ External primary evidence state: RECONCILED_NEGATIVE
 
 ## Frozen next development mechanism
 
+`NEXT_OCCURRENCE_INTENSITY_E4_CONTRACT.md` now completes the contingent
+occurrence--intensity route after valid E1--E3 decisions.  It retrieves ten
+complete training-fold-only residual fields from six forecast-only state
+features, preserves each residual as a coherent spatial field, and prohibits
+clipping, pixelwise resampling and outcome-time selection.  Its conjunctive
+gate requires at least `0.05` higher attainable inner coverage and at least
+`10%` lower absolute randomized-rank TV, together with the unchanged proper,
+boundary, spatial/physical and operational safeguards.  E4 has no trusted
+executor mode and is not launch-authorized; it is a frozen terminal contingent
+mechanism, not empirical evidence or a route around E1 admission.
+
 `NEXT_OCCURRENCE_INTENSITY_E3_CONTRACT.md` now freezes the atom-aware marginal
 mechanism that follows a clean E1 control and either scientific E2 outcome.  It
 preserves exact zero/one atoms and applies one training-fold-only reversible
