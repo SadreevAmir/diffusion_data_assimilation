@@ -56,6 +56,9 @@ to repair of the named invariant and repetition of the unchanged admission.
 
 ## Paired compact evidence
 
+- [ ] The compact JSON is accepted by
+  `validate_occurrence_intensity_e2_compact_result.py` without schema,
+  identity, finiteness, aggregate-parity or decision mismatch.
 - [ ] The compact result records exact E1/E2 identities, inventory and code
   digests, ordered case count, all invariant decisions and literal gate result.
 - [ ] Casewise observed-footprint innovation RMSE is reported separately for

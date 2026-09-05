@@ -76,6 +76,15 @@ reports ordinary CRPS, absolute randomized-rank adequacy, attainable coverage,
 truth-relative boundary events and the unchanged spatial/physical diagnostics;
 none may be used to retune E2.
 
+Before any controller admission, the result interface is frozen by
+`validate_occurrence_intensity_e2_compact_result.py`.  It requires exact
+identities and SHA-256 digests, the ordered case inventory, exact lag order,
+complete finite paired vectors, reconciled aggregates, all named invariants and
+operational checks, and non-empty secondary diagnostic records.  It recomputes
+the literal decision and rejects extra or missing fields.  This validator is a
+publication-side schema oracle only: it neither implements E2 nor creates a
+trusted mode.
+
 ## Stop/go decision
 
 E2 is `TEMPORAL_MECHANISM_USEFUL` if and only if all conditions hold:

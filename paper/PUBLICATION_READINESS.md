@@ -24,6 +24,17 @@ boundary is recorded in `CALENDAR_RESIDUAL_CFM_RESULT_RECONCILIATION.md`.
 
 ## Latest method-admission boundary (2026-09-05)
 
+The contingent E2 compact-result boundary is now executable and fail closed.
+`validate_occurrence_intensity_e2_compact_result.py` binds exact identities,
+digests, lag order, ten-member schedule, complete finite paired case vectors,
+aggregate parity, invariants, operational checks and required secondary
+diagnostics.  It independently recomputes `TEMPORAL_MECHANISM_USEFUL`,
+`TEMPORAL_MECHANISM_NEGATIVE` or `E2_INVALID`; a schema, identity, non-finite,
+invariant or decision mismatch cannot be reported as a scientific negative.
+Six focused mutation tests passed together with the six E1 admission tests.
+This is pre-admission engineering evidence only: no E2 result, trusted mode or
+launch authorization exists, and the verdict remains `NOT_READY`.
+
 The E1 admission boundary now validates the complete frozen handoff rather than
 only selected fields.  `validate_config` rejects extra top-level or dataset
 keys and binds the exact project, task, three-lag ordering and eight-field
