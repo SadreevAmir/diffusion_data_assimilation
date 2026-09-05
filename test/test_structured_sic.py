@@ -3,8 +3,12 @@ import unittest
 import torch
 
 from assim_lib.structured_sic import (
+    continuous_dequantize_occurrence,
+    decode_cfm_targets,
     decode_zero_inflated_sic,
     encode_zero_inflated_sic,
+    exact_one_policy,
+    make_cfm_targets,
     make_lagged_observation_channels,
 )
 
@@ -47,8 +51,7 @@ class LaggedConditioningTest(unittest.TestCase):
                         values[:, lag] * mask,
                         mask,
                         ages[:, lag, None, None] * mask,
-                        mask - synthetic,
-                        synthetic,
+                        mask - synthetic, synthetic, mask - synthetic, synthetic,
                     ),
                     dim=1,
                 )
@@ -79,8 +82,8 @@ class LaggedConditioningTest(unittest.TestCase):
             torch.tensor([[0.0, 1.0, 2.0]]),
             torch.tensor([[0.0, 1.0, 0.0]]),
         )
-        self.assertEqual(result.shape, (1, 18, 2, 2))
-        first, second, third = result[:, :6], result[:, 6:12], result[:, 12:]
+        self.assertEqual(result.shape, (1, 24, 2, 2))
+        first, second, third = result[:, :8], result[:, 8:16], result[:, 16:]
         self.assertAlmostEqual(first[0, 0, 0, 0].item(), 0.25)
         self.assertEqual(first[0, 3, 0, 0].item(), 0.0)
         self.assertEqual(first[0, 4, 0, 0].item(), 1.0)
@@ -158,14 +161,11 @@ class LaggedConditioningTest(unittest.TestCase):
         finite = torch.zeros(1, 3, 1, 1)
         ages = torch.tensor([[0.0, 1.0, 2.0]])
         provenance = torch.zeros(1, 3)
-        with self.assertRaisesRegex(ValueError, "finite"):
-            make_lagged_observation_channels(
-                torch.full_like(finite, float("nan")), finite, finite, ages, provenance
-            )
-        with self.assertRaisesRegex(ValueError, "finite"):
-            make_lagged_observation_channels(
-                finite, torch.full_like(finite, float("inf")), finite, ages, provenance
-            )
+        observed = torch.ones_like(finite)
+        with self.assertRaisesRegex(ValueError, "observed pixels"):
+            make_lagged_observation_channels(torch.full_like(finite, float("nan")), finite, observed, ages, provenance)
+        with self.assertRaisesRegex(ValueError, "observed pixels"):
+            make_lagged_observation_channels(finite, torch.full_like(finite, float("inf")), observed, ages, provenance)
         with self.assertRaisesRegex(ValueError, "finite"):
             make_lagged_observation_channels(
                 finite, finite, torch.full_like(finite, float("nan")), ages, provenance
@@ -179,8 +179,42 @@ class LaggedConditioningTest(unittest.TestCase):
                 finite, finite, finite, ages, torch.full_like(provenance, float("inf"))
             )
 
+    def test_nan_missing_values_are_zeroed_without_leakage(self):
+        background = torch.tensor([[[[0.2, float("nan")]]] * 3])
+        values = torch.tensor([[[[0.5, float("nan")]]] * 3])
+        masks = torch.tensor([[[[1.0, 0.0]]] * 3])
+        result = make_lagged_observation_channels(
+            background, values, masks, torch.tensor([[0.0, 1.0, 2.0]]), torch.zeros(1, 3)
+        )
+        self.assertTrue(torch.all(torch.isfinite(result)))
+        self.assertTrue(torch.all(result[..., 1] == 0))
+
+    def test_geometry_and_value_provenance_are_distinct(self):
+        base = torch.zeros(1, 3, 1, 1)
+        mask = torch.ones_like(base)
+        result = make_lagged_observation_channels(
+            base, base, mask, torch.tensor([[0.0, 1.0, 2.0]]), torch.zeros(1, 3), torch.ones_like(base)
+        )
+        self.assertEqual(result[0, 4, 0, 0].item(), 1.0)
+        self.assertEqual(result[0, 5, 0, 0].item(), 0.0)
+        self.assertEqual(result[0, 6, 0, 0].item(), 0.0)
+        self.assertEqual(result[0, 7, 0, 0].item(), 1.0)
+
 
 class BoundedRepresentationTest(unittest.TestCase):
+    def test_complete_dequantized_law_and_zero_auxiliary(self):
+        sic = torch.tensor([0.0, 0.2, 1.0])
+        occurrence, intensity = make_cfm_targets(
+            sic, torch.tensor([0.2, 0.4, 0.8]), torch.tensor([0.7, 0.1, 0.3])
+        )
+        self.assertTrue(torch.equal(occurrence, torch.tensor([0.1, 0.7, 0.9])))
+        self.assertTrue(torch.equal(intensity, torch.tensor([0.7, 0.2, 1.0])))
+        self.assertTrue(torch.equal(decode_cfm_targets(occurrence, intensity), sic))
+        self.assertTrue(torch.equal(continuous_dequantize_occurrence(torch.tensor([0., 1.]), torch.zeros(2)), torch.tensor([0., .5])))
+
+    def test_exact_one_policy_uses_training_inventory(self):
+        self.assertEqual(exact_one_policy(torch.tensor([0.0, 0.9])), "no_exact_one_atom")
+        self.assertEqual(exact_one_policy(torch.tensor([0.0, 1.0])), "explicit_exact_one_atom")
     def test_round_trip_preserves_zero_and_interior(self):
         concentration = torch.tensor([0.0, 1e-8, 0.001, 0.1, 0.15, 0.1501, 0.4, 0.999, 1.0])
         occurrence, intensity = encode_zero_inflated_sic(concentration)

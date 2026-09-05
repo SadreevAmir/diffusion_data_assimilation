@@ -1,0 +1,20 @@
+{
+  "mode": "occurrence_intensity_e1_engineering_sentinel",
+  "project_name": "generative-sea-ice-da",
+  "task_name": "occurrence-intensity-e1-engineering-sentinel",
+  "clearml": {"enabled": true},
+  "protocol": "primary_real",
+  "cases": 8,
+  "selection_role": "engineering_only",
+  "rank_gate": false,
+  "dataset": {
+    "lags_days": [0, 1, 2],
+    "channel_layout_per_lag": ["innovation", "value", "mask", "age", "geometry_real", "geometry_synthetic", "value_real", "value_synthetic"],
+    "observed_finite_only": true
+  },
+  "target": {
+    "occurrence": "continuous_dequantized_exact_zero",
+    "zero_intensity_auxiliary": "uniform_0_1",
+    "exact_one_policy_source": "train_inventory"
+  }
+}

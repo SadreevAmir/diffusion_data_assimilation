@@ -1,6 +1,6 @@
 # Provenance-aware occurrence–intensity CFM: corrected representation contract
 
-Status: P0_CORRECTED_INDEPENDENT_READMISSION_REQUIRED
+Status: P0_IMPLEMENTED_INDEPENDENT_READMISSION_REQUESTED
 
 ## Scientific hypothesis
 
@@ -26,8 +26,10 @@ labelled augmentation ablation after the primary sentinel passes.
   respectively 0, 1 and 2 on observed pixels and zero elsewhere.
 - Innovation at day `t-k` is exactly `y_{t-k} - b_{t-k}` under its finite mask.
   Passing only current `b_t` for multiple lags is a shape error, not broadcast.
-- Provenance is one-hot real/synthetic on every observed pixel and zero outside
-  each lag mask. Values and innovations are zero outside their own mask.
+- Geometry provenance and value provenance are separate one-hot real/synthetic
+  fields. They are zero outside each lag mask; values and innovations use
+  `torch.where`, so NaN at missing pixels cannot leak through multiplication.
+  Finiteness is required exactly on observed pixels.
 - Occurrence is the physical atom `A=1{SIC>0}`. The representation preserves
   every `0<SIC<=0.15` exactly. The `0.15` threshold exists only as the derived
   established-ice diagnostic/event and never controls encode/decode.
@@ -40,12 +42,22 @@ labelled augmentation ablation after the primary sentinel passes.
 - Every training run must fail closed unless `clearml.enabled=true`; its task
   records data/model hashes, protocol (`primary_real` or `synthetic_ablation`),
   seed, checkpoints, train/validation curves and sentinel artifacts.
+- The occurrence CFM target is `Z=(A+U)/2`, `U~Uniform[0,1)`, giving disjoint
+  continuous laws on `[0,.5)` and `[.5,1)` and exact-zero recovery at threshold
+  `.5`. At zero, intensity uses an independent `Uniform[0,1]` auxiliary law and
+  is ignored by decoding. Positive intensity remains the exact SIC value.
+- Exact-one handling is frozen only after the training inventory: presence of
+  exact ones selects `explicit_exact_one_atom`; absence selects
+  `no_exact_one_atom`. Sentinel information cannot change this policy.
 
-## Withdrawn sentinel
+## E1 engineering sentinel
 
-The prior eight-case sentinel is not admissible and must not run. Its numerical
-criteria below are retained only as historical design context pending independent
-readmission of corrected code. It had proposed eight predeclared validation cases spanning
+The new eight-case sentinel remains blocked pending independent admission. It is
+an engineering check only: it may test finiteness, bounds, channel leakage,
+orientation, provenance and visually inspect individual members, but it has no
+rank gate and cannot select a checkpoint or support a calibration claim. The
+historical numerical criteria below are withdrawn and retained only as design
+context. The cases span
 low/high ice area and sparse/dense real-track coverage, selected from training
 metadata without reading their truth fields. Train only the short predeclared
 budget; do not choose an epoch from sentinel rank metrics. Compare against the
