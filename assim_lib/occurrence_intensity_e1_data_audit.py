@@ -165,6 +165,12 @@ def run_real_data_audit(
     }
     dataset = dataset_builder(data_config, config["dataset_split"])
 
+    valid_domain = (
+        dataset.base_valid_mask[config["observed_channel"]]
+        .detach().cpu().to(torch.uint8).contiguous().numpy()
+    )
+    valid_domain_sha256 = hashlib.sha256(valid_domain.tobytes(order="C")).hexdigest()
+
     # Resolve every identity and seal source metadata before __getitem__ may read truth.
     resolved = [(case, _dataset_index(dataset, case)) for case in manifest["cases"]]
     source_inventory = []
@@ -263,6 +269,8 @@ def run_real_data_audit(
     }
     metadata = {
         "config_sha256": sha256_file(config_path), "case_manifest_sha256": sha256_file(manifest_path),
+        "dataset_config_sha256": sha256_file(config["dataset_config"]),
+        "valid_domain_sha256": valid_domain_sha256,
         "source_inventory_sha256": hashlib.sha256(inventory_bytes).hexdigest(),
         "source_inventory": source_inventory,
         "dataset_provenance": dataset.provenance(), "truth_values_consulted_for_selection": False,

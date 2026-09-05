@@ -44,7 +44,8 @@ def validate_compact_audit(config_path: Path, output: Path) -> str:
     }:
         raise ValueError("run_status does not describe the frozen engineering-only audit")
     expected_metadata = {
-        "config_sha256", "case_manifest_sha256", "source_inventory_sha256",
+        "config_sha256", "case_manifest_sha256", "dataset_config_sha256",
+        "valid_domain_sha256", "source_inventory_sha256",
         "source_inventory", "dataset_provenance", "truth_values_consulted_for_selection", "lags_days",
         "sral_footprint_semantics", "panel_layout",
     }
@@ -55,6 +56,11 @@ def validate_compact_audit(config_path: Path, output: Path) -> str:
     manifest_path = Path(config["case_manifest"])
     if metadata["case_manifest_sha256"] != hashlib.sha256(manifest_path.read_bytes()).hexdigest():
         raise ValueError("metadata does not bind the frozen case manifest")
+    dataset_config_path = Path(config["dataset_config"])
+    if metadata["dataset_config_sha256"] != hashlib.sha256(dataset_config_path.read_bytes()).hexdigest():
+        raise ValueError("metadata does not bind the frozen dataset config")
+    if not _is_sha256(metadata["valid_domain_sha256"]):
+        raise ValueError("metadata does not bind a canonical valid-domain mask")
     if metadata["truth_values_consulted_for_selection"] is not False:
         raise ValueError("truth-dependent case selection is forbidden")
     if metadata["lags_days"] != [0, 1, 2] or metadata["panel_layout"] != [
@@ -75,7 +81,9 @@ def validate_compact_audit(config_path: Path, output: Path) -> str:
         raise ValueError("source inventory must cover all eight cases")
     if not isinstance(cases, list) or len(cases) != 8:
         raise ValueError("per-case audit must contain exactly eight cases")
-    manifest_cases = _load(manifest_path)["cases"]
+    manifest = _load(manifest_path)
+    manifest_cases = manifest["cases"]
+    manifest_landmarks = manifest["orientation_landmarks"]
     expected_ids = [case["case_id"] for case in manifest_cases]
     if [case.get("case_id") for case in cases] != expected_ids:
         raise ValueError("audited identities differ from the frozen manifest")
@@ -124,6 +132,19 @@ def validate_compact_audit(config_path: Path, output: Path) -> str:
             raise ValueError("truth finiteness or lag-specific background invariant failed")
         if case["co_registered_shape"] != [320, 256] or len(case["orientation_landmarks"]) != 2:
             raise ValueError("co-registration/orientation contract failed")
+        for observed, expected in zip(case["orientation_landmarks"], manifest_landmarks):
+            if set(observed) != {"name", "row", "column", "valid_domain", "lag_mask_values"}:
+                raise ValueError("orientation landmark keys must be exact")
+            if any(observed[key] != expected[key] for key in ("name", "row", "column")):
+                raise ValueError("orientation landmarks differ from the frozen geographic anchors")
+            if not isinstance(observed["valid_domain"], bool):
+                raise ValueError("orientation landmark valid-domain state must be boolean")
+            if (
+                not isinstance(observed["lag_mask_values"], list)
+                or len(observed["lag_mask_values"]) != 3
+                or any(value not in (0, 1) for value in observed["lag_mask_values"])
+            ):
+                raise ValueError("orientation landmark lag-mask states must be three binary values")
         if [lag.get("lag_days") for lag in case["lags"]] != [0, 1, 2]:
             raise ValueError("lag order changed")
         for lag in case["lags"]:

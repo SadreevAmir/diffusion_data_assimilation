@@ -176,6 +176,32 @@ class E1RealDataAuditTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "differs from the frozen manifest"):
                 validate_compact_audit(CONFIG, root / "output")
 
+    def test_validator_rejects_dataset_config_drift(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            run_real_data_audit(
+                CONFIG, root / "output", dataset_builder=lambda config, split: FakeDataset(root)
+            )
+            path = root / "output" / "metadata.json"
+            payload = json.loads(path.read_text())
+            payload["dataset_config_sha256"] = "0" * 64
+            path.write_text(json.dumps(payload))
+            with self.assertRaisesRegex(ValueError, "frozen dataset config"):
+                validate_compact_audit(CONFIG, root / "output")
+
+    def test_validator_rejects_geographic_landmark_drift(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            run_real_data_audit(
+                CONFIG, root / "output", dataset_builder=lambda config, split: FakeDataset(root)
+            )
+            path = root / "output" / "per_case_audit.json"
+            payload = json.loads(path.read_text())
+            payload[0]["orientation_landmarks"][0]["row"] += 1
+            path.write_text(json.dumps(payload))
+            with self.assertRaisesRegex(ValueError, "frozen geographic anchors"):
+                validate_compact_audit(CONFIG, root / "output")
+
 
 if __name__ == "__main__":
     unittest.main()
