@@ -24,6 +24,20 @@ boundary is recorded in `CALENDAR_RESIDUAL_CFM_RESULT_RECONCILIATION.md`.
 
 ## Latest method-admission boundary (2026-09-05)
 
+The contingent E1--E4 route is now fully predeclared.  The terminal E4
+coherent-uncertainty-source mechanism is frozen in
+`NEXT_OCCURRENCE_INTENSITY_E4_CONTRACT.md`: it retrieves ten complete
+training-fold-only residual fields using six forecast-only state features,
+preserves every residual as a spatial field, and prohibits clipping,
+pixelwise resampling and outcome-time selection.  Its conjunctive decision
+requires at least `0.05` attainable-inner-coverage improvement and at least
+`10%` absolute randomized-rank-TV reduction together with the unchanged
+proper-score, truth-relative boundary, spatial/physical and operational
+safeguards.  E4 remains dependent on valid predecessor routing, has no
+controller-visible trusted mode and does not authorize launch.  Consequently
+this closure improves pre-result reproducibility but leaves `NOT_READY` and
+`eligible_calibration=MISSING_ELIGIBLE_RESULT` unchanged.
+
 The next independent marginal mechanism is now fully predeclared in
 `NEXT_OCCURRENCE_INTENSITY_E3_CONTRACT.md`.  E3 preserves exact zero and one
 atoms, applies a deterministic training-fold-only generalized-inverse transform

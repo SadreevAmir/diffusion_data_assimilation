@@ -2,6 +2,26 @@
 
 External primary evidence state: RECONCILED_NEGATIVE
 
+## Current E1--E4 pre-result handoff
+
+`NEXT_OCCURRENCE_INTENSITY_E4_CONTRACT.md` completes the frozen contingent
+route after valid E1--E3 decisions.  E4 uses the predecessor's unchanged
+purged folds and ten-member schedule, six forecast-only state features with
+training-fold-only standardization, and ten complete historical residual
+fields with chronological tie-breaking.  The compact result must bind code,
+input, base and fold digests plus analog identities and distances, casewise
+metric vectors and the literal decision.  Raw members and residual fields stay
+server-side under `summary_only` retrieval.
+
+This is a pre-result reproducibility contract only.  No controller-visible
+trusted mode implements it, no launch is authorized, and no local check may be
+interpreted as an admission or scientific result.  A finite valid result is
+useful only when attainable inner coverage improves by at least `0.05`,
+absolute randomized-rank total variation falls by at least `10%`, and every
+frozen proper-score, truth-relative boundary, spatial/physical and operational
+safeguard passes simultaneously.  A scientific negative closes E4 without
+retuning; an invalid result permits repair only of its named defect.
+
 ## Reconciled independent primary handoff
 
 The permitted CPU recovery

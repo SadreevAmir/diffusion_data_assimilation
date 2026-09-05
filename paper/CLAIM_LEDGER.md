@@ -3,7 +3,7 @@
 This ledger separates immutable evidence from hypotheses and planned results.
 Every manuscript claim must point to a row here before it is strengthened.
 
-Last audited: 2026-09-03.
+Last audited: 2026-09-05.
 
 Current decision boundary: the frozen calendar-residual CFM final-EMA gate is
 complete and negative. It passes proper-and-mean skill but fails coverage,
@@ -13,6 +13,14 @@ first-match router authorizes no follow-up: branches 1, 3 and 4 contradict
 reported family decisions, while branch 2 lacks its required compact
 concentration and outside-stratum decisions and therefore fails closed. See
 `CALENDAR_RESIDUAL_CFM_RESULT_RECONCILIATION.md`.
+
+Pre-result routing boundary: E1--E4 is fully frozen but not execution-ready.
+`NEXT_OCCURRENCE_INTENSITY_E4_CONTRACT.md` predeclares the terminal structured
+analog uncertainty-source test, including its training-fold-only complete-field
+retrieval and conjunctive stop/go thresholds.  It has no controller-visible
+trusted mode and supplies neither empirical evidence nor launch authority.
+Accordingly none of C1--C40 is strengthened and the minimum-tier evidence guard
+below is unchanged.
 
 External primary evidence state: RECONCILED_NEGATIVE
 
