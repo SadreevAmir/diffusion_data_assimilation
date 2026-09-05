@@ -204,9 +204,15 @@ def run_real_data_audit(
                 target, day_offsets=[lag], transform_index=config["sral_transform_index"]
             )
             if mask is None:
-                mask = torch.zeros(dataset.image_size, dtype=torch.float32)
+                raise ValueError(
+                    f"missing real SRAL footprint for {case['case_id']} lag={lag}"
+                )
             mask = mask.to(torch.float32)
-            if not torch.all((mask == 0) | (mask == 1)) or not torch.all(mask[~valid] == 0):
+            if (
+                not torch.any(mask > 0)
+                or not torch.all((mask == 0) | (mask == 1))
+                or not torch.all(mask[~valid] == 0)
+            ):
                 raise ValueError("SRAL footprint violates exact binary/valid-domain semantics")
             background, background_path = _lag_background(dataset, target, int(case["hour"]), lag)
             observed = mask.bool()

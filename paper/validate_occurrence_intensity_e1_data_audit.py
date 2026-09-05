@@ -93,8 +93,12 @@ def validate_compact_audit(config_path: Path, output: Path) -> str:
                 raise ValueError("future-date leakage detected")
             if lag["geometry_provenance"] != "real_sral_footprint" or lag["value_provenance"] != "forecast_value_at_real_sral_footprint":
                 raise ValueError("geometry/value provenance drift")
-            if isinstance(lag["footprint_pixels"], bool) or not isinstance(lag["footprint_pixels"], int) or lag["footprint_pixels"] < 0:
-                raise ValueError("invalid footprint count")
+            if (
+                isinstance(lag["footprint_pixels"], bool)
+                or not isinstance(lag["footprint_pixels"], int)
+                or lag["footprint_pixels"] <= 0
+            ):
+                raise ValueError("real lag footprint must be non-empty")
         panel = output / case["panel"]
         if not panel.is_file() or _png_dimensions(panel) != (1816, 320):
             raise ValueError("compact orientation panel has invalid geometry")

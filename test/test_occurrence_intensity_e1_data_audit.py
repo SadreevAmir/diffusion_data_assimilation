@@ -108,6 +108,39 @@ class E1RealDataAuditTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "future-date leakage"):
                 validate_compact_audit(CONFIG, root / "output")
 
+    def test_runner_rejects_missing_real_lag_footprint(self):
+        class MissingLagDataset(FakeDataset):
+            def sral_spatial_mask(self, target, *, day_offsets, transform_index):
+                if list(day_offsets) == [2]:
+                    return None
+                return super().sral_spatial_mask(
+                    target, day_offsets=day_offsets, transform_index=transform_index
+                )
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            with self.assertRaisesRegex(
+                ValueError, r"missing real SRAL footprint for .* lag=2"
+            ):
+                run_real_data_audit(
+                    CONFIG,
+                    root / "output",
+                    dataset_builder=lambda config, split: MissingLagDataset(root),
+                )
+
+    def test_validator_rejects_zero_footprint_count(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            run_real_data_audit(
+                CONFIG, root / "output", dataset_builder=lambda config, split: FakeDataset(root)
+            )
+            path = root / "output" / "per_case_audit.json"
+            payload = json.loads(path.read_text())
+            payload[0]["lags"][0]["footprint_pixels"] = 0
+            path.write_text(json.dumps(payload))
+            with self.assertRaisesRegex(ValueError, "real lag footprint must be non-empty"):
+                validate_compact_audit(CONFIG, root / "output")
+
 
 if __name__ == "__main__":
     unittest.main()
