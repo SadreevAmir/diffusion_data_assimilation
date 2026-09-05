@@ -149,19 +149,32 @@ def _validate_static_contract(
         "strict evaluation SRAL transform",
     )
     expected_evaluation = {
+        "checkpoint_name": "ema_last_model.pth",
         "split": "valid",
+        "stride_days": 45,
+        "max_cases": 8,
         "ensemble_size": 10,
         "sample_batch_size": 10,
         "num_timesteps": 25,
         "method": "dopri5",
+        "rtol": 0.00001,
+        "atol": 0.000001,
+        "inference_precision": "float32",
         "seed": 1234,
         "save_ensembles": True,
         "cfg_mode": "none",
+        "cfg_background_scale": 1.0,
+        "cfg_observation_scale": 1.0,
     }
     for key, expected in expected_evaluation.items():
         _require_equal(evaluation.get(key), expected, f"evaluation {key}")
 
     reference = pipeline.get("accepted_reference", {})
+    _require_equal(
+        reference.get("checkpoint_name"),
+        evaluation.get("checkpoint_name"),
+        "accepted-reference evaluation checkpoint name",
+    )
     _require_equal(reference.get("training_steps"), 48825, "accepted reference step count")
     _require_equal(
         reference.get("checkpoint_sha256"),
