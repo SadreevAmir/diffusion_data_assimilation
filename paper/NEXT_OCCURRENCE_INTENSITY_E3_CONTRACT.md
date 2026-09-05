@@ -17,6 +17,12 @@ publication-side correctness oracle is implemented by
 entrypoint by `scripts/run_occurrence_intensity_e3_sentinel.sh`.  They exercise
 the training-only mid-rank law, exact atom preservation, inverse support and
 compact evidence, but neither authorize a launch nor supply a trusted mode.
+The two compact files are checked fail-closed by
+`paper/validate_occurrence_intensity_e3_compact_result.py`. A later independent
+mode assignment is bound to the accepted upstream base, frozen contract,
+literal config and both compact artifacts by
+`paper/validate_occurrence_intensity_e3_mapping_record.py`; its successful
+output remains review-only and explicitly has `launch_authorized=false`.
 
 ## Falsifiable hypothesis and paper role
 

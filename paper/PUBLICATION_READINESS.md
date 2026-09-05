@@ -676,6 +676,17 @@ report 83 files; dated 79-file entries remain unchanged as audit history. No
 scientific result, blocker state or readiness decision changed. Publication
 status remains `NOT_READY`.
 
+The 2026-09-05 E3 handoff audit adds a fail-closed semantic validator for the
+two-file engineering sentinel and a separate controller-visible mapping-record
+validator. The first binds the literal frozen config and recomputes completion,
+support counts, round-trip tolerance, exact atom preservation, zero clipping
+and non-persistence of raw arrays. The second binds the accepted upstream base,
+contract, config and both compact artifacts to independently supplied commit,
+runner and mode identities; it rejects waivers and returns only review readiness
+with `launch_authorized=false`. This closes the remaining autonomous E3 compact
+evidence and mapping gap without creating a trusted mode or scientific result,
+so publication status remains `NOT_READY`.
+
 The 2026-09-05 E3 continuation converts the frozen atom-aware conditional
 anamorphosis from prose alone into an executable publication-side correctness
 oracle. `assim_lib/occurrence_intensity_e3.py` fits the training-only mid-rank
