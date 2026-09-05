@@ -1,6 +1,17 @@
 # Frozen E4 contract: structured analog uncertainty source
 
-Status: PREDECLARED_DEPENDENT_NO_EXECUTOR_MODE
+Status: EXECUTABLE_PUBLICATION_ORACLE_NO_EXECUTOR_MODE
+
+## Publication-side executable handoff
+
+`assim_lib/occurrence_intensity_e4.py` and the immutable
+`config/experiments/occurrence_intensity_e4_sentinel.json` now implement the
+eight-case engineering oracle. `scripts/run_occurrence_intensity_e4_sentinel.sh`
+exercises the six forecast-only features, training-only standardization,
+chronological tie resolution and complete-field addition. It emits only
+`run_status.json` and `artifact_manifest.json`; it never authorizes a launch or
+claims a scientific gate result. `test/test_occurrence_intensity_e4.py` freezes
+the selection and no-clipping semantics for independent repetition.
 
 ## Purpose and admissible base
 
@@ -87,4 +98,3 @@ boundary, spatial or operational failure.
   that predecessor already passes the full gate.
 - `E4_INVALID`: repair only the named implementation or evidence defect and
   repeat this identical contract.
-

@@ -1,0 +1,14 @@
+{
+  "mode": "occurrence_intensity_e4_engineering_sentinel",
+  "project_name": "generative-sea-ice-da",
+  "task_name": "occurrence-intensity-e4-engineering-sentinel",
+  "clearml": {"enabled": true},
+  "cases": 8,
+  "selection_role": "engineering_only",
+  "fit_scope": "training_fold_only",
+  "features": ["domain_mean", "domain_standard_deviation", "ice_extent", "established_ice_area", "meridional_centroid", "zonal_centroid"],
+  "neighbors": 10,
+  "tie_break": "chronological_training_index",
+  "whole_residual_fields": true,
+  "hard_clipping": false
+}
