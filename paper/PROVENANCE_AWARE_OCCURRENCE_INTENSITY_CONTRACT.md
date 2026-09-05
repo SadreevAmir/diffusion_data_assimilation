@@ -7,9 +7,10 @@ Status: P0_IMPLEMENTED_INDEPENDENT_READMISSION_REQUESTED
 The rejected residual CFM confounded observation age and origin by merging
 lagged real footprints and synthetic truth-derived tracks into one narrow mask.
 It also learned an unbounded residual and relied on hard output clipping.  The
-next mechanism makes both assumptions identifiable: each lag contributes six
-separate fields (innovation, observed value, mask, age, real provenance and
-synthetic provenance), while SIC is generated as occurrence plus bounded
+next mechanism makes both assumptions identifiable: each lag contributes eight
+separate fields (innovation, observed value, mask, age, real/synthetic geometry
+provenance and real/synthetic value provenance), while SIC is generated as
+occurrence plus bounded
 conditional intensity.  No generated concentration is hard-clipped.
 
 The earlier sentinel is withdrawn and must not be admitted or launched. Age
@@ -64,32 +65,27 @@ budget; do not choose an epoch from sentinel rank metrics. Compare against the
 completed residual CFM and the background on the same cases.
 
 For every case, save one compact correctly oriented panel containing all ten
-individual members, truth, background, each lag mask, ensemble mean and ensemble
-standard deviation. The server report also includes per-case values and paired
-aggregates for area bias, RMSE, fair CRPS, randomized-rank histogram, rank TV,
-truth-above-all rate, attainable range/inner coverage, exact-zero/one masses and
-a track-imprint statistic: mean absolute anomaly within a two-pixel dilation of
-the observed tracks divided by the same quantity off-track.
+individual members, background, each lag mask, ensemble mean and ensemble
+standard deviation. The server report includes engineering diagnostics only:
+finiteness, range, masked-channel leakage, orientation landmarks, provenance
+consistency, hard-clip count and a track-imprint statistic (mean absolute
+anomaly within a two-pixel dilation of the observed tracks divided by the same
+quantity off-track). It must not emit truth-conditioned rank, coverage,
+proper-score or checkpoint-selection diagnostics.
 
-Proceed to full training only if all conditions hold:
+The sentinel is technically accepted only if all conditions hold:
 
 1. every member is finite and within `[0,1]`, with zero hard-clipped pixels;
 2. no panel has a visually repeated narrow track imprint in at least two members,
    confirmed by two fixed orientation landmarks embedded in each panel;
-3. absolute mean area bias is at most `0.06` and improves by at least 25% versus
-   the rejected residual CFM;
-4. truth-above-all rate is at most `0.20` and rank TV is at most `0.16`, with
-   neither diagnostic worse than the rejected residual CFM;
-5. median track-imprint ratio is at most `1.25` and at least 20% lower than the
-   rejected residual CFM;
-6. fair CRPS does not worsen by more than 2% and background RMSE is improved.
+3. masked-channel leakage is at most `1e-7`, and all geometry/value provenance
+   fields agree with the frozen channel layout;
+4. the track-imprint ratio is no worse than `1.05 * background` on every case.
 
-Failure of any condition stops this mechanism without tuning thresholds,
-occurrence cutoff, channel definitions, lag count or short budget. A failure
-dominated by occurrence/boundary calibration activates the predeclared
-train-only seasonal atom-aware normal-score mechanism; persistent track imprint
-or poor ranks instead supports the conclusion that a new clean real-track-only
-retraining protocol is required.
+Failure of any condition stops E1 without tuning thresholds, occurrence cutoff,
+channel definitions, lag count or short budget. Passing is necessary only for a
+separately reviewed full experiment; it is not evidence of calibration benefit
+and does not itself authorize that experiment.
 
 ## Execution boundary
 
