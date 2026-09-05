@@ -1,6 +1,6 @@
 # Frozen E3 contract: atom-aware conditional anamorphosis
 
-Status: PREDECLARED_DEPENDENT_NO_EXECUTOR_MODE
+Status: EXECUTABLE_PUBLICATION_SIDE_PENDING_INDEPENDENT_ADMISSION
 
 ## Purpose and dependency
 
@@ -10,9 +10,13 @@ It may enter executor review only after E1 passes every engineering invariant in
 model if E2 is negative and the accepted E2 model if E2 is useful.  An invalid
 E2 does not authorize E3 until the named E2 defect is repaired.
 
-No controller-visible trusted-executor mode currently implements E3.  This file
-freezes the scientific contract; it neither authorizes a launch nor supplies a
-mode identifier.
+No controller-visible trusted-executor mode currently implements E3.  The
+publication-side correctness oracle is implemented by
+`assim_lib/occurrence_intensity_e3.py`, its literal frozen configuration by
+`config/experiments/occurrence_intensity_e3_sentinel.json`, and its local
+entrypoint by `scripts/run_occurrence_intensity_e3_sentinel.sh`.  They exercise
+the training-only mid-rank law, exact atom preservation, inverse support and
+compact evidence, but neither authorize a launch nor supply a trusted mode.
 
 ## Falsifiable hypothesis and paper role
 

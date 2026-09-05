@@ -676,6 +676,21 @@ report 83 files; dated 79-file entries remain unchanged as audit history. No
 scientific result, blocker state or readiness decision changed. Publication
 status remains `NOT_READY`.
 
+The 2026-09-05 E3 continuation converts the frozen atom-aware conditional
+anamorphosis from prose alone into an executable publication-side correctness
+oracle. `assim_lib/occurrence_intensity_e3.py` fits the training-only mid-rank
+law, preserves exact zero and one decisions, rejects inverse extrapolation
+instead of clipping, and emits only compact sentinel evidence. Its exact
+eight-case engineering configuration and entrypoint are frozen in
+`config/experiments/occurrence_intensity_e3_sentinel.json` and
+`scripts/run_occurrence_intensity_e3_sentinel.sh`; focused tests cover duplicate
+training values, small-positive round trips, atom identity, non-finite/range
+rejection, config mutation and artifact inventory. Python compilation, JSON
+parsing, shell syntax and whitespace checks pass locally. Runtime tests remain
+assigned to the named independent environment because the local interpreter
+lacks `torch`; no trusted mode, launch authorization or scientific result is
+claimed. Publication status therefore remains `NOT_READY`.
+
 The 2026-09-05 E2 mapping-interface audit adds
 `validate_occurrence_intensity_e2_mapping_record.py` and focused mutation tests.
 The validator requires the literal clean E1 admission response, exact record

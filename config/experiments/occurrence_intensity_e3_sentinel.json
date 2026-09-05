@@ -1,0 +1,14 @@
+{
+  "mode": "occurrence_intensity_e3_engineering_sentinel",
+  "project_name": "generative-sea-ice-da",
+  "task_name": "occurrence-intensity-e3-engineering-sentinel",
+  "clearml": {"enabled": true},
+  "cases": 8,
+  "selection_role": "engineering_only",
+  "source_stage": "accepted_e1_or_e2",
+  "fit_scope": "training_fold_only",
+  "cdf": "midrank_deterministic_ties",
+  "boundary_atoms": [0.0, 1.0],
+  "hard_clipping": false,
+  "roundtrip_atol": 1e-7
+}
