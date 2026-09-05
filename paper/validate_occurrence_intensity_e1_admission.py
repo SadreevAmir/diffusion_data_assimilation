@@ -12,6 +12,7 @@ from typing import Any, Mapping
 
 REQUEST_KEYS = {
     "decision", "reviewed_mode", "config", "runner", "implementation", "tests",
+    "compact_result_validator",
     "required_checks", "required_test_command", "accepted_response",
     "rejection_response", "pass_scope", "launch_authorized",
 }
@@ -22,6 +23,7 @@ EXPECTED_REQUEST_IDENTITIES = {
     "runner": "scripts/run_occurrence_intensity_e1_sentinel.sh",
     "implementation": ["assim_lib/structured_sic.py", "assim_lib/occurrence_intensity_e1.py"],
     "tests": ["test/test_structured_sic.py", "test/test_occurrence_intensity_e1.py"],
+    "compact_result_validator": "paper/validate_occurrence_intensity_e1_compact_result.py",
     "required_checks": [
         "dataset_integration", "nan_safe_observed_masking", "complete_occurrence_law",
         "zero_intensity_auxiliary_law", "train_only_exact_one_policy",
@@ -32,7 +34,8 @@ EXPECTED_REQUEST_IDENTITIES = {
     ],
     "required_test_command": (
         "python -m unittest discover -s test -p 'test_structured_sic.py' && "
-        "python -m unittest discover -s test -p 'test_occurrence_intensity_e1.py'"
+        "python -m unittest discover -s test -p 'test_occurrence_intensity_e1.py' && "
+        "python -m unittest paper.test_validate_occurrence_intensity_e1_compact_result"
     ),
 }
 

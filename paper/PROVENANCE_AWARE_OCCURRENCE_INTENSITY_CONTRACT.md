@@ -87,6 +87,14 @@ channel definitions, lag count or short budget. Passing is necessary only for a
 separately reviewed full experiment; it is not evidence of calibration benefit
 and does not itself authorize that experiment.
 
+`paper/validate_occurrence_intensity_e1_compact_result.py` is the fail-closed
+oracle for this handoff.  It binds the two compact JSON files to the frozen
+config digest; requires the exact eight-case, ten-member shapes and all eight
+named panels; checks per-case leakage, provenance, two orientation landmarks
+and track-imprint ratios; rejects any hard clipping; and accepts no additional
+fields that could introduce truth-conditioned selection metrics.  A pass means
+only `E1_SENTINEL_PASS` with `launch_authorized=false`.
+
 ## Execution boundary
 
 No trusted executor mode currently names this method. Local code and tests are
