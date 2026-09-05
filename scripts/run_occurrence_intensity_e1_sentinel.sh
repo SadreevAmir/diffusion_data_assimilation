@@ -3,7 +3,16 @@ set -euo pipefail
 
 CONFIG_PATH="${1:-config/experiments/occurrence_intensity_e1_sentinel.json}"
 OUTPUT_DIR="${2:-/tmp/occurrence_intensity_e1_sentinel}"
-PYTHON_BIN="${PYTHON_BIN:-python}"
+if [[ -z "${PYTHON_BIN:-}" ]]; then
+  if command -v python3 >/dev/null 2>&1; then
+    PYTHON_BIN="python3"
+  elif command -v python >/dev/null 2>&1; then
+    PYTHON_BIN="python"
+  else
+    echo "Neither python3 nor python is available; set PYTHON_BIN explicitly." >&2
+    exit 127
+  fi
+fi
 
 "$PYTHON_BIN" - "$CONFIG_PATH" "$OUTPUT_DIR" <<'PY'
 import json

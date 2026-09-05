@@ -20,6 +20,9 @@ class OccurrenceIntensityE1AdmissionTest(unittest.TestCase):
         self.assertIn("paper/validate_occurrence_intensity_e1_compact_result.py", source)
         self.assertIn('"$OUTPUT_DIR/run_status.json"', source)
         self.assertIn('"$OUTPUT_DIR/artifact_manifest.json"', source)
+        self.assertIn('command -v python3', source)
+        self.assertIn('command -v python', source)
+        self.assertIn('set PYTHON_BIN explicitly', source)
 
     def test_current_request_and_literal_pass(self):
         validate_request(REQUEST)
