@@ -80,7 +80,7 @@ def validate_compact_audit(config_path: Path, output: Path) -> str:
         "config_sha256", "case_manifest_sha256", "dataset_config_sha256",
         "valid_domain_sha256", "source_inventory_sha256",
         "source_inventory", "dataset_provenance", "truth_values_consulted_for_selection", "lags_days",
-        "sral_footprint_semantics", "panel_layout",
+        "sral_footprint_semantics", "panel_layout", "panel_landmark_overlay",
     }
     if set(metadata) != expected_metadata:
         raise ValueError("metadata keys must be exact")
@@ -101,6 +101,13 @@ def validate_compact_audit(config_path: Path, output: Path) -> str:
         "background_lag2", "mask_lag2",
     ]:
         raise ValueError("lag or panel layout drift")
+    if metadata["panel_landmark_overlay"] != {
+        "applied_to_each_tile": True,
+        "cross_radius_pixels": 3,
+        "alternating_values": [1.0, 0.0],
+        "landmarks": FROZEN_LANDMARKS,
+    }:
+        raise ValueError("orientation landmark overlay differs from the frozen contract")
     digest = metadata["source_inventory_sha256"]
     if not _is_sha256(digest):
         raise ValueError("invalid source inventory digest")

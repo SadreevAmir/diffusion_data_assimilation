@@ -120,7 +120,29 @@ class E1RealDataAuditTest(unittest.TestCase):
                     "background_lag2", "mask_lag2",
                 ],
             )
+            self.assertEqual(
+                result["metadata"]["panel_landmark_overlay"],
+                {
+                    "applied_to_each_tile": True,
+                    "cross_radius_pixels": 3,
+                    "alternating_values": [1.0, 0.0],
+                    "landmarks": json.loads(MANIFEST.read_text())["orientation_landmarks"],
+                },
+            )
             self.assertEqual(validate_compact_audit(CONFIG, root / "output"), "E1_REAL_DATA_AUDIT_PASS")
+
+    def test_validator_rejects_landmark_overlay_contract_drift(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            run_real_data_audit(
+                CONFIG, root / "output", dataset_builder=lambda config, split: FakeDataset(root)
+            )
+            path = root / "output" / "metadata.json"
+            payload = json.loads(path.read_text())
+            payload["panel_landmark_overlay"]["cross_radius_pixels"] = 2
+            path.write_text(json.dumps(payload))
+            with self.assertRaisesRegex(ValueError, "landmark overlay"):
+                validate_compact_audit(CONFIG, root / "output")
 
     def test_runner_publishes_completion_marker_last_and_atomically(self):
         with tempfile.TemporaryDirectory() as directory:

@@ -138,7 +138,23 @@ def _png(path: Path, image: np.ndarray) -> None:
     )
 
 
-def _panel(fields: list[torch.Tensor]) -> np.ndarray:
+def _mark_landmarks(array: np.ndarray, landmarks: list[dict[str, Any]]) -> np.ndarray:
+    """Add deterministic high-contrast crosses without changing panel geometry."""
+    marked = array.copy()
+    height, width = marked.shape
+    for landmark in landmarks:
+        row, column = int(landmark["row"]), int(landmark["column"])
+        if not (0 <= row < height and 0 <= column < width):
+            raise ValueError("orientation landmark lies outside panel field")
+        for offset in range(-3, 4):
+            if 0 <= column + offset < width:
+                marked[row, column + offset] = 1.0 if offset % 2 == 0 else 0.0
+            if 0 <= row + offset < height:
+                marked[row + offset, column] = 1.0 if offset % 2 == 0 else 0.0
+    return marked
+
+
+def _panel(fields: list[torch.Tensor], landmarks: list[dict[str, Any]]) -> np.ndarray:
     arrays = []
     for field in fields:
         array = field.detach().cpu().to(torch.float32).numpy()
@@ -148,7 +164,7 @@ def _panel(fields: list[torch.Tensor]) -> np.ndarray:
         else:
             lo, hi = np.nanmin(array), np.nanmax(array)
             array = (array - lo) / (hi - lo) if hi > lo else np.zeros_like(array)
-        arrays.append(np.nan_to_num(array, nan=0.0))
+        arrays.append(_mark_landmarks(np.nan_to_num(array, nan=0.0), landmarks))
     separator = np.ones((arrays[0].shape[0], 4), dtype=np.float32)
     return np.concatenate([item for pair in zip(arrays, [separator] * len(arrays)) for item in pair][:-1], axis=1)
 
@@ -344,7 +360,7 @@ def run_real_data_audit(
         for background, mask in zip(backgrounds, lag_masks):
             panel_fields.extend((background, mask))
         panel_path = panels_dir / panel_name
-        _png(panel_path, _panel(panel_fields))
+        _png(panel_path, _panel(panel_fields, manifest["orientation_landmarks"]))
         per_case.append({
             "case_id": case["case_id"], "coverage_slot": case["coverage_slot"],
             "target_date": case["target_date"], "hour": case["hour"],
@@ -370,6 +386,12 @@ def run_real_data_audit(
             "truth", "background_lag0", "mask_lag0", "background_lag1", "mask_lag1",
             "background_lag2", "mask_lag2",
         ],
+        "panel_landmark_overlay": {
+            "applied_to_each_tile": True,
+            "cross_radius_pixels": 3,
+            "alternating_values": [1.0, 0.0],
+            "landmarks": manifest["orientation_landmarks"],
+        },
     }
     # Evidence must be durable before the completion marker becomes visible.
     # Each replace is atomic within the output directory, so readers never see
