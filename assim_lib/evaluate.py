@@ -572,6 +572,7 @@ def evaluate(args: argparse.Namespace) -> dict[str, Any]:
             obs_mask = item["obs_mask"].unsqueeze(0).to(device)
             water_mask = item["water_mask"].unsqueeze(0).to(device)
             valid_mask_tensor = item["valid_mask"].unsqueeze(0).to(device)
+            initial_noise_hashes: list[str] = []
 
             progress.set_postfix(case=f"{case_order + 1}/{len(case_indices)}")
             generated = generate_ensemble(
@@ -594,6 +595,7 @@ def evaluate(args: argparse.Namespace) -> dict[str, Any]:
                 atol=atol,
                 autocast_dtype=autocast_dtype,
                 progress=progress,
+                initial_noise_hashes=initial_noise_hashes,
             )
 
             ensemble = denormalize_and_clip(generated, means, stds, concentration_channel)
@@ -608,6 +610,14 @@ def evaluate(args: argparse.Namespace) -> dict[str, Any]:
             obs_mask_physical = item["obs_mask"].detach().cpu().numpy() > 0.5
 
             metadata = {"case_order": case_order, "dataset_index": case_index, **item.get("meta", {})}
+            if initial_noise_hashes:
+                if len(initial_noise_hashes) != args.ensemble_size:
+                    raise ValueError("initial-noise audit did not record every ensemble member")
+                metadata["member_seeds"] = [
+                    args.seed + case_order * args.ensemble_size + member
+                    for member in range(args.ensemble_size)
+                ]
+                metadata["initial_noise_sha256"] = initial_noise_hashes
             case_metadata.append(_json_safe(metadata))
             for channel, field in enumerate(fields):
                 for region, mask in _region_masks(valid_mask, obs_mask_physical, channel).items():
