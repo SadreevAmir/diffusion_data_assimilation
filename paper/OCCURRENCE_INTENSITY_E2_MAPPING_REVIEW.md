@@ -104,6 +104,22 @@ SHA-256 values and `publication_commit` is the exact reviewed 40-hex commit.
 }
 ```
 
+The publication-side command below validates the literal E1 admission response,
+binds the supplied frozen contract and synthetic compact result by digest, and
+passes that compact result through the decision-bearing semantic oracle:
+
+```bash
+python paper/validate_occurrence_intensity_e2_mapping_record.py \
+  paper/OCCURRENCE_INTENSITY_E1_ADMISSION_REQUEST.json \
+  <independent-e1-response.json> <controller-mapping-record.json> \
+  paper/NEXT_OCCURRENCE_INTENSITY_E2_CONTRACT.md <synthetic-compact-result.json>
+```
+
+Its successful output is exactly a non-launching publication-side admission
+decision: `{"decision": "GO", "launch_authorized": false}`. It cannot establish
+that `reviewed_mode` exists or authorize execution; those remain controller
+responsibilities.
+
 Every unchecked, failed, waived or not-applicable item is `NO_GO`. Even `GO`
 only admits one frozen proposal under the separately exposed mode; scientific
 success still requires the complete conjunctive E2 decision above.

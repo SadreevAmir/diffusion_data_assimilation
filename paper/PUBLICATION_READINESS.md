@@ -676,6 +676,18 @@ report 83 files; dated 79-file entries remain unchanged as audit history. No
 scientific result, blocker state or readiness decision changed. Publication
 status remains `NOT_READY`.
 
+The 2026-09-05 E2 mapping-interface audit adds
+`validate_occurrence_intensity_e2_mapping_record.py` and focused mutation tests.
+The validator requires the literal clean E1 admission response, exact record
+keys, a safe literal mode identifier, lowercase commit and artifact identities,
+byte-exact bindings to the frozen E2 contract and synthetic compact result, and
+an empty deviation list. It passes the bound synthetic result through the
+existing decision-bearing semantic oracle before returning `GO`, and its CLI
+always reports `launch_authorized=false`. This closes the previously declared
+publication-side mapping-record validation gap. It does not prove controller
+mode existence, replace independent runner review or create a scientific
+result; publication status therefore remains `NOT_READY`.
+
 The 2026-09-05 temporal-mapping audit found and removed an ambiguity between E1
 and E2. E1 already uses lag-specific exogenous background fields to construct
 its conditioning innovations, but it generates only the current state; E2 is

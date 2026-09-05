@@ -83,7 +83,12 @@ complete finite paired vectors, reconciled aggregates, all named invariants and
 operational checks, and non-empty secondary diagnostic records.  It recomputes
 the literal decision and rejects extra or missing fields.  This validator is a
 publication-side schema oracle only: it neither implements E2 nor creates a
-trusted mode.
+trusted mode.  The separate
+`validate_occurrence_intensity_e2_mapping_record.py` validator closes the
+publication-side mapping interface: it requires a literal clean E1 admission,
+verifies the frozen contract and synthetic-result digests, and calls the
+compact-result oracle before returning a non-launching `GO`. Controller
+existence and runner review remain outside that publication-side decision.
 
 ## Stop/go decision
 
