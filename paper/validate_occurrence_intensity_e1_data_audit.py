@@ -116,6 +116,33 @@ def _validate_landmark_overlay(path: Path) -> None:
                     raise ValueError("orientation landmark overlay pixels differ from the frozen contract")
 
 
+def _validate_mask_footprints(path: Path, audit_case: dict[str, Any]) -> None:
+    """Bind reported footprint sizes to the three rendered binary mask tiles."""
+    width, height, pixels = _png_grayscale_pixels(path)
+    tile_width, separator_width = 256, 4
+    overlay_pixels = set()
+    for landmark in FROZEN_LANDMARKS:
+        row, column = landmark["row"], landmark["column"]
+        for delta in range(-3, 4):
+            overlay_pixels.add((row, column + delta))
+            overlay_pixels.add((row + delta, column))
+    for lag_index, lag in enumerate(audit_case["lags"]):
+        tile = 2 + 2 * lag_index
+        tile_start = tile * (tile_width + separator_width)
+        visible_ones = 0
+        for row in range(height):
+            for column in range(tile_width):
+                if (row, column) in overlay_pixels:
+                    continue
+                value = pixels[row * width + tile_start + column]
+                if value not in (0, 255):
+                    raise ValueError("rendered lag mask contains non-binary pixels")
+                visible_ones += value == 255
+        footprint = lag["footprint_pixels"]
+        if not visible_ones <= footprint <= visible_ones + len(overlay_pixels):
+            raise ValueError("reported lag footprint differs from rendered mask pixels")
+
+
 def _is_sha256(value: Any) -> bool:
     return (
         isinstance(value, str)
@@ -306,6 +333,7 @@ def validate_compact_audit(config_path: Path, output: Path) -> str:
         if hashlib.sha256(panel.read_bytes()).hexdigest() != case["panel_sha256"]:
             raise ValueError("compact orientation panel differs from its sealed hash")
         _validate_landmark_overlay(panel)
+        _validate_mask_footprints(panel, case)
     return "E1_REAL_DATA_AUDIT_PASS"
 
 

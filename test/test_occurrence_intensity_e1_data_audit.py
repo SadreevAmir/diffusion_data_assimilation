@@ -384,6 +384,19 @@ class E1RealDataAuditTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "real lag footprint must be non-empty"):
                 validate_compact_audit(CONFIG, root / "output")
 
+    def test_validator_rejects_resealed_footprint_not_matching_mask_panel(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            run_real_data_audit(
+                CONFIG, root / "output", dataset_builder=lambda config, split: FakeDataset(root)
+            )
+            path = root / "output" / "per_case_audit.json"
+            payload = json.loads(path.read_text())
+            payload[0]["lags"][0]["footprint_pixels"] += 100
+            path.write_text(json.dumps(payload))
+            with self.assertRaisesRegex(ValueError, "differs from rendered mask pixels"):
+                validate_compact_audit(CONFIG, root / "output")
+
     def test_validator_rejects_incomplete_sral_source_inventory_with_resealed_digest(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
