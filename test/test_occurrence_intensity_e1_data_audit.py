@@ -134,9 +134,32 @@ class E1RealDataAuditTest(unittest.TestCase):
                     CONFIG, root / "output", dataset_builder=lambda config, split: FakeDataset(root)
                 )
             self.assertEqual(
-                published, ["metadata.json", "per_case_audit.json", "run_status.json"]
+                published,
+                ["run_status.json", "metadata.json", "per_case_audit.json", "run_status.json"],
             )
             self.assertEqual(list((root / "output").glob(".*.tmp")), [])
+
+    def test_runner_invalidates_stale_completion_before_dataset_failure(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            output = root / "output"
+            output.mkdir()
+            (output / "run_status.json").write_text(json.dumps({"status": "completed"}))
+
+            def failing_builder(config, split):
+                raise RuntimeError("dataset unavailable")
+
+            with self.assertRaisesRegex(RuntimeError, "dataset unavailable"):
+                run_real_data_audit(CONFIG, output, dataset_builder=failing_builder)
+
+            self.assertEqual(
+                json.loads((output / "run_status.json").read_text()),
+                {
+                    "status": "running", "mode": audit_module.MODE,
+                    "resource_kind": "server_cpu", "cases": 8,
+                    "engineering_only": True, "calibration_claim": False,
+                },
+            )
 
     def test_validator_rejects_future_leakage(self):
         with tempfile.TemporaryDirectory() as directory:

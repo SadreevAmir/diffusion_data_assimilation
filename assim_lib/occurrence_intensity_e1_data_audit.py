@@ -186,6 +186,14 @@ def run_real_data_audit(
     manifest_path = Path(config["case_manifest"])
     manifest = load_json(manifest_path)
     validate_case_manifest(manifest)
+    output.mkdir(parents=True, exist_ok=True)
+    # Invalidate a completion marker from an earlier attempt before dataset
+    # construction, source hashing, or truth access can fail.  Reusing an
+    # output directory must never expose stale success for the current attempt.
+    _write_json_atomic(output / "run_status.json", {
+        "status": "running", "mode": MODE, "resource_kind": "server_cpu", "cases": 8,
+        "engineering_only": True, "calibration_claim": False,
+    })
     data_config = load_json(config["dataset_config"])
     # Primary audit is deterministic and real-only; no truth-derived synthetic masks are permitted.
     data_config = dict(data_config)
@@ -234,7 +242,6 @@ def run_real_data_audit(
         source_inventory.append({"case_id": case["case_id"], "sources": sources})
     inventory_bytes = json.dumps(source_inventory, sort_keys=True, separators=(",", ":")).encode()
 
-    output.mkdir(parents=True, exist_ok=True)
     panels_dir = output / "panels"
     panels_dir.mkdir(exist_ok=True)
     per_case = []
