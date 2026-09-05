@@ -73,3 +73,7 @@ occurrence is always `SIC>0`.
 E1 precedes E2–E4 because it is a validity control. After E1, E2, E3 and E4 test
 distinct temporal, marginal-boundary and spatial-source mechanisms; dependencies
 must follow scientific baselines, not hardware availability.
+
+The executable scientific details and frozen routing for E4 are bound in
+`NEXT_OCCURRENCE_INTENSITY_E4_CONTRACT.md`. That contract remains
+`PREDECLARED_DEPENDENT_NO_EXECUTOR_MODE` and does not authorize a launch.
