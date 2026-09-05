@@ -24,6 +24,17 @@ boundary is recorded in `CALENDAR_RESIDUAL_CFM_RESULT_RECONCILIATION.md`.
 
 ## Latest method-admission boundary (2026-09-05)
 
+Parallel pre-result work now freezes the exact contingent E2 temporal contract
+in `NEXT_OCCURRENCE_INTENSITY_E2_CONTRACT.md`.  E2 is not an alternative route
+around E1: it is dependent on a clean E1 engineering result and differs only by
+replacing age-only conditioning with a three-frame background trajectory and
+lag-matched likelihood innovations.  Its conjunctive stop/go requires at least
+10% observed-footprint innovation-RMSE improvement, no more than 2% fair-CRPS
+degradation, no more than 5% off-track anomaly-energy degradation, and all
+unchanged invariants.  No executor mode is claimed and no launch is authorized.
+This predeclaration removes the next method-selection gap without changing
+`NOT_READY` or `eligible_calibration=MISSING_ELIGIBLE_RESULT`.
+
 The current nearest scientific route is the provenance-aware occurrence–
 intensity E1 method, not a rerun of a closed calibration mechanism. Its local
 representation and engineering-sentinel implementation have been reconciled:

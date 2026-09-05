@@ -4,6 +4,16 @@ External primary evidence state: RECONCILED_NEGATIVE
 
 ## Frozen next development mechanism
 
+`NEXT_OCCURRENCE_INTENSITY_E2_CONTRACT.md` now freezes the contingent temporal
+mechanism behind the independently admitted E1 engineering control.  It changes
+only age-only conditioning to an explicit three-frame background trajectory
+with lag-matched likelihood innovations, holds training and evaluation identity
+fixed, and requires at least 10% observed-footprint innovation-RMSE improvement
+without more than 2% fair-CRPS or 5% off-track-energy degradation.  It has no
+trusted executor mode and is not launch-authorized.  Freezing it now prevents a
+future E1 decision from creating another method-selection gap; E1 remains the
+necessary first dependency.
+
 `NEXT_RANK_COHERENT_CONTRACT.md` freezes the next mechanistically distinct
 development test. It targets case-level rank dispersion by transporting whole
 member-anomaly fields from purged forecast-only analogs, with training-only
