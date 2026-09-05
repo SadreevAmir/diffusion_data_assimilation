@@ -665,6 +665,23 @@ report 83 files; dated 79-file entries remain unchanged as audit history. No
 scientific result, blocker state or readiness decision changed. Publication
 status remains `NOT_READY`.
 
+The 2026-09-05 E1 runtime audit reviewed the latest 25 commits and found that the
+existing handoff stopped at pure representation primitives and admission JSON.
+The publication worktree now contains one executable eight-case engineering
+path binding dataset-record integration, NaN-safe lag-specific conditioning,
+continuous occurrence and auxiliary zero-intensity targets, the train-only
+exact-one inventory decision, one finite trainer step, ten-member sampling and
+compact `run_status.json`/`artifact_manifest.json` output. The frozen config
+still requires literal `clearml.enabled=true`, and the sentinel remains
+engineering-only with no rank or scientific gate. Independent admission must
+run the two focused suites and the entrypoint, inspect the emitted schema, and
+return the exact PASS/REJECT response in
+`OCCURRENCE_INTENSITY_E1_ADMISSION_REQUEST.json`; neither local execution nor a
+PASS authorizes GPU launch. The local interpreter lacks `torch`, so only Python
+compilation, the six admission-validator tests and whitespace validation were
+completed here. Publication status remains `NOT_READY` until independent
+admission and subsequent scientific evidence.
+
 The subsequent score-aware dispatch audit adds the pure runner and its
 fail-closed server adapter to the mandatory publication inventory. Combined
 admission now emits one atomic `admission=GO` payload binding the literal

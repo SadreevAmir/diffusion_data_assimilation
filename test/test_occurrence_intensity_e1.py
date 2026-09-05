@@ -1,8 +1,11 @@
 import json
+import tempfile
 import unittest
 from pathlib import Path
 
-from assim_lib.occurrence_intensity_e1 import controller_request, validate_config
+from assim_lib.occurrence_intensity_e1 import (
+    controller_request, run_engineering_sentinel, validate_config,
+)
 
 
 CONFIG = Path("config/experiments/occurrence_intensity_e1_sentinel.json")
@@ -39,6 +42,22 @@ class E1HandoffTest(unittest.TestCase):
         config["unreviewed"] = True
         with self.assertRaisesRegex(ValueError, "config keys must be exact"):
             validate_config(config)
+
+    def test_complete_eight_case_runtime_emits_compact_artifacts(self):
+        with tempfile.TemporaryDirectory() as directory:
+            result = run_engineering_sentinel(CONFIG, directory)
+            self.assertEqual(result["run_status"]["status"], "completed")
+            self.assertEqual(result["run_status"]["cases"], 8)
+            self.assertFalse(result["run_status"]["scientific_gate"])
+            manifest = result["artifact_manifest"]
+            self.assertEqual(manifest["conditioning_shape"], [8, 24, 5, 4])
+            self.assertEqual(manifest["target_shape"], [8, 2, 5, 4])
+            self.assertEqual(manifest["sample_shape"], [8, 10, 1, 5, 4])
+            self.assertEqual(manifest["exact_one_policy"], "explicit_exact_one_atom")
+            self.assertTrue(manifest["sample_finite"])
+            self.assertEqual(manifest["raw_arrays"], "not_persisted")
+            self.assertTrue((Path(directory) / "run_status.json").is_file())
+            self.assertTrue((Path(directory) / "artifact_manifest.json").is_file())
 
 
 if __name__ == "__main__":

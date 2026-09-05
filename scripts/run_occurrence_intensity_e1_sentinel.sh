@@ -2,13 +2,11 @@
 set -euo pipefail
 
 CONFIG_PATH="${1:-config/experiments/occurrence_intensity_e1_sentinel.json}"
-python - "$CONFIG_PATH" <<'PY'
+OUTPUT_DIR="${2:-/tmp/occurrence_intensity_e1_sentinel}"
+python - "$CONFIG_PATH" "$OUTPUT_DIR" <<'PY'
 import json
 import sys
-from assim_lib.occurrence_intensity_e1 import controller_request
+from assim_lib.occurrence_intensity_e1 import run_engineering_sentinel
 
-request = controller_request(sys.argv[1])
-print(json.dumps(request, sort_keys=True))
-if not request["launch_authorized"]:
-    raise SystemExit("independent admission PASS is required before server execution")
+print(json.dumps(run_engineering_sentinel(sys.argv[1], sys.argv[2]), sort_keys=True))
 PY
