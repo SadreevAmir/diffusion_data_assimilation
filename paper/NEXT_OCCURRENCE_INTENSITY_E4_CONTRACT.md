@@ -13,6 +13,18 @@ chronological tie resolution and complete-field addition. It emits only
 claims a scientific gate result. `test/test_occurrence_intensity_e4.py` freezes
 the selection and no-clipping semantics for independent repetition.
 
+`paper/validate_occurrence_intensity_e4_compact_result.py` independently checks
+the exact two-file schema, frozen config digest, six-feature identity, complete
+8-by-10 analog inventory, finite ordered distances with chronological ties,
+whole-field shapes, train-only standardization and zero clipping. The companion
+`paper/validate_occurrence_intensity_e4_mapping_record.py` binds those artifacts,
+this contract, the frozen config, reviewed runner digest, publication commit and
+an accepted E1/E2/E3 predecessor. Both validators fail closed and always emit
+`launch_authorized=false`; passing them permits controller admission review, not
+scientific execution. Their dependency-free tests are
+`paper.test_validate_occurrence_intensity_e4_compact_result` and
+`paper.test_validate_occurrence_intensity_e4_mapping_record`.
+
 ## Purpose and admissible base
 
 E4 tests whether complete historical anomaly fields add coherent uncertainty
