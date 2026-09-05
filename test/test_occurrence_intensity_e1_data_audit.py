@@ -5,7 +5,9 @@ import unittest
 from unittest import mock
 from datetime import date
 from pathlib import Path
+import struct
 from types import SimpleNamespace
+import zlib
 
 import numpy as np
 import torch
@@ -143,6 +145,41 @@ class E1RealDataAuditTest(unittest.TestCase):
             path.write_text(json.dumps(payload))
             with self.assertRaisesRegex(ValueError, "landmark overlay"):
                 validate_compact_audit(CONFIG, root / "output")
+
+    def test_validator_rejects_resealed_missing_landmark_pixel(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            output = root / "output"
+            result = run_real_data_audit(
+                CONFIG, output, dataset_builder=lambda config, split: FakeDataset(root)
+            )
+            panel = output / result["per_case_audit"][0]["panel"]
+            payload = panel.read_bytes()
+            ihdr_end = 8 + 12 + 13
+            width, height = struct.unpack(">II", payload[16:24])
+            compressed = payload[ihdr_end + 8:-16]
+            self.assertEqual(payload[ihdr_end + 4:ihdr_end + 8], b"IDAT")
+            scanlines = bytearray(zlib.decompress(compressed))
+            row, column = 32, 32
+            scanlines[row * (width + 1) + 1 + column] = 127
+
+            def chunk(kind, body):
+                content = kind + body
+                return struct.pack(">I", len(body)) + content + struct.pack(">I", zlib.crc32(content))
+
+            corrupted = (
+                payload[:8]
+                + chunk(b"IHDR", payload[16:29])
+                + chunk(b"IDAT", zlib.compress(bytes(scanlines)))
+                + chunk(b"IEND", b"")
+            )
+            panel.write_bytes(corrupted)
+            audit_path = output / "per_case_audit.json"
+            audit = json.loads(audit_path.read_text())
+            audit[0]["panel_sha256"] = hashlib.sha256(corrupted).hexdigest()
+            audit_path.write_text(json.dumps(audit))
+            with self.assertRaisesRegex(ValueError, "overlay pixels"):
+                validate_compact_audit(CONFIG, output)
 
     def test_runner_publishes_completion_marker_last_and_atomically(self):
         with tempfile.TemporaryDirectory() as directory:

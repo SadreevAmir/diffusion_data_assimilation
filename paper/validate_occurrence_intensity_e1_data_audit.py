@@ -10,6 +10,7 @@ import json
 from pathlib import Path
 import struct
 from typing import Any
+import zlib
 
 MODE = "occurrence_intensity_e1_real_data_audit"
 FROZEN_CASES = [
@@ -54,6 +55,65 @@ def _png_dimensions(path: Path) -> tuple[int, int]:
     if len(header) != 24 or header[:8] != b"\x89PNG\r\n\x1a\n" or header[12:16] != b"IHDR":
         raise ValueError("missing or invalid compact orientation panel")
     return struct.unpack(">II", header[16:24])
+
+
+def _png_grayscale_pixels(path: Path) -> tuple[int, int, bytes]:
+    """Decode the runner's frozen 8-bit grayscale/filter-0 PNG contract."""
+    payload = path.read_bytes()
+    if payload[:8] != b"\x89PNG\r\n\x1a\n":
+        raise ValueError("missing or invalid compact orientation panel")
+    offset, width, height, compressed = 8, None, None, bytearray()
+    while offset < len(payload):
+        if offset + 12 > len(payload):
+            raise ValueError("truncated compact orientation panel")
+        length = struct.unpack(">I", payload[offset:offset + 4])[0]
+        kind = payload[offset + 4:offset + 8]
+        end = offset + 12 + length
+        if end > len(payload):
+            raise ValueError("truncated compact orientation panel chunk")
+        chunk = payload[offset + 8:offset + 8 + length]
+        if kind == b"IHDR":
+            if len(chunk) != 13 or chunk[8:] != bytes((8, 0, 0, 0, 0)):
+                raise ValueError("orientation panel must use frozen 8-bit grayscale encoding")
+            width, height = struct.unpack(">II", chunk[:8])
+        elif kind == b"IDAT":
+            compressed.extend(chunk)
+        elif kind == b"IEND":
+            break
+        offset = end
+    if width is None or height is None or not compressed:
+        raise ValueError("orientation panel is missing required PNG chunks")
+    try:
+        scanlines = zlib.decompress(bytes(compressed))
+    except zlib.error as error:
+        raise ValueError("orientation panel has invalid compressed pixels") from error
+    stride = width + 1
+    if len(scanlines) != height * stride:
+        raise ValueError("orientation panel pixel payload has invalid size")
+    rows = []
+    for row in range(height):
+        scanline = scanlines[row * stride:(row + 1) * stride]
+        if scanline[0] != 0:
+            raise ValueError("orientation panel uses an unfrozen PNG row filter")
+        rows.append(scanline[1:])
+    return width, height, b"".join(rows)
+
+
+def _validate_landmark_overlay(path: Path) -> None:
+    width, height, pixels = _png_grayscale_pixels(path)
+    tile_width, separator_width, tile_count = 256, 4, 7
+    if (width, height) != (tile_count * tile_width + (tile_count - 1) * separator_width, 320):
+        raise ValueError("compact orientation panel has invalid geometry")
+    for tile in range(tile_count):
+        tile_start = tile * (tile_width + separator_width)
+        for landmark in FROZEN_LANDMARKS:
+            row, column = landmark["row"], landmark["column"]
+            for delta in range(-3, 4):
+                expected = 255 if delta % 2 == 0 else 0
+                horizontal = row * width + tile_start + column + delta
+                vertical = (row + delta) * width + tile_start + column
+                if pixels[horizontal] != expected or pixels[vertical] != expected:
+                    raise ValueError("orientation landmark overlay pixels differ from the frozen contract")
 
 
 def _is_sha256(value: Any) -> bool:
@@ -245,6 +305,7 @@ def validate_compact_audit(config_path: Path, output: Path) -> str:
             raise ValueError("compact orientation panel hash is invalid")
         if hashlib.sha256(panel.read_bytes()).hexdigest() != case["panel_sha256"]:
             raise ValueError("compact orientation panel differs from its sealed hash")
+        _validate_landmark_overlay(panel)
     return "E1_REAL_DATA_AUDIT_PASS"
 
 
