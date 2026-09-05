@@ -17,6 +17,7 @@ import torch
 from .config import load_json
 from .data import build_dataset
 from .forecast import field_at_hour
+from .structured_sic import make_lagged_observation_channels
 from .transforms import prepare_model_field
 
 MODE = "occurrence_intensity_e1_real_data_audit"
@@ -307,7 +308,7 @@ def run_real_data_audit(
             raise ValueError("truth and sealed valid domain are not co-registered")
         if not torch.all(torch.isfinite(truth[valid])):
             raise ValueError("truth is non-finite inside the valid domain")
-        lag_masks, backgrounds, background_sources = [], [], []
+        lag_masks, backgrounds, background_sources, lag_values_with_nan = [], [], [], []
         lag_rows = []
         for lag, sealed_source in zip(config["lags_days"], sealed_case["sources"]):
             _verify_runtime_sources(dataset, target, sealed_source)
@@ -334,17 +335,38 @@ def run_real_data_audit(
             finite_on = bool(torch.all(torch.isfinite(lag_values[observed])))
             nan_outside = torch.full_like(lag_values, math.nan)
             nan_outside[observed] = lag_values[observed]
-            nan_safe = bool(torch.all(torch.isnan(nan_outside[~observed])))
             lag_rows.append({
                 "lag_days": lag, "source_date": (target - timedelta(days=lag)).isoformat(),
                 "footprint_pixels": int(mask.sum()), "finite_on_observed": finite_on,
-                "nan_outside_observed": nan_safe, "geometry_provenance": "real_sral_footprint",
+                "nan_outside_observed": False, "geometry_provenance": "real_sral_footprint",
                 "value_provenance": "forecast_value_at_real_sral_footprint",
                 "future_date_leakage": bool(target - timedelta(days=lag) > target),
             })
             lag_masks.append(mask)
             backgrounds.append(background)
+            lag_values_with_nan.append(nan_outside)
             background_sources.append(str(background_path))
+        masks_tensor = torch.stack(lag_masks).unsqueeze(0)
+        backgrounds_tensor = torch.stack(backgrounds).unsqueeze(0)
+        values_tensor = torch.stack(lag_values_with_nan).unsqueeze(0)
+        channels = make_lagged_observation_channels(
+            backgrounds_tensor,
+            values_tensor,
+            masks_tensor,
+            torch.tensor([[0, 1, 2]], dtype=backgrounds_tensor.dtype),
+            torch.zeros((1, 3), dtype=backgrounds_tensor.dtype),
+            torch.zeros_like(values_tensor),
+        ).reshape(1, 3, 8, *truth.shape)
+        if not torch.all(torch.isfinite(channels)):
+            raise ValueError("E1 observation channels leak non-finite values")
+        for lag_index, observed in enumerate(masks_tensor[0].bool()):
+            emitted_values = channels[0, lag_index, 1]
+            if (
+                not torch.equal(emitted_values[observed], values_tensor[0, lag_index][observed])
+                or not torch.all(emitted_values[~observed] == 0)
+            ):
+                raise ValueError("E1 observation channels violate NaN-safe masking")
+            lag_rows[lag_index]["nan_outside_observed"] = True
         landmark_values = []
         for landmark in manifest["orientation_landmarks"]:
             row, column = int(landmark["row"]), int(landmark["column"])

@@ -148,6 +148,21 @@ class E1RealDataAuditTest(unittest.TestCase):
             )
             self.assertEqual(validate_compact_audit(CONFIG, root / "output"), "E1_REAL_DATA_AUDIT_PASS")
 
+    def test_runner_executes_publication_channel_constructor_fail_closed(self):
+        def unsafe_channels(backgrounds, values, masks, ages, geometry, provenance):
+            result = torch.zeros((1, 24, *values.shape[-2:]), dtype=values.dtype)
+            result[:, 1] = values[:, 0]
+            return result
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            with mock.patch.object(
+                audit_module, "make_lagged_observation_channels", side_effect=unsafe_channels
+            ), self.assertRaisesRegex(ValueError, "leak non-finite values"):
+                run_real_data_audit(
+                    CONFIG, root / "output", dataset_builder=lambda config, split: FakeDataset(root)
+                )
+
     def test_validator_rejects_landmark_overlay_contract_drift(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
