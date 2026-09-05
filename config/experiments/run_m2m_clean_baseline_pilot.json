@@ -1,8 +1,8 @@
 {
-  "experiment_id": "clean_joint_state_calendar_pilot_seed1701_3epoch_all_hours_retry1",
+  "experiment_id": "clean_joint_state_calendar_pilot_seed1701_3epoch_all_hours_retry2",
   "training_config": "train_m2m_clean_baseline_pilot.json",
   "evaluation_config": "evaluate_m2m_clean_baseline_pilot.json",
-  "status_dir": "/home/autoresearch_results/clean_baseline_retrain_pilot_retry1",
+  "status_dir": "/home/autoresearch_results/clean_baseline_retrain_pilot_retry2",
   "accepted_reference": {
     "run_dir": "/home/checkpoints/concat_conditioning/m2m_2f_diffusion_balanced_50m/run_20260607_184239",
     "checkpoint_name": "ema_last_model.pth",
