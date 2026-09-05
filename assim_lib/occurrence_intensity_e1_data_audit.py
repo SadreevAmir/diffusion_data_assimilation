@@ -231,7 +231,11 @@ def run_real_data_audit(
     manifest_path = Path(config["case_manifest"])
     manifest = load_json(manifest_path)
     validate_case_manifest(manifest)
+    if output.is_symlink():
+        raise ValueError("E1 data-audit output directory must not be a symbolic link")
     output.mkdir(parents=True, exist_ok=True)
+    if not output.is_dir():
+        raise ValueError("E1 data-audit output path must be a directory")
     # Invalidate a completion marker from an earlier attempt before dataset
     # construction, source hashing, or truth access can fail.  Reusing an
     # output directory must never expose stale success for the current attempt.
@@ -288,7 +292,11 @@ def run_real_data_audit(
     inventory_bytes = json.dumps(source_inventory, sort_keys=True, separators=(",", ":")).encode()
 
     panels_dir = output / "panels"
+    if panels_dir.is_symlink():
+        raise ValueError("E1 data-audit panels directory must not be a symbolic link")
     panels_dir.mkdir(exist_ok=True)
+    if not panels_dir.is_dir():
+        raise ValueError("E1 data-audit panels path must be a directory")
     per_case = []
     for (case, index), sealed_case in zip(resolved, source_inventory):
         item = dataset[index]

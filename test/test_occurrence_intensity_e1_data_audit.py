@@ -253,6 +253,37 @@ class E1RealDataAuditTest(unittest.TestCase):
                 },
             )
 
+    def test_runner_rejects_symlinked_output_before_writing(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            redirected = root / "redirected"
+            redirected.mkdir()
+            output = root / "output"
+            output.symlink_to(redirected, target_is_directory=True)
+
+            with self.assertRaisesRegex(ValueError, "output directory must not be a symbolic link"):
+                run_real_data_audit(
+                    CONFIG, output, dataset_builder=lambda config, split: FakeDataset(root)
+                )
+
+            self.assertEqual(list(redirected.iterdir()), [])
+
+    def test_runner_rejects_symlinked_panels_before_panel_writing(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            output = root / "output"
+            output.mkdir()
+            redirected = root / "redirected_panels"
+            redirected.mkdir()
+            (output / "panels").symlink_to(redirected, target_is_directory=True)
+
+            with self.assertRaisesRegex(ValueError, "panels directory must not be a symbolic link"):
+                run_real_data_audit(
+                    CONFIG, output, dataset_builder=lambda config, split: FakeDataset(root)
+                )
+
+            self.assertEqual(list(redirected.iterdir()), [])
+
     def test_validator_rejects_future_leakage(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
