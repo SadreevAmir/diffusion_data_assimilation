@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+from datetime import date, timedelta
 import hashlib
 import json
 from pathlib import Path
@@ -22,6 +23,14 @@ def _png_dimensions(path: Path) -> tuple[int, int]:
     if len(header) != 24 or header[:8] != b"\x89PNG\r\n\x1a\n" or header[12:16] != b"IHDR":
         raise ValueError("missing or invalid compact orientation panel")
     return struct.unpack(">II", header[16:24])
+
+
+def _is_sha256(value: Any) -> bool:
+    return (
+        isinstance(value, str)
+        and len(value) == 64
+        and all(character in "0123456789abcdef" for character in value)
+    )
 
 
 def validate_compact_audit(config_path: Path, output: Path) -> str:
@@ -54,26 +63,63 @@ def validate_compact_audit(config_path: Path, output: Path) -> str:
     ]:
         raise ValueError("lag or panel layout drift")
     digest = metadata["source_inventory_sha256"]
-    if not isinstance(digest, str) or len(digest) != 64 or any(c not in "0123456789abcdef" for c in digest):
+    if not _is_sha256(digest):
         raise ValueError("invalid source inventory digest")
     inventory_bytes = json.dumps(
         metadata["source_inventory"], sort_keys=True, separators=(",", ":")
     ).encode()
     if hashlib.sha256(inventory_bytes).hexdigest() != digest:
         raise ValueError("source inventory digest does not bind the compact inventory")
-    if len(metadata["source_inventory"]) != 8:
+    inventory = metadata["source_inventory"]
+    if not isinstance(inventory, list) or len(inventory) != 8:
         raise ValueError("source inventory must cover all eight cases")
     if not isinstance(cases, list) or len(cases) != 8:
         raise ValueError("per-case audit must contain exactly eight cases")
-    expected_ids = [case["case_id"] for case in _load(manifest_path)["cases"]]
+    manifest_cases = _load(manifest_path)["cases"]
+    expected_ids = [case["case_id"] for case in manifest_cases]
     if [case.get("case_id") for case in cases] != expected_ids:
         raise ValueError("audited identities differ from the frozen manifest")
-    for case in cases:
+    if [entry.get("case_id") for entry in inventory] != expected_ids:
+        raise ValueError("source inventory identities differ from the frozen manifest")
+    for inventory_entry, audit_case in zip(inventory, cases):
+        if set(inventory_entry) != {"case_id", "sources"}:
+            raise ValueError("source inventory case keys must be exact")
+        sources = inventory_entry["sources"]
+        if not isinstance(sources, list) or len(sources) != 3:
+            raise ValueError("source inventory must contain exactly three lag sources per case")
+        audit_lags = audit_case.get("lags")
+        if not isinstance(audit_lags, list) or len(audit_lags) != 3:
+            raise ValueError("per-case audit must contain exactly three lag rows")
+        target_date = date.fromisoformat(audit_case.get("target_date", ""))
+        for source, audit_lag, expected_lag in zip(sources, audit_lags, (0, 1, 2)):
+            if set(source) != {"lag", "date", "forecast_sha256", "sral_sha256"}:
+                raise ValueError("source inventory lag keys must be exact")
+            expected_date = (target_date - timedelta(days=expected_lag)).isoformat()
+            if (
+                not isinstance(audit_lag, dict)
+                or source["lag"] != expected_lag
+                or source["date"] != expected_date
+                or source["date"] != audit_lag.get("source_date")
+            ):
+                raise ValueError("source inventory lag/date differs from the per-case audit")
+            if not _is_sha256(source["forecast_sha256"]):
+                raise ValueError("invalid forecast source hash")
+            sral_hashes = source["sral_sha256"]
+            if (
+                not isinstance(sral_hashes, list)
+                or not sral_hashes
+                or not all(_is_sha256(item) for item in sral_hashes)
+            ):
+                raise ValueError("each lag must bind at least one real SRAL source hash")
+    for case, manifest_case in zip(cases, manifest_cases):
         if set(case) != {
             "case_id", "coverage_slot", "target_date", "hour", "truth_finite_on_valid_domain",
             "lag_specific_backgrounds", "co_registered_shape", "orientation_landmarks", "lags", "panel",
         }:
             raise ValueError("per-case keys must be exact")
+        for identity_key in ("case_id", "coverage_slot", "target_date", "hour"):
+            if case[identity_key] != manifest_case[identity_key]:
+                raise ValueError("per-case identity metadata differs from the frozen manifest")
         if case["truth_finite_on_valid_domain"] is not True or case["lag_specific_backgrounds"] is not True:
             raise ValueError("truth finiteness or lag-specific background invariant failed")
         if case["co_registered_shape"] != [320, 256] or len(case["orientation_landmarks"]) != 2:

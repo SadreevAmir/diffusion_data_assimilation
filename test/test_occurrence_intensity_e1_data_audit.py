@@ -1,3 +1,4 @@
+import hashlib
 import json
 import tempfile
 import unittest
@@ -47,6 +48,10 @@ class FakeDataset:
                     field[1] = 0.25
                     np.save(path, field)
                     self.records_by_date[current] = SimpleNamespace(date=current, path=path)
+                if current not in self.sral_records:
+                    sral_path = root / f"sral_{current.isoformat()}.npy"
+                    np.save(sral_path, np.ones((4, 4), dtype=np.float32))
+                    self.sral_records[current] = [sral_path]
 
     def _num_days(self):
         return len(self.obs_data)
@@ -139,6 +144,36 @@ class E1RealDataAuditTest(unittest.TestCase):
             payload[0]["lags"][0]["footprint_pixels"] = 0
             path.write_text(json.dumps(payload))
             with self.assertRaisesRegex(ValueError, "real lag footprint must be non-empty"):
+                validate_compact_audit(CONFIG, root / "output")
+
+    def test_validator_rejects_incomplete_sral_source_inventory_with_resealed_digest(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            run_real_data_audit(
+                CONFIG, root / "output", dataset_builder=lambda config, split: FakeDataset(root)
+            )
+            path = root / "output" / "metadata.json"
+            payload = json.loads(path.read_text())
+            payload["source_inventory"][0]["sources"][1]["sral_sha256"] = []
+            inventory_bytes = json.dumps(
+                payload["source_inventory"], sort_keys=True, separators=(",", ":")
+            ).encode()
+            payload["source_inventory_sha256"] = hashlib.sha256(inventory_bytes).hexdigest()
+            path.write_text(json.dumps(payload))
+            with self.assertRaisesRegex(ValueError, "at least one real SRAL source hash"):
+                validate_compact_audit(CONFIG, root / "output")
+
+    def test_validator_rejects_case_metadata_drift(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            run_real_data_audit(
+                CONFIG, root / "output", dataset_builder=lambda config, split: FakeDataset(root)
+            )
+            path = root / "output" / "per_case_audit.json"
+            payload = json.loads(path.read_text())
+            payload[0]["coverage_slot"] = "tampered"
+            path.write_text(json.dumps(payload))
+            with self.assertRaisesRegex(ValueError, "differs from the frozen manifest"):
                 validate_compact_audit(CONFIG, root / "output")
 
 
