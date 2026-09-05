@@ -22,6 +22,33 @@ decisions and the regime-aware branch lacks its required decision fields, so it
 fails closed rather than inviting post-hoc reconstruction. The exact evidence
 boundary is recorded in `CALENDAR_RESIDUAL_CFM_RESULT_RECONCILIATION.md`.
 
+## Latest method-admission boundary (2026-09-05)
+
+The current nearest scientific route is the provenance-aware occurrence–
+intensity E1 method, not a rerun of a closed calibration mechanism. Its local
+representation and engineering-sentinel implementation have been reconciled:
+each lag has eight separate fields, geometry and value provenance are distinct,
+and the sentinel contains only engineering checks. In particular, it cannot use
+truth-conditioned rank, coverage, proper-score or checkpoint-selection metrics
+and cannot support a calibration claim.
+
+`OCCURRENCE_INTENSITY_E1_ADMISSION_REQUEST.json` is the machine-readable current
+handoff. It remains `PENDING_INDEPENDENT_REVIEW`, names the literal complete test
+command and seven required checks, and permits only the exact PASS or REJECT
+response shapes recorded there. A PASS is independent admission only: it is not
+launch authorization. No controller-visible trusted-executor mode currently
+implements this sentinel, so this worktree neither invents a mode identifier nor
+creates an experiment proposal.
+
+This boundary supersedes older statements below that name a conformal or
+score-aware comparator as the immediate next action; those statements remain an
+append-only history of earlier evidence states. The next decision is the literal
+independent E1 admission result. After PASS, a separately reviewed executor
+mapping is still required before the short engineering sentinel can be proposed.
+After REJECT, the complete returned test identifiers and messages determine the
+next autonomous implementation repair. The overall publication verdict remains
+`NOT_READY`, and `eligible_calibration=MISSING_ELIGIBLE_RESULT` is unchanged.
+
 ## Latest publication-trigger resolution (2026-09-03)
 
 ### Independent recheck at the current worktree boundary
