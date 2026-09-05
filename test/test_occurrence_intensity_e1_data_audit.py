@@ -64,7 +64,10 @@ class FakeDataset:
         truth = torch.full((2, *self.image_size), (target.toordinal() % 97) / 96)
         return {
             "truth": truth, "valid_mask": self.base_valid_mask.clone(),
-            "meta": {"case_id": f"{target.isoformat()}_h{hour:02d}"},
+            "meta": {
+                "case_id": f"{target.isoformat()}_h{hour:02d}",
+                "target_path": str(self.records_by_date[target].path),
+            },
         }
 
     def sral_spatial_mask(self, target, *, day_offsets, transform_index):
@@ -229,6 +232,27 @@ class E1RealDataAuditTest(unittest.TestCase):
                     CONFIG,
                     root / "output",
                     dataset_builder=lambda config, split: DriftedRecordDataset(root),
+                )
+
+    def test_runner_rejects_truth_source_drift_after_pretruth_seal(self):
+        class DriftedTruthSourceDataset(FakeDataset):
+            def __init__(self, root):
+                super().__init__(root)
+                self.drifted_truth_path = root / "drifted_truth.npy"
+                np.save(self.drifted_truth_path, np.zeros((2, 24, 4, 4), dtype=np.float32))
+
+            def __getitem__(self, index):
+                item = super().__getitem__(index)
+                item["meta"]["target_path"] = str(self.drifted_truth_path)
+                return item
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            with self.assertRaisesRegex(ValueError, "truth source differs"):
+                run_real_data_audit(
+                    CONFIG,
+                    root / "output",
+                    dataset_builder=lambda config, split: DriftedTruthSourceDataset(root),
                 )
 
     def test_validator_rejects_zero_footprint_count(self):

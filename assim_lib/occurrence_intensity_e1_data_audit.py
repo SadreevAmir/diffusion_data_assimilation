@@ -245,10 +245,14 @@ def run_real_data_audit(
     panels_dir = output / "panels"
     panels_dir.mkdir(exist_ok=True)
     per_case = []
-    for case, index in resolved:
+    for (case, index), sealed_case in zip(resolved, source_inventory):
         item = dataset[index]
         if item["meta"]["case_id"] != case["case_id"]:
             raise ValueError("dataset case identity changed after metadata seal")
+        sealed_truth_path = Path(sealed_case["sources"][0]["forecast_path"])
+        actual_truth_path = Path(item["meta"].get("target_path", ""))
+        if not actual_truth_path.is_file() or actual_truth_path.resolve() != sealed_truth_path.resolve():
+            raise ValueError("dataset truth source differs from the pre-truth source seal")
         target = date.fromisoformat(case["target_date"])
         truth = item["truth"][config["observed_channel"]]
         valid = item["valid_mask"][config["observed_channel"]].bool()
