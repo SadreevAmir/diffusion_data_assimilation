@@ -545,6 +545,16 @@ class E1RealDataAuditTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "inventory must match"):
                 validate_compact_audit(CONFIG, root / "output")
 
+    def test_validator_rejects_extra_nonselected_artifact(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            run_real_data_audit(
+                CONFIG, root / "output", dataset_builder=lambda config, split: FakeDataset(root)
+            )
+            (root / "output" / "debug_dump.json").write_text("{}")
+            with self.assertRaisesRegex(ValueError, "artifact inventory must match"):
+                validate_compact_audit(CONFIG, root / "output")
+
     def test_validator_rejects_panel_reassigned_to_another_case(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

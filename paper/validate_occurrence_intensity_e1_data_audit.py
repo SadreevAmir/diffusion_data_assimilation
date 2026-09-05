@@ -175,6 +175,22 @@ def validate_compact_audit(config_path: Path, output: Path) -> str:
     config = _load(config_path)
     if config != FROZEN_CONFIG:
         raise ValueError("config differs from the complete frozen audit contract")
+    expected_files = {
+        "run_status.json", "metadata.json", "per_case_audit.json",
+        *{
+            f"panels/{case['case_id']}_truth_background_lag_masks.png"
+            for case in FROZEN_CASES
+        },
+    }
+    actual_files = {
+        path.relative_to(output).as_posix()
+        for path in output.rglob("*")
+        if path.is_file() or path.is_symlink()
+    }
+    if actual_files != expected_files:
+        raise ValueError("compact artifact inventory must match the frozen selection exactly")
+    if any(path.is_symlink() for path in output.rglob("*")):
+        raise ValueError("compact artifacts must be regular files, not symbolic links")
     status = _load(output / "run_status.json")
     metadata = _load(output / "metadata.json")
     cases = _load(output / "per_case_audit.json")
