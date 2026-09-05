@@ -1,0 +1,19 @@
+{
+  "project_name": "m2m_distribution_calibration",
+  "task_name": "clean_joint_state_calendar_pilot_seed1701_3epoch_all_hours",
+  "data_config": "../data/m2m_2f_calendar_clean_pilot.json",
+  "model_config": "../methods/concat_conditioning_diffusion_clean_pilot_2f.json",
+  "clearml": {
+    "enabled": true,
+    "env_path": "/home/.env",
+    "tags": [
+      "clean_retrain",
+      "joint_state_flow",
+      "calendar_exact_pairing",
+      "all_hours",
+      "three_epoch_pilot",
+      "final_visual_gate"
+    ],
+    "upload_checkpoints": false
+  }
+}

@@ -1,0 +1,62 @@
+{
+  "dataset_name": "M2MForecastDataset",
+  "dataset_dir": "/mnt/sciml/data_assimilation/da_arctic_2015-2024_v0.1",
+  "sral_dir": "/mnt/sciml/data_assimilation/sral_si/sral_new_format",
+  "mask_path": "/mnt/sciml/data_assimilation/land_mask.npy",
+  "mask_true_is_invalid": true,
+  "lead_time_hours": 24,
+  "fields": ["siconc", "sithic"],
+  "indices": [0, 1],
+  "means": [0.7343208614260409, 0.7205874274506255],
+  "stds": [0.3458938161358195, 0.5776655110213467],
+  "padding_values": [0.0, 0.0],
+  "image_size": [320, 256],
+  "target_hour_index": 23,
+  "hour_mode": "all",
+  "background_strategy": "calendar_year_ago",
+  "calendar_features": [],
+  "resample_observation_masks_each_epoch": true,
+  "observed_channels": [0, 1],
+  "assimilation_range": 3,
+  "split_protocol": "3dvar_main_200d",
+  "observation_mask": {
+    "kind": "sral_tracks",
+    "sral_transform_index": 11,
+    "synthetic_probability": 0.0,
+    "empty_probability": 0.0,
+    "require_finite_model_values": true,
+    "synthetic": {
+      "kind": "generated_track",
+      "n_tracks_range": [5, 9]
+    }
+  },
+  "train": {
+    "back_start_day": "2015-01-01",
+    "back_end_day": "2020-12-31",
+    "obs_start_day": "2016-01-01",
+    "obs_end_day": "2021-12-31",
+    "observation_mask": {
+      "kind": "sral_tracks",
+      "sral_transform_index": 11,
+      "synthetic_probability": 0.5,
+      "empty_probability": 0.0,
+      "require_finite_model_values": true,
+      "synthetic": {
+        "kind": "generated_track",
+        "n_tracks_range": [5, 9]
+      }
+    }
+  },
+  "valid": {
+    "back_start_day": "2021-01-01",
+    "back_end_day": "2021-12-31",
+    "obs_start_day": "2022-01-01",
+    "obs_end_day": "2022-12-31"
+  },
+  "test": {
+    "back_start_day": "2022-01-01",
+    "back_end_day": "2022-07-19",
+    "obs_start_day": "2023-01-01",
+    "obs_end_day": "2023-07-19"
+  }
+}

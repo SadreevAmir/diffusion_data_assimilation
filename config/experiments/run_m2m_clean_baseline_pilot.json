@@ -1,0 +1,20 @@
+{
+  "experiment_id": "clean_joint_state_calendar_pilot_seed1701_3epoch_all_hours",
+  "training_config": "train_m2m_clean_baseline_pilot.json",
+  "evaluation_config": "evaluate_m2m_clean_baseline_pilot.json",
+  "status_dir": "/home/autoresearch_results/clean_baseline_retrain_pilot",
+  "accepted_reference": {
+    "run_dir": "/home/checkpoints/concat_conditioning/m2m_2f_diffusion_balanced_50m/run_20260607_184239",
+    "checkpoint_name": "ema_last_model.pth",
+    "checkpoint_sha256": "cd73cedc97a9f19d15c70ba31d28d3248a77dc6ef568edf8793326763810fdfe",
+    "training_steps": 48825,
+    "architecture": "joint state flow; UNet 96/192/384/384; all-hour legacy training"
+  },
+  "diagnostics": {
+    "fixed_case_orders": [0, 2, 4, 6],
+    "fixed_member_ids": [0, 3, 6, 9],
+    "orientation": "native_array_row_0_at_top_no_flip_no_transpose",
+    "siconc_scale": [0.0, 1.0],
+    "human_visual_review_required": true
+  }
+}

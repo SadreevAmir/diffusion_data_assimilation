@@ -1,0 +1,46 @@
+{
+  "project_name": "m2m_distribution_calibration",
+  "task_name": "clean_joint_state_calendar_pilot_visual_evaluation",
+  "data_config": "../data/m2m_2f_calendar_clean_pilot.json",
+  "data_overrides": {
+    "hour_mode": "fixed",
+    "target_hour_index": 23,
+    "observed_channels": [0],
+    "observation_mask": {
+      "sral_transform_index": 1,
+      "synthetic_probability": 0.0,
+      "empty_probability": 0.0,
+      "require_finite_model_values": true
+    }
+  },
+  "model_config": "../methods/concat_conditioning_diffusion_clean_pilot_2f.json",
+  "evaluation": {
+    "checkpoint_name": "ema_last_model.pth",
+    "split": "valid",
+    "stride_days": 45,
+    "max_cases": 8,
+    "ensemble_size": 10,
+    "sample_batch_size": 10,
+    "num_timesteps": 25,
+    "method": "dopri5",
+    "rtol": 0.00001,
+    "atol": 0.000001,
+    "inference_precision": "float32",
+    "seed": 1234,
+    "save_ensembles": true,
+    "cfg_mode": "none",
+    "cfg_background_scale": 1.0,
+    "cfg_observation_scale": 1.0
+  },
+  "clearml": {
+    "enabled": true,
+    "env_path": "/home/.env",
+    "tags": [
+      "clean_retrain",
+      "fixed_seasonal_cases",
+      "individual_member_visual_gate",
+      "tie_aware_ranks"
+    ],
+    "upload_samples": false
+  }
+}
