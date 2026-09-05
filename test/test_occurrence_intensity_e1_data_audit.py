@@ -255,6 +255,22 @@ class E1RealDataAuditTest(unittest.TestCase):
                     dataset_builder=lambda config, split: DriftedTruthSourceDataset(root),
                 )
 
+    def test_runner_rejects_valid_domain_drift_after_pretruth_seal(self):
+        class DriftedValidDomainDataset(FakeDataset):
+            def __getitem__(self, index):
+                item = super().__getitem__(index)
+                item["valid_mask"][0, 10, 10] = 1
+                return item
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            with self.assertRaisesRegex(ValueError, "valid domain differs"):
+                run_real_data_audit(
+                    CONFIG,
+                    root / "output",
+                    dataset_builder=lambda config, split: DriftedValidDomainDataset(root),
+                )
+
     def test_validator_rejects_zero_footprint_count(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

@@ -256,6 +256,11 @@ def run_real_data_audit(
         target = date.fromisoformat(case["target_date"])
         truth = item["truth"][config["observed_channel"]]
         valid = item["valid_mask"][config["observed_channel"]].bool()
+        sealed_valid = dataset.base_valid_mask[config["observed_channel"]].bool()
+        if valid.shape != sealed_valid.shape or not torch.equal(valid.cpu(), sealed_valid.cpu()):
+            raise ValueError("dataset valid domain differs from the pre-truth domain seal")
+        if truth.shape != valid.shape:
+            raise ValueError("truth and sealed valid domain are not co-registered")
         if not torch.all(torch.isfinite(truth[valid])):
             raise ValueError("truth is non-finite inside the valid domain")
         lag_masks, backgrounds, background_sources = [], [], []
