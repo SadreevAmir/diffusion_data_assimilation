@@ -1,5 +1,6 @@
 import copy
 import json
+import os
 import unittest
 from pathlib import Path
 
@@ -12,6 +13,14 @@ REQUEST = json.loads(
 
 
 class OccurrenceIntensityE1AdmissionTest(unittest.TestCase):
+    def test_runner_is_executable_and_validates_emitted_compact_result(self):
+        runner = Path(REQUEST["runner"])
+        self.assertTrue(os.access(runner, os.X_OK))
+        source = runner.read_text(encoding="utf-8")
+        self.assertIn("paper/validate_occurrence_intensity_e1_compact_result.py", source)
+        self.assertIn('"$OUTPUT_DIR/run_status.json"', source)
+        self.assertIn('"$OUTPUT_DIR/artifact_manifest.json"', source)
+
     def test_current_request_and_literal_pass(self):
         validate_request(REQUEST)
         self.assertEqual(
