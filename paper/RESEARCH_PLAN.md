@@ -4,6 +4,16 @@ External primary evidence state: RECONCILED_NEGATIVE
 
 ## Frozen next development mechanism
 
+`NEXT_OCCURRENCE_INTENSITY_E3_CONTRACT.md` now freezes the atom-aware marginal
+mechanism that follows a clean E1 control and either scientific E2 outcome.  It
+preserves exact zero/one atoms and applies one training-fold-only reversible
+transform solely to interior positive concentration.  Its conjunctive gate
+requires at least 15% lower absolute rank TV and at least 0.05 higher attainable
+inner coverage, while limiting fair-CRPS degradation to 2%, every boundary-event
+error degradation to 1%, and each spatial/off-track degradation to 5%.  It has
+no trusted executor mode and is not launch-authorized; freezing it now keeps the
+calibration campaign active without bypassing E1 or tuning after E2.
+
 `NEXT_OCCURRENCE_INTENSITY_E2_CONTRACT.md` now freezes the contingent temporal
 mechanism behind the independently admitted E1 engineering control.  It changes
 only age-only conditioning to an explicit three-frame background trajectory

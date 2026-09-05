@@ -24,6 +24,15 @@ boundary is recorded in `CALENDAR_RESIDUAL_CFM_RESULT_RECONCILIATION.md`.
 
 ## Latest method-admission boundary (2026-09-05)
 
+The next independent marginal mechanism is now fully predeclared in
+`NEXT_OCCURRENCE_INTENSITY_E3_CONTRACT.md`.  E3 preserves exact zero and one
+atoms, applies a deterministic training-fold-only generalized-inverse transform
+only to interior concentration, and requires simultaneous rank-TV, attainable-
+coverage, proper-score, boundary, spatial and operational success.  It remains
+dependent on a clean E1 control and the valid E2 routing, has no trusted mode and
+does not authorize launch.  This closes the next scientific-contract gap while
+leaving `NOT_READY` and `eligible_calibration=MISSING_ELIGIBLE_RESULT` unchanged.
+
 Parallel pre-result work now freezes the exact contingent E2 temporal contract
 in `NEXT_OCCURRENCE_INTENSITY_E2_CONTRACT.md`.  E2 is not an alternative route
 around E1: it is dependent on a clean E1 engineering result and differs only by
