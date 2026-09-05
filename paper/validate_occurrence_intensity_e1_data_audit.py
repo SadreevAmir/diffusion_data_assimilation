@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
+import struct
 from typing import Any
 
 MODE = "occurrence_intensity_e1_real_data_audit"
@@ -14,6 +15,13 @@ MODE = "occurrence_intensity_e1_real_data_audit"
 
 def _load(path: Path) -> Any:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _png_dimensions(path: Path) -> tuple[int, int]:
+    header = path.read_bytes()[:24]
+    if len(header) != 24 or header[:8] != b"\x89PNG\r\n\x1a\n" or header[12:16] != b"IHDR":
+        raise ValueError("missing or invalid compact orientation panel")
+    return struct.unpack(">II", header[16:24])
 
 
 def validate_compact_audit(config_path: Path, output: Path) -> str:
@@ -41,7 +49,8 @@ def validate_compact_audit(config_path: Path, output: Path) -> str:
     if metadata["truth_values_consulted_for_selection"] is not False:
         raise ValueError("truth-dependent case selection is forbidden")
     if metadata["lags_days"] != [0, 1, 2] or metadata["panel_layout"] != [
-        "truth", "background_lag0", "mask_lag0", "mask_lag1", "mask_lag2"
+        "truth", "background_lag0", "mask_lag0", "background_lag1", "mask_lag1",
+        "background_lag2", "mask_lag2",
     ]:
         raise ValueError("lag or panel layout drift")
     digest = metadata["source_inventory_sha256"]
@@ -87,8 +96,8 @@ def validate_compact_audit(config_path: Path, output: Path) -> str:
             if isinstance(lag["footprint_pixels"], bool) or not isinstance(lag["footprint_pixels"], int) or lag["footprint_pixels"] < 0:
                 raise ValueError("invalid footprint count")
         panel = output / case["panel"]
-        if not panel.is_file() or not panel.read_bytes().startswith(b"\x89PNG\r\n\x1a\n"):
-            raise ValueError("missing or invalid compact orientation panel")
+        if not panel.is_file() or _png_dimensions(panel) != (1816, 320):
+            raise ValueError("compact orientation panel has invalid geometry")
     return "E1_REAL_DATA_AUDIT_PASS"
 
 

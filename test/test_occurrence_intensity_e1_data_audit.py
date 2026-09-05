@@ -88,6 +88,13 @@ class E1RealDataAuditTest(unittest.TestCase):
             )
             self.assertEqual(len(result["per_case_audit"]), 8)
             self.assertTrue(all(len(case["lags"]) == 3 for case in result["per_case_audit"]))
+            self.assertEqual(
+                result["metadata"]["panel_layout"],
+                [
+                    "truth", "background_lag0", "mask_lag0", "background_lag1", "mask_lag1",
+                    "background_lag2", "mask_lag2",
+                ],
+            )
             self.assertEqual(validate_compact_audit(CONFIG, root / "output"), "E1_REAL_DATA_AUDIT_PASS")
 
     def test_validator_rejects_future_leakage(self):

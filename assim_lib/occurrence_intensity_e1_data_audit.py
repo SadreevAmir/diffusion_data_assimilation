@@ -239,7 +239,10 @@ def run_real_data_audit(
                 "lag_mask_values": [int(mask[row, column]) for mask in lag_masks],
             })
         panel_name = f"{case['case_id']}_truth_background_lag_masks.png"
-        _png(panels_dir / panel_name, _panel([truth, backgrounds[0], *lag_masks]))
+        panel_fields = [truth]
+        for background, mask in zip(backgrounds, lag_masks):
+            panel_fields.extend((background, mask))
+        _png(panels_dir / panel_name, _panel(panel_fields))
         per_case.append({
             "case_id": case["case_id"], "coverage_slot": case["coverage_slot"],
             "target_date": case["target_date"], "hour": case["hour"],
@@ -258,7 +261,10 @@ def run_real_data_audit(
         "source_inventory": source_inventory,
         "dataset_provenance": dataset.provenance(), "truth_values_consulted_for_selection": False,
         "lags_days": [0, 1, 2], "sral_footprint_semantics": "finite_after_transform_11_and_valid_domain",
-        "panel_layout": ["truth", "background_lag0", "mask_lag0", "mask_lag1", "mask_lag2"],
+        "panel_layout": [
+            "truth", "background_lag0", "mask_lag0", "background_lag1", "mask_lag1",
+            "background_lag2", "mask_lag2",
+        ],
     }
     payloads = {"run_status.json": status, "metadata.json": metadata, "per_case_audit.json": per_case}
     for name, payload in payloads.items():
