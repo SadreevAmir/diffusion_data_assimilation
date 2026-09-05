@@ -1,0 +1,18 @@
+{
+  "selection_rule": "eight_fixed_temporal_coverage_slots_from_forecast_and_sral_metadata_only",
+  "truth_values_consulted": false,
+  "cases": [
+    {"case_id": "2022-01-01_h23", "target_date": "2022-01-01", "hour": 23, "coverage_slot": "winter_early"},
+    {"case_id": "2022-01-26_h23", "target_date": "2022-01-26", "hour": 23, "coverage_slot": "winter_late"},
+    {"case_id": "2022-02-25_h23", "target_date": "2022-02-25", "hour": 23, "coverage_slot": "spring_early"},
+    {"case_id": "2022-03-22_h23", "target_date": "2022-03-22", "hour": 23, "coverage_slot": "spring_late"},
+    {"case_id": "2022-04-21_h23", "target_date": "2022-04-21", "hour": 23, "coverage_slot": "melt_early"},
+    {"case_id": "2022-05-16_h23", "target_date": "2022-05-16", "hour": 23, "coverage_slot": "melt_mid"},
+    {"case_id": "2022-06-15_h23", "target_date": "2022-06-15", "hour": 23, "coverage_slot": "melt_late"},
+    {"case_id": "2022-07-15_h23", "target_date": "2022-07-15", "hour": 23, "coverage_slot": "summer_early"}
+  ],
+  "orientation_landmarks": [
+    {"name": "western_arctic_grid_landmark", "row": 32, "column": 32},
+    {"name": "greenland_sector_grid_landmark", "row": 287, "column": 223}
+  ]
+}

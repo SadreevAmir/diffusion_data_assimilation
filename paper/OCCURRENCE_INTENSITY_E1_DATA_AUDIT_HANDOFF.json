@@ -1,0 +1,16 @@
+{
+  "decision": "READY_FOR_TRUSTED_SERVER_CPU_MAPPING",
+  "mode": "occurrence_intensity_e1_real_data_audit",
+  "resource_kind": "server_cpu",
+  "config": "config/experiments/occurrence_intensity_e1_data_audit.json",
+  "case_manifest": "paper/OCCURRENCE_INTENSITY_E1_REAL_CASES.json",
+  "runner": "scripts/run_occurrence_intensity_e1_data_audit.sh",
+  "implementation": "assim_lib/occurrence_intensity_e1_data_audit.py",
+  "compact_validator": "paper/validate_occurrence_intensity_e1_data_audit.py",
+  "required_runtime": ["python3", "numpy", "torch", "real_forecast_archive", "real_sral_archive", "land_mask"],
+  "success_token": "E1_REAL_DATA_AUDIT_PASS",
+  "launch_authorized": false,
+  "scientific_claim": false,
+  "artifact_policy": "selected_artifacts",
+  "selected_artifacts": ["run_status.json", "metadata.json", "per_case_audit.json", "panels/*.png"]
+}

@@ -1,0 +1,15 @@
+{
+  "mode": "occurrence_intensity_e1_real_data_audit",
+  "project_name": "generative-sea-ice-da",
+  "task_name": "occurrence-intensity-e1-real-data-audit",
+  "clearml": {"enabled": true},
+  "resource_kind": "server_cpu",
+  "dataset_config": "config/data/m2m_2f_1y.json",
+  "dataset_split": "valid",
+  "case_manifest": "paper/OCCURRENCE_INTENSITY_E1_REAL_CASES.json",
+  "lags_days": [0, 1, 2],
+  "sral_transform_index": 11,
+  "observed_channel": 0,
+  "artifact_policy": "selected_artifacts",
+  "selected_artifacts": ["run_status.json", "metadata.json", "per_case_audit.json", "panels/*.png"]
+}
