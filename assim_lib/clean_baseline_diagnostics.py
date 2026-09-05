@@ -43,6 +43,15 @@ SEASONS = {
     11: "SON",
     12: "DJF",
 }
+FIXED_VISUAL_CASE_COUNT = 8
+FIXED_VISUAL_MEMBER_IDS = (0, 3, 6, 9)
+FIXED_WORST_CASES_PER_METRIC = 1
+WORST_CASE_METRICS = (
+    "fair_crps",
+    "mean_rmse",
+    "tie_aware_rank_tv_from_uniform",
+    "member_lag1_texture_error",
+)
 
 
 def tie_aware_rank_counts(
@@ -160,6 +169,22 @@ def _case_date(payload: Any, fallback: str) -> date:
         raise ValueError(f"cannot recover ISO target date from {text!r}") from error
 
 
+def _lag1_gradient_rms(field: np.ndarray, valid: np.ndarray) -> float:
+    """Return RMS first differences over all valid horizontal/vertical edges."""
+    values = np.asarray(field, dtype=np.float64)
+    mask = np.asarray(valid, dtype=bool)
+    if values.ndim != 2 or mask.shape != values.shape:
+        raise ValueError("lag-1 texture inputs must be co-registered 2-D arrays")
+    horizontal = mask[:, 1:] & mask[:, :-1]
+    vertical = mask[1:, :] & mask[:-1, :]
+    edge_count = int(horizontal.sum() + vertical.sum())
+    if edge_count == 0:
+        raise ValueError("lag-1 texture diagnostic requires at least one valid neighboring pair")
+    squared_sum = float(np.square(values[:, 1:] - values[:, :-1])[horizontal].sum())
+    squared_sum += float(np.square(values[1:, :] - values[:-1, :])[vertical].sum())
+    return math.sqrt(squared_sum / edge_count)
+
+
 def evaluate_sample_directory(sample_dir: Path) -> dict[str, Any]:
     paths = sorted(sample_dir.glob("*.npz"))
     if not paths:
@@ -210,10 +235,17 @@ def evaluate_sample_directory(sample_dir: Path) -> dict[str, Any]:
         mean = np.mean(ensemble, axis=0)
         difference = mean[valid] - truth[valid]
         count = int(valid.sum())
+        case_fair_sum = fair_crps_sum(ensemble, truth, valid)
+        case_rank_frequencies = counts / count
+        case_rank_uniform = 1.0 / counts.size
+        truth_lag1_gradient_rms = _lag1_gradient_rms(truth, valid)
+        member_lag1_gradient_rms = np.asarray(
+            [_lag1_gradient_rms(member, valid) for member in ensemble], dtype=np.float64
+        )
         point_count += count
         error_sum += float(difference.sum())
         squared_error_sum += float(np.square(difference).sum())
-        fair_sum += fair_crps_sum(ensemble, truth, valid)
+        fair_sum += case_fair_sum
         ordinary_sum += _ordinary_crps_sum(ensemble, truth, valid)
         for endpoint_name, endpoint_value in (("zero", 0.0), ("one", 1.0)):
             totals = _endpoint_totals(ensemble, truth, valid, endpoint_value)
@@ -227,9 +259,20 @@ def evaluate_sample_directory(sample_dir: Path) -> dict[str, Any]:
                 "path": path.name,
                 "target_date": target_date.isoformat(),
                 "pixels": count,
-                "fair_crps": fair_crps_sum(ensemble, truth, valid) / count,
+                "fair_crps": case_fair_sum / count,
                 "mean_rmse": float(np.sqrt(np.mean(np.square(difference)))),
                 "mean_bias": float(np.mean(difference)),
+                "tie_aware_rank_tv_from_uniform": float(
+                    0.5 * np.abs(case_rank_frequencies - case_rank_uniform).sum()
+                ),
+                "truth_lag1_gradient_rms": truth_lag1_gradient_rms,
+                "mean_member_lag1_gradient_rms": float(member_lag1_gradient_rms.mean()),
+                "member_lag1_texture_error": float(
+                    np.mean(np.abs(member_lag1_gradient_rms - truth_lag1_gradient_rms))
+                ),
+                "member_lag1_texture_bias": float(
+                    member_lag1_gradient_rms.mean() - truth_lag1_gradient_rms
+                ),
                 "strict_truth_above_all_rate": float(np.mean(truth[valid] > np.max(ensemble, axis=0)[valid])),
             }
         )
@@ -343,6 +386,140 @@ def reconcile_case_inputs(candidate_dir: Path, reference_dir: Path) -> list[str]
                 if not _arrays_equal(candidate_payload[key], reference_payload[key]):
                     raise ValueError(f"candidate/reference {key} differs on {target_date}")
     return dates
+
+
+def select_worst_cases(
+    per_case: list[dict[str, Any]],
+    *,
+    top_k: int = FIXED_WORST_CASES_PER_METRIC,
+) -> dict[str, Any]:
+    """Select predeclared candidate failures deterministically, never by visual inspection."""
+    if top_k < 1:
+        raise ValueError("worst-case top_k must be positive")
+    if not per_case:
+        raise ValueError("worst-case selection requires per-case diagnostics")
+    dates = [str(case.get("target_date", "")) for case in per_case]
+    if any(not value for value in dates) or len(set(dates)) != len(dates):
+        raise ValueError("per-case target dates must be present and unique")
+    if top_k > len(per_case):
+        raise ValueError("worst-case top_k exceeds the fixed case count")
+
+    selections: dict[str, list[dict[str, Any]]] = {}
+    selected_dates: set[str] = set()
+    for metric in WORST_CASE_METRICS:
+        scored = []
+        for case in per_case:
+            if metric not in case:
+                raise ValueError(f"per-case diagnostic {metric} is missing")
+            score = float(case[metric])
+            if not math.isfinite(score):
+                raise ValueError(f"per-case diagnostic {metric} is non-finite")
+            scored.append((score, str(case["target_date"]), str(case.get("path", ""))))
+        # Higher is always worse. ISO date and filename are frozen deterministic tie-breakers.
+        scored.sort(key=lambda row: (-row[0], row[1], row[2]))
+        chosen = [
+            {"rank": rank, "target_date": target_date, "path": path, "score": score}
+            for rank, (score, target_date, path) in enumerate(scored[:top_k], start=1)
+        ]
+        selections[metric] = chosen
+        selected_dates.update(item["target_date"] for item in chosen)
+    return {
+        "protocol": (
+            "candidate-only predeclared metrics; higher is worse; ties use earliest ISO date "
+            "then lexicographic filename; no random state or visual preselection"
+        ),
+        "top_k_per_metric": top_k,
+        "metrics": list(WORST_CASE_METRICS),
+        "selections": selections,
+        "selected_dates": sorted(selected_dates),
+    }
+
+
+def make_all_case_contact_sheet(
+    candidate_dir: Path,
+    reference_dir: Path,
+    output_path: Path,
+    *,
+    member_ids: tuple[int, ...] = FIXED_VISUAL_MEMBER_IDS,
+    expected_case_count: int = FIXED_VISUAL_CASE_COUNT,
+) -> dict[str, Any]:
+    """Render candidate/reference rows for every fixed case on one non-selective sheet."""
+    candidate = _sample_inventory(candidate_dir)
+    reference = _sample_inventory(reference_dir)
+    dates = sorted(candidate)
+    if set(candidate) != set(reference):
+        raise ValueError("candidate and accepted-reference dates differ")
+    if len(dates) != expected_case_count:
+        raise ValueError(
+            f"all-case contact sheet requires exactly {expected_case_count} cases, got {len(dates)}"
+        )
+    if tuple(member_ids) != FIXED_VISUAL_MEMBER_IDS:
+        raise ValueError(f"contact sheet requires fixed member ids {FIXED_VISUAL_MEMBER_IDS}")
+
+    titles = ["truth", "background", *(f"member {member}" for member in member_ids), "mean", "std"]
+    rows: list[tuple[str, str, np.ndarray, np.ndarray, np.ndarray, np.ndarray]] = []
+    for target_date in dates:
+        for label, path in (
+            ("candidate", candidate[target_date]),
+            ("accepted reference", reference[target_date]),
+        ):
+            with np.load(path, allow_pickle=False) as payload:
+                fields = [str(field) for field in payload["fields"].tolist()]
+                if "siconc" not in fields:
+                    raise ValueError(f"siconc is absent from {path.name}")
+                channel = fields.index("siconc")
+                ensemble = np.asarray(payload["analysis_ensemble"][:, channel], dtype=np.float64)
+                truth = np.asarray(payload["truth"][channel], dtype=np.float64)
+                background = np.asarray(payload["background"][channel], dtype=np.float64)
+                valid = np.asarray(payload["valid_mask"][channel], dtype=bool)
+            if any(member < 0 or member >= ensemble.shape[0] for member in member_ids):
+                raise ValueError("fixed contact-sheet member id is outside the ensemble")
+            rows.append((target_date, label, ensemble, truth, background, valid))
+
+    figure, axes = plt.subplots(
+        len(rows),
+        len(titles),
+        figsize=(2.15 * len(titles), 1.65 * len(rows) + 1.0),
+        squeeze=False,
+        constrained_layout=True,
+    )
+    figure.suptitle(
+        "All 8 fixed cases — no visual preselection\n"
+        f"members {'/'.join(str(member) for member in FIXED_VISUAL_MEMBER_IDS)}; "
+        "native row-0-at-top orientation; identical SIC scale [0,1]",
+        fontsize=15,
+    )
+    for row_index, (target_date, label, ensemble, truth, background, valid) in enumerate(rows):
+        values = [truth, background]
+        values.extend(ensemble[member] for member in member_ids)
+        values.extend((ensemble.mean(axis=0), ensemble.std(axis=0)))
+        for column, (title, field) in enumerate(zip(titles, values, strict=True)):
+            axis = axes[row_index, column]
+            axis.imshow(
+                np.ma.masked_invalid(np.where(valid, field, np.nan)),
+                origin="upper",
+                interpolation="nearest",
+                cmap="Blues_r" if title != "std" else "magma",
+                vmin=0.0,
+                vmax=1.0,
+            )
+            if row_index == 0:
+                axis.set_title(title)
+            axis.set_xticks([])
+            axis.set_yticks([])
+            if column == 0:
+                axis.set_ylabel(f"{target_date}\n{label}", fontsize=8)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    figure.savefig(output_path, dpi=180, bbox_inches="tight")
+    plt.close(figure)
+    return {
+        "path": str(output_path),
+        "dates": dates,
+        "rows": len(rows),
+        "member_ids": list(member_ids),
+        "orientation": "native_array_row_0_at_top_no_flip_no_transpose",
+        "siconc_scale": [0.0, 1.0],
+    }
 
 
 def make_comparison_panels(
@@ -498,7 +675,30 @@ def analyze(
     reference_metrics = evaluate_sample_directory(reference_dir)
     if candidate_metrics["cases"] != reference_metrics["cases"]:
         raise ValueError("candidate and accepted-reference case counts differ")
+    if len(paired_dates) != FIXED_VISUAL_CASE_COUNT:
+        raise ValueError(
+            f"deterministic visual gate requires exactly {FIXED_VISUAL_CASE_COUNT} paired cases"
+        )
+    if tuple(member_ids) != FIXED_VISUAL_MEMBER_IDS:
+        raise ValueError(f"deterministic visual gate requires member ids {FIXED_VISUAL_MEMBER_IDS}")
     output_dir.mkdir(parents=True, exist_ok=True)
+    all_case_contact_sheet = make_all_case_contact_sheet(
+        candidate_dir,
+        reference_dir,
+        output_dir / "all_8_fixed_cases_contact_sheet.png",
+        member_ids=member_ids,
+    )
+    worst_case_protocol = select_worst_cases(candidate_metrics["per_case"])
+    worst_case_orders = tuple(
+        paired_dates.index(target_date) for target_date in worst_case_protocol["selected_dates"]
+    )
+    worst_case_panels = make_comparison_panels(
+        candidate_dir,
+        reference_dir,
+        output_dir / "worst_cases",
+        case_orders=worst_case_orders,
+        member_ids=member_ids,
+    )
     panels = make_comparison_panels(
         candidate_dir,
         reference_dir,
@@ -546,6 +746,9 @@ def analyze(
             "orientation": "native_array_row_0_at_top_no_flip_no_transpose",
             "siconc_scale": [0.0, 1.0],
             "panels": panels,
+            "all_case_contact_sheet": all_case_contact_sheet,
+            "worst_case_protocol": worst_case_protocol,
+            "worst_case_panels": worst_case_panels,
             "rank_and_endpoint_figure": rank_figure,
         },
     }
