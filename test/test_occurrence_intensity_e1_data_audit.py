@@ -585,6 +585,59 @@ class E1RealDataAuditTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "differs from its sealed hash"):
                 validate_compact_audit(CONFIG, root / "output")
 
+    def test_validator_rejects_resealed_extra_png_chunk(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            output = root / "output"
+            result = run_real_data_audit(
+                CONFIG, output, dataset_builder=lambda config, split: FakeDataset(root)
+            )
+            panel = output / result["per_case_audit"][0]["panel"]
+            payload = panel.read_bytes()
+            ihdr_end = 8 + 12 + 13
+            body = b"audit"
+            kind = b"tEXt"
+            extra = (
+                struct.pack(">I", len(body)) + kind + body
+                + struct.pack(">I", zlib.crc32(kind + body))
+            )
+            resealed = payload[:ihdr_end] + extra + payload[ihdr_end:]
+            panel.write_bytes(resealed)
+            audit_path = output / "per_case_audit.json"
+            audit = json.loads(audit_path.read_text())
+            audit[0]["panel_sha256"] = hashlib.sha256(resealed).hexdigest()
+            audit_path.write_text(json.dumps(audit))
+            with self.assertRaisesRegex(ValueError, "frozen PNG chunk sequence"):
+                validate_compact_audit(CONFIG, output)
+
+    def test_validator_rejects_resealed_concatenated_zlib_stream(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            output = root / "output"
+            result = run_real_data_audit(
+                CONFIG, output, dataset_builder=lambda config, split: FakeDataset(root)
+            )
+            panel = output / result["per_case_audit"][0]["panel"]
+            payload = panel.read_bytes()
+            ihdr_end = 8 + 12 + 13
+            compressed_length = struct.unpack(">I", payload[ihdr_end:ihdr_end + 4])[0]
+            compressed_start = ihdr_end + 8
+            compressed_end = compressed_start + compressed_length
+            concatenated = payload[compressed_start:compressed_end] + zlib.compress(b"extra")
+            kind = b"IDAT"
+            idat = (
+                struct.pack(">I", len(concatenated)) + kind + concatenated
+                + struct.pack(">I", zlib.crc32(kind + concatenated))
+            )
+            resealed = payload[:ihdr_end] + idat + payload[compressed_end + 4:]
+            panel.write_bytes(resealed)
+            audit_path = output / "per_case_audit.json"
+            audit = json.loads(audit_path.read_text())
+            audit[0]["panel_sha256"] = hashlib.sha256(resealed).hexdigest()
+            audit_path.write_text(json.dumps(audit))
+            with self.assertRaisesRegex(ValueError, "concatenated zlib stream"):
+                validate_compact_audit(CONFIG, output)
+
     def test_validator_rejects_extra_panel_from_reused_output_directory(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

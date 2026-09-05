@@ -83,6 +83,7 @@ def _png_grayscale_pixels(path: Path) -> tuple[int, int, bytes]:
     if payload[:8] != b"\x89PNG\r\n\x1a\n":
         raise ValueError("missing or invalid compact orientation panel")
     offset, width, height, compressed = 8, None, None, bytearray()
+    chunk_kinds = []
     seen_ihdr = False
     seen_iend = False
     while offset < len(payload):
@@ -90,6 +91,7 @@ def _png_grayscale_pixels(path: Path) -> tuple[int, int, bytes]:
             raise ValueError("truncated compact orientation panel")
         length = struct.unpack(">I", payload[offset:offset + 4])[0]
         kind = payload[offset + 4:offset + 8]
+        chunk_kinds.append(kind)
         end = offset + 12 + length
         if end > len(payload):
             raise ValueError("truncated compact orientation panel chunk")
@@ -117,12 +119,17 @@ def _png_grayscale_pixels(path: Path) -> tuple[int, int, bytes]:
         offset = end
     if not seen_iend or offset != len(payload):
         raise ValueError("orientation panel has missing or trailing PNG content")
+    if chunk_kinds != [b"IHDR", b"IDAT", b"IEND"]:
+        raise ValueError("orientation panel differs from the frozen PNG chunk sequence")
     if width is None or height is None or not compressed:
         raise ValueError("orientation panel is missing required PNG chunks")
     try:
-        scanlines = zlib.decompress(bytes(compressed))
+        decoder = zlib.decompressobj()
+        scanlines = decoder.decompress(bytes(compressed)) + decoder.flush()
     except zlib.error as error:
         raise ValueError("orientation panel has invalid compressed pixels") from error
+    if not decoder.eof or decoder.unused_data or decoder.unconsumed_tail:
+        raise ValueError("orientation panel has an incomplete or concatenated zlib stream")
     stride = width + 1
     if len(scanlines) != height * stride:
         raise ValueError("orientation panel pixel payload has invalid size")
