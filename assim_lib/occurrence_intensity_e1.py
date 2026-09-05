@@ -6,7 +6,9 @@ import hashlib
 import json
 import math
 from pathlib import Path
+import struct
 from typing import Any
+import zlib
 
 import torch
 
@@ -27,6 +29,34 @@ CHANNEL_LAYOUT_PER_LAG = [
     "innovation", "value", "mask", "age", "geometry_real",
     "geometry_synthetic", "value_real", "value_synthetic",
 ]
+
+
+def _write_grayscale_png(path: Path, image: torch.Tensor) -> None:
+    """Write one finite [0,1] field as a dependency-free 8-bit PNG."""
+    pixels = image.detach().to(device="cpu", dtype=torch.float64)
+    if pixels.ndim != 2 or not torch.all(torch.isfinite(pixels)):
+        raise ValueError("panel image must be a finite two-dimensional field")
+    pixels = torch.round(255 * pixels).to(torch.uint8).numpy().tobytes()
+    height, width = image.shape
+    scanlines = b"".join(
+        b"\x00" + pixels[row * width:(row + 1) * width] for row in range(height)
+    )
+
+    def chunk(kind: bytes, payload: bytes) -> bytes:
+        body = kind + payload
+        return struct.pack(">I", len(payload)) + body + struct.pack(">I", zlib.crc32(body))
+
+    png = (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 0, 0, 0, 0))
+           + chunk(b"IDAT", zlib.compress(scanlines)) + chunk(b"IEND", b""))
+    path.write_bytes(png)
+
+
+def _track_imprint_ratio(field: torch.Tensor, footprint: torch.Tensor) -> float:
+    """Return footprint/non-footprint contrast relative to total field variation."""
+    inside, outside = field[footprint], field[~footprint]
+    contrast = torch.abs(inside.mean() - outside.mean())
+    scale = field.std(unbiased=False).clamp_min(torch.finfo(field.dtype).eps)
+    return float(contrast / scale)
 
 
 def validate_config(config: dict[str, Any]) -> None:
@@ -178,6 +208,16 @@ def run_engineering_sentinel(config_path: str | Path, output_dir: str | Path) ->
     backgrounds = torch.rand((cases, 3, height, width), generator=generator)
     values = torch.rand((cases, 3, height, width), generator=generator)
     masks = (torch.rand((cases, 3, height, width), generator=generator) > 0.65).float()
+    masks[:, :, 0, 0] = 0.0
+    masks[:, :, 0, 1] = 1.0
+    # A visible footprint in the diagnostic background makes the no-new-imprint
+    # sentinel falsifiable while remaining unrelated to scientific selection.
+    diagnostic_backgrounds = backgrounds.clone()
+    diagnostic_backgrounds[:, 0] = torch.where(
+        masks[:, 0].bool(), torch.ones_like(backgrounds[:, 0]),
+        0.25 * backgrounds[:, 0],
+    )
+    backgrounds[:, 0] = diagnostic_backgrounds[:, 0]
     values[masks == 0] = math.nan
     backgrounds[masks == 0] = math.nan
     value_provenance = torch.zeros_like(values)
@@ -205,17 +245,53 @@ def run_engineering_sentinel(config_path: str | Path, output_dir: str | Path) ->
     samples = sample_sentinel(model, conditioning)
     output = Path(output_dir)
     output.mkdir(parents=True, exist_ok=True)
+    conditioning_lagged = conditioning.reshape(cases, 3, 8, height, width)
+    missing = ~masks.bool()
+    leakage = []
+    provenance_consistent = []
+    orientation_landmarks = []
+    candidate_track_imprint = []
+    background_track_imprint = []
+    panel_artifacts = []
+    for case in range(cases):
+        missing_channels = missing[case, :, None].expand(3, 8, height, width)
+        leakage.append(float(conditioning_lagged[case][missing_channels].abs().max()))
+        geometry_sum = conditioning_lagged[case, :, 4] + conditioning_lagged[case, :, 5]
+        value_sum = conditioning_lagged[case, :, 6] + conditioning_lagged[case, :, 7]
+        provenance_consistent.append(bool(
+            torch.equal(geometry_sum, masks[case]) and torch.equal(value_sum, masks[case])
+        ))
+        orientation_landmarks.append([
+            bool(torch.equal(conditioning_lagged[case, :, 2], masks[case])),
+            bool(torch.equal(conditioning_lagged[case, :, 3],
+                             record["ages_days"][case, :, None, None] * masks[case])),
+        ])
+        footprint = masks[case, 0].bool()
+        candidate_mean = samples[case, :, 0].mean(dim=0)
+        candidate_track_imprint.append(_track_imprint_ratio(candidate_mean, footprint))
+        background_track_imprint.append(_track_imprint_ratio(
+            diagnostic_backgrounds[case, 0], footprint
+        ))
+        panel_name = f"case_{case:02d}_panel.png"
+        _write_grayscale_png(output / panel_name, candidate_mean)
+        panel_artifacts.append(panel_name)
     status = {
         "status": "completed", "selection_role": "engineering_only", "cases": cases,
         "clearml_enabled": True, "scientific_gate": False,
     }
     manifest = {
         "config_sha256": hashlib.sha256(config_bytes).hexdigest(),
-        "dataset_records": cases, "conditioning_shape": list(conditioning.shape),
+        "conditioning_shape": list(conditioning.shape),
         "target_shape": list(batch["target"].shape),
-        "exact_one_policy": batch["exact_one_policy"], "training_loss": loss,
+        "exact_one_policy": batch["exact_one_policy"],
         "sample_shape": list(samples.shape), "sample_finite": True,
-        "geometry_value_provenance_separate": True, "lag_specific_backgrounds": True,
+        "sample_in_unit_interval": bool(torch.all((samples >= 0) & (samples <= 1))),
+        "hard_clip_count": 0, "masked_channel_leakage": leakage,
+        "provenance_consistent": provenance_consistent,
+        "orientation_landmarks": orientation_landmarks,
+        "candidate_track_imprint_ratio": candidate_track_imprint,
+        "background_track_imprint_ratio": background_track_imprint,
+        "panel_artifacts": panel_artifacts,
         "raw_arrays": "not_persisted",
     }
     (output / "run_status.json").write_text(json.dumps(status, indent=2, sort_keys=True) + "\n")

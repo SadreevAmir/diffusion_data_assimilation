@@ -6,6 +6,7 @@ from pathlib import Path
 from assim_lib.occurrence_intensity_e1 import (
     controller_request, run_engineering_sentinel, validate_config,
 )
+from paper.validate_occurrence_intensity_e1_compact_result import validate_result
 
 
 CONFIG = Path("config/experiments/occurrence_intensity_e1_sentinel.json")
@@ -56,8 +57,16 @@ class E1HandoffTest(unittest.TestCase):
             self.assertEqual(manifest["exact_one_policy"], "explicit_exact_one_atom")
             self.assertTrue(manifest["sample_finite"])
             self.assertEqual(manifest["raw_arrays"], "not_persisted")
+            self.assertEqual(
+                validate_result(result["run_status"], manifest, CONFIG.read_bytes()),
+                "E1_SENTINEL_PASS",
+            )
             self.assertTrue((Path(directory) / "run_status.json").is_file())
             self.assertTrue((Path(directory) / "artifact_manifest.json").is_file())
+            for panel in manifest["panel_artifacts"]:
+                panel_path = Path(directory) / panel
+                self.assertTrue(panel_path.is_file())
+                self.assertTrue(panel_path.read_bytes().startswith(b"\x89PNG\r\n\x1a\n"))
 
 
 if __name__ == "__main__":
