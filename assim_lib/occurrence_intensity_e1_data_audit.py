@@ -64,6 +64,12 @@ def _write_json_atomic(path: Path, payload: Any) -> None:
             temporary.unlink()
 
 
+def _reject_output_symlinks(output: Path) -> None:
+    """Reject redirected entries before the producer writes any artifact."""
+    if any(path.is_symlink() for path in output.rglob("*")):
+        raise ValueError("E1 data-audit output tree must not contain symbolic links")
+
+
 def validate_audit_config(config: dict[str, Any]) -> None:
     if set(config) != CONFIG_KEYS:
         raise ValueError("E1 data-audit config keys must be exact")
@@ -236,6 +242,7 @@ def run_real_data_audit(
     output.mkdir(parents=True, exist_ok=True)
     if not output.is_dir():
         raise ValueError("E1 data-audit output path must be a directory")
+    _reject_output_symlinks(output)
     # Invalidate a completion marker from an earlier attempt before dataset
     # construction, source hashing, or truth access can fail.  Reusing an
     # output directory must never expose stale success for the current attempt.

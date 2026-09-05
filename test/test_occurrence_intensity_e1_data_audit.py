@@ -284,6 +284,26 @@ class E1RealDataAuditTest(unittest.TestCase):
 
             self.assertEqual(list(redirected.iterdir()), [])
 
+    def test_runner_rejects_symlinked_panel_file_before_any_writing(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            output = root / "output"
+            panels = output / "panels"
+            panels.mkdir(parents=True)
+            redirected = root / "redirected_panel.png"
+            redirected.write_bytes(b"unchanged")
+            first_case = json.loads(MANIFEST.read_text())["cases"][0]["case_id"]
+            panel = panels / f"{first_case}_truth_background_lag_masks.png"
+            panel.symlink_to(redirected)
+
+            with self.assertRaisesRegex(ValueError, "output tree must not contain symbolic links"):
+                run_real_data_audit(
+                    CONFIG, output, dataset_builder=lambda config, split: FakeDataset(root)
+                )
+
+            self.assertEqual(redirected.read_bytes(), b"unchanged")
+            self.assertFalse((output / "run_status.json").exists())
+
     def test_validator_rejects_future_leakage(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
