@@ -40,6 +40,15 @@ launch authorization. No controller-visible trusted-executor mode currently
 implements this sentinel, so this worktree neither invents a mode identifier nor
 creates an experiment proposal.
 
+`validate_occurrence_intensity_e1_admission.py` is the fail-closed ingestion
+boundary for that future independent response. It validates the current request
+contract before accepting a response, rejects extra response fields, requires a
+literal clean PASS or a nonempty REJECT, verifies failed-check names against the
+frozen checklist, and requires every failed-test entry to carry both an identifier
+and message. Its compact output always retains `launch_authorized=false` and binds
+the decision to the SHA-256 of the request bytes. This guard does not manufacture
+an admission result and does not provide an executor mapping.
+
 This boundary supersedes older statements below that name a conformal or
 score-aware comparator as the immediate next action; those statements remain an
 append-only history of earlier evidence states. The next decision is the literal
