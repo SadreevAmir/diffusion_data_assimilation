@@ -1,6 +1,6 @@
 {
   "project_name": "m2m_distribution_calibration",
-  "task_name": "clean_joint_state_calendar_pilot_visual_evaluation_retry2",
+  "task_name": "clean_joint_state_calendar_pilot_visual_evaluation_retry3",
   "data_config": "../data/m2m_2f_calendar_clean_pilot.json",
   "data_overrides": {
     "hour_mode": "fixed",

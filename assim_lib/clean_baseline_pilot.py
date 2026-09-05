@@ -185,11 +185,11 @@ def _validate_dataset_samples(dataset, data_config: dict[str, Any], *, split: st
     if not base_indices:
         raise ValueError(f"no fixed preflight cases selected for {split}")
     if dataset.hour_mode == "all":
-        frozen_hours = (0, 6, 12, 18, int(data_config["target_hour_index"]))
+        target_hour = int(data_config["target_hour_index"])
         indices = [
             (index // dataset.hours_per_day) * dataset.hours_per_day + hour
-            for index in base_indices
-            for hour in frozen_hours
+            for case_order, index in enumerate(base_indices)
+            for hour in ((0, 6, 12, 18, target_hour) if case_order == 0 else (target_hour,))
         ]
     else:
         indices = base_indices

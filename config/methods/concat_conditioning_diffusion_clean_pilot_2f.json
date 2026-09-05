@@ -39,7 +39,7 @@
   "sample_cfg_mode": "none",
   "sample_cfg_background_scale": 1.0,
   "sample_cfg_observation_scale": 1.0,
-  "base_output_dir": "/home/autoresearch_results/clean_baseline_retrain_pilot_retry2/training",
+  "base_output_dir": "/home/autoresearch_results/clean_baseline_retrain_pilot_retry3/training",
   "run_name": "",
   "tracker": null,
   "clearml_upload_checkpoints": false,

@@ -1,6 +1,6 @@
 {
   "project_name": "m2m_distribution_calibration",
-  "task_name": "clean_joint_state_calendar_pilot_seed1701_3epoch_all_hours_retry2",
+  "task_name": "clean_joint_state_calendar_pilot_seed1701_3epoch_all_hours_retry3",
   "data_config": "../data/m2m_2f_calendar_clean_pilot.json",
   "model_config": "../methods/concat_conditioning_diffusion_clean_pilot_2f.json",
   "clearml": {
@@ -12,7 +12,7 @@
       "calendar_exact_pairing",
       "all_hours",
       "three_epoch_pilot",
-      "dedicated_gpu1_shm8g_retry",
+      "dedicated_gpu1_shm8g_retry3",
       "final_visual_gate"
     ],
     "upload_checkpoints": false
