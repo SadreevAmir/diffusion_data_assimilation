@@ -105,6 +105,8 @@ def _validate_static_contract(
     _require_equal(model_config.get("timestep_beta_params"), [1.0, 1.5], "timestep beta")
     _require_equal(model_config.get("num_epochs"), 3, "pilot epochs")
     _require_equal(model_config.get("train_batch_size"), 16, "training batch size")
+    _require_equal(model_config.get("num_workers_train"), 0, "shared-memory-safe train workers")
+    _require_equal(model_config.get("num_workers_val"), 0, "shared-memory-safe validation workers")
     _require_equal(model_config.get("learning_rate"), 0.0001, "learning rate")
     _require_equal(model_config.get("lr_warmup_steps"), 500, "warmup")
     _require_equal(model_config.get("mixed_precision"), "bf16", "training precision")
