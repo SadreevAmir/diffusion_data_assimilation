@@ -1,0 +1,22 @@
+{
+  "project_name": "m2m_distribution_calibration",
+  "task_name": "clean_joint_state_exact_old_recipe_seed0_15epoch",
+  "data_config": "../data/m2m_2f_calendar_clean_pilot.json",
+  "model_config": "../methods/concat_conditioning_diffusion_clean_reproduction_2f.json",
+  "clearml": {
+    "enabled": true,
+    "env_path": "/home/.env",
+    "tags": [
+      "clean_retrain",
+      "exact_legacy_recipe",
+      "joint_state_flow",
+      "calendar_exact_pairing",
+      "disjoint_validation_2022",
+      "all_hours",
+      "seed0",
+      "15_epochs",
+      "gpu1"
+    ],
+    "upload_checkpoints": false
+  }
+}
