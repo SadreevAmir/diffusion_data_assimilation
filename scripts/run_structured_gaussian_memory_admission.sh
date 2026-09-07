@@ -6,7 +6,7 @@ set -Eeuo pipefail
 
 EXPERIMENT="${REPO_DIR}/config/experiments/admit_structured_joint_gaussian_preconditioned_checkpointed.json"
 PYTHON_BIN="/opt/conda/bin/python"
-TIMEOUT_SECONDS=3600
+TIMEOUT_SECONDS=3540
 KILL_GRACE_SECONDS=60
 
 export PYTHONDONTWRITEBYTECODE=1
