@@ -38,6 +38,12 @@ from .structured_trajectory_evaluation import (
     evaluate_structured_publication_ensemble,
     make_structured_trajectory_figure,
     sample_structured_batch,
+    structured_trajectory_metrics,
+)
+from .structured_solver_control import (
+    _paired_field_differences,
+    _sic_neighbor_energy_by_lead,
+    _solver_gate,
 )
 
 
@@ -50,6 +56,8 @@ EXPECTED_TIMEPOINTS = 65
 PROPER_SCORE_RELATIVE_LIMIT = 1.02
 SPATIAL_VARIOGRAM_RELATIVE_LIMIT = 0.70
 SPATIAL_LAGS = (1, 2, 4)
+CANDIDATE_SOLVER_CASE_POSITIONS = (0, 2)
+CANDIDATE_SOLVER_MEMBER_POSITIONS = (0, 1)
 _SHA256_RE = re.compile(r"[0-9a-f]{64}")
 
 
@@ -349,6 +357,38 @@ def _load_ema_sampler(
     return Sampler(model, structured_velocity_parameterization=expected_parameterization), actual
 
 
+def _load_candidate_training_identity(
+    output_dir: Path,
+    candidate_run_dir: Path,
+    attempt: str,
+) -> dict[str, str]:
+    path = output_dir / "training_result.json"
+    if path.is_symlink() or not path.is_file():
+        raise ValueError("candidate training identity is unsafe or absent")
+    payload = load_json(path)
+    expected_run = (output_dir / "training/seed1701").resolve()
+    if (
+        payload.get("schema_version") != SCHEMA_VERSION
+        or payload.get("status") != "training_completed"
+        or payload.get("attempt_token") != attempt
+        or Path(str(payload.get("candidate_run_dir", ""))).resolve() != expected_run
+        or candidate_run_dir.resolve() != expected_run
+        or payload.get("optimizer_steps") != EXPECTED_STEPS
+        or payload.get("internal_sampling_disabled") is not True
+        or payload.get("authoritative_evaluation")
+        != "separate_bare_model_strict_fp32"
+    ):
+        raise ValueError("candidate training identity differs from this pilot attempt")
+    hashes = {
+        "metadata_sha256": payload.get("metadata_sha256"),
+        "ema_state_sha256": payload.get("ema_state_sha256"),
+        "resume_sha256": payload.get("resume_sha256"),
+    }
+    if any(_SHA256_RE.fullmatch(str(value)) is None for value in hashes.values()):
+        raise ValueError("candidate training identity has invalid hashes")
+    return {key: str(value) for key, value in hashes.items()}
+
+
 @contextmanager
 def _strict_fp32_context():
     previous_matmul_tf32 = torch.backends.cuda.matmul.allow_tf32
@@ -402,6 +442,8 @@ def _sample_model(
     stats: dict[str, Any],
     config: TrainingConfig,
     device: torch.device,
+    *,
+    timepoints: int = EXPECTED_TIMEPOINTS,
 ) -> torch.Tensor:
     by_case: list[torch.Tensor] = []
     for case_position, batch in enumerate(batches):
@@ -411,7 +453,7 @@ def _sample_model(
             with _strict_fp32_context():
                 sample = sample_structured_batch(
                     sampler, batch, stats=stats, size=config.image_size,
-                    num_timesteps=EXPECTED_TIMEPOINTS, device=device, method="rk4",
+                    num_timesteps=int(timepoints), device=device, method="rk4",
                     rtol=config.sample_rtol, atol=config.sample_atol,
                     initial_noise=initial_noise.clone().to(device),
                 )
@@ -431,12 +473,12 @@ def _spatial_variogram_errors(
     details: dict[str, float] = {}
     aggregates: dict[str, float] = {}
     for lag in SPATIAL_LAGS:
-        scores: list[torch.Tensor] = []
-        for lead in range(4):
-            domain = valid_mask[:, 0] > 0
-            if lead == 0:
-                domain = domain & ~(lag0_mask[:, 0] > 0)
-            for offset, field in enumerate(("sic", "sit")):
+        for offset, field in enumerate(("sic", "sit")):
+            field_scores: list[torch.Tensor] = []
+            for lead in range(4):
+                domain = valid_mask[:, 0] > 0
+                if lead == 0:
+                    domain = domain & ~(lag0_mask[:, 0] > 0)
                 channel = 2 * lead + offset
                 direction_scores: list[torch.Tensor] = []
                 for axis in (-2, -1):
@@ -460,8 +502,10 @@ def _spatial_variogram_errors(
                 selected = torch.cat(direction_scores)
                 value = selected.mean(dtype=torch.float64)
                 details[f"lag{lag}_lead{lead}_{field}"] = float(value.item())
-                scores.append(selected)
-        aggregates[f"lag{lag}"] = float(torch.cat(scores).mean(dtype=torch.float64).item())
+                field_scores.append(selected)
+            aggregates[f"lag{lag}_{field}"] = float(
+                torch.cat(field_scores).mean(dtype=torch.float64).item()
+            )
     return {"power": 0.5, "directions": ["vertical", "horizontal"], "aggregate": aggregates, "details": details}
 
 
@@ -484,11 +528,22 @@ def paired_pilot_gate(
     candidate_metrics: dict[str, Any],
     raw_spatial: dict[str, Any],
     candidate_spatial: dict[str, Any],
+    candidate_solver_gate: dict[str, Any],
 ) -> dict[str, Any]:
     """Apply the complete frozen quantitative gate, failing closed on omissions."""
 
     checks: dict[str, Any] = {}
     passed = True
+    solver_ok = (
+        candidate_solver_gate.get("status") == "converged"
+        and candidate_solver_gate.get("pilot_permitted") is True
+    )
+    checks["candidate_solver/rk4_64_vs_128"] = {
+        "passed": solver_ok,
+        "status": candidate_solver_gate.get("status"),
+        "pilot_permitted": candidate_solver_gate.get("pilot_permitted"),
+    }
+    passed = passed and solver_ok
     for lead in range(4):
         label = "d0" if lead == 0 else f"d+{lead}"
         for field in ("sic", "sit"):
@@ -523,12 +578,14 @@ def paired_pilot_gate(
                 checks[name] = {"passed": ok, "raw": raw, "candidate": candidate, "maximum_ratio": 1.0}
                 passed = passed and ok
     for lag in SPATIAL_LAGS:
-        name = f"spatial_variogram/lag{lag}"
-        raw = raw_spatial.get("aggregate", {}).get(f"lag{lag}")
-        candidate = candidate_spatial.get("aggregate", {}).get(f"lag{lag}")
-        ok = _finite_nonnegative(raw) and _finite_nonnegative(candidate) and float(candidate) <= SPATIAL_VARIOGRAM_RELATIVE_LIMIT * float(raw)
-        checks[name] = {"passed": ok, "raw": raw, "candidate": candidate, "maximum_ratio": SPATIAL_VARIOGRAM_RELATIVE_LIMIT}
-        passed = passed and ok
+        for field in ("sic", "sit"):
+            name = f"spatial_variogram/lag{lag}/{field}"
+            key = f"lag{lag}_{field}"
+            raw = raw_spatial.get("aggregate", {}).get(key)
+            candidate = candidate_spatial.get("aggregate", {}).get(key)
+            ok = _finite_nonnegative(raw) and _finite_nonnegative(candidate) and float(candidate) <= SPATIAL_VARIOGRAM_RELATIVE_LIMIT * float(raw)
+            checks[name] = {"passed": ok, "raw": raw, "candidate": candidate, "maximum_ratio": SPATIAL_VARIOGRAM_RELATIVE_LIMIT}
+            passed = passed and ok
     for transition in ("d+0_to_d+1", "d+1_to_d+2", "d+2_to_d+3"):
         for field in ("sic", "sit"):
             for score in ("increment_fair_crps", "ensemble_mean_increment_rmse"):
@@ -617,6 +674,61 @@ def _save_visuals(
     fig.savefig(visual / "paired_rank_histograms.png", dpi=180, bbox_inches="tight")
     plt.close(fig)
 
+    seasonal_positions = (0, 2, 4, 6)
+    seasonal_labels = ("DJF", "MAM", "JJA", "SON")
+    fig, axes = plt.subplots(4, 12, figsize=(36, 14), constrained_layout=True)
+    seasonal_valid = valid[list(seasonal_positions)].expand(-1, 4, -1, -1) > 0
+    sit_values = torch.cat(
+        [
+            values[list(seasonal_positions), 1::2][seasonal_valid]
+            for values in (truth, raw[:, 0], candidate[:, 0])
+        ]
+    )
+    sit_max = max(float(torch.quantile(sit_values, 0.99).item()), 1e-6)
+    columns = (
+        (0, "sic", "truth", truth), (0, "sic", "raw", raw[:, 0]),
+        (0, "sic", "candidate", candidate[:, 0]),
+        (3, "sic", "truth", truth), (3, "sic", "raw", raw[:, 0]),
+        (3, "sic", "candidate", candidate[:, 0]),
+        (0, "sit", "truth", truth), (0, "sit", "raw", raw[:, 0]),
+        (0, "sit", "candidate", candidate[:, 0]),
+        (3, "sit", "truth", truth), (3, "sit", "raw", raw[:, 0]),
+        (3, "sit", "candidate", candidate[:, 0]),
+    )
+    for row, (case_position, season) in enumerate(
+        zip(seasonal_positions, seasonal_labels, strict=True)
+    ):
+        ocean = valid[case_position, 0] > 0
+        for column, (lead, field, source, values) in enumerate(columns):
+            offset = 0 if field == "sic" else 1
+            channel = 2 * lead + offset
+            display = torch.where(
+                ocean, values[case_position, channel], torch.nan
+            ).numpy()
+            axes[row, column].imshow(
+                display,
+                origin="upper",
+                cmap="Blues" if field == "sic" else "viridis",
+                vmin=0.0,
+                vmax=1.0 if field == "sic" else sit_max,
+            )
+            axes[row, column].set_xticks([])
+            axes[row, column].set_yticks([])
+            if row == 0:
+                axes[row, column].set_title(f"{field.upper()} d+{lead}\n{source}")
+            if column == 0:
+                axes[row, column].set_ylabel(
+                    f"{season}\n{case_ids[case_position]}", fontsize=11
+                )
+    fig.suptitle(
+        "Frozen seasonal QC: truth vs raw vs candidate, fixed member 0",
+        fontsize=18,
+    )
+    fig.savefig(
+        visual / "paired_seasonal_member00.png", dpi=180, bbox_inches="tight"
+    )
+    plt.close(fig)
+
 
 def run_evaluation(
     experiment_path: Path,
@@ -640,6 +752,9 @@ def run_evaluation(
         refinement_gate_path,
         expected_result_sha256=refinement_result_sha256,
         expected_gate_sha256=refinement_gate_sha256,
+    )
+    candidate_expected_hashes = _load_candidate_training_identity(
+        output_dir, candidate_run_dir, attempt
     )
     data_config, stats, candidate_config, audit, _ = _load_experiment_contract(experiment_path)
     raw_data, raw_stats, raw_config, raw_audit, _ = _load_experiment_contract(raw_experiment_path)
@@ -685,9 +800,29 @@ def run_evaluation(
     torch.cuda.empty_cache()
     candidate_sampler, candidate_hashes = _load_ema_sampler(
         candidate_run_dir, candidate_config, data_config, stats,
-        "gaussian_path_preconditioned", None, device,
+        "gaussian_path_preconditioned", candidate_expected_hashes, device,
     )
     candidate_ensemble = _sample_model(candidate_sampler, batches, noise, stats, candidate_config, device)
+    solver_case_positions = list(CANDIDATE_SOLVER_CASE_POSITIONS)
+    solver_member_positions = list(CANDIDATE_SOLVER_MEMBER_POSITIONS)
+    candidate_64_subset = candidate_ensemble[solver_case_positions][
+        :, solver_member_positions
+    ]
+    candidate_128_subset = _sample_model(
+        candidate_sampler,
+        [batches[position] for position in solver_case_positions],
+        [
+            [
+                noise[case_position][member_position]
+                for member_position in solver_member_positions
+            ]
+            for case_position in solver_case_positions
+        ],
+        stats,
+        candidate_config,
+        device,
+        timepoints=129,
+    )
     del candidate_sampler
     gc.collect()
     torch.cuda.empty_cache()
@@ -705,7 +840,67 @@ def run_evaluation(
     candidate_spatial = _spatial_variogram_errors(candidate_ensemble, truth, valid, lag0)
     raw_metrics["paired_spatial_variogram"] = raw_spatial
     candidate_metrics["paired_spatial_variogram"] = candidate_spatial
-    gate = paired_pilot_gate(raw_metrics, candidate_metrics, raw_spatial, candidate_spatial)
+    solver_truth = truth[solver_case_positions]
+    solver_background = background[solver_case_positions]
+    solver_valid = valid[solver_case_positions]
+    solver_lag0 = lag0[solver_case_positions]
+    solver_variants: dict[str, Any] = {}
+    for label, ensemble in (
+        ("rk4_64_intervals_fp32", candidate_64_subset),
+        ("rk4_128_intervals_fp32", candidate_128_subset),
+    ):
+        solver_variants[label] = {
+            "status": "passed",
+            "metrics": structured_trajectory_metrics(
+                ensemble,
+                solver_truth,
+                solver_background,
+                solver_valid,
+                lag0_mask=solver_lag0,
+                sic_cap=float(stats["sic_cap"]),
+                exclude_lag0_from_day0_scores=True,
+            ),
+            "sic_neighbor_energy_by_lead": _sic_neighbor_energy_by_lead(
+                ensemble, solver_valid, solver_lag0
+            ),
+        }
+    comparison_key = "rk4_64_intervals_fp32_vs_rk4_128_intervals_fp32"
+    solver_comparisons = {
+        comparison_key: {
+            "variants": ["rk4_64_intervals_fp32", "rk4_128_intervals_fp32"],
+            **_paired_field_differences(
+                candidate_64_subset,
+                candidate_128_subset,
+                solver_valid,
+                solver_lag0,
+                sic_cap=float(stats["sic_cap"]),
+            ),
+        }
+    }
+    candidate_solver_gate = _solver_gate(solver_variants, solver_comparisons)
+    candidate_solver_control = {
+        "schema_version": "structured_gaussian_candidate_solver_refinement_v1",
+        "case_positions": solver_case_positions,
+        "dataset_indices": [case_indices[position] for position in solver_case_positions],
+        "member_positions": solver_member_positions,
+        "member_seeds": [
+            contract.member_seeds[position] for position in solver_member_positions
+        ],
+        "same_initial_noise_as_paired_pilot": True,
+        "variants": solver_variants,
+        "paired_comparisons": solver_comparisons,
+        "solver_gate": candidate_solver_gate,
+    }
+    _atomic_json(
+        output_dir / "candidate_solver_control.json", candidate_solver_control
+    )
+    gate = paired_pilot_gate(
+        raw_metrics,
+        candidate_metrics,
+        raw_spatial,
+        candidate_spatial,
+        candidate_solver_gate,
+    )
     _atomic_json(output_dir / "raw_metrics.json", raw_metrics)
     _atomic_json(output_dir / "candidate_metrics.json", candidate_metrics)
     _save_visuals(output_dir, truth, background, raw_ensemble, candidate_ensemble, valid, raw_metrics, candidate_metrics, case_ids)
@@ -728,11 +923,17 @@ def run_evaluation(
         "reference_hashes": raw_actual_hashes,
         "candidate_hashes": candidate_hashes,
         "solver_refinement_hashes": refinement_hashes,
+        "candidate_solver_control": {
+            "artifact": "candidate_solver_control.json",
+            "sha256": _sha256(output_dir / "candidate_solver_control.json"),
+            "status": candidate_solver_gate["status"],
+        },
         "gate": gate,
         "visual_artifacts": [
             "visual_qc/raw_case00_member00.png",
             "visual_qc/candidate_case00_member00.png",
             "visual_qc/paired_rank_histograms.png",
+            "visual_qc/paired_seasonal_member00.png",
         ],
         "visual_review_required": True,
         "full_training_permitted": False,

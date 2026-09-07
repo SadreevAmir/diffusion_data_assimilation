@@ -48,7 +48,15 @@
       "bitwise exact paired day-0 observations"
     ],
     "solver_stability_gate": "aggregate physical scores change by at most 1 percent and event probabilities by at most 1 percentage point from 64 to 128 RK4 intervals",
-    "spatial_gate": "lag-1/2/4 variogram error decreases by at least 30 percent relative to the paired raw-velocity epoch-15 reference and no temporal-increment regression",
+    "candidate_solver_refinement": {
+      "case_positions": [0, 2],
+      "dataset_indices": [0, 90],
+      "member_positions": [0, 1],
+      "member_seeds": [16002861, 16002962],
+      "reuse": "the exact paired-pilot initial noise tensors already generated for these case/member positions",
+      "comparison": "strict-FP32 RK4-64 versus RK4-128 with the frozen solver thresholds"
+    },
+    "spatial_gate": "for each field separately, lag-1/2/4 variogram error decreases by at least 30 percent relative to the paired raw-velocity epoch-15 reference; SIC and SIT are never pooled across physical units; no temporal-increment regression",
     "proper_score_gate": "fieldwise per-lead fair CRPS and ensemble-mean RMSE do not degrade by more than 2 percent",
     "calibration_gate": "fieldwise per-lead rank-TV to uniform and mean absolute central 50/80/90 coverage error do not regress relative to the paired raw-velocity reference",
     "visual_gate": "fixed paired SIC/SIT member panels show no salt-and-pepper, track imprint, or disconnected granular texture"

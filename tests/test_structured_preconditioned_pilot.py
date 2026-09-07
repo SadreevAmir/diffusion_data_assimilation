@@ -64,42 +64,90 @@ def _metrics(value: float = 1.0) -> dict:
     }
 
 
+def _spatial(value: float) -> dict:
+    return {
+        "aggregate": {
+            f"lag{lag}_{field}": value
+            for lag in pilot.SPATIAL_LAGS
+            for field in ("sic", "sit")
+        }
+    }
+
+
 class StructuredPreconditionedPilotTests(unittest.TestCase):
     def test_complete_quantitative_gate_passes_but_never_unlocks_full_training(self) -> None:
         raw = _metrics()
         candidate = _metrics(0.69)
-        raw_spatial = {"aggregate": {f"lag{lag}": 1.0 for lag in pilot.SPATIAL_LAGS}}
-        candidate_spatial = {"aggregate": {f"lag{lag}": 0.70 for lag in pilot.SPATIAL_LAGS}}
-        result = pilot.paired_pilot_gate(raw, candidate, raw_spatial, candidate_spatial)
+        raw_spatial = _spatial(1.0)
+        candidate_spatial = _spatial(0.70)
+        solver = {"status": "converged", "pilot_permitted": True}
+        result = pilot.paired_pilot_gate(
+            raw, candidate, raw_spatial, candidate_spatial, solver
+        )
         self.assertEqual(result["status"], "quantitative_pass")
         self.assertTrue(result["quantitative_passed"])
         self.assertEqual(result["visual_review_status"], "pending_independent_review")
         self.assertFalse(result["full_training_permitted"])
         self.assertFalse(result["test_2023_used"])
-        self.assertEqual(len(result["checks"]), 59)
+        self.assertEqual(len(result["checks"]), 63)
 
     def test_gate_fails_closed_on_missing_nonfinite_and_regression(self) -> None:
         raw = _metrics()
-        candidate = _metrics()
-        spatial = {"aggregate": {f"lag{lag}": 1.0 for lag in pilot.SPATIAL_LAGS}}
+        candidate = _metrics(0.69)
+        raw_spatial = _spatial(1.0)
+        candidate_spatial = _spatial(0.70)
+        solver = {"status": "converged", "pilot_permitted": True}
         adverse = copy.deepcopy(candidate)
         del adverse["leads"]["d+2"]["fields"]["sit"]["fair_crps"]
         self.assertEqual(
-            pilot.paired_pilot_gate(raw, adverse, spatial, spatial)["status"],
+            pilot.paired_pilot_gate(
+                raw, adverse, raw_spatial, candidate_spatial, solver
+            )["status"],
             "quantitative_fail",
         )
         adverse = copy.deepcopy(candidate)
         adverse["temporal"]["transitions"]["d+1_to_d+2"]["fields"]["sic"]["increment_fair_crps"] = float("nan")
         self.assertEqual(
-            pilot.paired_pilot_gate(raw, adverse, spatial, spatial)["status"],
+            pilot.paired_pilot_gate(
+                raw, adverse, raw_spatial, candidate_spatial, solver
+            )["status"],
             "quantitative_fail",
         )
         adverse = copy.deepcopy(candidate)
         adverse["support"]["ensemble_support_violation_count"] = 1
         self.assertEqual(
-            pilot.paired_pilot_gate(raw, adverse, spatial, spatial)["status"],
+            pilot.paired_pilot_gate(
+                raw, adverse, raw_spatial, candidate_spatial, solver
+            )["status"],
             "quantitative_fail",
         )
+        self.assertEqual(
+            pilot.paired_pilot_gate(
+                raw,
+                candidate,
+                raw_spatial,
+                candidate_spatial,
+                {"status": "failed", "pilot_permitted": False},
+            )["status"],
+            "quantitative_fail",
+        )
+
+    def test_spatial_gate_never_pools_sic_and_sit_units(self) -> None:
+        raw = _metrics()
+        candidate = _metrics(0.69)
+        raw_spatial = _spatial(1.0)
+        candidate_spatial = _spatial(0.10)
+        candidate_spatial["aggregate"]["lag2_sic"] = 0.71
+        result = pilot.paired_pilot_gate(
+            raw,
+            candidate,
+            raw_spatial,
+            candidate_spatial,
+            {"status": "converged", "pilot_permitted": True},
+        )
+        self.assertFalse(result["checks"]["spatial_variogram/lag2/sic"]["passed"])
+        self.assertTrue(result["checks"]["spatial_variogram/lag2/sit"]["passed"])
+        self.assertEqual(result["status"], "quantitative_fail")
 
     def test_frozen_panel_builds_validation_only_contract(self) -> None:
         repo = Path(__file__).resolve().parents[1]
@@ -114,6 +162,39 @@ class StructuredPreconditionedPilotTests(unittest.TestCase):
         self.assertEqual(len(contract.member_seeds), 8)
         self.assertEqual(contract.blockers, ())
         self.assertFalse(panel["test_2023_permitted"])
+        protocol = load_json(
+            repo / "paper/STRUCTURED_GAUSSIAN_PRECONDITIONED_PILOT_PROTOCOL.json"
+        )
+        refinement = protocol["evaluation"]["candidate_solver_refinement"]
+        self.assertEqual(refinement["case_positions"], [0, 2])
+        self.assertEqual(refinement["member_positions"], [0, 1])
+        self.assertEqual(pilot.CANDIDATE_SOLVER_CASE_POSITIONS, (0, 2))
+        self.assertEqual(pilot.CANDIDATE_SOLVER_MEMBER_POSITIONS, (0, 1))
+
+    def test_candidate_identity_is_bound_to_current_attempt_and_hashes(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "result"
+            run = output / "training/seed1701"
+            run.mkdir(parents=True)
+            payload = {
+                "schema_version": pilot.SCHEMA_VERSION,
+                "status": "training_completed",
+                "attempt_token": "attempt",
+                "candidate_run_dir": str(run.resolve()),
+                "optimizer_steps": 2128,
+                "internal_sampling_disabled": True,
+                "authoritative_evaluation": "separate_bare_model_strict_fp32",
+                "metadata_sha256": "1" * 64,
+                "ema_state_sha256": "2" * 64,
+                "resume_sha256": "3" * 64,
+            }
+            (output / "training_result.json").write_text(
+                json.dumps(payload), encoding="utf-8"
+            )
+            hashes = pilot._load_candidate_training_identity(output, run, "attempt")
+            self.assertEqual(hashes["ema_state_sha256"], "2" * 64)
+            with self.assertRaisesRegex(ValueError, "pilot attempt"):
+                pilot._load_candidate_training_identity(output, run, "other")
 
     def test_spatial_variogram_uses_both_spatial_axes(self) -> None:
         truth = torch.zeros((1, 8, 8, 9))
@@ -122,7 +203,14 @@ class StructuredPreconditionedPilotTests(unittest.TestCase):
         valid = torch.ones((1, 1, 8, 9))
         lag0 = torch.zeros_like(valid)
         result = pilot._spatial_variogram_errors(ensemble, truth, valid, lag0)
-        self.assertEqual(result["aggregate"], {"lag1": 0.0, "lag2": 0.0, "lag4": 0.0})
+        self.assertEqual(
+            result["aggregate"],
+            {
+                f"lag{lag}_{field}": 0.0
+                for lag in pilot.SPATIAL_LAGS
+                for field in ("sic", "sit")
+            },
+        )
 
     def test_real_two_field_valid_mask_is_verified_before_collapse(self) -> None:
         mask = torch.ones((8, 2, 320, 256))
