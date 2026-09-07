@@ -7,7 +7,12 @@
     "method_config": "config/methods/structured_joint_uniform_real_lagged_2f.json",
     "checkpoint_stage": "epoch_0016_recovery_after_zero_based_epoch_15",
     "optimizer_steps": 2128,
-    "lr_scheduler_total_steps": 4123
+    "lr_scheduler_total_steps": 4123,
+    "server_inventory_experiment": "structured_joint_reference_inventory_retry1",
+    "server_inventory_artifact_sha256": "f02c65cdfdf12d61cc854cb8996ed5bddce928c3a204c66cc971b307cbad34b6",
+    "metadata_sha256": "f45aa6f1699ae0cb46acd7d2a4e0e6b65d53f39c47ca20710d95b7ce5e814d21",
+    "ema_state_sha256": "6fadfaa402434cd4273c3679d30ca765639153748ec172aa0f72d7babfed23d4",
+    "resume_sha256": "452e147e108a62dccf29b09dae1246aaa3d71f2d719120565fbbf4f06eb1ae1f"
   },
   "candidate": {
     "experiment_config": "config/experiments/train_structured_joint_gaussian_preconditioned_pilot.json",
