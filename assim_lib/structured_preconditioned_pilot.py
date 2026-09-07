@@ -178,6 +178,11 @@ def run_training(experiment_path: Path, output_dir: Path) -> dict[str, Any]:
         "base_output_dir": str((output_dir / "training").resolve()),
         "run_name": "seed1701",
         "resume_from_checkpoint": "",
+        # The structured batch is large enough that multiprocessing queues
+        # exhausted the launch container's /dev/shm. Loading in the training
+        # process changes only I/O scheduling, not samples, order, or updates.
+        "num_workers_train": 0,
+        "num_workers_val": 0,
         # These diagnostics are non-authoritative and would duplicate the
         # strict paired evaluator while perturbing wall time, not optimizer RNG.
         "sample_every_n_epochs": 0,
@@ -204,6 +209,8 @@ def run_training(experiment_path: Path, output_dir: Path) -> dict[str, Any]:
         "attempt_token": attempt,
         "candidate_run_dir": str(run_dir),
         "optimizer_steps": EXPECTED_STEPS,
+        "dataloader_workers_train": 0,
+        "dataloader_workers_val": 0,
         "metadata_sha256": _sha256(metadata_path),
         "ema_state_sha256": _sha256(ema_path),
         "resume_sha256": _sha256(resume_path),

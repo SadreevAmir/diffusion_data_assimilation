@@ -234,6 +234,8 @@ class StructuredPreconditionedPilotTests(unittest.TestCase):
                 self.assertEqual(training["sample_every_n_epochs"], 0)
                 self.assertEqual(training["metric_every_n_epochs"], 0)
                 self.assertFalse(training["metric_save_ensemble_samples"])
+                self.assertEqual(training["num_workers_train"], 0)
+                self.assertEqual(training["num_workers_val"], 0)
                 run = Path(training["base_output_dir"]) / training["run_name"]
                 recovery = run / "structured_recovery/epoch_0016"
                 recovery.mkdir(parents=True)
@@ -250,6 +252,8 @@ class StructuredPreconditionedPilotTests(unittest.TestCase):
             ), mock.patch.object(pilot, "train_main", side_effect=fake_train):
                 result = pilot.run_training(experiment, output)
             self.assertEqual(result["optimizer_steps"], 2128)
+            self.assertEqual(result["dataloader_workers_train"], 0)
+            self.assertEqual(result["dataloader_workers_val"], 0)
             self.assertTrue(result["internal_sampling_disabled"])
 
     def test_wrapper_refuses_existing_output_and_preserves_clearml_connectivity(self) -> None:

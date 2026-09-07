@@ -3,6 +3,7 @@
   "status": "blocked_pending_strict_fp32_refinement_and_independent_launch_review",
   "scientific_hypothesis": "Analytically removing the Gaussian marginal component of the linear-path conditional-flow velocity reduces nuisance regression and small-scale sample noise without changing the target law, conditioning, architecture, loss on reconstructed velocity, or optimizer-step budget.",
   "single_changed_factor": "structured_velocity_parameterization=gaussian_path_preconditioned",
+  "execution_only_dataloader_contract": "num_workers_train=num_workers_val=0 avoids multiprocessing shared-memory queues; this changes I/O scheduling only, not the frozen dataset, sample order, optimizer updates, or target law",
   "reference": {
     "method_config": "config/methods/structured_joint_uniform_real_lagged_2f.json",
     "checkpoint_stage": "epoch_0016_recovery_after_zero_based_epoch_15",
