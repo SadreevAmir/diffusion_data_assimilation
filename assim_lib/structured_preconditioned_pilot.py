@@ -183,6 +183,7 @@ def run_training(experiment_path: Path, output_dir: Path) -> dict[str, Any]:
         # process changes only I/O scheduling, not samples, order, or updates.
         "num_workers_train": 0,
         "num_workers_val": 0,
+        "preserve_persistent_worker_rng": True,
         # These diagnostics are non-authoritative and would duplicate the
         # strict paired evaluator while perturbing wall time, not optimizer RNG.
         "sample_every_n_epochs": 0,
@@ -211,6 +212,7 @@ def run_training(experiment_path: Path, output_dir: Path) -> dict[str, Any]:
         "optimizer_steps": EXPECTED_STEPS,
         "dataloader_workers_train": 0,
         "dataloader_workers_val": 0,
+        "persistent_worker_rng_compatible": True,
         "metadata_sha256": _sha256(metadata_path),
         "ema_state_sha256": _sha256(ema_path),
         "resume_sha256": _sha256(resume_path),

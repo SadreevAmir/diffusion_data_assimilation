@@ -46,6 +46,7 @@ class TrainingConfig:
     eval_batch_size: int = 4
     num_workers_train: int = 4
     num_workers_val: int = 2
+    preserve_persistent_worker_rng: bool = False
     num_epochs: int = 20
     gradient_accumulation_steps: int = 1
     learning_rate: float = 1e-4
@@ -173,6 +174,14 @@ class TrainingConfig:
         invalid = {name: value for name, value in positive_ints.items() if value <= 0}
         if invalid:
             raise ValueError(f"Training values must be positive: {invalid}")
+        if self.num_workers_train < 0 or self.num_workers_val < 0:
+            raise ValueError("DataLoader worker counts must be non-negative")
+        if self.preserve_persistent_worker_rng and (
+            self.num_workers_train != 0 or self.num_workers_val != 0
+        ):
+            raise ValueError(
+                "preserve_persistent_worker_rng requires zero train and validation workers"
+            )
         if self.lr_scheduler_total_steps < 0:
             raise ValueError("lr_scheduler_total_steps must be non-negative")
         if self.training_objective not in {

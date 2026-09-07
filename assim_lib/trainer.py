@@ -22,7 +22,7 @@ from .clearml_tracking import ClearMLTracker
 from .config import TrainingConfig, jsonable
 from .dashboard import make_multi_case_background_condition_assim_figure
 from .flow_parameterization import reconstruct_velocity, velocity_model_state
-from .runtime import make_normalized_xy_grid
+from .runtime import make_normalized_xy_grid, preserve_persistent_worker_rng
 from .sampler import Sampler
 from .structured_joint_state import (
     StructuredDecodeSaturationError,
@@ -279,6 +279,9 @@ class UNetTrainer:
         (self.model, self.optimizer, self.train_dataloader, self.val_dataloader, self.lr_scheduler) = (
             self.accelerator.prepare(model, optimizer, data_loader_train, data_loader_val, lr_scheduler)
         )
+        if config.preserve_persistent_worker_rng:
+            self.train_dataloader = preserve_persistent_worker_rng(self.train_dataloader)
+            self.val_dataloader = preserve_persistent_worker_rng(self.val_dataloader)
         _debug(f"accelerator ready device={self.accelerator.device}")
 
         self.unwrapped_model = self.accelerator.unwrap_model(self.model)

@@ -7,6 +7,44 @@ import torch
 from torch.utils.data import DataLoader
 
 
+class PersistentWorkerRngCompatibilityAdapter:
+    """Preserve persistent-worker CPU RNG consumption without tensor IPC."""
+
+    def __init__(self, loader):
+        if int(getattr(loader, "num_workers", -1)) != 0:
+            raise ValueError("RNG compatibility adapter requires num_workers=0")
+        self.loader = loader
+        self.iterator_count = 0
+
+    def __iter__(self):
+        if self.iterator_count == 0:
+            self.iterator_count += 1
+            return self.loader.__iter__()
+        state = torch.random.get_rng_state()
+        try:
+            iterator = self.loader.__iter__()
+        finally:
+            torch.random.set_rng_state(state)
+        self.iterator_count += 1
+        return iterator
+
+    def __len__(self):
+        return len(self.loader)
+
+    def __getattr__(self, name):
+        return getattr(self.loader, name)
+
+
+def preserve_persistent_worker_rng(loader):
+    """Wrap a loader, including the base loader created by Accelerate."""
+
+    base = getattr(loader, "base_dataloader", None)
+    if base is not None:
+        loader.base_dataloader = PersistentWorkerRngCompatibilityAdapter(base)
+        return loader
+    return PersistentWorkerRngCompatibilityAdapter(loader)
+
+
 def dataloader_batch_count(dataset_size: int, batch_size: int, *, drop_last: bool) -> int:
     """Return the exact number of batches produced by the configured loader."""
     if dataset_size < 0 or batch_size <= 0:
