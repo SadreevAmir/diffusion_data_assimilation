@@ -124,6 +124,15 @@ class StructuredPreconditionedPilotTests(unittest.TestCase):
         result = pilot._spatial_variogram_errors(ensemble, truth, valid, lag0)
         self.assertEqual(result["aggregate"], {"lag1": 0.0, "lag2": 0.0, "lag4": 0.0})
 
+    def test_real_two_field_valid_mask_is_verified_before_collapse(self) -> None:
+        mask = torch.ones((8, 2, 320, 256))
+        collapsed = pilot._single_valid_mask(mask)
+        self.assertEqual(tuple(collapsed.shape), (8, 1, 320, 256))
+        adverse = mask.clone()
+        adverse[0, 1, 0, 0] = 0
+        with self.assertRaisesRegex(ValueError, "SIC and SIT"):
+            pilot._single_valid_mask(adverse)
+
     def test_training_mode_disables_internal_sampling_and_keeps_exact_budget(self) -> None:
         repo = Path(__file__).resolve().parents[1]
         experiment = repo / "config/experiments/train_structured_joint_gaussian_preconditioned_pilot.json"

@@ -469,6 +469,16 @@ def _finite_nonnegative(value: Any) -> bool:
     return isinstance(value, (int, float)) and math.isfinite(float(value)) and float(value) >= 0
 
 
+def _single_valid_mask(mask: torch.Tensor) -> torch.Tensor:
+    """Collapse the two physical-field masks only after proving equality."""
+
+    if mask.ndim != 4 or mask.shape[1] != 2:
+        raise ValueError("structured dataset valid_mask must have shape [B,2,H,W]")
+    if not torch.equal(mask[:, :1], mask[:, 1:2]):
+        raise ValueError("SIC and SIT valid masks differ")
+    return mask[:, :1]
+
+
 def paired_pilot_gate(
     raw_metrics: dict[str, Any],
     candidate_metrics: dict[str, Any],
@@ -654,7 +664,9 @@ def run_evaluation(
     batches = [{key: value.to(device=device, dtype=torch.float32) if isinstance(value, torch.Tensor) else value for key, value in batch.items()} for batch in cpu_batches]
     truth = torch.cat([batch["structured_physical_truth"].float() for batch in cpu_batches])
     background = torch.cat([batch["structured_physical_background"].float() for batch in cpu_batches])
-    valid = torch.cat([batch["valid_mask"].float() for batch in cpu_batches])
+    valid = _single_valid_mask(
+        torch.cat([batch["valid_mask"].float() for batch in cpu_batches])
+    )
     lag0 = torch.cat([batch["structured_lag0_mask"].float() for batch in cpu_batches])
     noise, noise_manifest = _generate_paired_noise(candidate_config, len(batches), contract.member_seeds, device)
     _atomic_json(output_dir / "noise_manifest.json", {
