@@ -10,6 +10,8 @@ set -Eeuo pipefail
 
 EXPERIMENT="${REPO_DIR}/config/experiments/train_structured_joint_d0_d3_real_lagged_31e.json"
 PYTHON_BIN="/opt/conda/bin/python"
+SOLVER_TIMEOUT_SECONDS=13800
+SOLVER_KILL_GRACE_SECONDS=60
 
 export PYTHONDONTWRITEBYTECODE=1
 export HF_HUB_OFFLINE=1
@@ -76,7 +78,9 @@ printf '%s\n' "${STRUCTURED_SOLVER_CONTROL_ATTEMPT}" \
     > "${OUTPUT_DIR}/.structured_solver_control_owner"
 
 cd "${REPO_DIR}"
-"${PYTHON_BIN}" -m assim_lib.structured_solver_control \
+timeout --signal=TERM --kill-after="${SOLVER_KILL_GRACE_SECONDS}s" \
+    "${SOLVER_TIMEOUT_SECONDS}s" \
+    "${PYTHON_BIN}" -m assim_lib.structured_solver_control \
     --experiment "${EXPERIMENT}" \
     --run-dir "${RUN_DIR}" \
     --output-dir "${OUTPUT_DIR}" \

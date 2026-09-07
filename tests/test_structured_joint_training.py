@@ -969,6 +969,24 @@ class StructuredTrainingAndSamplingTests(unittest.TestCase):
         valid[..., -1] = 0.0
         structured_trajectory_metrics(bad, truth, truth, valid, sic_cap=0.9970703125)
 
+    def test_structured_rmse_accumulates_large_finite_sit_in_float64(self) -> None:
+        truth = torch.tensor([[[[0.5]], [[1.0e30]]]], dtype=torch.float32)
+        background = truth.clone()
+        ensemble = torch.tensor(
+            [[[[[0.5]], [[1.0e30]]], [[[0.5]], [[2.0e30]]]]],
+            dtype=torch.float32,
+        )
+        valid = torch.ones((1, 1, 1, 1), dtype=torch.float32)
+        metrics = structured_trajectory_metrics(
+            ensemble,
+            truth,
+            background,
+            valid,
+            sic_cap=0.9970703125,
+        )
+        self.assertTrue(math.isfinite(metrics["lead0_sit_mean_rmse"]))
+        self.assertGreater(metrics["lead0_sit_mean_rmse"], 0.0)
+
 
 class StructuredArchiveAuditTests(unittest.TestCase):
     def test_static_mask_must_be_finite_binary_and_have_ocean(self) -> None:

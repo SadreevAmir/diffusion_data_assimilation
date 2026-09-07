@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import os
 import re
 from contextlib import contextmanager
@@ -44,6 +45,12 @@ CASE_INDICES = (0, 90)
 MEMBER_SEEDS = (16012880, 16012981)
 RK4_TIMEPOINTS = (33, 65, 129)
 FP32_TIMEPOINTS = 65
+REQUIRED_VARIANT_LABELS = (
+    "rk4_32_intervals_bf16",
+    "rk4_64_intervals_bf16",
+    "rk4_128_intervals_bf16",
+    "rk4_64_intervals_fp32",
+)
 SCORE_RELATIVE_TOLERANCE = 0.01
 EVENT_PROBABILITY_ABSOLUTE_TOLERANCE = 0.01
 TEXTURE_RELATIVE_TOLERANCE = 0.01
@@ -357,6 +364,8 @@ def _paired_field_differences(
 
 
 def _relative_difference(left: float, right: float) -> float:
+    if not math.isfinite(float(left)) or not math.isfinite(float(right)):
+        return float("inf")
     denominator = max(abs(float(left)), abs(float(right)), 1e-12)
     return abs(float(left) - float(right)) / denominator
 
@@ -402,17 +411,21 @@ def _solver_gate(
     variants: dict[str, Any],
     comparisons: dict[str, Any]
 ) -> dict[str, Any]:
-    required_pairs = (
-        "rk4_64_intervals_bf16_vs_rk4_128_intervals_bf16",
-        "rk4_64_intervals_bf16_vs_fp32",
-    )
-    required_variants = (
-        "rk4_32_intervals_bf16",
-        "rk4_64_intervals_bf16",
-        "rk4_128_intervals_bf16",
-        "rk4_64_intervals_fp32",
-    )
-    if any(variants.get(name, {}).get("status") != "passed" for name in required_variants):
+    required_pairs = {
+        "rk4_64_intervals_bf16_vs_rk4_128_intervals_bf16": (
+            "rk4_64_intervals_bf16",
+            "rk4_128_intervals_bf16",
+        ),
+        "rk4_64_intervals_bf16_vs_fp32": (
+            "rk4_64_intervals_bf16",
+            "rk4_64_intervals_fp32",
+        ),
+    }
+    if any(
+        not isinstance(variants.get(name), dict)
+        or variants[name].get("status") != "passed"
+        for name in REQUIRED_VARIANT_LABELS
+    ):
         return {
             "status": "failed",
             "reason": "one or more required variants failed strict physical decode",
@@ -424,6 +437,97 @@ def _solver_gate(
             "reason": "a required paired comparison is absent",
             "pilot_permitted": False,
         }
+
+    required_score_keys = {
+        f"lead{lead}_{field}_{score}"
+        for lead in range(4)
+        for field in ("sic", "sit")
+        for score in ("fair_crps", "mean_rmse")
+    }
+    required_texture_keys = {f"lead{lead}" for lead in range(4)}
+    for name in REQUIRED_VARIANT_LABELS:
+        metrics = variants[name].get("metrics")
+        textures = variants[name].get("sic_neighbor_energy_by_lead")
+        if not isinstance(metrics, dict) or not isinstance(textures, dict):
+            return {
+                "status": "failed",
+                "reason": f"{name} lacks required metrics or texture diagnostics",
+                "pilot_permitted": False,
+            }
+        missing_scores = required_score_keys - set(metrics)
+        if missing_scores or set(textures) != required_texture_keys:
+            return {
+                "status": "failed",
+                "reason": f"{name} has an incomplete solver-control metric schema",
+                "pilot_permitted": False,
+                "missing_scores": sorted(missing_scores),
+            }
+        checked_values = [metrics[key] for key in required_score_keys] + list(
+            textures.values()
+        )
+        if any(
+            not isinstance(value, (int, float))
+            or not math.isfinite(float(value))
+            or float(value) < 0
+            for value in checked_values
+        ):
+            return {
+                "status": "failed",
+                "reason": f"{name} contains a nonfinite or negative required diagnostic",
+                "pilot_permitted": False,
+            }
+        if (
+            metrics.get("support_violation_fraction") != 0.0
+            or metrics.get("ensemble_support_violation_fraction") != 0.0
+            or metrics.get("lag0_observation_max_abs_error") != 0.0
+        ):
+            return {
+                "status": "failed",
+                "reason": f"{name} violates physical support or exact day-0 observations",
+                "pilot_permitted": False,
+            }
+
+    required_event_keys = {
+        f"lead{lead}_{event}"
+        for lead in range(4)
+        for event in ("occurrence", "cap")
+    }
+    for pair, expected_variants in required_pairs.items():
+        comparison = comparisons[pair]
+        if (
+            not isinstance(comparison, dict)
+            or comparison.get("variants") != list(expected_variants)
+        ):
+            return {
+                "status": "failed",
+                "reason": f"{pair} is not bound to its required ordered variants",
+                "pilot_permitted": False,
+            }
+        events = comparison.get("events")
+        if not isinstance(events, dict) or set(events) != required_event_keys:
+            return {
+                "status": "failed",
+                "reason": f"{pair} has an incomplete event diagnostic schema",
+                "pilot_permitted": False,
+            }
+        for event in events.values():
+            if not isinstance(event, dict):
+                return {
+                    "status": "failed",
+                    "reason": f"{pair} contains a malformed event diagnostic",
+                    "pilot_permitted": False,
+                }
+            value = event.get("mean_absolute_probability_difference")
+            if (
+                not isinstance(value, (int, float))
+                or not math.isfinite(float(value))
+                or not 0.0 <= float(value) <= 1.0
+            ):
+                return {
+                    "status": "failed",
+                    "reason": f"{pair} contains an invalid event probability difference",
+                    "pilot_permitted": False,
+                }
 
     checks: dict[str, Any] = {}
     passed = True
@@ -650,19 +754,49 @@ def run_control(
 
     visual_dir = output_dir / "visual_qc"
     visual_dir.mkdir()
-    for label, ensemble in successful.items():
-        figure = make_structured_trajectory_figure(
-            truth[0],
-            background[0],
-            ensemble[0, 0],
-            valid[0],
-            title=f"frozen raw-velocity epoch 15: {label}",
-        )
+    import matplotlib.pyplot as plt
+
+    if set(variants) != set(REQUIRED_VARIANT_LABELS):
+        raise RuntimeError("solver-control variant set differs from compact contract")
+    for label in REQUIRED_VARIANT_LABELS:
+        status = variants[label]
+        ensemble = successful.get(label)
+        if ensemble is not None:
+            figure = make_structured_trajectory_figure(
+                truth[0],
+                background[0],
+                ensemble[0, 0],
+                valid[0],
+                title=f"frozen raw-velocity epoch 15: {label}",
+            )
+        else:
+            figure, axis = plt.subplots(figsize=(12, 6))
+            axis.axis("off")
+            axis.text(
+                0.5,
+                0.55,
+                "NO PHYSICAL SAMPLE",
+                ha="center",
+                va="center",
+                fontsize=24,
+                color="crimson",
+                weight="bold",
+            )
+            axis.text(
+                0.5,
+                0.43,
+                f"{label}\nstrict decode status: {status.get('status', 'unknown')}",
+                ha="center",
+                va="center",
+                fontsize=15,
+            )
+            figure.suptitle(
+                "Frozen raw-velocity epoch 15 solver control",
+                fontsize=18,
+            )
         figure.savefig(
             visual_dir / f"{label}.png", dpi=180, bbox_inches="tight"
         )
-        import matplotlib.pyplot as plt
-
         plt.close(figure)
 
     gate = _solver_gate(variants, comparisons)
@@ -689,9 +823,9 @@ def run_control(
         "solver_gate": gate,
         "decision_rule": (
             "If physical structure materially changes with RK4 refinement or "
-            "FP32, correct sampling before any retraining; otherwise the speckle "
-            "is a model/target-coordinate failure and the preconditioned pilot "
-            "may proceed."
+            "FP32, correct sampling before any retraining; otherwise the tested "
+            "numerical sensitivities do not explain the speckle and the "
+            "preconditioned pilot may proceed."
         ),
     }
     _atomic_json(output_dir / "solver_control.json", result)

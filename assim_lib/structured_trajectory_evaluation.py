@@ -1512,7 +1512,7 @@ def structured_trajectory_metrics(
                 f"{name} violates finite joint SIC/SIT support at {invalid_count} valid points "
                 f"(sic_cap={sic_cap})"
             )
-    ensemble_mean = ensemble.mean(dim=1)
+    ensemble_mean = ensemble.to(dtype=torch.float64).mean(dim=1)
     result: dict[str, float | list[float]] = dict(support_diagnostics)
     fields = ("sic", "sit")
     for lead in range(truth.shape[1] // 2):
@@ -1535,7 +1535,7 @@ def structured_trajectory_metrics(
             result[f"lead{lead}_{field}_mean_rmse"] = float(
                 (
                     (
-                        (channel_mean - channel_truth).square()
+                        (channel_mean - channel_truth.to(dtype=torch.float64)).square()
                         * score_valid
                     ).sum()
                     / valid_count
@@ -1546,7 +1546,10 @@ def structured_trajectory_metrics(
             result[f"lead{lead}_{field}_background_rmse"] = float(
                 (
                     (
-                        (channel_background - channel_truth).square()
+                        (
+                            channel_background.to(dtype=torch.float64)
+                            - channel_truth.to(dtype=torch.float64)
+                        ).square()
                         * score_valid
                     ).sum()
                     / valid_count
