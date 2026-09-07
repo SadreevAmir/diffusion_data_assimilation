@@ -1,9 +1,11 @@
-"""Paired validation-only solver/precision control for a frozen structured CFM.
+"""Paired validation-only solver control for a frozen structured CFM.
 
 This diagnostic never trains or selects a checkpoint.  It holds checkpoint,
-validation cases and initial noise fixed while refining the RK4 grid and while
-running one genuine FP32 forward control.  Raw members remain on the server;
-only compact metrics and fixed visual panels are emitted.
+validation cases and initial noise fixed while refining the strict-FP32 RK4
+grid.  It is the minimal follow-up to a completed bf16/FP32 control whose
+precision comparison failed while its bf16 RK4 grid comparison converged.  Raw
+members remain on the server; only compact metrics and fixed visual panels are
+emitted.
 """
 
 from __future__ import annotations
@@ -40,16 +42,13 @@ from .structured_trajectory_evaluation import (
 from .sampler import Sampler
 
 
-SCHEMA_VERSION = "structured_solver_control_v1"
+SCHEMA_VERSION = "structured_solver_fp32_refinement_v1"
 CASE_INDICES = (0, 90)
 MEMBER_SEEDS = (16012880, 16012981)
-RK4_TIMEPOINTS = (33, 65, 129)
-FP32_TIMEPOINTS = 65
+FP32_TIMEPOINTS = (65, 129)
 REQUIRED_VARIANT_LABELS = (
-    "rk4_32_intervals_bf16",
-    "rk4_64_intervals_bf16",
-    "rk4_128_intervals_bf16",
     "rk4_64_intervals_fp32",
+    "rk4_128_intervals_fp32",
 )
 SCORE_RELATIVE_TOLERANCE = 0.01
 EVENT_PROBABILITY_ABSOLUTE_TOLERANCE = 0.01
@@ -213,11 +212,7 @@ def _sic_neighbor_energy_by_lead(
 
 
 @contextmanager
-def _precision_context(use_bf16: bool):
-    if use_bf16:
-        with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
-            yield
-        return
+def _strict_fp32_context():
     previous_matmul_tf32 = torch.backends.cuda.matmul.allow_tf32
     previous_cudnn_tf32 = torch.backends.cudnn.allow_tf32
     previous_matmul_precision = torch.get_float32_matmul_precision()
@@ -240,7 +235,6 @@ def _sample_variant(
     stats: dict,
     config: TrainingConfig,
     timepoints: int,
-    use_bf16: bool,
 ) -> tuple[torch.Tensor | None, dict[str, Any]]:
     members_by_case: list[torch.Tensor] = []
     failures: list[dict[str, Any]] = []
@@ -256,7 +250,7 @@ def _sample_variant(
                 generator=generator,
             )
             try:
-                with _precision_context(use_bf16):
+                with _strict_fp32_context():
                     sample = sample_structured_batch(
                         sampler,
                         batch,
@@ -293,22 +287,14 @@ def _sample_variant(
     return torch.cat(members_by_case, dim=0), {
         "status": "passed",
         "partial_metrics_permitted": False,
-        "precision": (
-            {
-                "network_autocast": "bf16",
-                "ode_state_dtype": "float32",
-                "tf32_disabled": False,
-            }
-            if use_bf16
-            else {
-                "network_autocast": "disabled",
-                "model_parameter_dtype": "float32",
-                "input_and_ode_state_dtype": "float32",
-                "matmul_tf32": False,
-                "cudnn_tf32": False,
-                "float32_matmul_precision": "highest",
-            }
-        ),
+        "precision": {
+            "network_autocast": "disabled",
+            "model_parameter_dtype": "float32",
+            "input_and_ode_state_dtype": "float32",
+            "matmul_tf32": False,
+            "cudnn_tf32": False,
+            "float32_matmul_precision": "highest",
+        },
     }
 
 
@@ -412,13 +398,9 @@ def _solver_gate(
     comparisons: dict[str, Any]
 ) -> dict[str, Any]:
     required_pairs = {
-        "rk4_64_intervals_bf16_vs_rk4_128_intervals_bf16": (
-            "rk4_64_intervals_bf16",
-            "rk4_128_intervals_bf16",
-        ),
-        "rk4_64_intervals_bf16_vs_fp32": (
-            "rk4_64_intervals_bf16",
+        "rk4_64_intervals_fp32_vs_rk4_128_intervals_fp32": (
             "rk4_64_intervals_fp32",
+            "rk4_128_intervals_fp32",
         ),
     }
     if any(
@@ -597,7 +579,10 @@ def run_control(
     expected_metadata_sha256: str,
     expected_ema_sha256: str,
     expected_resume_sha256: str,
+    predecessor_solver_control_sha256: str,
 ) -> dict[str, Any]:
+    if _SHA256_RE.fullmatch(predecessor_solver_control_sha256) is None:
+        raise ValueError("invalid predecessor solver-control SHA-256")
     attempt_token = os.environ.get("STRUCTURED_SOLVER_CONTROL_ATTEMPT", "")
     if not attempt_token:
         raise ValueError("missing structured solver-control ownership token")
@@ -671,15 +656,14 @@ def run_control(
 
     variants: dict[str, Any] = {}
     successful: dict[str, torch.Tensor] = {}
-    for timepoints in RK4_TIMEPOINTS:
-        label = f"rk4_{timepoints - 1}_intervals_bf16"
+    for timepoints in FP32_TIMEPOINTS:
+        label = f"rk4_{timepoints - 1}_intervals_fp32"
         ensemble, status = _sample_variant(
             sampler=sampler,
             batches=batches,
             stats=stats,
             config=config,
             timepoints=timepoints,
-            use_bf16=True,
         )
         variants[label] = status
         if ensemble is not None:
@@ -697,36 +681,9 @@ def run_control(
                 _sic_neighbor_energy_by_lead(ensemble, valid, lag0)
             )
 
-    fp32_batch = batches
-    fp32_ensemble, fp32_status = _sample_variant(
-        sampler=sampler,
-        batches=fp32_batch,
-        stats=stats,
-        config=config,
-        timepoints=FP32_TIMEPOINTS,
-        use_bf16=False,
-    )
-    fp32_label = "rk4_64_intervals_fp32"
-    variants[fp32_label] = fp32_status
-    if fp32_ensemble is not None:
-        successful[fp32_label] = fp32_ensemble
-        variants[fp32_label]["metrics"] = structured_trajectory_metrics(
-            fp32_ensemble,
-            truth,
-            background,
-            valid,
-            lag0_mask=lag0,
-            sic_cap=float(stats["sic_cap"]),
-            exclude_lag0_from_day0_scores=True,
-        )
-        variants[fp32_label]["sic_neighbor_energy_by_lead"] = (
-            _sic_neighbor_energy_by_lead(fp32_ensemble, valid, lag0)
-        )
-
     comparisons: dict[str, Any] = {}
     for left, right in (
-        ("rk4_32_intervals_bf16", "rk4_64_intervals_bf16"),
-        ("rk4_64_intervals_bf16", "rk4_128_intervals_bf16"),
+        ("rk4_64_intervals_fp32", "rk4_128_intervals_fp32"),
     ):
         if left in successful and right in successful:
             comparisons[f"{left}_vs_{right}"] = {
@@ -739,19 +696,6 @@ def run_control(
                     sic_cap=float(stats["sic_cap"]),
                 ),
             }
-    bf16_key = "rk4_64_intervals_bf16"
-    if bf16_key in successful and fp32_label in successful:
-        comparisons["rk4_64_intervals_bf16_vs_fp32"] = {
-            "variants": [bf16_key, fp32_label],
-            **_paired_field_differences(
-                successful[bf16_key],
-                successful[fp32_label],
-                valid,
-                lag0,
-                sic_cap=float(stats["sic_cap"]),
-            ),
-        }
-
     visual_dir = output_dir / "visual_qc"
     visual_dir.mkdir()
     import matplotlib.pyplot as plt
@@ -807,6 +751,9 @@ def run_control(
         "training_performed": False,
         "test_2023_used": False,
         "reference": {
+            "predecessor_solver_control_sha256": (
+                predecessor_solver_control_sha256
+            ),
             "experiment_sha256": _sha256(experiment_path),
             "metadata_sha256": _sha256(metadata_path),
             "ema_checkpoint_sha256": _sha256(ema_path),
@@ -822,15 +769,15 @@ def run_control(
         "paired_comparisons": comparisons,
         "solver_gate": gate,
         "decision_rule": (
-            "If physical structure materially changes with RK4 refinement or "
-            "FP32, correct sampling before any retraining; otherwise the tested "
-            "numerical sensitivities do not explain the speckle and the "
-            "preconditioned pilot may proceed."
+            "If strict-FP32 RK4-64 and RK4-128 agree within the frozen "
+            "thresholds, freeze strict FP32 as the common raw/candidate "
+            "evaluation backend; otherwise correct the sampling path before "
+            "any retraining."
         ),
     }
     _atomic_json(output_dir / "solver_control.json", result)
     gate_artifact = {
-        "schema_version": "structured_solver_gate_v1",
+        "schema_version": "structured_solver_fp32_gate_v1",
         "status": gate["status"],
         "pilot_permitted": gate.get("pilot_permitted", False),
         "solver_control_sha256": _sha256(output_dir / "solver_control.json"),
@@ -865,6 +812,7 @@ def main() -> None:
     parser.add_argument("--expected-metadata-sha256", required=True)
     parser.add_argument("--expected-ema-sha256", required=True)
     parser.add_argument("--expected-resume-sha256", required=True)
+    parser.add_argument("--predecessor-solver-control-sha256", required=True)
     args = parser.parse_args()
     result = run_control(
         args.experiment.resolve(),
@@ -874,6 +822,9 @@ def main() -> None:
         expected_metadata_sha256=args.expected_metadata_sha256,
         expected_ema_sha256=args.expected_ema_sha256,
         expected_resume_sha256=args.expected_resume_sha256,
+        predecessor_solver_control_sha256=(
+            args.predecessor_solver_control_sha256
+        ),
     )
     print(json.dumps(result, indent=2, sort_keys=True))
 

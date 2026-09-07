@@ -39,17 +39,14 @@ class StructuredSolverControlTests(unittest.TestCase):
     def test_frozen_solver_design_is_small_paired_and_validation_only(self) -> None:
         self.assertEqual(control.CASE_INDICES, (0, 90))
         self.assertEqual(len(set(control.MEMBER_SEEDS)), 2)
-        self.assertEqual(control.RK4_TIMEPOINTS, (33, 65, 129))
-        self.assertEqual(control.FP32_TIMEPOINTS, 65)
+        self.assertEqual(control.FP32_TIMEPOINTS, (65, 129))
 
     def test_visual_contract_has_one_panel_per_required_variant(self) -> None:
         self.assertEqual(
             control.REQUIRED_VARIANT_LABELS,
             (
-                "rk4_32_intervals_bf16",
-                "rk4_64_intervals_bf16",
-                "rk4_128_intervals_bf16",
                 "rk4_64_intervals_fp32",
+                "rk4_128_intervals_fp32",
             ),
         )
 
@@ -73,10 +70,8 @@ class StructuredSolverControlTests(unittest.TestCase):
 
     def test_solver_gate_is_executable_and_fail_closed(self) -> None:
         variant_names = (
-            "rk4_32_intervals_bf16",
-            "rk4_64_intervals_bf16",
-            "rk4_128_intervals_bf16",
             "rk4_64_intervals_fp32",
+            "rk4_128_intervals_fp32",
         )
         variants = {
             name: {
@@ -110,24 +105,17 @@ class StructuredSolverControlTests(unittest.TestCase):
             }
         }
         comparisons = {
-            "rk4_64_intervals_bf16_vs_rk4_128_intervals_bf16": {
+            "rk4_64_intervals_fp32_vs_rk4_128_intervals_fp32": {
                 "variants": [
-                    "rk4_64_intervals_bf16",
-                    "rk4_128_intervals_bf16",
-                ],
-                **comparison,
-            },
-            "rk4_64_intervals_bf16_vs_fp32": {
-                "variants": [
-                    "rk4_64_intervals_bf16",
                     "rk4_64_intervals_fp32",
+                    "rk4_128_intervals_fp32",
                 ],
                 **comparison,
             },
         }
         baseline_comparisons = copy.deepcopy(comparisons)
         self.assertEqual(control._solver_gate(variants, comparisons)["status"], "converged")
-        comparisons["rk4_64_intervals_bf16_vs_fp32"]["events"][
+        comparisons["rk4_64_intervals_fp32_vs_rk4_128_intervals_fp32"]["events"][
             "lead0_occurrence"
         ]["mean_absolute_probability_difference"] = 0.5
         failed = control._solver_gate(variants, comparisons)
@@ -135,7 +123,7 @@ class StructuredSolverControlTests(unittest.TestCase):
         self.assertFalse(failed["pilot_permitted"])
 
         adverse_variants = copy.deepcopy(variants)
-        del adverse_variants["rk4_64_intervals_bf16"]["metrics"][
+        del adverse_variants["rk4_64_intervals_fp32"]["metrics"][
             "lead3_sit_fair_crps"
         ]
         self.assertEqual(
@@ -151,14 +139,14 @@ class StructuredSolverControlTests(unittest.TestCase):
         ):
             with self.subTest(key=key, value=value):
                 adverse_variants = copy.deepcopy(variants)
-                adverse_variants["rk4_64_intervals_bf16"]["metrics"][key] = value
+                adverse_variants["rk4_64_intervals_fp32"]["metrics"][key] = value
                 gate = control._solver_gate(adverse_variants, baseline_comparisons)
                 self.assertEqual(gate["status"], "failed")
                 self.assertFalse(gate["pilot_permitted"])
 
         adverse_comparisons = copy.deepcopy(baseline_comparisons)
         del adverse_comparisons[
-            "rk4_64_intervals_bf16_vs_fp32"
+            "rk4_64_intervals_fp32_vs_rk4_128_intervals_fp32"
         ]["events"]["lead3_cap"]
         self.assertEqual(
             control._solver_gate(variants, adverse_comparisons)["status"], "failed"
@@ -192,6 +180,7 @@ class StructuredSolverControlTests(unittest.TestCase):
                 "REFERENCE_METADATA_SHA256": "0" * 64,
                 "REFERENCE_EMA_SHA256": "1" * 64,
                 "REFERENCE_RESUME_SHA256": "2" * 64,
+                "PREDECESSOR_SOLVER_CONTROL_SHA256": "3" * 64,
             }
             completed = subprocess.run(
                 ["bash", str(script)],
@@ -207,6 +196,7 @@ class StructuredSolverControlTests(unittest.TestCase):
             self.assertIn("SOLVER_TIMEOUT_SECONDS=13800", source)
             self.assertIn("SOLVER_KILL_GRACE_SECONDS=60", source)
             self.assertIn("--kill-after=\"${SOLVER_KILL_GRACE_SECONDS}s\"", source)
+            self.assertIn("--predecessor-solver-control-sha256", source)
 
 
 if __name__ == "__main__":

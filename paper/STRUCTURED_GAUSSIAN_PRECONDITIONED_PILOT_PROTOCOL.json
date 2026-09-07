@@ -1,6 +1,6 @@
 {
   "schema_version": "structured_gaussian_preconditioned_pilot_v1",
-  "status": "blocked_pending_solver_control_and_independent_launch_review",
+  "status": "blocked_pending_strict_fp32_refinement_and_independent_launch_review",
   "scientific_hypothesis": "Analytically removing the Gaussian marginal component of the linear-path conditional-flow velocity reduces nuisance regression and small-scale sample noise without changing the target law, conditioning, architecture, loss on reconstructed velocity, or optimizer-step budget.",
   "single_changed_factor": "structured_velocity_parameterization=gaussian_path_preconditioned",
   "reference": {
@@ -21,10 +21,14 @@
     "lr_scheduler_total_steps": 4123
   },
   "pretraining_solver_control": {
+    "completed_control_experiment": "structured_joint_solver_control_epoch15_v1",
+    "completed_control_sha256": "039a2a556b30616001ffbc9bd24138e4e6fd188d2c9a9b8eded79948e933cd6a",
+    "completed_control_status": "failed",
+    "completed_control_finding": "The bf16 RK4-64 versus RK4-128 comparison converged, but bf16 versus strict FP32 exceeded the frozen 1 percent relative-score threshold (maximum 1.5569274 percent). Event-probability and SIC-neighbor-energy thresholds passed. Fixed panels remained strongly granular for every solver and precision variant, so the tested numerical effects do not explain the raw-checkpoint sample failure.",
     "same_checkpoint_case_and_initial_noise": true,
-    "rk4_intervals": [32, 64, 128],
-    "true_fp32_forward_control": true,
-    "decision": "Pilot is permitted only when the hash-bound solver gate is converged: every per-field/per-lead fair-CRPS and mean-RMSE relative change is at most 1 percent, every mean occurrence/cap probability change is at most 1 percentage point, and every per-lead SIC neighbor-energy relative change is at most 1 percent for both RK4-64 versus RK4-128 and bf16 versus strict FP32.",
+    "required_refinement_experiment": "structured_joint_solver_fp32_refinement_epoch15_v1",
+    "required_refinement": "Strict-FP32 RK4-64 versus RK4-128 on the same two cases, two member seeds and initial noise as the completed control.",
+    "decision": "Pilot is permitted only when the new hash-bound strict-FP32 refinement gate is converged: every per-field/per-lead fair-CRPS and mean-RMSE relative change is at most 1 percent, every mean occurrence/cap probability change is at most 1 percentage point, and every per-lead SIC neighbor-energy relative change is at most 1 percent for strict-FP32 RK4-64 versus RK4-128. A pass freezes strict FP32 as the common raw/candidate evaluation backend; the failed predecessor gate remains part of the record and its threshold is not relaxed.",
     "required_status": "converged",
     "required_gate_artifact": "solver_gate.json"
   },

@@ -7,6 +7,7 @@ set -Eeuo pipefail
 : "${REFERENCE_METADATA_SHA256:?missing frozen metadata SHA-256}"
 : "${REFERENCE_EMA_SHA256:?missing frozen EMA SHA-256}"
 : "${REFERENCE_RESUME_SHA256:?missing frozen resume SHA-256}"
+: "${PREDECESSOR_SOLVER_CONTROL_SHA256:?missing predecessor solver-control SHA-256}"
 
 EXPERIMENT="${REPO_DIR}/config/experiments/train_structured_joint_d0_d3_real_lagged_31e.json"
 PYTHON_BIN="/opt/conda/bin/python"
@@ -39,7 +40,7 @@ temporary = output / f".run_status.json.{os.getpid()}.tmp"
 temporary.write_text(
     json.dumps(
         {
-            "schema_version": "structured_solver_control_v1",
+            "schema_version": "structured_solver_fp32_refinement_v1",
             "status": "failed",
             "exit_code": int(sys.argv[2]),
             "selection_permitted": False,
@@ -87,4 +88,5 @@ timeout --signal=TERM --kill-after="${SOLVER_KILL_GRACE_SECONDS}s" \
     --recovery-epoch 16 \
     --expected-metadata-sha256 "${REFERENCE_METADATA_SHA256}" \
     --expected-ema-sha256 "${REFERENCE_EMA_SHA256}" \
-    --expected-resume-sha256 "${REFERENCE_RESUME_SHA256}"
+    --expected-resume-sha256 "${REFERENCE_RESUME_SHA256}" \
+    --predecessor-solver-control-sha256 "${PREDECESSOR_SOLVER_CONTROL_SHA256}"
