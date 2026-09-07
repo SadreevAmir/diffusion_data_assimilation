@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import json
 import hashlib
+import json
 import math
 import os
 import shutil
@@ -15,7 +15,9 @@ import torch.nn.functional as F
 from accelerate import Accelerator
 from accelerate.logging import get_logger
 from accelerate.utils import ProjectConfiguration
+from diffusers import __version__ as diffusers_version
 from diffusers.training_utils import EMAModel
+from torch.utils.checkpoint import checkpoint as torch_checkpoint
 from tqdm.auto import tqdm
 
 from .clearml_tracking import ClearMLTracker
@@ -63,6 +65,56 @@ def _latest_structured_sampling_valid(records: list[dict]) -> bool:
 
 
 _STRUCTURED_RESUME_SCHEMA = "structured_joint_resume_v1"
+_ACTIVATION_CHECKPOINTING_DIFFUSERS_VERSION = "0.36.0"
+
+
+def _non_reentrant_checkpoint(module, *args):
+    """Checkpoint one native diffusers block without changing its RNG semantics."""
+    return torch_checkpoint(
+        module.__call__,
+        *args,
+        use_reentrant=False,
+        preserve_rng_state=True,
+    )
+
+
+def configure_activation_checkpointing(model, enabled: bool) -> tuple[str, ...]:
+    """Enable the single audited activation-checkpointing implementation."""
+    if not enabled:
+        return ()
+    if diffusers_version != _ACTIVATION_CHECKPOINTING_DIFFUSERS_VERSION:
+        raise RuntimeError(
+            "activation checkpointing requires the audited "
+            f"diffusers=={_ACTIVATION_CHECKPOINTING_DIFFUSERS_VERSION}, "
+            f"got {diffusers_version}"
+        )
+    enable = getattr(model, "enable_gradient_checkpointing", None)
+    if not callable(enable) or not bool(
+        getattr(model, "_supports_gradient_checkpointing", False)
+    ):
+        raise RuntimeError("model does not support native diffusers activation checkpointing")
+    expected_modules = tuple(
+        name
+        for name, module in model.named_modules()
+        if hasattr(module, "gradient_checkpointing")
+    )
+    if not expected_modules:
+        raise RuntimeError("model exposes no native checkpointable modules")
+    enable(gradient_checkpointing_func=_non_reentrant_checkpoint)
+    modules = tuple(
+        name
+        for name, module in model.named_modules()
+        if bool(getattr(module, "gradient_checkpointing", False))
+    )
+    if (
+        not bool(getattr(model, "is_gradient_checkpointing", False))
+        or modules != expected_modules
+    ):
+        raise RuntimeError(
+            "activation checkpointing was requested but did not activate on every "
+            f"native block: expected={expected_modules}, active={modules}"
+        )
+    return modules
 
 
 def _canonical_sha256(payload) -> str:
@@ -126,7 +178,10 @@ def _validate_existing_structured_run_files(
     """Validate existing provenance before the constructor writes anything."""
     config_path = output_dir / "config.json"
     metadata_path = output_dir / "metadata.json"
-    existing = (config_path.exists() or config_path.is_symlink(), metadata_path.exists() or metadata_path.is_symlink())
+    existing = (
+        config_path.exists() or config_path.is_symlink(),
+        metadata_path.exists() or metadata_path.is_symlink(),
+    )
     if not any(existing):
         return False
     if not all(existing):
@@ -192,6 +247,9 @@ class UNetTrainer:
         self.channel_stds = list(self.data_config.get("stds", [1.0] * config.out_channels))
         self._shared_viz_obs_mask: torch.Tensor | None = None
         self._shared_viz_obs_mask_attempted = False
+        self.activation_checkpointed_modules = configure_activation_checkpointing(
+            model, config.activation_checkpointing
+        )
 
         config_payload = jsonable(asdict(config))
         run_metadata = {
@@ -213,6 +271,9 @@ class UNetTrainer:
             "data_config": jsonable(self.data_config),
             "dataset_provenance": jsonable(dataset_provenance or {}),
             "training_config": config_payload,
+            "activation_checkpointed_modules": list(
+                self.activation_checkpointed_modules
+            ),
             "experiment_config": jsonable(experiment_config) if experiment_config is not None else None,
             "model_config": jsonable(model_config) if model_config is not None else None,
             "resume_contract_sha256": self._resume_contract_sha256,
@@ -1965,7 +2026,10 @@ class UNetTrainer:
             one["structured_physical_background"][0],
             sample,
             one["valid_mask"][0],
-            title=f"joint SIC/SIT trajectory d..d+{self.config.trajectory_horizon_days}, epoch {epoch}, {weights_label}",
+            title=(
+                "joint SIC/SIT trajectory "
+                f"d..d+{self.config.trajectory_horizon_days}, epoch {epoch}, {weights_label}"
+            ),
         )
         path = os.path.join(samples_dir, f"epoch_{epoch:04d}_structured_trajectory.png")
         figure.savefig(path, dpi=_DASHBOARD_DPI, bbox_inches="tight")

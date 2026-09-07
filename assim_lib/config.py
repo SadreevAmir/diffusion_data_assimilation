@@ -49,6 +49,7 @@ class TrainingConfig:
     preserve_persistent_worker_rng: bool = False
     num_epochs: int = 20
     gradient_accumulation_steps: int = 1
+    activation_checkpointing: bool = False
     learning_rate: float = 1e-4
     lr_warmup_steps: int = 500
     lr_scheduler_total_steps: int = 0

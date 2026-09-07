@@ -1,0 +1,19 @@
+{
+  "project_name": "m2m_distribution_calibration",
+  "task_name": "structured_joint_gaussian_checkpointed_memory_admission",
+  "data_config": "../data/m2m_2f_structured_joint_real_lagged.json",
+  "model_config": "../methods/structured_joint_gaussian_preconditioned_checkpointed_pilot_2f.json",
+  "clearml": {
+    "enabled": true,
+    "env_path": "/home/.env",
+    "tags": [
+      "resource_admission",
+      "activation_checkpointing_execution_only",
+      "actual_trainer_two_updates",
+      "validation_ema_batch8",
+      "not_model_quality",
+      "single_gpu"
+    ],
+    "upload_checkpoints": false
+  }
+}

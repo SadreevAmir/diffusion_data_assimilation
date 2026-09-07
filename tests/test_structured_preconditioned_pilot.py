@@ -106,7 +106,9 @@ class StructuredPreconditionedPilotTests(unittest.TestCase):
             "quantitative_fail",
         )
         adverse = copy.deepcopy(candidate)
-        adverse["temporal"]["transitions"]["d+1_to_d+2"]["fields"]["sic"]["increment_fair_crps"] = float("nan")
+        adverse["temporal"]["transitions"]["d+1_to_d+2"]["fields"]["sic"][
+            "increment_fair_crps"
+        ] = float("nan")
         self.assertEqual(
             pilot.paired_pilot_gate(
                 raw, adverse, raw_spatial, candidate_spatial, solver
@@ -223,7 +225,6 @@ class StructuredPreconditionedPilotTests(unittest.TestCase):
 
     def test_training_mode_disables_internal_sampling_and_keeps_exact_budget(self) -> None:
         repo = Path(__file__).resolve().parents[1]
-        experiment = repo / "config/experiments/train_structured_joint_gaussian_preconditioned_pilot.json"
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / "output"
             output.mkdir()
@@ -251,7 +252,17 @@ class StructuredPreconditionedPilotTests(unittest.TestCase):
             with mock.patch.dict(os.environ, {"STRUCTURED_PILOT_ATTEMPT": "attempt"}), mock.patch.object(
                 pilot.torch.cuda, "device_count", return_value=1
             ), mock.patch.object(pilot, "train_main", side_effect=fake_train):
-                result = pilot.run_training(experiment, output)
+                checkpointed_experiment = repo / (
+                    "config/experiments/"
+                    "train_structured_joint_gaussian_preconditioned_checkpointed_pilot.json"
+                )
+                checkpointed_method = load_json(
+                    repo
+                    / "config/methods/"
+                    "structured_joint_gaussian_preconditioned_checkpointed_pilot_2f.json"
+                )
+                self.assertTrue(checkpointed_method["activation_checkpointing"])
+                result = pilot.run_training(checkpointed_experiment, output)
             self.assertEqual(result["optimizer_steps"], 2128)
             self.assertEqual(result["dataloader_workers_train"], 0)
             self.assertEqual(result["dataloader_workers_val"], 0)

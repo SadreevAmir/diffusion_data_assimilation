@@ -1,0 +1,56 @@
+{
+  "schema_version": "structured_gaussian_memory_admission_v1",
+  "status": "frozen_for_independent_astra_review",
+  "purpose": "execution_memory_only_not_model_quality",
+  "single_attempt": true,
+  "paths": {
+    "experiment": "config/experiments/admit_structured_joint_gaussian_preconditioned_checkpointed.json",
+    "method": "config/methods/structured_joint_gaussian_preconditioned_checkpointed_pilot_2f.json",
+    "runner": "scripts/run_structured_gaussian_memory_admission.sh",
+    "implementation": "assim_lib/structured_gaussian_memory_admission.py",
+    "result": "memory_admission.json"
+  },
+  "required_identity_sha256": {
+    "config/experiments/admit_structured_joint_gaussian_preconditioned_checkpointed.json": "9f0795f877c05ca6122fb95de4f4120afcc377ceb7d7995170e321bb44fa8bcd",
+    "config/experiments/train_structured_joint_gaussian_preconditioned_checkpointed_pilot.json": "21094a49157c7bdbb0fe787f4695a600082905c4baf35f8528caaf9ea10b4ab8",
+    "config/methods/structured_joint_gaussian_preconditioned_checkpointed_pilot_2f.json": "a0f594936b4fe25b0081be0379124b25dcc1d9a3b158de74a4d746706568ca1a",
+    "assim_lib/structured_preconditioned_pilot.py": "8512a0e4dea2d76f8904dc9ca1dfdda40cc1e7e8ede931a6a6ac6cface5618fd",
+    "paper/STRUCTURED_PAIRED_PILOT_PANEL.json": "232af0176ced9acc1eaf85a2bd9f9349ba1a5293731301df1ea417df2a258331",
+    "paper/STRUCTURED_GAUSSIAN_PRECONDITIONED_PILOT_PROTOCOL.json": "42162dc5fead36b831e8e054b7619a0dfa00ba12dfdf3f3470253f590cde3094"
+  },
+  "scientific_invariants": {
+    "target_law": "unchanged_gaussian_path_preconditioned",
+    "architecture": "unchanged_unet",
+    "train_batch_size": 16,
+    "eval_batch_size": 8,
+    "gradient_accumulation_steps": 1,
+    "mixed_precision": "bf16",
+    "planned_pilot_optimizer_steps": 2128,
+    "lr_scheduler_total_steps": 4123,
+    "validation_weight_source": "ema",
+    "test_2023_permitted": false,
+    "full_training_permitted": false
+  },
+  "cpu_parity_gate": {
+    "forward_bitwise_equal": true,
+    "rng_state_equal": true,
+    "gradient_none_pattern_equal": true,
+    "gradient_atol": 0.000001,
+    "gradient_rtol": 0.00001,
+    "post_adam_parameters_bitwise_equal": true,
+    "post_ema_parameters_bitwise_equal": true
+  },
+  "gpu_memory_gate": {
+    "visible_cuda_devices": 1,
+    "checkpointed_peak_reserved_strictly_lower": true,
+    "production_peak_reserved_fraction_max": 0.9,
+    "production_train_updates": 2,
+    "second_update_after_adam_state_allocation": true,
+    "production_validation_batches": 1,
+    "production_validation_batch_size": 8,
+    "actual_trainer": true,
+    "accelerate": true,
+    "clearml_online": true
+  },
+  "terminal_rule": "failure_closes_checkpointing_memory_recovery_without_another_workaround"
+}
