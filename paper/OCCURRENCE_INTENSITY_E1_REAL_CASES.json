@@ -1,8 +1,9 @@
 {
-  "selection_rule": "eight_fixed_temporal_coverage_slots_from_forecast_and_sral_metadata_only",
+  "selection_version": "e1_real_cases_v2",
+  "selection_rule": "eight_fixed_temporal_coverage_slots_with_complete_lag_source_metadata_only",
   "truth_values_consulted": false,
   "cases": [
-    {"case_id": "2022-01-01_h23", "target_date": "2022-01-01", "hour": 23, "coverage_slot": "winter_early"},
+    {"case_id": "2022-01-02_h23", "target_date": "2022-01-02", "hour": 23, "coverage_slot": "winter_early"},
     {"case_id": "2022-01-26_h23", "target_date": "2022-01-26", "hour": 23, "coverage_slot": "winter_late"},
     {"case_id": "2022-02-25_h23", "target_date": "2022-02-25", "hour": 23, "coverage_slot": "spring_early"},
     {"case_id": "2022-03-22_h23", "target_date": "2022-03-22", "hour": 23, "coverage_slot": "spring_late"},

@@ -47,6 +47,22 @@ def resolve_checkpoint_name(run_dir: str, checkpoint_name: str) -> str:
 def load_sampler(run_dir: str, checkpoint_name: str, model_config: dict, device=None) -> Sampler:
     checkpoint_name = resolve_checkpoint_name(run_dir, checkpoint_name)
     config = TrainingConfig.from_dict(model_config)
+    metadata = load_run_metadata(run_dir)
+    if config.training_objective == "structured_joint_state_flow":
+        stored_config = metadata.get("training_config")
+        if not isinstance(stored_config, dict):
+            raise ValueError(
+                "structured checkpoint metadata must record its training_config"
+            )
+        stored_parameterization = stored_config.get(
+            "structured_velocity_parameterization", "raw"
+        )
+        if stored_config.get("training_objective") != config.training_objective:
+            raise ValueError("structured checkpoint objective differs from model config")
+        if stored_parameterization != config.structured_velocity_parameterization:
+            raise ValueError(
+                "structured checkpoint velocity parameterization differs from model config"
+            )
     model = build_unet(config)
     checkpoint_path = os.path.join(run_dir, checkpoint_name)
     try:
@@ -62,6 +78,11 @@ def load_sampler(run_dir: str, checkpoint_name: str, model_config: dict, device=
     model.eval()
     if device is not None:
         model.to(device)
-    metadata = load_run_metadata(run_dir)
     metadata["resolved_checkpoint_name"] = checkpoint_name
-    return Sampler(model, metadata=metadata)
+    return Sampler(
+        model,
+        metadata=metadata,
+        structured_velocity_parameterization=(
+            config.structured_velocity_parameterization
+        ),
+    )

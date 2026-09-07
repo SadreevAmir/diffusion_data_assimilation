@@ -50,6 +50,7 @@ class TrainingConfig:
     gradient_accumulation_steps: int = 1
     learning_rate: float = 1e-4
     lr_warmup_steps: int = 500
+    lr_scheduler_total_steps: int = 0
     mixed_precision: str = "no"
     seed: int = 0
     training_objective: str = "flow"
@@ -65,8 +66,15 @@ class TrainingConfig:
     sample_method: str = "euler"
     sample_rtol: float = 1e-3
     sample_atol: float = 1e-4
+    sample_end_time: float = 0.001
     sample_use_ema: bool = True
     ema_decay: float = 0.999
+    ema_use_warmup: bool = False
+    ema_update_after_step: int = 0
+    ema_min_decay: float = 0.0
+    validation_weight_source: str = "raw"
+    minimum_optimizer_steps: int = 0
+    diagnostic_min_optimizer_steps: int = 0
     sample_start_mode: str = "background"
     sample_start_noise_level: float = 0.5
     sample_enforce_observations: bool = True
@@ -79,6 +87,7 @@ class TrainingConfig:
     run_name: str = ""
     tracker: str | None = None
     resume_from_checkpoint: str = ""
+    recovery_checkpoint_name: str = "structured_recovery"
     clearml_enabled: bool = True
     clearml_project_name: str = "concat_conditioning"
     clearml_task_name: str = ""
@@ -111,6 +120,11 @@ class TrainingConfig:
         "UpBlock2D",
     )
     norm_num_groups: int = 32
+    structured_state_stats_path: str = ""
+    structured_state_stats: dict[str, Any] | None = None
+    structured_velocity_parameterization: str = "raw"
+    validation_seed: int = 2718
+    trajectory_horizon_days: int = 0
 
     @classmethod
     def from_dict(cls, config: Mapping[str, Any]) -> TrainingConfig:
@@ -140,6 +154,12 @@ class TrainingConfig:
         return parsed
 
     def validate(self) -> None:
+        from .flow_parameterization import (
+            RAW_VELOCITY,
+            validate_velocity_parameterization,
+        )
+
+        validate_velocity_parameterization(self.structured_velocity_parameterization)
         if len(self.image_size) != 2 or any(size <= 0 for size in self.image_size):
             raise ValueError(f"image_size must contain two positive values, got {self.image_size}")
         positive_ints = {
@@ -153,9 +173,16 @@ class TrainingConfig:
         invalid = {name: value for name, value in positive_ints.items() if value <= 0}
         if invalid:
             raise ValueError(f"Training values must be positive: {invalid}")
-        if self.training_objective not in {"flow", "residual_flow", "bridge"}:
+        if self.lr_scheduler_total_steps < 0:
+            raise ValueError("lr_scheduler_total_steps must be non-negative")
+        if self.training_objective not in {
+            "flow",
+            "residual_flow",
+            "bridge",
+            "structured_joint_state_flow",
+        }:
             raise ValueError(f"Unknown training_objective={self.training_objective!r}")
-        if self.timestep_sampler not in {"uniform", "beta"}:
+        if self.timestep_sampler not in {"uniform", "beta", "stratified_uniform"}:
             raise ValueError(f"Unknown timestep_sampler={self.timestep_sampler!r}")
         if self.loss_domain not in {"full", "valid"}:
             raise ValueError(f"Unknown loss_domain={self.loss_domain!r}; expected 'full' or 'valid'")
@@ -165,6 +192,96 @@ class TrainingConfig:
             raise ValueError("residual_flow is incompatible with sample_start_mode='bridge'")
         if not 0.0 <= self.background_dropout_probability <= 1.0:
             raise ValueError("background_dropout_probability must be within [0, 1]")
+        if not 0.0 <= self.sample_end_time < 1.0:
+            raise ValueError("sample_end_time must lie in [0, 1)")
+        if self.training_objective == "structured_joint_state_flow":
+            from .structured_joint_state import LATENT_CHANNELS, validate_structured_state_stats
+
+            expected_latent_channels = LATENT_CHANNELS * (self.trajectory_horizon_days + 1)
+            if self.trajectory_horizon_days < 0:
+                raise ValueError("trajectory_horizon_days must be non-negative")
+            if self.out_channels != expected_latent_channels:
+                raise ValueError(
+                    "structured_joint_state_flow requires "
+                    f"out_channels={expected_latent_channels}, got {self.out_channels}"
+                )
+            if self.timestep_sampler != "stratified_uniform":
+                raise ValueError(
+                    "structured_joint_state_flow requires timestep_sampler='stratified_uniform'"
+                )
+            if self.loss_domain != "valid":
+                raise ValueError("structured_joint_state_flow requires loss_domain='valid'")
+            if self.obs_loss_weight != 0.0 or self.smoothness_loss_weight != 0.0:
+                raise ValueError(
+                    "structured_joint_state_flow requires zero auxiliary observation and smoothness loss"
+                )
+            if self.sample_start_mode != "noise":
+                raise ValueError("structured_joint_state_flow requires sample_start_mode='noise'")
+            if self.sample_end_time != 0.0:
+                raise ValueError("structured_joint_state_flow requires sample_end_time=0")
+            if self.sample_enforce_observations or self.sample_obs_guidance_scale != 0.0:
+                raise ValueError(
+                    "structured_joint_state_flow does not use hard observation enforcement or guidance"
+                )
+            if self.sample_cfg_mode != "none":
+                raise ValueError("structured_joint_state_flow requires sample_cfg_mode='none'")
+            if self.background_dropout_probability != 0.0:
+                raise ValueError(
+                    "structured_joint_state_flow requires background_dropout_probability=0"
+                )
+            probabilities = self.conditioning_mode_probabilities
+            if probabilities not in (None, {"both": 1.0}):
+                raise ValueError(
+                    "structured_joint_state_flow requires both-only conditioning "
+                    "(conditioning_mode_probabilities null or {'both': 1.0})"
+                )
+            if self.structured_state_stats is None:
+                raise ValueError("structured_joint_state_flow requires structured_state_stats")
+            validate_structured_state_stats(self.structured_state_stats)
+            if self.validation_weight_source != "ema" or not self.sample_use_ema:
+                raise ValueError(
+                    "structured_joint_state_flow requires EMA for both validation selection and sampling"
+                )
+            if self.ema_use_warmup or self.ema_update_after_step != 0 or self.ema_min_decay != 0.0:
+                raise ValueError(
+                    "structured_joint_state_flow freezes the default diffusers EMA ramp "
+                    "(no warmup, update_after_step=0, min_decay=0)"
+                )
+            if self.minimum_optimizer_steps <= 0:
+                raise ValueError(
+                    "structured_joint_state_flow requires a positive predeclared minimum_optimizer_steps"
+                )
+            if not 0 <= self.diagnostic_min_optimizer_steps <= self.minimum_optimizer_steps:
+                raise ValueError(
+                    "structured_joint_state_flow requires diagnostic_min_optimizer_steps "
+                    "within [0, minimum_optimizer_steps]"
+                )
+            if self.gradient_accumulation_steps != 1:
+                raise ValueError(
+                    "structured_joint_state_flow currently requires gradient_accumulation_steps=1 "
+                    "so each EMA update follows an optimizer update"
+                )
+            if self.resume_from_checkpoint not in {"", "auto"}:
+                raise ValueError(
+                    "structured_joint_state_flow supports only empty or 'auto' resume policy"
+                )
+            if not self.run_name:
+                raise ValueError(
+                    "structured_joint_state_flow requires a stable run_name for fail-safe resume"
+                )
+            if (
+                not self.recovery_checkpoint_name
+                or Path(self.recovery_checkpoint_name).name != self.recovery_checkpoint_name
+                or self.recovery_checkpoint_name in {".", ".."}
+            ):
+                raise ValueError("recovery_checkpoint_name must be one safe directory name")
+        elif self.structured_velocity_parameterization != RAW_VELOCITY:
+            raise ValueError(
+                "structured velocity preconditioning is only valid for "
+                "structured_joint_state_flow"
+            )
+        elif self.validation_weight_source not in {"raw", "ema"}:
+            raise ValueError("validation_weight_source must be 'raw' or 'ema'")
 
 
 def jsonable(value: Any) -> Any:

@@ -1,0 +1,47 @@
+{
+  "schema_version": "structured_joint_forecast_snapshot_sha256_v1",
+  "verified_at": "2026-09-07",
+  "local_worktree": "/Users/amir/sciml/diffusion_data_assimilation_agent_worktree",
+  "server_worktree": "/home/a.madreev/diffusion_data_assimilation/autoresearch_worktrees/structured_joint_forecast_v2_20260907_0255",
+  "verification": {
+    "local_server_byte_identical": true,
+    "comparison_method": "independent sha256sum over every scoped path in both worktrees",
+    "server_cpu_focused_tests": "43/43 PASS (35 structured + 8 publication)",
+    "server_cpu_tests_directory": "111/111 PASS",
+    "server_cpu_legacy_test_directory": "90/91 PASS",
+    "known_unrelated_legacy_failure": "test_occurrence_intensity_e2.E2OperatorTimeMappingTest.test_each_operator_uses_its_matching_generated_state"
+  },
+  "semantic_identities": {
+    "canonical_data_config_sha256": "f8ed0a4c1db42b151a9ebf2797524c96d4c1b9b12762a47e9bf5518144b5d441",
+    "archive_audit_artifact_sha256": "e20b851c5f55296077ce835b458afb0afc3a759e399e375c1556befba2b25f56",
+    "train_stats_artifact_sha256": "42551e8888c51b79f4e94ee441d9ec7e2bc373afaaa7e96750896a5c8fa82c14",
+    "train_pair_manifest_sha256": "a15de6d5eccc297574587cf60be582ad83da741be824aa97da10322ded75cd0b",
+    "forecast_audited_content_sha256": "d5ae6899a2e942af0c44a62f29f0e6aeb019a80b6ddd3120a094ac8fa1b05dc6",
+    "static_mask_content_sha256": "d49e5c196496ba0e95bdd03d6e81895f5443dd96728c44835c26359a93560b56",
+    "sral_content_manifest_sha256": "ec340c2269f7793d18b44bd658316fe9586fe2379e470f49c0adb38b8640d4ee"
+  },
+  "files": {
+    "assim_lib/config.py": "9fc2f38551685558fbfce4054ce0c1bc886e576caf9cadccfa1e917416981726",
+    "assim_lib/data.py": "dd98d86eaf66ee2faab49e16419ac62308ddf053dc7be3220ce108129ed71637",
+    "assim_lib/main.py": "3b9b7c019979f274f0f6289be4af76269a182e7935daac7c051d983b726d622e",
+    "assim_lib/runtime.py": "6ade7d03306cd14d135b66df2e09558585853800bedf0ea7363483c93450159e",
+    "assim_lib/sampler.py": "7090961db7d1e850fe1f26e2817eccd97d2e913b243c29220bdfcc9c984ba09f",
+    "assim_lib/trainer.py": "1dacbbbdd3967b21e630a15ccded79805e999c3880b7d42f84a9f975ef7520a3",
+    "assim_lib/structured_archive_audit.py": "3c8dc0449d723b9954ccaebc1a8d96f48c5d7581949c6d052cd5eaec41323d54",
+    "assim_lib/structured_joint_preflight.py": "62d8bc41a627cee317a8e051520a34814b1fdc065b9334d5cc3323ca5723efcd",
+    "assim_lib/structured_joint_state.py": "2a6663d3809d4aa4c7879dd285af383eaae0039dbcdc28fc7c13c00149f724b9",
+    "assim_lib/structured_joint_stats.py": "c86ba2d4d6fb4af052f3d29da33127a6d1958003f900d4aa7309b887e132c494",
+    "assim_lib/structured_trajectory_evaluation.py": "4e06f8bda20dd0099b6ef7510c150a7184042bb70652e809ff9fb5b7809b65c6",
+    "config/data/m2m_2f_structured_joint_archive_audit.json": "e20b851c5f55296077ce835b458afb0afc3a759e399e375c1556befba2b25f56",
+    "config/data/m2m_2f_structured_joint_real_lagged.json": "67462c51b9cf8feaf44c757a5f92358c1dde0879aec810989587666c03065cbe",
+    "config/data/m2m_2f_structured_joint_train_stats.json": "42551e8888c51b79f4e94ee441d9ec7e2bc373afaaa7e96750896a5c8fa82c14",
+    "config/evaluation/structured_joint_d0_d3_publication_protocol.json": "575e2d60885946797435ffd9b5cb1cbe71f4cb8a3462c177505ddc6ac575f771",
+    "config/evaluation/structured_joint_d0_d3_test_cases.json": "ff6c4d44d35de9c4a94d62bb1821033eac031d6d2a5c07fbf0f223eb8a7be4ef",
+    "config/experiments/train_structured_joint_d0_d3_real_lagged_31e.json": "704eda230d43e4ffc11a924afdf8ad17e769319ebc37c7732e0ed4ba77351572",
+    "config/methods/structured_joint_uniform_real_lagged_2f.json": "e0cf757dc2a821b20849d709f4e09b0a6a0bbd0aec035cb0fec3a0946b04285c",
+    "paper/STRUCTURED_JOINT_FORECAST_PREFLIGHT.json": "afb8a4b743b9065e1c6e9fd00df7f44228aa1aed6fb58ff35dad5a0281696f46",
+    "tests/test_distribution_preserving_training.py": "70250aebb49e573aa3ede65b8e2430e325fec6115be45a9318679ac94286df5e",
+    "tests/test_structured_publication_evaluation.py": "615d454c8f1be436dd11684375a7e339de6794b70f89bd40abd69922fb458a27",
+    "tests/test_structured_joint_training.py": "0dba3775c354b75494bb8ea3f61a6408c735f357ce9ae7af09d05e82d4878a4e"
+  }
+}

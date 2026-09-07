@@ -1,0 +1,72 @@
+{
+  "schema_version": "structured_joint_state_stats_v3",
+  "source_split": "train",
+  "inactive_filler_law": "independent_standard_normal",
+  "interior_value_law": "continuous_resolution_approximation",
+  "data_config_sha256": "f8ed0a4c1db42b151a9ebf2797524c96d4c1b9b12762a47e9bf5518144b5d441",
+  "pair_manifest_sha256": "a15de6d5eccc297574587cf60be582ad83da741be824aa97da10322ded75cd0b",
+  "conditioning_normalization": {
+    "source_split": "train",
+    "fields": [
+      "siconc",
+      "sithic"
+    ],
+    "open_water_nan_as_physical_zero": true,
+    "estimator": "population_moments_over_all_valid_ocean_trajectory_values",
+    "means": [
+      0.19301218262209952,
+      0.18969311571248842
+    ],
+    "stds": [
+      0.36890927421384667,
+      0.4359687842884708
+    ],
+    "value_count_per_field": 416916364,
+    "data_config_update_required": {
+      "means": [
+        0.19301218262209952,
+        0.18969311571248842
+      ],
+      "stds": [
+        0.36890927421384667,
+        0.4359687842884708
+      ]
+    }
+  },
+  "sic_cap": 0.9970703125,
+  "occurrence_probability": 0.25964502798935474,
+  "cap_probability_given_ice": 0.0509974751931545,
+  "occurrence_logit_mean": -0.6664054847309733,
+  "occurrence_logit_std": 1.6869415708959599,
+  "cap_logit_mean": -1.2448993365366474,
+  "cap_logit_std": 1.3191261408929276,
+  "sic_interior_logit_mean": 1.4012487731973968,
+  "sic_interior_logit_std": 3.7743883752552554,
+  "sit_positive_log_mean": -0.6888795488595949,
+  "sit_positive_log_std": 0.9412276268082193,
+  "audit": {
+    "sample_count": 8572,
+    "anchor_count": 2143,
+    "trajectory_steps": 4,
+    "distinct_target_record_count": 2161,
+    "valid_value_count": 416916364,
+    "ice_value_count": 108250261,
+    "cap_value_count": 5520490,
+    "joint_nan_value_count": 308666103,
+    "source_array_dtype": "float16",
+    "nan_semantics": "joint_sic_sit_nan_means_open_water_zero",
+    "hour_mode": "fixed",
+    "target_slice_index": 23,
+    "trajectory_semantics": "consecutive_daily_archive_snapshots",
+    "utc_time_coordinate_verified": false,
+    "histogram_bins": 131072,
+    "sic_interior_logit_range": [
+      -24.0,
+      24.0
+    ],
+    "sit_positive_log_range": [
+      -24.0,
+      8.0
+    ]
+  }
+}

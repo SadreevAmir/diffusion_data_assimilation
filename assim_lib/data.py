@@ -39,6 +39,10 @@ THREEDVAR_MAIN_200D_SPLITS = {
     },
 }
 
+STRUCTURED_CONDITIONING_LAYOUT = "structured_sic_lagged_v1"
+STRUCTURED_CONDITIONING_CHANNELS = 17
+STRUCTURED_TRAJECTORY_CONDITIONING_LAYOUT = "structured_sic_sit_trajectory_v1"
+
 
 def previous_calendar_date(value: date) -> date | None:
     """Return the same month/day in the preceding year.
@@ -63,7 +67,7 @@ def calendar_feature_values(target_date: date, hour: int, names: Iterable[str]) 
                 reference = date(2001, target_date.month, target_date.day)
                 day_index = float((reference - date(2001, 1, 1)).days)
             angle = 2.0 * np.pi * day_index / 365.0
-        elif name == "hour":
+        elif name in {"hour", "time_index"}:
             angle = 2.0 * np.pi * (int(hour) % 24) / 24.0
         else:
             raise ValueError(f"Unknown calendar feature: {name!r}")
@@ -149,10 +153,17 @@ def _sral_transform(arr: np.ndarray, index: int) -> np.ndarray:
 
 def _combine_sral_files(paths: list[Path]) -> np.ndarray | None:
     combined = None
+    expected_shape = None
     for path in paths:
         arr = np.load(path)
-        if combined is None or combined.shape != arr.shape:
+        if expected_shape is None:
+            expected_shape = arr.shape
             combined = np.full(arr.shape, np.nan, dtype=np.float32)
+        elif arr.shape != expected_shape:
+            raise ValueError(
+                f"SRAL files for one date have inconsistent shapes: "
+                f"expected {expected_shape}, got {arr.shape} in {path}"
+            )
         finite = np.isfinite(arr)
         fill = np.isnan(combined) & finite
         combined[fill] = arr[fill]
@@ -230,7 +241,7 @@ def _make_mask(image_size, valid_mask, config, rng, mask_config=None) -> torch.T
 class M2MForecastDataset(Dataset):
     name = "M2MForecastDataset"
 
-    def __init__(self, config, split: str = "train"):
+    def __init__(self, config, split: str = "train", *, forecast_only: bool = False):
         validate_temporal_split_protocol(config)
         if split not in config or not isinstance(config[split], Mapping):
             raise KeyError(f"Missing dataset split configuration: {split!r}")
@@ -241,17 +252,26 @@ class M2MForecastDataset(Dataset):
         self.stds = self.config["stds"]
         self.padding_values = self.config["padding_values"]
         self.image_size = tuple(int(v) for v in self.config.get("image_size", [320, 256]))
-        self.hour_index = int(self.config.get("target_hour_index", 23))
+        self.hour_index = int(
+            self.config.get("target_slice_index", self.config.get("target_hour_index", 23))
+        )
         self.hour_mode = str(self.config.get("hour_mode", "fixed"))
         if self.hour_mode not in ("fixed", "all"):
             raise ValueError(f"Unknown hour_mode={self.hour_mode!r}; expected 'fixed' or 'all'")
         self.hours_per_day = 24 if self.hour_mode == "all" else 1
         self.calendar_features = tuple(self.config.get("calendar_features", ()))
-        unexpected_calendar_features = set(self.calendar_features) - {"day_of_year", "hour"}
+        unexpected_calendar_features = set(self.calendar_features) - {
+            "day_of_year",
+            "hour",
+            "time_index",
+        }
         if unexpected_calendar_features:
             raise ValueError(f"Unknown calendar_features: {sorted(unexpected_calendar_features)}")
         self.observed_channels = [int(v) for v in self.config.get("observed_channels", [0])]
         self.assimilation_range = int(self.config.get("assimilation_range", 1))
+        self.future_horizon_days = int(self.config.get("future_horizon_days", 0))
+        if self.future_horizon_days < 0:
+            raise ValueError("future_horizon_days must be non-negative")
         self.obs_shift = max(0, self.assimilation_range - 1)
         split_seed_offset = {"train": 0, "valid": 10000, "test": 20000}.get(split, 30000)
         self.seed = int(self.config.get("seed", 1234)) + split_seed_offset
@@ -299,21 +319,37 @@ class M2MForecastDataset(Dataset):
         self.records_by_date = {record.date: record for record in records}
         self._sorted_record_dates = sorted(self.records_by_date.keys())
         self.calendar_pairs = (
-            self._build_calendar_pairs() if self.background_strategy == "calendar_year_ago" else []
+            self._build_calendar_pairs()
+            if self.background_strategy == "calendar_year_ago" and not forecast_only
+            else []
         )
+        self.forecast_only = bool(forecast_only)
         self.base_valid_mask = self._load_base_valid_mask()
         self._validate_observation_mask_config()
+        self._validate_structured_conditioning_config()
+        self._validate_structured_sral_coverage()
 
     def _build_calendar_pairs(self):
         pairs = []
         for target_record in self.obs_data:
             if not self.target_start <= target_record.date <= self.target_end:
                 continue
+            if target_record.date + timedelta(days=self.future_horizon_days) > self.target_end:
+                continue
             background_date = previous_calendar_date(target_record.date)
             if background_date is None or not self.background_start <= background_date <= self.background_end:
                 continue
             background_record = self.records_by_date.get(background_date)
-            if background_record is not None:
+            trajectory_available = all(
+                self.records_by_date.get(target_record.date + timedelta(days=horizon)) is not None
+                and previous_calendar_date(target_record.date + timedelta(days=horizon)) is not None
+                and self.records_by_date.get(
+                    previous_calendar_date(target_record.date + timedelta(days=horizon))
+                )
+                is not None
+                for horizon in range(self.future_horizon_days + 1)
+            )
+            if background_record is not None and trajectory_available:
                 pairs.append((background_record, target_record))
         if not pairs:
             raise ValueError("No exact previous-calendar-year background/target pairs are available")
@@ -357,6 +393,95 @@ class M2MForecastDataset(Dataset):
         if synthetic_kind == "sral_tracks":
             raise ValueError("observation_mask.synthetic.kind cannot be 'sral_tracks'")
 
+    def _validate_structured_conditioning_config(self) -> None:
+        layout = self.config.get("conditioning_layout")
+        if layout not in {
+            STRUCTURED_CONDITIONING_LAYOUT,
+            STRUCTURED_TRAJECTORY_CONDITIONING_LAYOUT,
+        }:
+            return
+        mask_config = self.config.get("observation_mask", {})
+        expected = {
+            "indices": [0, 1],
+            "observed_channels": (
+                [0, 1] if layout == STRUCTURED_TRAJECTORY_CONDITIONING_LAYOUT else [0]
+            ),
+            "assimilation_range": 3,
+            "background_strategy": "calendar_year_ago",
+            "calendar_features": (
+                ("day_of_year", "time_index")
+                if layout == STRUCTURED_TRAJECTORY_CONDITIONING_LAYOUT
+                else ("day_of_year", "hour")
+            ),
+            "mask_kind": "sral_tracks",
+            "sral_transform_index": 1,
+            "synthetic_probability": 0.0,
+            "empty_probability": 0.0,
+            "require_finite_model_values": False,
+        }
+        actual = {
+            "indices": self.indices,
+            "observed_channels": self.observed_channels,
+            "assimilation_range": self.assimilation_range,
+            "background_strategy": self.background_strategy,
+            "calendar_features": self.calendar_features,
+            "mask_kind": mask_config.get("kind", "generated_track"),
+            "sral_transform_index": int(
+                mask_config.get("sral_transform_index", self.config.get("sral_transform_index", 11))
+            ),
+            "synthetic_probability": float(mask_config.get("synthetic_probability", 0.0)),
+            "empty_probability": float(mask_config.get("empty_probability", 0.0)),
+            "require_finite_model_values": bool(
+                mask_config.get("require_finite_model_values", True)
+            ),
+        }
+        if layout == STRUCTURED_TRAJECTORY_CONDITIONING_LAYOUT:
+            expected.update(
+                {
+                    "future_horizon_days": 3,
+                    "source_array_dtype": "float16",
+                    "model_nan_semantics": "joint_sic_sit_nan_means_open_water_zero",
+                    "trajectory_semantics": "consecutive_daily_archive_snapshots",
+                    "target_slice_index": 23,
+                    "utc_time_coordinate_verified": False,
+                    "time_claim_policy": "archive_date_only_no_utc_or_operational_lead_claim",
+                    "forbidden_time_labels": [
+                        "operational_lead",
+                        "23:00_UTC",
+                        "24h_issue_time",
+                    ],
+                    "dynamic_forcing_indices": [],
+                }
+            )
+            actual.update(
+                {
+                    "future_horizon_days": self.future_horizon_days,
+                    "source_array_dtype": self.config.get("source_array_dtype"),
+                    "model_nan_semantics": self.config.get("model_nan_semantics"),
+                    "trajectory_semantics": self.config.get("trajectory_semantics"),
+                    "target_slice_index": self.config.get("target_slice_index"),
+                    "utc_time_coordinate_verified": self.config.get(
+                        "utc_time_coordinate_verified"
+                    ),
+                    "time_claim_policy": self.config.get("time_claim_policy"),
+                    "forbidden_time_labels": self.config.get("forbidden_time_labels"),
+                    "dynamic_forcing_indices": self.config.get(
+                        "dynamic_forcing_indices"
+                    ),
+                }
+            )
+        mismatches = {
+            key: (actual[key], expected_value)
+            for key, expected_value in expected.items()
+            if actual[key] != expected_value
+        }
+        if mismatches:
+            raise ValueError(
+                f"{layout} has an incompatible data protocol: {mismatches}"
+            )
+        if layout == STRUCTURED_TRAJECTORY_CONDITIONING_LAYOUT and self.future_horizon_days <= 0:
+            raise ValueError("trajectory conditioning requires future_horizon_days > 0")
+
     def _load_base_valid_mask(self) -> torch.Tensor:
         channels = len(self.indices)
         if "mask_path" not in self.config or not self.config["mask_path"]:
@@ -369,18 +494,184 @@ class M2MForecastDataset(Dataset):
         return load_valid_mask(raw, channels, self.image_size)
 
     def _load_sral_records(self) -> dict[date, list[Path]]:
+        requires_sral = (
+            self.config.get("observation_mask", {}).get("kind", "generated_track")
+            == "sral_tracks"
+        )
         sral_dir = self.config.get("sral_dir")
         if not sral_dir:
+            if requires_sral:
+                raise ValueError("sral_tracks conditioning requires an explicit sral_dir")
             return {}
         sral_path = Path(sral_dir)
         if not sral_path.is_dir():
+            if requires_sral:
+                raise ValueError(f"SRAL geometry directory is missing: {sral_path}")
             return {}
         out: dict[date, list[Path]] = {}
-        for path in sorted(sral_path.glob("*.npy")):
+        files = sorted(sral_path.glob("*.npy"))
+        if requires_sral and not files:
+            raise ValueError(f"SRAL geometry directory contains no .npy files: {sral_path}")
+        expected_shape = None
+        transform_index = int(
+            self.config.get("observation_mask", {}).get(
+                "sral_transform_index", self.config.get("sral_transform_index", 11)
+            )
+        )
+        for path in files:
             parsed = parse_date(path.name)
-            if parsed is not None:
-                out.setdefault(parsed, []).append(path)
+            if parsed is None:
+                raise ValueError(f"SRAL filename has no unambiguous date: {path}")
+            array = np.load(path, mmap_mode="r")
+            if array.ndim != 3:
+                raise ValueError(f"SRAL source must be [C,H,W], got {array.shape} in {path}")
+            if transform_index >= array.shape[0]:
+                raise ValueError(
+                    f"SRAL transform index {transform_index} exceeds {array.shape[0]} channels in {path}"
+                )
+            if array.shape[-2] > self.image_size[0] or array.shape[-1] > self.image_size[1]:
+                raise ValueError(
+                    f"SRAL geometry {array.shape[-2:]} exceeds image size {self.image_size} in {path}"
+                )
+            if expected_shape is None:
+                expected_shape = array.shape
+            elif array.shape != expected_shape:
+                raise ValueError(
+                    f"SRAL archive shape drift: expected {expected_shape}, got {array.shape} in {path}"
+                )
+            out.setdefault(parsed, []).append(path)
         return out
+
+    def _validate_structured_sral_coverage(self) -> None:
+        self.structured_sral_availability = {}
+        if self.config.get("conditioning_layout") != STRUCTURED_TRAJECTORY_CONDITIONING_LAYOUT:
+            return
+        for lag in range(3):
+            candidate_dates = set()
+            for _, target_record in self.calendar_pairs:
+                value_date = target_record.date - timedelta(days=lag)
+                background_date = previous_calendar_date(value_date)
+                if (
+                    value_date in self.records_by_date
+                    and background_date is not None
+                    and background_date in self.records_by_date
+                ):
+                    candidate_dates.add(value_date)
+            available_dates = candidate_dates & set(self.sral_records)
+            if candidate_dates and not available_dates:
+                raise ValueError(
+                    f"SRAL observation law is empty for split={self.split} lag={lag}: "
+                    f"{len(candidate_dates)} candidate dates and zero available files"
+                )
+            missing_dates = candidate_dates - available_dates
+            self.structured_sral_availability[f"lag{lag}"] = {
+                "candidate_date_count": len(candidate_dates),
+                "available_file_date_count": len(available_dates),
+                "missing_date_count": len(missing_dates),
+                "missing_fraction": (
+                    len(missing_dates) / len(candidate_dates) if candidate_dates else None
+                ),
+            }
+
+    @classmethod
+    def build_structured_forecast_item(cls, config: Mapping, target_date: str | date) -> dict:
+        """Build truth-free d..d+3 inputs from background trajectory and past/current tracks."""
+        anchor = as_date(target_date)
+        background_dates = [
+            previous_calendar_date(anchor + timedelta(days=lead))
+            for lead in range(int(config.get("future_horizon_days", 0)) + 1)
+        ]
+        if any(value is None for value in background_dates):
+            raise ValueError("forecast horizon has no exact previous-calendar-year background date")
+        inference_config = dict(config)
+        inference_config["inference"] = {
+            "back_start_day": min(background_dates).isoformat(),
+            "back_end_day": max(background_dates).isoformat(),
+            "obs_start_day": anchor.isoformat(),
+            "obs_end_day": anchor.isoformat(),
+        }
+        dataset = cls(inference_config, split="inference", forecast_only=True)
+        return dataset._structured_forecast_item(anchor)
+
+    def _structured_forecast_item(self, target_date: date) -> dict:
+        if self.config.get("conditioning_layout") != STRUCTURED_TRAJECTORY_CONDITIONING_LAYOUT:
+            raise ValueError("truth-free forecast builder requires structured trajectory conditioning")
+        hour = self.hour_index
+        background_records = []
+        for lead in range(self.future_horizon_days + 1):
+            background_date = previous_calendar_date(target_date + timedelta(days=lead))
+            record = self.records_by_date.get(background_date) if background_date else None
+            if record is None:
+                raise FileNotFoundError(
+                    f"missing exact previous-calendar-year background for d+{lead}"
+                )
+            background_records.append(record)
+        raw_backgrounds = [
+            field_at_hour(record.path, hour, self.indices) for record in background_records
+        ]
+        for record, raw in zip(background_records, raw_backgrounds, strict=True):
+            self._validate_structured_raw_field(raw, record.path)
+        normalized_backgrounds = [
+            prepare_model_field(
+                raw,
+                None,
+                self.means,
+                self.stds,
+                self.padding_values,
+                self.image_size,
+            )[0]
+            for raw in raw_backgrounds
+        ]
+        background = torch.cat(normalized_backgrounds, dim=0)
+        valid_mask = self.base_valid_mask.clone()
+        condition, obs_values, obs_mask, flow_mask, lag0_physical, diagnostics = (
+            self._structured_trajectory_conditioning(
+                target_date, hour, background, valid_mask
+            )
+        )
+        physical_backgrounds = []
+        padding = torch.as_tensor(self.padding_values, dtype=torch.float32).view(-1, 1, 1)
+        for raw in raw_backgrounds:
+            physical = torch.as_tensor(raw, dtype=torch.float32)
+            physical = torch.where(torch.isfinite(physical), physical, padding)
+            physical_backgrounds.append(
+                pad_to_size(physical, self.image_size, fill_value=self.padding_values)
+            )
+        lag0_mask = (1.0 - flow_mask[:1]) * valid_mask[:1]
+        feature_values = calendar_feature_values(target_date, hour, self.calendar_features)
+        return {
+            "background": background,
+            "obs_values": obs_values,
+            "obs_mask": obs_mask,
+            "valid_mask": valid_mask,
+            "water_mask": torch.cat(
+                [
+                    valid_mask[:1],
+                    *[
+                        torch.full((1, *self.image_size), value, dtype=torch.float32)
+                        for value in feature_values
+                    ],
+                ],
+                dim=0,
+            ),
+            "structured_conditioning": condition,
+            "structured_flow_mask": flow_mask,
+            "structured_lag0_mask": lag0_mask,
+            "structured_lag0_physical_values": lag0_physical,
+            "structured_physical_background": torch.cat(physical_backgrounds, dim=0),
+            "meta": {
+                "case_id": f"{target_date.isoformat()}_slice{hour:02d}_forecast",
+                "target_date": target_date.isoformat(),
+                "archive_slice_index": hour,
+                "trajectory_semantics": self.config["trajectory_semantics"],
+                "background_trajectory_paths": [
+                    str(record.path) for record in background_records
+                ],
+                "target_trajectory_paths": [],
+                "truth_free_forecast_builder": True,
+                **diagnostics,
+            },
+        }
 
     def _num_days(self) -> int:
         if self.background_strategy == "calendar_year_ago":
@@ -394,16 +685,32 @@ class M2MForecastDataset(Dataset):
 
     @property
     def conditioned_input_channels(self) -> int:
+        if self.config.get("conditioning_layout") == STRUCTURED_TRAJECTORY_CONDITIONING_LAYOUT:
+            trajectory_steps = self.future_horizon_days + 1
+            state_channels = 4 * trajectory_steps
+            condition_channels = 3 * trajectory_steps + 3 * 5 + 1 + 4
+            return state_channels + 2 + condition_channels
+        if self.config.get("conditioning_layout") == STRUCTURED_CONDITIONING_LAYOUT:
+            # Four structured state coordinates, two xy coordinates, and the
+            # immutable 17-channel condition tensor defined below.
+            return 4 + 2 + STRUCTURED_CONDITIONING_CHANNELS
         field_channels = len(self.indices)
         static_channels = 1 + 2 * len(self.calendar_features)
         return 5 * field_channels + 2 + static_channels
 
     def provenance(self) -> dict:
         if self.background_strategy == "calendar_year_ago":
-            pair_lines = [
-                f"{background.date.isoformat()},{target.date.isoformat()}\n"
-                for background, target in self.calendar_pairs
-            ]
+            pair_lines = []
+            for background, target in self.calendar_pairs:
+                trajectory = ",".join(
+                    (
+                        target.date + timedelta(days=horizon)
+                    ).isoformat()
+                    for horizon in range(self.future_horizon_days + 1)
+                )
+                pair_lines.append(
+                    f"{background.date.isoformat()},{target.date.isoformat()},{trajectory}\n"
+                )
             target_candidates = sum(
                 self.target_start <= record.date <= self.target_end for record in self.obs_data
             )
@@ -427,7 +734,68 @@ class M2MForecastDataset(Dataset):
             ),
             "calendar_features": list(self.calendar_features),
             "resample_observation_masks_each_epoch": self.resample_observation_masks_each_epoch,
+            "future_horizon_days": self.future_horizon_days,
+            "target_slice_index": self.hour_index,
+            "utc_time_coordinate_verified": self.config.get(
+                "utc_time_coordinate_verified"
+            ),
+            "trajectory_semantics": self.config.get("trajectory_semantics", "unspecified"),
+            "time_claim_policy": self.config.get("time_claim_policy", "unspecified"),
+            "source_array_dtype": self.config.get("source_array_dtype", "unspecified"),
+            "model_nan_semantics": self.config.get("model_nan_semantics", "unspecified"),
+            "sral_source": {
+                "declared_root": self.config.get("sral_dir"),
+                "resolved_root": (
+                    str(Path(self.config["sral_dir"]).resolve())
+                    if self.config.get("sral_dir")
+                    else None
+                ),
+                "dated_record_count": len(self.sral_records),
+                "file_count": sum(len(paths) for paths in self.sral_records.values()),
+            },
+            "sral_availability_by_lag": self.structured_sral_availability,
         }
+
+    def validate_structured_sral_audit_contract(self, audit: Mapping) -> None:
+        """Match runtime source inventory/availability to the admitted full audit."""
+        if self.config.get("conditioning_layout") != STRUCTURED_TRAJECTORY_CONDITIONING_LAYOUT:
+            return
+        expected_source = audit["sral_provenance"]
+        actual_source = self.provenance()["sral_source"]
+        for key in ("resolved_root", "dated_record_count", "file_count"):
+            if actual_source[key] != expected_source[key]:
+                raise ValueError(f"runtime SRAL source {key} differs from archive audit")
+        expected_lags = expected_source["availability_by_split_and_lag"][self.split]
+        for lag, actual in self.structured_sral_availability.items():
+            expected = expected_lags[lag]
+            comparisons = {
+                "candidate_date_count": expected["candidate_date_count"],
+                "available_file_date_count": expected["available_file_date_count"],
+                "missing_date_count": expected["missing_date_count"],
+            }
+            if actual != {**comparisons, "missing_fraction": expected["missing_fraction"]}:
+                raise ValueError(f"runtime SRAL availability differs for {self.split}/{lag}")
+
+    def _validate_structured_raw_field(self, raw: np.ndarray, source: Path) -> None:
+        """Fail closed on archive assumptions used by the structured codec."""
+        raw = np.asarray(raw)
+        if raw.ndim != 3 or raw.shape[0] != 2:
+            raise ValueError(f"structured SIC/SIT field must be [2,H,W], got {raw.shape} in {source}")
+        expected_dtype = self.config.get("source_array_dtype")
+        if expected_dtype is not None and raw.dtype.name != str(expected_dtype):
+            raise ValueError(
+                f"structured source dtype {raw.dtype.name} != declared {expected_dtype!r} in {source}"
+            )
+        height, width = raw.shape[-2:]
+        valid = self.base_valid_mask[0, :height, :width].detach().cpu().numpy() > 0
+        sic_nan = np.isnan(raw[0]) & valid
+        sit_nan = np.isnan(raw[1]) & valid
+        if not np.array_equal(sic_nan, sit_nan):
+            raise ValueError(
+                f"mismatched SIC/SIT missingness on water in {source}"
+            )
+        if np.any(np.isinf(raw)):
+            raise ValueError(f"Inf is forbidden in structured SIC/SIT source {source}")
 
     def _resolve_index(self, idx: int) -> tuple[int, int]:
         day_idx, hour_in_day = divmod(int(idx), self.hours_per_day)
@@ -649,6 +1017,244 @@ class M2MForecastDataset(Dataset):
             day_offsets=range(self.assimilation_range),
         )
 
+    def _structured_lag_conditioning(
+        self,
+        target_date: date,
+        hour: int,
+        background: torch.Tensor,
+        valid_mask: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, dict]:
+        """Build the strict SIC-only lagged conditioning tensor.
+
+        Each lag is represented separately as ``(value, innovation, mask)``.
+        A missing exact calendar-year counterpart (notably February 29) makes
+        that entire lag unavailable; no nearest-date substitution is allowed.
+        Raw model NaNs are the archive's open-water encoding and therefore map
+        to physical zero rather than deleting an otherwise valid observation.
+        """
+        zero = torch.zeros((1, *self.image_size), dtype=torch.float32)
+        lag_channels: list[torch.Tensor] = []
+        lag_available: list[bool] = []
+        lag_obs_count: list[int] = []
+        for lag in range(3):
+            current_date = target_date - timedelta(days=lag)
+            previous_date = previous_calendar_date(current_date)
+            current_record = self.records_by_date.get(current_date)
+            previous_record = self.records_by_date.get(previous_date) if previous_date else None
+            spatial_mask = self.sral_spatial_mask(
+                target_date,
+                day_offsets=(lag,),
+                transform_index=1,
+            )
+            if current_record is None or previous_record is None or spatial_mask is None:
+                lag_channels.extend((zero.clone(), zero.clone(), zero.clone()))
+                lag_available.append(False)
+                lag_obs_count.append(0)
+                continue
+
+            current_sic, _ = prepare_model_field(
+                field_at_hour(current_record.path, hour, [self.indices[0]]),
+                None,
+                [self.means[0]],
+                [self.stds[0]],
+                [self.padding_values[0]],
+                self.image_size,
+            )
+            previous_sic, _ = prepare_model_field(
+                field_at_hour(previous_record.path, hour, [self.indices[0]]),
+                None,
+                [self.means[0]],
+                [self.stds[0]],
+                [self.padding_values[0]],
+                self.image_size,
+            )
+            mask = ((spatial_mask > 0) & (valid_mask[:1] > 0)).to(torch.float32)
+            observed = torch.where(mask > 0, current_sic, zero)
+            innovation = torch.where(mask > 0, current_sic - previous_sic, zero)
+            lag_channels.extend((observed, innovation, mask))
+            lag_available.append(True)
+            lag_obs_count.append(int(mask.sum().item()))
+
+        feature_values = calendar_feature_values(target_date, hour, self.calendar_features)
+        calendar_channels = [
+            torch.full((1, *self.image_size), value, dtype=torch.float32)
+            for value in feature_values
+        ]
+        background_condition = torch.where(valid_mask > 0, background, torch.zeros_like(background))
+        condition = torch.cat(
+            [
+                background_condition,
+                valid_mask[:1],
+                *lag_channels,
+                valid_mask[:1],
+                *calendar_channels,
+            ],
+            dim=0,
+        )
+        if condition.shape[0] != STRUCTURED_CONDITIONING_CHANNELS:
+            raise RuntimeError(
+                "structured conditioning channel invariant failed: "
+                f"expected {STRUCTURED_CONDITIONING_CHANNELS}, got {condition.shape[0]}"
+            )
+
+        obs_values = torch.zeros((len(self.indices), *self.image_size), dtype=torch.float32)
+        obs_mask = torch.zeros_like(obs_values)
+        obs_values[0] = lag_channels[0][0]
+        obs_mask[0] = lag_channels[2][0]
+        diagnostics = self._observation_diagnostics(
+            "structured_sral_tracks",
+            obs_mask,
+            valid_mask,
+            empty_obs_days=sum(not available for available in lag_available),
+        )
+        diagnostics.update(
+            {
+                "lag_available": lag_available,
+                "lag_obs_count": lag_obs_count,
+                "structured_conditioning_channels": STRUCTURED_CONDITIONING_CHANNELS,
+            }
+        )
+        return condition, obs_values, obs_mask, diagnostics
+
+    def _structured_trajectory_conditioning(
+        self,
+        target_date: date,
+        hour: int,
+        background_trajectory: torch.Tensor,
+        valid_mask: torch.Tensor,
+    ) -> tuple[
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        dict,
+    ]:
+        zero_field = torch.zeros((2, *self.image_size), dtype=torch.float32)
+        zero_mask = torch.zeros((1, *self.image_size), dtype=torch.float32)
+        lag_channels: list[torch.Tensor] = []
+        lag_available: list[bool] = []
+        lag_obs_count: list[int] = []
+        lag_zero_mask = None
+        lag0_physical = zero_field.clone()
+        for lag in range(3):
+            value_date = target_date - timedelta(days=lag)
+            background_date = previous_calendar_date(value_date)
+            value_record = self.records_by_date.get(value_date)
+            background_record = self.records_by_date.get(background_date) if background_date else None
+            if (
+                value_record is None
+                or background_record is None
+                or value_date not in self.sral_records
+            ):
+                lag_channels.extend((zero_field.clone(), zero_field.clone(), zero_mask.clone()))
+                lag_available.append(False)
+                lag_obs_count.append(0)
+                if lag == 0:
+                    lag_zero_mask = zero_mask.clone()
+                continue
+            spatial_mask = self.sral_spatial_mask(
+                target_date,
+                day_offsets=(lag,),
+                transform_index=1,
+            )
+            if spatial_mask is None:
+                raise ValueError(
+                    f"SRAL geometry has no finite valid coverage for required lag date {value_date}"
+                )
+            value_raw = field_at_hour(value_record.path, hour, self.indices)
+            background_raw = field_at_hour(background_record.path, hour, self.indices)
+            self._validate_structured_raw_field(value_raw, value_record.path)
+            self._validate_structured_raw_field(background_raw, background_record.path)
+            value, _ = prepare_model_field(
+                value_raw,
+                None,
+                self.means,
+                self.stds,
+                self.padding_values,
+                self.image_size,
+            )
+            lag_background, _ = prepare_model_field(
+                background_raw,
+                None,
+                self.means,
+                self.stds,
+                self.padding_values,
+                self.image_size,
+            )
+            mask = ((spatial_mask > 0) & (valid_mask[:1] > 0)).to(torch.float32)
+            expanded = mask.expand_as(value)
+            observed = torch.where(expanded > 0, value, zero_field)
+            innovation = torch.where(expanded > 0, value - lag_background, zero_field)
+            lag_channels.extend((observed, innovation, mask))
+            lag_available.append(True)
+            lag_obs_count.append(int(mask.sum().item()))
+            if lag == 0:
+                lag_zero_mask = mask
+                raw_physical = torch.as_tensor(value_raw, dtype=torch.float32)
+                raw_physical = torch.where(
+                    torch.isfinite(raw_physical),
+                    raw_physical,
+                    torch.zeros_like(raw_physical),
+                )
+                raw_physical = pad_to_size(
+                    raw_physical, self.image_size, fill_value=(0.0, 0.0)
+                )
+                lag0_physical = torch.where(
+                    mask.expand_as(raw_physical) > 0,
+                    raw_physical,
+                    torch.zeros_like(raw_physical),
+                )
+
+        feature_values = calendar_feature_values(target_date, hour, self.calendar_features)
+        calendar_channels = [
+            torch.full((1, *self.image_size), value, dtype=torch.float32)
+            for value in feature_values
+        ]
+        background_channels: list[torch.Tensor] = []
+        for lead in range(self.future_horizon_days + 1):
+            lead_background = background_trajectory[2 * lead : 2 * lead + 2]
+            background_channels.extend(
+                (
+                    torch.where(
+                        valid_mask[:1].expand_as(lead_background) > 0,
+                        lead_background,
+                        torch.zeros_like(lead_background),
+                    ),
+                    valid_mask[:1],
+                )
+            )
+        condition = torch.cat(
+            [
+                *background_channels,
+                *lag_channels,
+                valid_mask[:1],
+                *calendar_channels,
+            ],
+            dim=0,
+        )
+        expected_channels = 3 * (self.future_horizon_days + 1) + 15 + 1 + 4
+        if condition.shape[0] != expected_channels:
+            raise RuntimeError(
+                f"trajectory condition expected {expected_channels} channels, got {condition.shape[0]}"
+            )
+        obs_values = torch.zeros((len(self.indices), *self.image_size), dtype=torch.float32)
+        obs_mask = torch.zeros_like(obs_values)
+        obs_values[:] = lag_channels[0]
+        obs_mask[:] = lag_channels[2].expand_as(obs_mask)
+        assert lag_zero_mask is not None
+        trajectory_steps = self.future_horizon_days + 1
+        flow_mask = valid_mask[:1].repeat(4 * trajectory_steps, 1, 1)
+        flow_mask[:4] *= 1.0 - lag_zero_mask
+        diagnostics = self._observation_diagnostics(
+            "structured_model_truth_pseudo_obs_sic_sit_on_real_sral_geometry",
+            obs_mask,
+            valid_mask,
+            empty_obs_days=sum(not available for available in lag_available),
+        )
+        diagnostics.update({"lag_available": lag_available, "lag_obs_count": lag_obs_count})
+        return condition, obs_values, obs_mask, flow_mask, lag0_physical, diagnostics
+
     def _nearest_record(self, target: date):
         if not self._sorted_record_dates:
             return None
@@ -701,27 +1307,81 @@ class M2MForecastDataset(Dataset):
             back_record, background_offset_days = self._select_background_record(
                 target_record.date, idx, day_idx
             )
-        background, _ = prepare_model_field(
-            field_at_hour(back_record.path, hour, self.indices),
+        trajectory_layout = (
+            self.config.get("conditioning_layout") == STRUCTURED_TRAJECTORY_CONDITIONING_LAYOUT
+        )
+        trajectory_steps = self.future_horizon_days + 1 if trajectory_layout else 1
+        if trajectory_layout:
+            background_records = [
+                self.records_by_date[
+                    previous_calendar_date(target_record.date + timedelta(days=horizon))
+                ]
+                for horizon in range(trajectory_steps)
+            ]
+        else:
+            background_records = [back_record]
+        target_records = [
+            self.records_by_date[target_record.date + timedelta(days=horizon)]
+            for horizon in range(trajectory_steps)
+        ]
+        background_fields = [
+            field_at_hour(record.path, hour, self.indices) for record in background_records
+        ]
+        target_fields = [field_at_hour(record.path, hour, self.indices) for record in target_records]
+        if trajectory_layout:
+            for record, field in zip(background_records, background_fields, strict=True):
+                self._validate_structured_raw_field(field, record.path)
+            for record, field in zip(target_records, target_fields, strict=True):
+                self._validate_structured_raw_field(field, record.path)
+        normalized_background = [prepare_model_field(
+            field,
             None,
             self.means,
             self.stds,
             self.padding_values,
             self.image_size,
-        )
-        truth, _ = prepare_model_field(
-            field_at_hour(target_record.path, hour, self.indices),
+        )[0] for field in background_fields]
+        normalized_truth = [prepare_model_field(
+            field,
             None,
             self.means,
             self.stds,
             self.padding_values,
             self.image_size,
-        )
+        )[0] for field in target_fields]
+        background = torch.cat(normalized_background, dim=0)
+        truth = torch.cat(normalized_truth, dim=0)
         valid_mask = self.base_valid_mask.clone()
 
         mask_config = self.config.get("observation_mask", {})
         mask_kind = mask_config.get("kind", "generated_track")
-        if mask_kind == "sral_tracks":
+        structured_conditioning = None
+        structured_flow_mask = None
+        structured_lag0_physical_values = None
+        if trajectory_layout:
+            (
+                structured_conditioning,
+                obs_values,
+                obs_mask,
+                structured_flow_mask,
+                structured_lag0_physical_values,
+                obs_diagnostics,
+            ) = self._structured_trajectory_conditioning(
+                target_record.date,
+                hour,
+                background,
+                valid_mask,
+            )
+        elif self.config.get("conditioning_layout") == STRUCTURED_CONDITIONING_LAYOUT:
+            structured_conditioning, obs_values, obs_mask, obs_diagnostics = (
+                self._structured_lag_conditioning(
+                    target_record.date,
+                    hour,
+                    background,
+                    valid_mask,
+                )
+            )
+        elif mask_kind == "sral_tracks":
             conditioning_kind = self._selected_sral_conditioning(mask_config, observation_rng)
             if conditioning_kind == "sral_tracks":
                 obs_values, obs_mask, obs_diagnostics = self._sral_track_observations(
@@ -758,7 +1418,7 @@ class M2MForecastDataset(Dataset):
         static_conditions.extend(
             torch.full((1, *self.image_size), value, dtype=torch.float32) for value in feature_values
         )
-        return {
+        item = {
             "truth": truth,
             "background": background,
             "obs_values": obs_values,
@@ -766,19 +1426,81 @@ class M2MForecastDataset(Dataset):
             "valid_mask": valid_mask,
             "water_mask": torch.cat(static_conditions, dim=0),
             "meta": {
-                "case_id": f"{target_record.date.isoformat()}_h{hour:02d}",
+                "case_id": (
+                    f"{target_record.date.isoformat()}_slice{hour:02d}"
+                    if trajectory_layout
+                    else f"{target_record.date.isoformat()}_t{hour:02d}"
+                ),
                 "background_date": back_record.date.isoformat(),
                 "target_date": target_record.date.isoformat(),
                 "background_offset_days": int(background_offset_days),
                 "background_strategy": self.background_strategy,
                 "calendar_feature_values": list(feature_values),
+                "archive_slice_index": hour,
+                # Legacy generic consumers still read hour/time_index.  For the
+                # structured trajectory contract these are archive indices,
+                # never a UTC or issue-time claim.
                 "hour": hour,
+                "time_index": hour,
+                "utc_time_coordinate_verified": bool(
+                    self.config.get("utc_time_coordinate_verified", False)
+                ),
+                "trajectory_semantics": self.config.get(
+                    "trajectory_semantics", "unspecified"
+                ),
+                "time_claim_policy": self.config.get(
+                    "time_claim_policy", "unspecified"
+                ),
+                "trajectory_archive_date_labels": [
+                    "analysis_snapshot_d",
+                    *[
+                        f"forecast_archive_day_d_plus_{lead}"
+                        for lead in range(1, trajectory_steps)
+                    ],
+                ],
                 "background_path": str(back_record.path),
                 "target_path": str(target_record.path),
+                "background_trajectory_paths": [str(record.path) for record in background_records],
+                "target_trajectory_paths": [str(record.path) for record in target_records],
                 "split": self.split,
                 **obs_diagnostics,
             },
         }
+        if structured_conditioning is not None:
+            item["structured_conditioning"] = structured_conditioning
+            physical_targets = []
+            physical_backgrounds = []
+            padding = torch.as_tensor(self.padding_values, dtype=torch.float32).view(-1, 1, 1)
+            for target_field, background_field in zip(
+                target_fields, background_fields, strict=True
+            ):
+                physical_truth = torch.as_tensor(target_field, dtype=torch.float32)
+                physical_truth = torch.where(torch.isfinite(physical_truth), physical_truth, padding)
+                physical_targets.append(
+                    pad_to_size(physical_truth, self.image_size, fill_value=self.padding_values)
+                )
+                physical_background = torch.as_tensor(background_field, dtype=torch.float32)
+                physical_background = torch.where(
+                    torch.isfinite(physical_background), physical_background, padding
+                )
+                physical_backgrounds.append(
+                    pad_to_size(
+                        physical_background,
+                        self.image_size,
+                        fill_value=self.padding_values,
+                    )
+                )
+            item["structured_physical_truth"] = torch.cat(physical_targets, dim=0)
+            item["structured_physical_background"] = torch.cat(physical_backgrounds, dim=0)
+        if structured_flow_mask is not None:
+            item["structured_flow_mask"] = structured_flow_mask
+            lag0_mask = 1.0 - structured_flow_mask[:1]
+            lag0_mask *= valid_mask[:1]
+            item["structured_lag0_mask"] = lag0_mask
+            if structured_lag0_physical_values is None:
+                raise RuntimeError("structured lag0 physical values were not preserved")
+            item["structured_lag0_physical_values"] = structured_lag0_physical_values
+        return item
 
 
 DATASETS = {

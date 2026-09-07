@@ -1,0 +1,162 @@
+{
+  "schema_version": "structured_joint_gpu_admission_smoke_v1",
+  "purpose": "capacity_and_runtime_contract_only_not_model_quality",
+  "paths": {
+    "protocol": "config/admission/structured_joint_gpu_smoke_v1.json",
+    "experiment": "config/experiments/train_structured_joint_d0_d3_real_lagged_31e.json",
+    "data_config": "config/data/m2m_2f_structured_joint_real_lagged.json",
+    "method_config": "config/methods/structured_joint_uniform_real_lagged_2f.json",
+    "audit": "config/data/m2m_2f_structured_joint_archive_audit.json",
+    "stats": "config/data/m2m_2f_structured_joint_train_stats.json"
+  },
+  "validated_server_snapshot": {
+    "manifest_path": "paper/STRUCTURED_JOINT_FORECAST_SNAPSHOT_SHA256.json",
+    "manifest_sha256": "9eff2a34ad52bff934f0979fb03e3794480d9754eada91d9cc7c645a3641dd73"
+  },
+  "smoke_extension_validation": {
+    "status": "server_cpu_verified",
+    "manifest_path": "paper/STRUCTURED_JOINT_GPU_SMOKE_EXTENSION_SHA256.json",
+    "manifest_sha256": "e409bd39b0fb059aa2795fcff2c2bb5c17c149f191ec59ee5be853db2f2a1605"
+  },
+  "smoke_extension_required_files": [
+    "assim_lib/structured_joint_gpu_admission.py",
+    "scripts/run_structured_joint_gpu_admission_container.sh",
+    "scripts/run_structured_joint_gpu_admission_smoke.sh",
+    "tests/test_structured_joint_gpu_admission.py"
+  ],
+  "expected_gpu_uuid": "GPU-40ff1cbb-07cc-992e-23cb-8fe181972b76",
+  "resource_gates": {
+    "visible_cuda_device_count": 1,
+    "logical_cuda_device": 0,
+    "max_preexisting_memory_mib": 512,
+    "max_preexisting_utilization_percent": 5,
+    "require_zero_preexisting_compute_processes": true
+  },
+  "required_output_root": "/home/autoresearch_results/structured_joint_gpu_admission_smoke",
+  "lock_path": "/tmp/structured_joint_gpu_admission_GPU-40ff1cbb-07cc-992e-23cb-8fe181972b76.lock",
+  "outer_container_contract": {
+    "launcher": "scripts/run_structured_joint_gpu_admission_container.sh",
+    "server_worktree": "/home/a.madreev/diffusion_data_assimilation/autoresearch_worktrees/structured_joint_forecast_v2_20260907_0255",
+    "host_output_root": "/home/a.madreev/diffusion_data_assimilation/autoresearch_results/structured_joint_gpu_admission_smoke",
+    "container_output_root": "/home/autoresearch_results/structured_joint_gpu_admission_smoke",
+    "expected_local_image_id": "sha256:6461c778a994df485f968da62fb9992a800f91ad58d455e0db20bd31d8ecc9e5",
+    "image_identity_check": "docker image inspect --format {{.Id}} must equal expected_local_image_id",
+    "image_run_reference": "expected_local_image_id",
+    "entrypoint": "/bin/bash",
+    "pull_policy": "never",
+    "network": "none",
+    "gpu_device": "GPU-40ff1cbb-07cc-992e-23cb-8fe181972b76",
+    "repository_mount": "read_only",
+    "data_mount": "read_only",
+    "output_mount": "isolated_read_write",
+    "host_gpu_lock": true,
+    "no_new_privileges": true,
+    "run_as_host_uid_gid": true,
+    "cpu_limit": 4,
+    "detached_unique_container_name": true,
+    "python_total_wall_seconds": 1800,
+    "host_watchdog_grace_seconds": 30,
+    "host_watchdog_total_seconds": 1830,
+    "docker_start_timeout_seconds": 60,
+    "docker_control_timeout_seconds": 30,
+    "timeout_cleanup_scope": "exact_verified_owned_container_id_and_name_only",
+    "confirm_container_removal_before_unlock": true,
+    "preserve_normal_container_exit_status": true,
+    "auto_full_training_permitted": false
+  },
+  "clearml_permitted": false,
+  "network_permitted": false,
+  "required_environment": {
+    "CLEARML_OFFLINE_MODE": "1",
+    "HF_HUB_OFFLINE": "1",
+    "TRANSFORMERS_OFFLINE": "1",
+    "WANDB_MODE": "offline",
+    "WANDB_DISABLED": "true",
+    "OMP_NUM_THREADS": "1",
+    "MKL_NUM_THREADS": "1",
+    "OPENBLAS_NUM_THREADS": "1",
+    "NUMEXPR_NUM_THREADS": "1"
+  },
+  "expected_effective_contract": {
+    "dataset_name": "M2MForecastDataset",
+    "conditioning_layout": "structured_sic_sit_trajectory_v1",
+    "future_horizon_days": 3,
+    "dynamic_forcing_indices": [],
+    "training_objective": "structured_joint_state_flow",
+    "image_size": [320, 256],
+    "in_channels": 50,
+    "out_channels": 16,
+    "train_batch_size": 16,
+    "mixed_precision": "bf16",
+    "timestep_sampler": "stratified_uniform",
+    "diagnostic_min_optimizer_steps": 1000,
+    "sample_method": "rk4",
+    "num_sample_timesteps": 33,
+    "sample_rtol": 0.00001,
+    "sample_atol": 0.000001,
+    "sample_end_time": 0.0
+  },
+  "batch_selection": {
+    "split": "train",
+    "indices": "one consecutive configured-size batch starting at the first audited usable train lag0 date",
+    "shuffle": false,
+    "workers": 0
+  },
+  "sampler_contract": {
+    "split": "truth_free_forecast",
+    "case_rule": "first audited validation lag0 date with usable nonempty SRAL geometry",
+    "actual_model_capacity_members": 1,
+    "actual_model_capacity_weights": "EMA after one admission optimizer step",
+    "actual_model_capacity_output": "finite float32 endpoint latent on the exact flow subspace",
+    "actual_model_physical_decode": "diagnostic only because one-step near-random weights are not a quality checkpoint",
+    "controlled_decode_fixture": "zero finite latent through the real structured decoder and exact lag0 composition",
+    "quality_claim_permitted": false,
+    "require_exact_paired_lag0": true,
+    "require_joint_support": true,
+    "require_zero_on_land_and_padding": true
+  },
+  "seeds": {
+    "model_initialization": 1701,
+    "train_step": 91701,
+    "sampler_noise": 92701
+  },
+  "limits": {
+    "config_preflight_wall_seconds": 900,
+    "data_materialization_wall_seconds": 300,
+    "train_step_wall_seconds": 600,
+    "sampler_wall_seconds": 600,
+    "sampler_max_nfe": 128,
+    "total_wall_seconds": 1800
+  },
+  "sha_snapshot_code_paths": [
+    "assim_lib/config.py",
+    "assim_lib/data.py",
+    "assim_lib/forecast.py",
+    "assim_lib/model_io.py",
+    "assim_lib/runtime.py",
+    "assim_lib/sampler.py",
+    "assim_lib/structured_archive_audit.py",
+    "assim_lib/structured_joint_gpu_admission.py",
+    "assim_lib/structured_joint_preflight.py",
+    "assim_lib/structured_joint_state.py",
+    "assim_lib/trainer.py",
+    "assim_lib/transforms.py",
+    "scripts/run_structured_joint_gpu_admission_container.sh",
+    "scripts/run_structured_joint_gpu_admission_smoke.sh"
+  ],
+  "admission_gates": [
+    "the validated server snapshot manifest has its declared SHA-256 and every production file matches its per-file SHA-256",
+    "a separate non-circular extension manifest binds the server-CPU-tested admission module, both runners, and focused tests",
+    "all identity files are ordinary and unchanged by SHA-256 before model construction and after both smokes",
+    "bound archive audit and train-only statistics pass the structured CPU preflight",
+    "exactly one idle visible GPU is both nvidia-smi UUID and torch logical cuda:0",
+    "one configured batch-size full-resolution bf16 forward/backward/AdamW/scheduler/EMA step is finite and within time/memory",
+    "one configured fixed-RK4 truth-free sampler call uses exactly 128 NFE and stays within the time bound",
+    "actual-model endpoint latent is finite float32 and exactly zero outside the flow subspace",
+    "a separate controlled codec fixture preserves exact paired d0 observations, joint SIC/SIT support, and zero land/padding",
+    "the outer container has no network, only the admitted GPU, read-only repository/data mounts, and runs the exact verified immutable local image ID with pull disabled",
+    "an independent host watchdog bounds the whole smoke, then stops/removes only its exact verified unique container while retaining the host GPU lock until removal is confirmed",
+    "normal container exit status is preserved and the admission harness never starts full training",
+    "result JSON is committed atomically in a new isolated output directory"
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "schema_version": "structured_joint_publication_protocol_v1",
+  "status": "blocked_pending_equal_information_baselines_and_checkpoint_generation",
+  "checkpoint_rule": "minimum EMA validation flow loss; test is opened once after freezing",
+  "test_anchor_range": ["2023-01-01", "2023-07-16"],
+  "case_rule": "all and only eligible consecutive d..d+3 archive trajectories with exact previous-calendar-year backgrounds, fully contained in the test split",
+  "case_manifest_sha256": "ff6c4d44d35de9c4a94d62bb1821033eac031d6d2a5c07fbf0f223eb8a7be4ef",
+  "ensemble_size": 50,
+  "member_seeds": [41000, 41001, 41002, 41003, 41004, 41005, 41006, 41007, 41008, 41009, 41010, 41011, 41012, 41013, 41014, 41015, 41016, 41017, 41018, 41019, 41020, 41021, 41022, 41023, 41024, 41025, 41026, 41027, 41028, 41029, 41030, 41031, 41032, 41033, 41034, 41035, 41036, 41037, 41038, 41039, 41040, 41041, 41042, 41043, 41044, 41045, 41046, 41047, 41048, 41049],
+  "strata": {
+    "day0_exact_track": "score exact-support error separately; exclude from calibration scores because it is forced",
+    "day0_unobserved_ocean": "primary day0 probabilistic calibration stratum",
+    "future_days": ["d+1", "d+2", "d+3"]
+  },
+  "required_scores": {
+    "marginal_probabilistic": ["fair_CRPS", "tie_aware_fractional_rank_histogram", "rank_TV", "central_50_80_90_coverage"],
+    "point": ["ensemble_mean_RMSE", "ensemble_mean_MAE"],
+    "event": ["ice_occurrence_Brier_and_reliability", "SIC_cap_probability_Brier_and_reliability", "ice_edge_displacement"],
+    "spatial": ["variogram_score_predeclared_lags", "FSS_predeclared_scales", "power_spectrum_ratio"],
+    "temporal": ["increment_CRPS", "lagged_spatial_correlation", "trajectory_variogram_score"],
+    "physical": ["finite", "SIC_in_0_to_archive_cap", "SIT_nonnegative", "joint_occurrence", "exact_day0_support"]
+  },
+  "equal_information_baselines_required": [
+    "matched unstructured Gaussian-coordinate CFM ablation trained with the identical 50-channel conditioning, split, trajectory horizons, optimizer-step budget and evaluation seeds; do not reuse a pre-existing checkpoint unless its exact input contract is proven identical",
+    "deterministic exact previous-calendar-year background trajectory and deterministic persistence, scored only with proper deterministic scores and never presented as calibrated ensembles",
+    "train-only seasonal-analog ensemble conditioned only on the same calendar and permitted observation-availability pattern, with no validation/test values used in analog selection"
+  ],
+  "claim_boundary": "offline archive hindcast over consecutive dated snapshots; no operational lead-time, UTC-valid-time, real-SRAL-value, wind/current, or full categorical float16 law claim"
+}

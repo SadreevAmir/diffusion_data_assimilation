@@ -1,20 +1,22 @@
 import hashlib
 import json
+import struct
 import tempfile
 import unittest
-from unittest import mock
+import zlib
 from datetime import date
 from pathlib import Path
-import struct
 from types import SimpleNamespace
-import zlib
+from unittest import mock
 
 import numpy as np
 import torch
 
 import assim_lib.occurrence_intensity_e1_data_audit as audit_module
 from assim_lib.occurrence_intensity_e1_data_audit import (
-    run_real_data_audit, validate_audit_config, validate_case_manifest,
+    run_real_data_audit,
+    validate_audit_config,
+    validate_case_manifest,
 )
 from paper.validate_occurrence_intensity_e1_data_audit import (
     _validate_manifest_contract,
@@ -35,6 +37,7 @@ class FakeDataset:
     hours_per_day = 24
     background_strategy = "indexed"
     obs_shift = 0
+    observed_channels = [0]
 
     def __init__(self, root: Path):
         self.base_valid_mask = torch.zeros((2, *self.image_size))
@@ -43,18 +46,28 @@ class FakeDataset:
         self.obs_data = []
         self.records_by_date = {}
         self.sral_records = {}
+
+        def ensure_forecast(current):
+            if current in self.records_by_date:
+                return
+            path = root / f"source_{current.isoformat()}.npy"
+            field = np.zeros((2, 24, 4, 4), dtype=np.float32)
+            field[0] = (
+                0.2 + 0.1 * (current.year - 2020)
+                + current.timetuple().tm_yday / 1000
+            )
+            field[1] = 0.25
+            np.save(path, field)
+            self.records_by_date[current] = SimpleNamespace(date=current, path=path)
+
         for case in cases:
             target = date.fromisoformat(case["target_date"])
             self.obs_data.append(SimpleNamespace(date=target))
             for lag in (0, 1, 2):
                 current = target.fromordinal(target.toordinal() - lag)
-                if current not in self.records_by_date:
-                    path = root / f"source_{current.isoformat()}.npy"
-                    field = np.zeros((2, 24, 4, 4), dtype=np.float32)
-                    field[0] = (current.toordinal() % 101) / 100
-                    field[1] = 0.25
-                    np.save(path, field)
-                    self.records_by_date[current] = SimpleNamespace(date=current, path=path)
+                background = current.replace(year=current.year - 1)
+                ensure_forecast(current)
+                ensure_forecast(background)
                 if current not in self.sral_records:
                     sral_path = root / f"sral_{current.isoformat()}.npy"
                     np.save(sral_path, np.ones((4, 4), dtype=np.float32))
@@ -122,6 +135,12 @@ class E1RealDataAuditTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "unreviewed selection rule"):
             _validate_manifest_contract(manifest)
 
+    def test_compact_validator_rejects_selection_version_drift(self):
+        manifest = json.loads(MANIFEST.read_text())
+        manifest["selection_version"] = "e1_real_cases_v1"
+        with self.assertRaisesRegex(ValueError, "selection version"):
+            _validate_manifest_contract(manifest)
+
     def test_runner_uses_dataset_and_emits_valid_compact_contract(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -148,6 +167,104 @@ class E1RealDataAuditTest(unittest.TestCase):
             )
             self.assertEqual(validate_compact_audit(CONFIG, root / "output"), "E1_REAL_DATA_AUDIT_PASS")
 
+    def test_runner_uses_target_year_values_and_previous_calendar_year_backgrounds(self):
+        captured = []
+        panel_fields = []
+        original = audit_module.make_lagged_observation_channels
+        original_panel = audit_module._panel
+
+        def recording_channels(backgrounds, values, masks, ages, geometry, provenance):
+            captured.append((backgrounds.clone(), values.clone(), masks.clone()))
+            return original(backgrounds, values, masks, ages, geometry, provenance)
+
+        def recording_panel(fields, landmarks):
+            panel_fields.append([field.clone() for field in fields])
+            return original_panel(fields, landmarks)
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            seen_config = {}
+
+            def builder(config, split):
+                seen_config.update(config)
+                return FakeDataset(root)
+
+            with mock.patch.object(
+                audit_module, "make_lagged_observation_channels", side_effect=recording_channels
+            ), mock.patch.object(audit_module, "_panel", side_effect=recording_panel):
+                result = run_real_data_audit(CONFIG, root / "output", dataset_builder=builder)
+
+            self.assertEqual(seen_config["observed_channels"], [0])
+            self.assertEqual(result["metadata"]["observed_channels"], [0])
+            self.assertEqual(result["metadata"]["occurrence_encoder_value_space"], "physical_0_1")
+            self.assertEqual(result["metadata"]["case_selection_version"], "e1_real_cases_v2")
+            first = result["per_case_audit"][0]
+            self.assertEqual(
+                [lag["value_source_date"] for lag in first["lags"]],
+                ["2022-01-02", "2022-01-01", "2021-12-31"],
+            )
+            self.assertEqual(
+                [lag["background_source_date"] for lag in first["lags"]],
+                ["2021-01-02", "2021-01-01", "2020-12-31"],
+            )
+            backgrounds, values, masks = captured[0]
+            observed = masks.bool()
+            self.assertTrue(torch.all((backgrounds[observed] >= 0) & (backgrounds[observed] <= 1)))
+            self.assertTrue(torch.all((values[observed] >= 0) & (values[observed] <= 1)))
+            self.assertTrue(torch.any((values - backgrounds)[observed] != 0))
+            self.assertTrue(torch.all(torch.isnan(values[~observed])))
+            self.assertTrue(all(lag["innovation_nonzero_pixels"] > 0 for lag in first["lags"]))
+            expected_truth = (
+                FakeDataset(root)[0]["truth"][0] * FakeDataset.stds[0]
+                + FakeDataset.means[0]
+            )
+            torch.testing.assert_close(panel_fields[0][0], expected_truth)
+
+    def test_runner_filters_target_raw_nan_and_counts_background_padding(self):
+        class RawMissingSicDataset(FakeDataset):
+            def __init__(self, root):
+                super().__init__(root)
+                first_case = json.loads(MANIFEST.read_text())["cases"][0]
+                target = date.fromisoformat(first_case["target_date"])
+                target_field = np.load(self.records_by_date[target].path)
+                target_field[0, 23, 0, 0] = np.nan
+                np.save(self.records_by_date[target].path, target_field)
+                background = target.replace(year=target.year - 1)
+                background_field = np.load(self.records_by_date[background].path)
+                background_field[0, 23, 0, 1] = np.nan
+                np.save(self.records_by_date[background].path, background_field)
+
+        captured = []
+        original = audit_module.make_lagged_observation_channels
+
+        def recording_channels(backgrounds, values, masks, ages, geometry, provenance):
+            captured.append((backgrounds.clone(), values.clone(), masks.clone()))
+            return original(backgrounds, values, masks, ages, geometry, provenance)
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            with mock.patch.object(
+                audit_module, "make_lagged_observation_channels", side_effect=recording_channels
+            ):
+                result = run_real_data_audit(
+                    CONFIG,
+                    root / "output",
+                    dataset_builder=lambda config, split: RawMissingSicDataset(root),
+                )
+
+            lag0 = result["per_case_audit"][0]["lags"][0]
+            self.assertEqual(lag0["sral_footprint_pixels"], 4)
+            self.assertEqual(lag0["footprint_pixels"], 3)
+            self.assertEqual(lag0["target_raw_nonfinite_sral_pixels"], 1)
+            self.assertEqual(lag0["background_raw_finite_observed_pixels"], 2)
+            self.assertEqual(lag0["background_padding_observed_pixels"], 1)
+            self.assertFalse(lag0["background_raw_finite_required_for_innovation"])
+            backgrounds, values, masks = captured[0]
+            self.assertEqual(float(masks[0, 0, 0, 0]), 0.0)
+            self.assertEqual(float(backgrounds[0, 0, 0, 1]), 0.0)
+            self.assertTrue(torch.all(torch.isfinite(backgrounds)))
+            self.assertTrue(torch.all(torch.isfinite(values[masks.bool()])))
+
     def test_runner_executes_publication_channel_constructor_fail_closed(self):
         def unsafe_channels(backgrounds, values, masks, ages, geometry, provenance):
             result = torch.zeros((1, 24, *values.shape[-2:]), dtype=values.dtype)
@@ -161,6 +278,46 @@ class E1RealDataAuditTest(unittest.TestCase):
             ), self.assertRaisesRegex(ValueError, "leak non-finite values"):
                 run_real_data_audit(
                     CONFIG, root / "output", dataset_builder=lambda config, split: FakeDataset(root)
+                )
+
+    def test_runner_rejects_constructor_that_zeroes_nonzero_innovations(self):
+        original = audit_module.make_lagged_observation_channels
+
+        def zeroed_innovations(backgrounds, values, masks, ages, geometry, provenance):
+            result = original(backgrounds, values, masks, ages, geometry, provenance)
+            lagged = result.reshape(1, 3, 8, *values.shape[-2:]).clone()
+            lagged[:, :, 0] = 0
+            return lagged.reshape_as(result)
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            with mock.patch.object(
+                audit_module,
+                "make_lagged_observation_channels",
+                side_effect=zeroed_innovations,
+            ), self.assertRaisesRegex(ValueError, "lagged forecast protocol"):
+                run_real_data_audit(
+                    CONFIG, root / "output", dataset_builder=lambda config, split: FakeDataset(root)
+                )
+
+    def test_runner_rejects_standardized_sic_as_physical_encoder_input(self):
+        class StandardizedSicDataset(FakeDataset):
+            def __init__(self, root):
+                super().__init__(root)
+                first_case = json.loads(MANIFEST.read_text())["cases"][0]
+                target = date.fromisoformat(first_case["target_date"])
+                path = self.records_by_date[target].path
+                field = np.load(path)
+                field[0] = -1.0
+                np.save(path, field)
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            with self.assertRaisesRegex(ValueError, r"outside physical \[0,1\]"):
+                run_real_data_audit(
+                    CONFIG,
+                    root / "output",
+                    dataset_builder=lambda config, split: StandardizedSicDataset(root),
                 )
 
     def test_validator_rejects_landmark_overlay_contract_drift(self):
@@ -277,7 +434,7 @@ class E1RealDataAuditTest(unittest.TestCase):
             redirected.mkdir()
             (output / "panels").symlink_to(redirected, target_is_directory=True)
 
-            with self.assertRaisesRegex(ValueError, "panels directory must not be a symbolic link"):
+            with self.assertRaisesRegex(ValueError, "symbolic links"):
                 run_real_data_audit(
                     CONFIG, output, dataset_builder=lambda config, split: FakeDataset(root)
                 )
@@ -307,7 +464,11 @@ class E1RealDataAuditTest(unittest.TestCase):
     def test_validator_rejects_future_leakage(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            run_real_data_audit(CONFIG, root / "output", dataset_builder=lambda config, split: FakeDataset(root))
+            run_real_data_audit(
+                CONFIG,
+                root / "output",
+                dataset_builder=lambda config, split: FakeDataset(root),
+            )
             path = root / "output" / "per_case_audit.json"
             payload = json.loads(path.read_text())
             payload[0]["lags"][0]["future_date_leakage"] = True
@@ -460,7 +621,11 @@ class E1RealDataAuditTest(unittest.TestCase):
             )
             path = root / "output" / "per_case_audit.json"
             payload = json.loads(path.read_text())
-            payload[0]["lags"][0]["footprint_pixels"] = 0
+            lag = payload[0]["lags"][0]
+            lag["footprint_pixels"] = 0
+            lag["target_raw_nonfinite_sral_pixels"] = lag["sral_footprint_pixels"]
+            lag["background_raw_finite_observed_pixels"] = 0
+            lag["background_padding_observed_pixels"] = 0
             path.write_text(json.dumps(payload))
             with self.assertRaisesRegex(ValueError, "real lag footprint must be non-empty"):
                 validate_compact_audit(CONFIG, root / "output")
@@ -473,7 +638,10 @@ class E1RealDataAuditTest(unittest.TestCase):
             )
             path = root / "output" / "per_case_audit.json"
             payload = json.loads(path.read_text())
-            payload[0]["lags"][0]["footprint_pixels"] += 100
+            lag = payload[0]["lags"][0]
+            lag["footprint_pixels"] += 100
+            lag["sral_footprint_pixels"] += 100
+            lag["background_raw_finite_observed_pixels"] += 100
             path.write_text(json.dumps(payload))
             with self.assertRaisesRegex(ValueError, "differs from rendered mask pixels"):
                 validate_compact_audit(CONFIG, root / "output")
@@ -563,7 +731,7 @@ class E1RealDataAuditTest(unittest.TestCase):
             )
             path = root / "output" / "metadata.json"
             payload = json.loads(path.read_text())
-            payload["source_inventory"][0]["sources"][0]["forecast_sha256"] = "0" * 64
+            payload["source_inventory"][0]["sources"][0]["value_forecast_sha256"] = "0" * 64
             inventory_bytes = json.dumps(
                 payload["source_inventory"], sort_keys=True, separators=(",", ":")
             ).encode()

@@ -5,7 +5,12 @@ import json
 from pathlib import Path
 
 from .config import TrainingConfig, load_json, merge_config_overrides, resolve_path
-from .runtime import add_noise, build_dataloader, seed_everything
+from .runtime import (
+    add_noise,
+    build_dataloader,
+    seed_everything,
+    validate_optimizer_step_budget,
+)
 
 
 def _debug(message: str) -> None:
@@ -27,10 +32,35 @@ def main(config: dict, config_dir: Path, *, trainer_class=None, scheduler_factor
 
     from .data import build_dataset
     from .model_io import build_unet
+    from .structured_archive_audit import validate_bound_archive_audit
+    from .structured_joint_state import (
+        canonical_mapping_sha256,
+        validate_conditioning_normalization,
+    )
     from .trainer import UNetTrainer
 
     _debug("imports complete")
     model_config = {**model_config_raw, **config.get("training", {})}
+    if model_config.get("training_objective") == "structured_joint_state_flow":
+        archive_audit = validate_bound_archive_audit(data_config, data_config_path)
+        stats_path_value = model_config.get("structured_state_stats_path")
+        if not stats_path_value:
+            raise ValueError(
+                "structured_joint_state_flow requires structured_state_stats_path"
+            )
+        stats_path = resolve_path(stats_path_value, model_config_path.resolve().parent)
+        _debug(f"loading structured train-only statistics: {stats_path}")
+        model_config["structured_state_stats"] = load_json(stats_path)
+        validate_conditioning_normalization(
+            data_config, model_config["structured_state_stats"]
+        )
+        expected_data_hash = model_config["structured_state_stats"].get("data_config_sha256")
+        actual_data_hash = canonical_mapping_sha256(data_config)
+        if expected_data_hash != actual_data_hash:
+            raise ValueError(
+                "structured-state statistics/data config hash mismatch: "
+                f"stats={expected_data_hash}, actual={actual_data_hash}"
+            )
     clearml_config = config.get("clearml", {})
     model_config["clearml_project_name"] = config["project_name"]
     model_config["clearml_task_name"] = config["task_name"]
@@ -56,13 +86,27 @@ def main(config: dict, config_dir: Path, *, trainer_class=None, scheduler_factor
     train_dataset = build_dataset(data_config, split="train")
     _debug(f"building valid dataset: {data_config.get('dataset_name')}")
     valid_dataset = build_dataset(data_config, split="valid")
+    if train_config.training_objective == "structured_joint_state_flow":
+        train_dataset.validate_structured_sral_audit_contract(archive_audit)
+        valid_dataset.validate_structured_sral_audit_contract(archive_audit)
+        expected_pair_hash = train_config.structured_state_stats["pair_manifest_sha256"]
+        actual_pair_hash = train_dataset.provenance().get("pair_manifest_sha256")
+        if expected_pair_hash != actual_pair_hash:
+            raise ValueError(
+                "structured-state statistics/train pair manifest mismatch: "
+                f"stats={expected_pair_hash}, actual={actual_pair_hash}"
+            )
     expected_in_channels = getattr(train_dataset, "conditioned_input_channels", None)
     if expected_in_channels is not None and train_config.in_channels != expected_in_channels:
         raise ValueError(
             f"Model in_channels={train_config.in_channels} does not match dataset-conditioned "
             f"input channels={expected_in_channels}"
         )
-    expected_out_channels = len(getattr(train_dataset, "indices", ()))
+    expected_out_channels = (
+        4 * (train_config.trajectory_horizon_days + 1)
+        if train_config.training_objective == "structured_joint_state_flow"
+        else len(getattr(train_dataset, "indices", ()))
+    )
     if expected_out_channels and train_config.out_channels != expected_out_channels:
         raise ValueError(
             f"Model out_channels={train_config.out_channels} does not match dataset fields="
@@ -82,6 +126,15 @@ def main(config: dict, config_dir: Path, *, trainer_class=None, scheduler_factor
         shuffle=False,
     )
     _debug(f"dataloader batches train={len(train_loader)} valid={len(valid_loader)}")
+    if train_config.training_objective == "structured_joint_state_flow":
+        runtime_steps_per_epoch, runtime_planned_steps = validate_optimizer_step_budget(
+            train_config, len(train_loader)
+        )
+        _debug(
+            "runtime optimizer budget "
+            f"steps_per_epoch={runtime_steps_per_epoch} planned={runtime_planned_steps} "
+            f"minimum={train_config.minimum_optimizer_steps}"
+        )
 
     _debug("building UNet")
     model = build_unet(train_config)
@@ -90,10 +143,15 @@ def main(config: dict, config_dir: Path, *, trainer_class=None, scheduler_factor
     _debug("building optimizer and scheduler")
     optimizer = torch.optim.AdamW(model.parameters(), lr=train_config.learning_rate)
     scheduler_builder = scheduler_factory or get_cosine_schedule_with_warmup
+    scheduler_total_steps = (
+        int(train_config.lr_scheduler_total_steps)
+        if train_config.lr_scheduler_total_steps > 0
+        else len(train_loader) * train_config.num_epochs
+    )
     lr_scheduler = scheduler_builder(
         optimizer=optimizer,
         num_warmup_steps=train_config.lr_warmup_steps,
-        num_training_steps=max(1, len(train_loader) * train_config.num_epochs),
+        num_training_steps=max(1, scheduler_total_steps),
     )
     _debug("initializing trainer and ClearML task")
     trainer_type = trainer_class or UNetTrainer

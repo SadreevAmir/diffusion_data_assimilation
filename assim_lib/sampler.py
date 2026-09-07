@@ -4,6 +4,13 @@ import torch
 from torchdiffeq import odeint
 
 from .runtime import get_device, make_normalized_xy_grid
+from .structured_joint_state import decode_structured_joint_trajectory
+from .flow_parameterization import (
+    RAW_VELOCITY,
+    reconstruct_velocity,
+    validate_velocity_parameterization,
+    velocity_model_state,
+)
 from .transforms import make_conditioned_model_input
 
 _FIXED_STEP_METHODS = {"euler", "midpoint", "rk4", "heun3"}
@@ -27,9 +34,25 @@ def _cfg_enabled(mode: str, background_scale: float, observation_scale: float) -
 
 
 class Sampler:
-    def __init__(self, model, metadata: dict | None = None):
+    def __init__(
+        self,
+        model,
+        metadata: dict | None = None,
+        structured_velocity_parameterization: str | None = None,
+    ):
         self.model = model
         self.metadata = dict(metadata or {})
+        training_config = self.metadata.get("training_config", {})
+        if not isinstance(training_config, dict):
+            training_config = {}
+        configured_parameterization = (
+            structured_velocity_parameterization
+            if structured_velocity_parameterization is not None
+            else training_config.get("structured_velocity_parameterization", RAW_VELOCITY)
+        )
+        self.structured_velocity_parameterization = validate_velocity_parameterization(
+            configured_parameterization
+        )
         self.normalization_means = self.metadata.get("normalization_means")
         self.normalization_stds = self.metadata.get("normalization_stds")
         self._grids = {}
@@ -66,6 +89,10 @@ class Sampler:
         cfg_mode: str = "none",
         cfg_background_scale: float = 1.0,
         cfg_observation_scale: float = 1.0,
+        model_conditioning: torch.Tensor | None = None,
+        state_channels: int | None = None,
+        end_time: float = 0.001,
+        state_mask: torch.Tensor | None = None,
     ) -> torch.Tensor:
         device = device or get_device()
         background = background.to(device)
@@ -78,9 +105,17 @@ class Sampler:
         water_mask = water_mask.to(device)
         if valid_mask is not None:
             valid_mask = valid_mask.to(device)
-        batch_size, channels = background.shape[:2]
+        if state_mask is not None:
+            state_mask = state_mask.to(device)
+        batch_size, background_channels = background.shape[:2]
+        channels = background_channels if state_channels is None else int(state_channels)
+        if channels <= 0:
+            raise ValueError("state_channels must be positive")
         height, width = size
         num_timesteps = max(int(num_timesteps), 2)
+        end_time = float(end_time)
+        if not 0.0 <= end_time < 1.0:
+            raise ValueError("end_time must lie in [0, 1)")
         if sample_target not in ("state", "residual"):
             raise ValueError(f"Unknown sample_target={sample_target!r}; expected 'state' or 'residual'")
         cfg_mode = str(cfg_mode)
@@ -90,6 +125,35 @@ class Sampler:
         cfg_observation_scale = float(cfg_observation_scale)
         use_cfg = _cfg_enabled(cfg_mode, cfg_background_scale, cfg_observation_scale)
         grid = self._grid(height, width, device, background.dtype).expand(batch_size, -1, -1, -1)
+        if model_conditioning is None and channels != background_channels:
+            raise ValueError("state_channels may differ from background only with model_conditioning")
+        if model_conditioning is not None:
+            model_conditioning = model_conditioning.to(device=device, dtype=background.dtype)
+            if (
+                model_conditioning.ndim != 4
+                or model_conditioning.shape[0] != batch_size
+                or tuple(model_conditioning.shape[-2:]) != (height, width)
+            ):
+                raise ValueError(
+                    "model_conditioning must have shape "
+                    f"[B,C,{height},{width}] with B={batch_size}, got "
+                    f"{tuple(model_conditioning.shape)}"
+                )
+            if start_mode != "noise" or sample_target != "state":
+                raise ValueError(
+                    "explicit model_conditioning requires start_mode='noise' and sample_target='state'"
+                )
+            if enforce_observations or obs_guidance_scale > 0.0 or use_cfg:
+                raise ValueError(
+                    "explicit model_conditioning is incompatible with legacy enforcement, guidance, and CFG"
+                )
+            if state_mask is not None and state_mask.shape != (
+                batch_size,
+                channels,
+                height,
+                width,
+            ):
+                raise ValueError("state_mask must match the explicit latent state shape")
         if initial_noise is not None:
             expected_shape = (batch_size, channels, height, width)
             if tuple(initial_noise.shape) != expected_shape:
@@ -100,7 +164,20 @@ class Sampler:
 
         if start_mode == "noise":
             start_t = 1.0
-            x0 = initial_noise if initial_noise is not None else torch.randn_like(background)
+            x0 = (
+                initial_noise
+                if initial_noise is not None
+                else torch.randn(
+                    (batch_size, channels, height, width),
+                    device=device,
+                    dtype=background.dtype,
+                )
+            )
+            if model_conditioning is not None and (state_mask is not None or valid_mask is not None):
+                state_valid = (
+                    state_mask if state_mask is not None else valid_mask[:, :1]
+                ).expand_as(x0) > 0
+                x0 = torch.where(state_valid, x0, torch.zeros_like(x0))
         elif start_mode == "background":
             start_t = min(max(float(start_noise_level), 0.001), 1.0)
             eps = initial_noise if initial_noise is not None else torch.randn_like(background)
@@ -116,9 +193,18 @@ class Sampler:
                 f"Unknown start_mode={start_mode!r}; expected 'noise', 'background', or 'bridge'"
             )
 
-        timesteps = torch.linspace(start_t, 0.001, num_timesteps, device=device)
+        timesteps = torch.linspace(start_t, end_time, num_timesteps, device=device)
 
         def finalize(state_sample: torch.Tensor) -> torch.Tensor:
+            if model_conditioning is not None:
+                if valid_mask is not None:
+                    state_valid = valid_mask[:, :1].expand_as(state_sample) > 0
+                    state_sample = torch.where(
+                        state_valid,
+                        state_sample,
+                        torch.zeros_like(state_sample),
+                    )
+                return state_sample
             analysis = background + state_sample if sample_target == "residual" else state_sample
             if enforce_observations:
                 analysis = torch.where(obs_mask > 0, obs_values, analysis)
@@ -154,16 +240,47 @@ class Sampler:
             model_water_mask: torch.Tensor,
             t_tensor: torch.Tensor,
         ) -> torch.Tensor:
-            model_input = make_conditioned_model_input(
-                state,
-                model_grid,
-                model_background,
-                model_background_mask,
-                model_obs_values,
-                model_obs_mask,
-                model_water_mask,
+            normalized_time = t_tensor / 1000.0
+            model_state = state
+            if model_conditioning is not None:
+                model_state = velocity_model_state(
+                    state,
+                    normalized_time,
+                    self.structured_velocity_parameterization,
+                )
+            if model_conditioning is None:
+                model_input = make_conditioned_model_input(
+                    model_state,
+                    model_grid,
+                    model_background,
+                    model_background_mask,
+                    model_obs_values,
+                    model_obs_mask,
+                    model_water_mask,
+                )
+            else:
+                model_input = torch.cat((model_state, model_grid, model_conditioning), dim=1)
+            model_output = _model_output(self.model(model_input, t_tensor))
+            # Mixed-precision inference may return bf16 velocity while the ODE
+            # state is float32.  Keep the neural forward mixed precision, but
+            # accumulate every fixed/adaptive integration update in state dtype.
+            model_output = model_output.to(dtype=state.dtype)
+            velocity = (
+                reconstruct_velocity(
+                    model_output,
+                    state,
+                    normalized_time,
+                    self.structured_velocity_parameterization,
+                )
+                if model_conditioning is not None
+                else model_output
             )
-            return _model_output(self.model(model_input, t_tensor))
+            if model_conditioning is not None and (state_mask is not None or valid_mask is not None):
+                state_valid = (
+                    state_mask if state_mask is not None else valid_mask[:, :1]
+                ).expand_as(velocity) > 0
+                velocity = torch.where(state_valid, velocity, torch.zeros_like(velocity))
+            return velocity
 
         def f(t, x):
             t_tensor = t.expand(batch_size) * 1000
@@ -232,7 +349,7 @@ class Sampler:
 
         kwargs = {}
         if method in _FIXED_STEP_METHODS:
-            time_span = abs(start_t - 0.001)
+            time_span = abs(start_t - end_time)
             kwargs["options"] = {"step_size": max(time_span / max(num_timesteps - 1, 1), 1e-6)}
         else:
             kwargs["rtol"] = rtol
@@ -240,6 +357,55 @@ class Sampler:
 
         trajectory = odeint(f, x0, timesteps, method=method, **kwargs)
         return finalize(trajectory[-1])
+
+    @torch.no_grad()
+    def sample_structured_trajectory(
+        self,
+        *,
+        background_trajectory: torch.Tensor,
+        model_conditioning: torch.Tensor,
+        valid_mask: torch.Tensor,
+        flow_mask: torch.Tensor,
+        lag0_physical_values: torch.Tensor,
+        lag0_mask: torch.Tensor,
+        stats: dict,
+        size: tuple[int, int],
+        num_timesteps: int,
+        device=None,
+        method: str = "dopri5",
+        rtol: float = 1e-5,
+        atol: float = 1e-6,
+        initial_noise: torch.Tensor | None = None,
+    ) -> torch.Tensor:
+        """Sample one joint trajectory and insert exact paired lag-0 observations."""
+        state_channels = int(flow_mask.shape[1])
+        zeros = torch.zeros_like(background_trajectory)
+        latent = self.sample_conditioned(
+            background=background_trajectory,
+            background_mask=valid_mask[:, :1].expand_as(background_trajectory),
+            obs_values=zeros,
+            obs_mask=zeros,
+            water_mask=valid_mask[:, :1],
+            valid_mask=valid_mask,
+            size=size,
+            num_timesteps=num_timesteps,
+            device=device,
+            method=method,
+            rtol=rtol,
+            atol=atol,
+            start_mode="noise",
+            initial_noise=initial_noise,
+            model_conditioning=model_conditioning,
+            state_channels=state_channels,
+            state_mask=flow_mask,
+            end_time=0.0,
+        )
+        physical = decode_structured_joint_trajectory(latent, stats)
+        exact_mask = lag0_mask.to(device=physical.device, dtype=physical.dtype)
+        exact_values = lag0_physical_values.to(device=physical.device, dtype=physical.dtype)
+        physical[:, :2] = torch.where(exact_mask > 0, exact_values, physical[:, :2])
+        physical_valid = valid_mask[:, :1].to(device=physical.device) > 0
+        return torch.where(physical_valid, physical, torch.zeros_like(physical))
 
     def _sample_guided_euler(
         self,

@@ -1,0 +1,27 @@
+{
+  "project_name": "m2m_distribution_calibration",
+  "task_name": "structured_joint_d0_d3_sic_sit_tracks_slice23_seed1701_31epoch",
+  "data_config": "../data/m2m_2f_structured_joint_real_lagged.json",
+  "model_config": "../methods/structured_joint_uniform_real_lagged_2f.json",
+  "clearml": {
+    "enabled": true,
+    "env_path": "/home/.env",
+    "tags": [
+      "structured_joint_state",
+      "joint_trajectory_d0_d3",
+      "exact_atoms",
+      "stratified_uniform_t",
+      "valid_only_loss",
+      "model_truth_sic_sit_pseudo_obs_on_real_sral_geometry",
+      "separate_lags",
+      "calendar_exact_pairing",
+      "archive_slice23_no_utc_claim",
+      "consecutive_daily_archive_snapshots",
+      "archive_semantics_audit_required",
+      "seed1701",
+      "31_epochs",
+      "single_gpu"
+    ],
+    "upload_checkpoints": false
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "schema_version": "structured_joint_full_launch_payload_v1",
+  "verified_at": "2026-09-07",
+  "purpose": "Bind the code added after the passed GPU admission smoke and used by the guarded full-training launch.",
+  "bindings": {
+    "production_snapshot_sha256": "9eff2a34ad52bff934f0979fb03e3794480d9754eada91d9cc7c645a3641dd73",
+    "smoke_extension_sha256": "e409bd39b0fb059aa2795fcff2c2bb5c17c149f191ec59ee5be853db2f2a1605",
+    "admission_protocol_sha256": "e5e7b8c0e372631bf47a7a2113823ebee0537fab27406ff577ce57ab6f501179",
+    "passed_smoke_result_sha256": "3ee4d71fdf9ab04a3f04cd03bb304a59bdd9f6a3a09363bb78f38b8b8a2bab11",
+    "smoke_identity_snapshot_sha256": "e0a4ee5fee858117a6556fb54af9bf0be5d80b1c6b2cd8f3311ee6b9b5832e91"
+  },
+  "files": {
+    "assim_lib/structured_joint_full_launch_guard.py": "4fcb3c782dfec55592bb27f558c8d069cf9d58d7e5f6b9ed8cd6e05d5298d9f2",
+    "scripts/run_structured_joint_full_training_guarded.sh": "6a4d420ba38e9212a57b7626e9ade5497872f8e91703fe8b8555e010f68f0452",
+    "tests/test_structured_joint_full_launcher.py": "5fd2c48f96d5217818bbc5863286faa48e33b2f3649dd170fab2758f57cfba4b"
+  }
+}

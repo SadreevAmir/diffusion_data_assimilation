@@ -7,6 +7,47 @@ import torch
 from torch.utils.data import DataLoader
 
 
+def dataloader_batch_count(dataset_size: int, batch_size: int, *, drop_last: bool) -> int:
+    """Return the exact number of batches produced by the configured loader."""
+    if dataset_size < 0 or batch_size <= 0:
+        raise ValueError("dataset_size must be non-negative and batch_size must be positive")
+    if drop_last:
+        return dataset_size // batch_size
+    return (dataset_size + batch_size - 1) // batch_size
+
+
+def optimizer_step_budget(
+    dataloader_batches: int,
+    num_epochs: int,
+    gradient_accumulation_steps: int,
+) -> tuple[int, int]:
+    """Return optimizer steps per epoch and over the complete training run."""
+    if dataloader_batches <= 0 or num_epochs <= 0 or gradient_accumulation_steps <= 0:
+        raise ValueError("step-budget inputs must be positive")
+    steps_per_epoch = (
+        dataloader_batches + gradient_accumulation_steps - 1
+    ) // gradient_accumulation_steps
+    return steps_per_epoch, steps_per_epoch * num_epochs
+
+
+def validate_optimizer_step_budget(config, dataloader_batches: int) -> tuple[int, int]:
+    """Fail closed against the actual DataLoader length used by the runtime."""
+    steps_per_epoch, planned_steps = optimizer_step_budget(
+        dataloader_batches,
+        int(config.num_epochs),
+        int(config.gradient_accumulation_steps),
+    )
+    if int(config.lr_warmup_steps) >= planned_steps:
+        raise ValueError("learning-rate warmup consumes the entire planned training run")
+    minimum = int(config.minimum_optimizer_steps)
+    if planned_steps < minimum:
+        raise ValueError(
+            f"actual runtime optimizer-step budget {planned_steps} is below the "
+            f"predeclared minimum {minimum}"
+        )
+    return steps_per_epoch, planned_steps
+
+
 def get_device() -> str:
     if torch.cuda.is_available():
         return "cuda"

@@ -1,0 +1,48 @@
+{
+  "schema_version": "structured_gaussian_preconditioned_pilot_v1",
+  "status": "blocked_pending_solver_control_and_independent_launch_review",
+  "scientific_hypothesis": "Analytically removing the Gaussian marginal component of the linear-path conditional-flow velocity reduces nuisance regression and small-scale sample noise without changing the target law, conditioning, architecture, loss on reconstructed velocity, or optimizer-step budget.",
+  "single_changed_factor": "structured_velocity_parameterization=gaussian_path_preconditioned",
+  "reference": {
+    "method_config": "config/methods/structured_joint_uniform_real_lagged_2f.json",
+    "checkpoint_stage": "epoch_0016_recovery_after_zero_based_epoch_15",
+    "optimizer_steps": 2128,
+    "lr_scheduler_total_steps": 4123
+  },
+  "candidate": {
+    "experiment_config": "config/experiments/train_structured_joint_gaussian_preconditioned_pilot.json",
+    "method_config": "config/methods/structured_joint_gaussian_preconditioned_pilot_2f.json",
+    "optimizer_steps": 2128,
+    "lr_scheduler_total_steps": 4123
+  },
+  "pretraining_solver_control": {
+    "same_checkpoint_case_and_initial_noise": true,
+    "rk4_intervals": [32, 64, 128],
+    "true_fp32_forward_control": true,
+    "decision": "Pilot is permitted only when the hash-bound solver gate is converged: every per-field/per-lead fair-CRPS and mean-RMSE relative change is at most 1 percent, every mean occurrence/cap probability change is at most 1 percentage point, and every per-lead SIC neighbor-energy relative change is at most 1 percent for both RK4-64 versus RK4-128 and bf16 versus strict FP32.",
+    "required_status": "converged",
+    "required_gate_artifact": "solver_gate.json"
+  },
+  "validation_only": true,
+  "test_2023_permitted": false,
+  "evaluation": {
+    "paired_panel_manifest": "paper/STRUCTURED_PAIRED_PILOT_PANEL.json",
+    "paired_panel_manifest_sha256": "232af0176ced9acc1eaf85a2bd9f9349ba1a5293731301df1ea417df2a258331",
+    "cases": 8,
+    "seasonal_rule": "two fixed eligible validation dates from each meteorological season",
+    "members": 8,
+    "paired_member_seeds": true,
+    "required_physical_gates": [
+      "zero nonfinite values",
+      "zero decode saturation",
+      "zero joint-support violations",
+      "bitwise exact paired day-0 observations"
+    ],
+    "solver_stability_gate": "aggregate physical scores change by at most 1 percent and event probabilities by at most 1 percentage point from 64 to 128 RK4 intervals",
+    "spatial_gate": "lag-1/2/4 variogram error decreases by at least 30 percent relative to the paired raw-velocity epoch-15 reference and no temporal-increment regression",
+    "proper_score_gate": "fieldwise per-lead fair CRPS and ensemble-mean RMSE do not degrade by more than 2 percent",
+    "visual_gate": "fixed paired SIC/SIT member panels show no salt-and-pepper, track imprint, or disconnected granular texture"
+  },
+  "automatic_full_training_permitted": false,
+  "failure_interpretation": "A failed paired pilot does not support Gaussian-path velocity preconditioning at the tested 2128-step budget; it does not justify smoothing, seed selection, clipping, or opening test-2023."
+}

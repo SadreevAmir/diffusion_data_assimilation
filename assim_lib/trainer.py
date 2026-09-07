@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import math
 import os
+import shutil
 from contextlib import contextmanager
 from dataclasses import asdict
 from datetime import datetime
+from pathlib import Path
 
 import torch
 import torch.nn.functional as F
@@ -18,8 +21,19 @@ from tqdm.auto import tqdm
 from .clearml_tracking import ClearMLTracker
 from .config import TrainingConfig, jsonable
 from .dashboard import make_multi_case_background_condition_assim_figure
+from .flow_parameterization import reconstruct_velocity, velocity_model_state
 from .runtime import make_normalized_xy_grid
 from .sampler import Sampler
+from .structured_joint_state import (
+    StructuredDecodeSaturationError,
+    decode_structured_joint_trajectory,
+    encode_structured_joint_trajectory,
+)
+from .structured_trajectory_evaluation import (
+    make_structured_trajectory_figure,
+    sample_structured_batch,
+    structured_trajectory_metrics,
+)
 from .transforms import channel_denormalize, make_conditioned_model_input
 
 logger = get_logger(__name__)
@@ -42,6 +56,90 @@ _UNCONDITIONAL_PANEL_HEIGHT = 5.6
 
 def _debug(message: str) -> None:
     print(f"[assim_lib][trainer] {message}", flush=True)
+
+
+def _latest_structured_sampling_valid(records: list[dict]) -> bool:
+    return bool(records and records[-1].get("status") == "passed")
+
+
+_STRUCTURED_RESUME_SCHEMA = "structured_joint_resume_v1"
+
+
+def _canonical_sha256(payload) -> str:
+    encoded = json.dumps(jsonable(payload), sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _atomic_json(path: Path, payload) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    try:
+        temporary.write_text(json.dumps(jsonable(payload), indent=2), encoding="utf-8")
+        os.replace(temporary, path)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+def _checkpoint_payload_manifest(root: Path) -> dict[str, str]:
+    manifest = {}
+    for path in sorted(root.rglob("*")):
+        if path.is_symlink():
+            raise ValueError(f"checkpoint payload cannot contain symlinks: {path}")
+        if path.is_file() and path.name != "resume.json":
+            manifest[path.relative_to(root).as_posix()] = _file_sha256(path)
+    if not manifest:
+        raise ValueError("checkpoint payload is empty")
+    return manifest
+
+
+def _require_finite_loss(loss: torch.Tensor, provenance: str) -> None:
+    if loss.numel() != 1 or not bool(torch.isfinite(loss).all()):
+        raise FloatingPointError(f"non-finite scalar training loss; {provenance}")
+
+
+def _require_finite_gradients(model, provenance: str) -> None:
+    bad = []
+    for name, parameter in model.named_parameters():
+        if parameter.grad is not None and not bool(torch.isfinite(parameter.grad).all()):
+            bad.append(name)
+            if len(bad) >= 8:
+                break
+    if bad:
+        raise FloatingPointError(
+            f"non-finite gradients before optimizer step in {bad}; {provenance}"
+        )
+
+
+def _validate_existing_structured_run_files(
+    output_dir: Path,
+    config_payload: dict,
+    contract_sha256: str,
+) -> bool:
+    """Validate existing provenance before the constructor writes anything."""
+    config_path = output_dir / "config.json"
+    metadata_path = output_dir / "metadata.json"
+    existing = (config_path.exists() or config_path.is_symlink(), metadata_path.exists() or metadata_path.is_symlink())
+    if not any(existing):
+        return False
+    if not all(existing):
+        raise ValueError("structured run has only one of config.json/metadata.json")
+    if any(path.is_symlink() or not path.is_file() for path in (config_path, metadata_path)):
+        raise ValueError("structured run provenance files must be ordinary files")
+    existing_config = json.loads(config_path.read_text(encoding="utf-8"))
+    existing_metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    if existing_config != jsonable(config_payload):
+        raise ValueError("existing structured run config identity differs")
+    if existing_metadata.get("resume_contract_sha256") != contract_sha256:
+        raise ValueError("existing structured run metadata identity differs")
+    return True
 
 
 class UNetTrainer:
@@ -70,11 +168,64 @@ class UNetTrainer:
         self.clearml = None
         self.data_config = data_config or {}
         self.dashboard_dataset = dashboard_dataset
+        self._resume_contract_payload = {
+            "training_config": jsonable(asdict(config)),
+            "data_config": jsonable(data_config or {}),
+            "dataset_provenance": jsonable(dataset_provenance or {}),
+            "experiment_config": jsonable(experiment_config or {}),
+            "model_config": jsonable(model_config or {}),
+            "code_sha256": {
+                name: _file_sha256(Path(__file__).with_name(name))
+                for name in (
+                    "trainer.py",
+                    "data.py",
+                    "sampler.py",
+                    "flow_parameterization.py",
+                    "structured_joint_state.py",
+                    "structured_trajectory_evaluation.py",
+                )
+            },
+        }
+        self._resume_contract_sha256 = _canonical_sha256(self._resume_contract_payload)
         self.fields = list(self.data_config.get("fields", [f"ch{i}" for i in range(config.out_channels)]))
         self.channel_means = list(self.data_config.get("means", [0.0] * config.out_channels))
         self.channel_stds = list(self.data_config.get("stds", [1.0] * config.out_channels))
         self._shared_viz_obs_mask: torch.Tensor | None = None
         self._shared_viz_obs_mask_attempted = False
+
+        config_payload = jsonable(asdict(config))
+        run_metadata = {
+            "fields": self.fields,
+            "normalization_means": self.channel_means,
+            "normalization_stds": self.channel_stds,
+            "sample_metrics_values_space": "physical",
+            "validation_weight_source": config.validation_weight_source,
+            "checkpoint_selection_rule": (
+                "minimum EMA validation flow loss"
+                if config.validation_weight_source == "ema"
+                else "minimum raw-weight validation flow loss"
+            ),
+            "ema_schedule": (
+                "diffusers EMAModel: step=max(0,optimization_step-update_after_step-1); "
+                "decay=max(min_decay,min(ema_decay,(1+step)/(10+step)))"
+            ),
+            "concentration_clipping": "[0, 1]" if "siconc" in self.fields else None,
+            "data_config": jsonable(self.data_config),
+            "dataset_provenance": jsonable(dataset_provenance or {}),
+            "training_config": config_payload,
+            "experiment_config": jsonable(experiment_config) if experiment_config is not None else None,
+            "model_config": jsonable(model_config) if model_config is not None else None,
+            "resume_contract_sha256": self._resume_contract_sha256,
+            "structured_diagnostic_seed_rule": (
+                "validation_seed + 1000003*(epoch+1) + 10007*(case_index+1) "
+                "+ 101*(member_index+1) + stream_index"
+            ),
+        }
+        existing_structured_run = False
+        if config.training_objective == "structured_joint_state_flow":
+            existing_structured_run = _validate_existing_structured_run_files(
+                Path(self.output_dir), config_payload, self._resume_contract_sha256
+            )
 
         logging_dir = os.path.join(self.output_dir, "logs")
         _debug(f"output_dir={self.output_dir}")
@@ -90,22 +241,11 @@ class UNetTrainer:
 
         if self.accelerator.is_main_process:
             os.makedirs(self.output_dir, exist_ok=True)
-            with open(os.path.join(self.output_dir, "config.json"), "w") as f:
-                json.dump(jsonable(asdict(config)), f, indent=4)
-            run_metadata = {
-                "fields": self.fields,
-                "normalization_means": self.channel_means,
-                "normalization_stds": self.channel_stds,
-                "sample_metrics_values_space": "physical",
-                "concentration_clipping": "[0, 1]" if "siconc" in self.fields else None,
-                "data_config": jsonable(self.data_config),
-                "dataset_provenance": jsonable(dataset_provenance or {}),
-                "training_config": jsonable(asdict(config)),
-                "experiment_config": jsonable(experiment_config) if experiment_config is not None else None,
-                "model_config": jsonable(model_config) if model_config is not None else None,
-            }
-            with open(os.path.join(self.output_dir, "metadata.json"), "w") as f:
-                json.dump(run_metadata, f, indent=4)
+            if not existing_structured_run:
+                _atomic_json(Path(self.output_dir) / "config.json", config_payload)
+                _atomic_json(Path(self.output_dir) / "metadata.json", run_metadata)
+            elif config.training_objective != "structured_joint_state_flow":
+                raise RuntimeError("unreachable legacy run provenance branch")
             if config.clearml_enabled:
                 _debug("initializing ClearML on main process")
                 self.clearml = ClearMLTracker(
@@ -142,36 +282,277 @@ class UNetTrainer:
         _debug(f"accelerator ready device={self.accelerator.device}")
 
         self.unwrapped_model = self.accelerator.unwrap_model(self.model)
-        self.ema_model = EMAModel(self.unwrapped_model.parameters(), decay=float(config.ema_decay))
+        self.ema_model = EMAModel(
+            self.unwrapped_model.parameters(),
+            decay=float(config.ema_decay),
+            min_decay=float(config.ema_min_decay),
+            update_after_step=int(config.ema_update_after_step),
+            use_ema_warmup=bool(config.ema_use_warmup),
+        )
         self.ema_model.to(self.accelerator.device)
 
         height, width = config.image_size
         self._grid = make_normalized_xy_grid(height, width).to(self.accelerator.device)
 
-    def _sample_timesteps(self, batch_size: int) -> torch.Tensor:
+    def _sample_timesteps(
+        self,
+        batch_size: int,
+        *,
+        generator: torch.Generator | None = None,
+    ) -> torch.Tensor:
         device = self.accelerator.device
         if self.config.timestep_sampler == "beta":
+            if generator is not None:
+                raise ValueError("a dedicated generator is not supported for beta timestep sampling")
             alpha, beta = self.config.timestep_beta_params
             return torch.distributions.Beta(alpha, beta).sample((batch_size,)).to(device)
+        if self.config.timestep_sampler == "stratified_uniform":
+            jitter = torch.rand(batch_size, device=device, generator=generator)
+            timesteps = (torch.arange(batch_size, device=device) + jitter) / float(batch_size)
+            order = torch.randperm(batch_size, device=device, generator=generator)
+            return timesteps[order]
         return torch.rand(batch_size, device=device)
 
+    def _make_sampler(self, model) -> Sampler:
+        return Sampler(
+            model,
+            structured_velocity_parameterization=(
+                self.config.structured_velocity_parameterization
+            ),
+        )
+
+    def _structured_model_state(
+        self, state: torch.Tensor, timesteps: torch.Tensor
+    ) -> torch.Tensor:
+        if self.config.training_objective != "structured_joint_state_flow":
+            return state
+        return velocity_model_state(
+            state,
+            timesteps,
+            self.config.structured_velocity_parameterization,
+        )
+
+    def _reconstruct_model_velocity(
+        self,
+        model_output: torch.Tensor,
+        state: torch.Tensor,
+        timesteps: torch.Tensor,
+    ) -> torch.Tensor:
+        if self.config.training_objective != "structured_joint_state_flow":
+            return model_output
+        return reconstruct_velocity(
+            model_output,
+            state,
+            timesteps,
+            self.config.structured_velocity_parameterization,
+        )
+
+    def _structured_diagnostic_seed(
+        self,
+        epoch: int,
+        *,
+        case_index: int = -1,
+        member_index: int = -1,
+        stream_index: int = 0,
+    ) -> int:
+        return int(
+            (
+                int(self.config.validation_seed)
+                + 1_000_003 * (int(epoch) + 1)
+                + 10_007 * (int(case_index) + 1)
+                + 101 * (int(member_index) + 1)
+                + int(stream_index)
+            )
+            % (2**63 - 1)
+        )
+
+    @contextmanager
+    def _structured_diagnostic_rng(self, epoch: int, *, stream_index: int = 0):
+        """Keep monitoring/plotting RNG entirely outside the training RNG stream."""
+        if self.config.training_objective != "structured_joint_state_flow":
+            yield
+            return
+        device = self.accelerator.device
+        cuda_devices = []
+        if device.type == "cuda":
+            cuda_devices = [device.index if device.index is not None else torch.cuda.current_device()]
+        with torch.random.fork_rng(devices=cuda_devices, enabled=True):
+            seed = self._structured_diagnostic_seed(
+                epoch, stream_index=stream_index
+            )
+            torch.manual_seed(seed)
+            if cuda_devices:
+                with torch.cuda.device(cuda_devices[0]):
+                    torch.cuda.manual_seed(seed)
+            yield
+
     def _training_loop_start(self) -> tuple[int, int]:
-        """Extension point for trusted epoch-boundary resume implementations."""
+        """Restore the structured run from its last atomic epoch boundary."""
+        if self.config.training_objective != "structured_joint_state_flow":
+            return 0, 0
+        if self.accelerator.num_processes != 1:
+            raise ValueError("structured recovery currently requires exactly one process/GPU")
+        if self.config.resume_from_checkpoint != "auto":
+            return 0, 0
+        root = Path(self.output_dir) / self.config.recovery_checkpoint_name
+        latest_path = root / "latest.json"
+        if not latest_path.exists():
+            if latest_path.is_symlink():
+                raise ValueError("structured recovery pointer cannot be a dangling symlink")
+            return 0, 0
+        if latest_path.is_symlink() or not latest_path.is_file():
+            raise ValueError("structured recovery pointer must be an ordinary file")
+        latest = json.loads(latest_path.read_text(encoding="utf-8"))
+        state_name = latest.get("state_dir")
+        if (
+            latest.get("schema_version") != _STRUCTURED_RESUME_SCHEMA
+            or not isinstance(state_name, str)
+            or not state_name.startswith("epoch_")
+        ):
+            raise ValueError("structured recovery pointer schema is invalid")
+        state_dir = root / state_name
+        state_path = state_dir / "resume.json"
+        ema_path = state_dir / "ema_state.pth"
+        accelerator_path = state_dir / "accelerator"
+        if any(path.is_symlink() for path in (state_dir, state_path, ema_path, accelerator_path)):
+            raise ValueError("structured recovery paths cannot be symlinks")
+        if not state_dir.is_dir() or not state_path.is_file() or not ema_path.is_file():
+            raise ValueError("structured recovery state is incomplete")
+        if _file_sha256(state_path) != latest.get("resume_sha256"):
+            raise ValueError("structured recovery metadata content differs from pointer")
+        state = json.loads(state_path.read_text(encoding="utf-8"))
+        next_epoch = state.get("next_epoch")
+        global_step = state.get("global_step")
+        if (
+            state.get("schema_version") != _STRUCTURED_RESUME_SCHEMA
+            or state.get("contract_sha256") != self._resume_contract_sha256
+            or type(next_epoch) is not int
+            or not 1 <= next_epoch <= self.config.num_epochs
+            or type(global_step) is not int
+            or global_step != next_epoch * len(self.train_dataloader)
+            or state.get("steps_per_epoch") != len(self.train_dataloader)
+        ):
+            raise ValueError("structured recovery state violates the run contract")
+        if state.get("payload_manifest_sha256") != _canonical_sha256(
+            _checkpoint_payload_manifest(state_dir)
+        ):
+            raise ValueError("structured recovery payload content is corrupted or incomplete")
+        history = state.get("validation_history")
+        if (
+            not isinstance(history, list)
+            or len(history) != next_epoch
+            or [row.get("epoch") for row in history] != list(range(next_epoch))
+        ):
+            raise ValueError("structured recovery validation history is inconsistent")
+        self.accelerator.load_state(str(accelerator_path))
+        try:
+            ema_state = torch.load(ema_path, map_location="cpu", weights_only=True)
+        except TypeError:
+            ema_state = torch.load(ema_path, map_location="cpu")
+        self.ema_model.load_state_dict(ema_state)
+        self.ema_model.to(self.accelerator.device)
+        self.val_history = history
+        self.best_val_loss = float(state["best_val_loss"])
+        _debug(f"resumed structured state at epoch={next_epoch} step={global_step}")
+        return next_epoch, global_step
+
+    def _save_structured_recovery(self, next_epoch: int, global_step: int) -> None:
+        if self.config.training_objective != "structured_joint_state_flow":
+            return
+        if not self.accelerator.is_main_process or self.accelerator.num_processes != 1:
+            return
+        if global_step != next_epoch * len(self.train_dataloader):
+            raise ValueError("structured recovery can only be saved at an exact epoch boundary")
+        root = Path(self.output_dir) / self.config.recovery_checkpoint_name
+        root.mkdir(parents=True, exist_ok=True)
+        state_name = f"epoch_{next_epoch:04d}"
+        target = root / state_name
+        temporary = root / f".{state_name}.{os.getpid()}.tmp"
+        if target.exists() or target.is_symlink():
+            latest_path = root / "latest.json"
+            latest = (
+                json.loads(latest_path.read_text(encoding="utf-8"))
+                if latest_path.is_file() and not latest_path.is_symlink()
+                else {}
+            )
+            if latest.get("state_dir") == state_name:
+                raise ValueError(f"committed structured recovery target already exists: {target}")
+            if target.is_symlink() or not target.is_dir():
+                raise ValueError(f"uncommitted structured recovery target has unsafe type: {target}")
+            shutil.rmtree(target)
+        if temporary.exists():
+            shutil.rmtree(temporary)
+        temporary.mkdir()
+        try:
+            self.accelerator.save_state(str(temporary / "accelerator"), safe_serialization=False)
+            torch.save(self.ema_model.state_dict(), temporary / "ema_state.pth")
+            payload_manifest = _checkpoint_payload_manifest(temporary)
+            state = {
+                "schema_version": _STRUCTURED_RESUME_SCHEMA,
+                "contract_sha256": self._resume_contract_sha256,
+                "next_epoch": next_epoch,
+                "global_step": global_step,
+                "steps_per_epoch": len(self.train_dataloader),
+                "best_val_loss": float(self.best_val_loss),
+                "validation_history": self.val_history,
+                "payload_manifest_sha256": _canonical_sha256(payload_manifest),
+            }
+            _atomic_json(temporary / "resume.json", state)
+            os.replace(temporary, target)
+            pointer = {
+                "schema_version": _STRUCTURED_RESUME_SCHEMA,
+                "state_dir": state_name,
+                "resume_sha256": _file_sha256(target / "resume.json"),
+            }
+            _atomic_json(root / "latest.json", pointer)
+        finally:
+            if temporary.exists():
+                shutil.rmtree(temporary)
         return 0, 0
 
     def _after_training_epoch(self, epoch: int, global_step: int) -> None:
         """Extension point called after all ordinary epoch artifacts are durable."""
 
     def _batch_to_device(self, batch: dict) -> dict[str, torch.Tensor]:
-        return {
+        moved = {
             key: batch[key].to(self.accelerator.device, dtype=torch.float32, non_blocking=True)
             for key in ("truth", "background", "obs_values", "obs_mask", "valid_mask", "water_mask")
         }
+        if "structured_conditioning" in batch:
+            moved["structured_conditioning"] = batch["structured_conditioning"].to(
+                self.accelerator.device,
+                dtype=torch.float32,
+                non_blocking=True,
+            )
+        for key in ("structured_physical_truth", "structured_physical_background"):
+            if key in batch:
+                moved[key] = batch[key].to(
+                    self.accelerator.device,
+                    dtype=torch.float32,
+                    non_blocking=True,
+                )
+        if "structured_flow_mask" in batch:
+            moved["structured_flow_mask"] = batch["structured_flow_mask"].to(
+                self.accelerator.device,
+                dtype=torch.float32,
+                non_blocking=True,
+            )
+        for key in ("structured_lag0_mask", "structured_lag0_physical_values"):
+            if key in batch:
+                moved[key] = batch[key].to(
+                    self.accelerator.device,
+                    dtype=torch.float32,
+                    non_blocking=True,
+                )
+        return moved
 
     def _conditioned_inputs(
         self, batch: dict[str, torch.Tensor]
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         background = batch["background"]
+        if self.config.training_objective == "structured_joint_state_flow":
+            background_mask = batch["valid_mask"][:, :1].expand_as(background)
+            return background, background_mask, batch["obs_values"], batch["obs_mask"]
         background_mask = torch.ones_like(background)
         obs_values = batch["obs_values"]
         obs_mask = batch["obs_mask"]
@@ -228,6 +609,19 @@ class UNetTrainer:
     ) -> torch.Tensor:
         batch_size = noisy_truth.shape[0]
         grid = self._grid.expand(batch_size, -1, -1, -1)
+        if self.config.training_objective == "structured_joint_state_flow":
+            condition = batch.get("structured_conditioning")
+            if condition is None:
+                raise KeyError(
+                    "structured_joint_state_flow requires batch['structured_conditioning']"
+                )
+            model_input = torch.cat((noisy_truth, grid, condition), dim=1)
+            if model_input.shape[1] != self.config.in_channels:
+                raise ValueError(
+                    f"structured model input has {model_input.shape[1]} channels, "
+                    f"expected {self.config.in_channels}"
+                )
+            return model_input
         if background is None or background_mask is None or obs_values is None or obs_mask is None:
             (
                 conditioned_background,
@@ -255,6 +649,7 @@ class UNetTrainer:
         batch: dict[str, torch.Tensor],
         timesteps: torch.Tensor,
         residual_background: torch.Tensor | None = None,
+        generator: torch.Generator | None = None,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         if self.config.training_objective == "flow":
             return self.add_noise(truth, timesteps)
@@ -266,9 +661,33 @@ class UNetTrainer:
             state = (1.0 - t) * truth + t * batch["background"]
             target_velocity = batch["background"] - truth
             return state, target_velocity
+        if self.config.training_objective == "structured_joint_state_flow":
+            physical_truth = batch.get("structured_physical_truth")
+            if physical_truth is None:
+                raise KeyError(
+                    "structured_joint_state_flow requires batch['structured_physical_truth']"
+                )
+            clean = encode_structured_joint_trajectory(
+                physical_truth,
+                batch["valid_mask"][:, :1],
+                self.config.structured_state_stats,
+                generator=generator,
+            )
+            flow_mask = batch.get("structured_flow_mask", batch["valid_mask"][:, :1])
+            valid = flow_mask.expand_as(clean) > 0
+            clean = torch.where(valid, clean, torch.zeros_like(clean))
+            noise = torch.randn(
+                clean.shape,
+                device=clean.device,
+                dtype=clean.dtype,
+                generator=generator,
+            )
+            noise = torch.where(valid, noise, torch.zeros_like(noise))
+            t = timesteps.view(-1, *([1] * (clean.dim() - 1)))
+            return (1.0 - t) * clean + t * noise, noise - clean
         raise ValueError(
             f"Unknown training_objective={self.config.training_objective!r}; "
-            "expected 'flow', 'residual_flow', or 'bridge'"
+            "expected 'flow', 'residual_flow', 'bridge', or 'structured_joint_state_flow'"
         )
 
     def _sample_target(self) -> str:
@@ -280,6 +699,7 @@ class UNetTrainer:
             "method": method,
             "rtol": float(getattr(self.config, "sample_rtol", 1e-3)),
             "atol": float(getattr(self.config, "sample_atol", 1e-4)),
+            "end_time": float(getattr(self.config, "sample_end_time", 0.001)),
             "memory_efficient_euler": method == "euler",
         }
 
@@ -291,6 +711,11 @@ class UNetTrainer:
         }
 
     def _physical_metric_tensor(self, tensor: torch.Tensor) -> torch.Tensor:
+        if self.config.training_objective == "structured_joint_state_flow":
+            return decode_structured_joint_trajectory(
+                tensor.to(dtype=torch.float32),
+                self.config.structured_state_stats,
+            )
         physical = channel_denormalize(tensor.to(dtype=torch.float32), self.channel_means, self.channel_stds)
         if "siconc" in self.fields:
             concentration_channel = self.fields.index("siconc")
@@ -329,7 +754,10 @@ class UNetTrainer:
         batch: dict[str, torch.Tensor],
     ) -> torch.Tensor:
         if self.config.loss_domain == "valid":
-            return self._masked_mse(pred, target, batch["valid_mask"])
+            mask = batch.get("structured_flow_mask", batch["valid_mask"])
+            if mask.shape[1] != pred.shape[1]:
+                mask = mask[:, :1]
+            return self._masked_mse(pred, target, mask)
         return F.mse_loss(pred, target)
 
     @staticmethod
@@ -404,6 +832,14 @@ class UNetTrainer:
 
     def _report_sample_validation_metrics(self, metrics: dict[str, float], step: int):
         if self.clearml is None or not metrics:
+            return
+
+        if self.config.training_objective == "structured_joint_state_flow":
+            for key, value in metrics.items():
+                if isinstance(value, (int, float)) and math.isfinite(float(value)):
+                    self.clearml.report_scalar(
+                        "structured_trajectory/metric", key, float(value), step
+                    )
             return
 
         def _report(title: str, series: str, key: str):
@@ -485,31 +921,55 @@ class UNetTrainer:
                 self.clearml.upload_artifact(name, os.path.join(output_dir, name))
 
     def compute_val_loss(self) -> tuple[float, float, float]:
+        if self.config.validation_weight_source == "ema":
+            with self._sampling_model():
+                return self._compute_val_loss_on_current_weights()
+        return self._compute_val_loss_on_current_weights()
+
+    def _compute_val_loss_on_current_weights(self) -> tuple[float, float, float]:
         self.model.eval()
         total_full = 0.0
         n = len(self.val_dataloader)
         _debug(f"validation start batches={n}")
+        validation_generator = None
+        if self.config.training_objective == "structured_joint_state_flow":
+            validation_generator = torch.Generator(device=self.accelerator.device)
+            validation_generator.manual_seed(
+                int(self.config.validation_seed) + int(self.accelerator.process_index)
+            )
 
         with torch.no_grad():
             for raw_batch in self.val_dataloader:
                 batch = self._batch_to_device(raw_batch)
                 truth = batch["truth"]
                 batch_size = truth.shape[0]
-                timesteps = self._sample_timesteps(batch_size)
+                timesteps = self._sample_timesteps(
+                    batch_size,
+                    generator=validation_generator,
+                )
                 background, background_mask, obs_values, obs_mask = self._conditioned_inputs(batch)
                 model_state, v_real = self._make_training_pair(
-                    truth, batch, timesteps, residual_background=background
+                    truth,
+                    batch,
+                    timesteps,
+                    residual_background=background,
+                    generator=validation_generator,
                 )
 
                 model_input = self._make_model_input(
-                    model_state,
+                    self._structured_model_state(model_state, timesteps),
                     batch,
                     background=background,
                     background_mask=background_mask,
                     obs_values=obs_values,
                     obs_mask=obs_mask,
                 )
-                v_pred = self.model(model_input, timesteps * 1000, return_dict=False)[0]
+                model_output = self.model(
+                    model_input, timesteps * 1000, return_dict=False
+                )[0]
+                v_pred = self._reconstruct_model_velocity(
+                    model_output, model_state, timesteps
+                )
                 loss_full = self._flow_matching_loss(v_pred, v_real, batch)
 
                 total_full += self.accelerator.gather_for_metrics(loss_full).mean().item()
@@ -614,6 +1074,8 @@ class UNetTrainer:
 
     @torch.no_grad()
     def compute_sample_validation_metrics(self, epoch: int | None = None) -> dict[str, float]:
+        if self.config.training_objective == "structured_joint_state_flow":
+            return self._compute_structured_trajectory_metrics(epoch)
         max_cases = int(self.config.metric_num_cases)
         if max_cases <= 0:
             return {}
@@ -664,7 +1126,7 @@ class UNetTrainer:
 
         self.model.eval()
         with self._sampling_model() as sample_model:
-            sampler = Sampler(sample_model)
+            sampler = self._make_sampler(sample_model)
             for batch in self._iter_indexed_batches(indices, self.config.eval_batch_size):
                 ensemble = []
                 for _ in range(num_ensemble):
@@ -828,13 +1290,116 @@ class UNetTrainer:
         )
         return metrics
 
+    @torch.no_grad()
+    def _compute_structured_trajectory_metrics(self, epoch: int | None = None) -> dict:
+        max_cases = int(self.config.metric_num_cases)
+        num_ensemble = int(self.config.metric_num_ensemble)
+        if max_cases <= 0:
+            return {}
+        if num_ensemble < 2:
+            raise ValueError("structured trajectory metrics require at least two members")
+        indices = self._metric_case_indices(max_cases, int(self.config.metric_stride_days))
+        ensembles = []
+        truths = []
+        backgrounds = []
+        valid_masks = []
+        lag0_masks = []
+        self.model.eval()
+        with self._sampling_model() as sample_model:
+            sampler = self._make_sampler(sample_model)
+            effective_epoch = int(epoch) if epoch is not None else 0
+            for case_index in indices:
+                batch = next(self._iter_indexed_batches([case_index], 1))
+                members = []
+                for member_index in range(num_ensemble):
+                    member_seed = self._structured_diagnostic_seed(
+                        effective_epoch,
+                        case_index=case_index,
+                        member_index=member_index,
+                        stream_index=11,
+                    )
+                    generator = torch.Generator(device=self.accelerator.device)
+                    generator.manual_seed(member_seed)
+                    initial_noise = torch.randn(
+                        (1, self.config.out_channels, *self.config.image_size),
+                        dtype=batch["background"].dtype,
+                        device=self.accelerator.device,
+                        generator=generator,
+                    )
+                    try:
+                        members.append(sample_structured_batch(
+                            sampler,
+                            batch,
+                            stats=self.config.structured_state_stats,
+                            size=self.config.image_size,
+                            num_timesteps=self.config.metric_num_timesteps,
+                            device=self.accelerator.device,
+                            method=self.config.sample_method,
+                            rtol=self.config.sample_rtol,
+                            atol=self.config.sample_atol,
+                            initial_noise=initial_noise,
+                        ))
+                    except StructuredDecodeSaturationError as error:
+                        raise StructuredDecodeSaturationError(
+                            f"validation case={case_index} member={member_index}: {error}",
+                            {
+                                **error.diagnostics,
+                                "case_index": int(case_index),
+                                "member_index": int(member_index),
+                                "member_seed": int(member_seed),
+                            },
+                        ) from error
+                ensembles.append(torch.stack(members, dim=1))
+                truths.append(batch["structured_physical_truth"])
+                backgrounds.append(batch["structured_physical_background"])
+                valid_masks.append(batch["valid_mask"])
+                lag0_masks.append(batch["structured_lag0_mask"])
+        if not ensembles:
+            return {}
+        ensemble = torch.cat(ensembles, dim=0)
+        metrics = structured_trajectory_metrics(
+            ensemble,
+            torch.cat(truths, dim=0),
+            torch.cat(backgrounds, dim=0),
+            torch.cat(valid_masks, dim=0),
+            lag0_mask=torch.cat(lag0_masks, dim=0),
+            sic_cap=float(self.config.structured_state_stats["sic_cap"]),
+        )
+        metrics.update(
+            {
+                "metric_num_cases": float(ensemble.shape[0]),
+                "metric_num_ensemble": float(num_ensemble),
+                "metric_num_timesteps": float(self.config.metric_num_timesteps),
+            }
+        )
+        if epoch is not None:
+            samples_dir = os.path.join(self.output_dir, "samples")
+            os.makedirs(samples_dir, exist_ok=True)
+            torch.save(
+                {
+                    "samples": ensemble.detach().cpu(),
+                    "truth": torch.cat(truths, dim=0).detach().cpu(),
+                    "background": torch.cat(backgrounds, dim=0).detach().cpu(),
+                    "valid_mask": torch.cat(valid_masks, dim=0).detach().cpu(),
+                    "lag0_mask": torch.cat(lag0_masks, dim=0).detach().cpu(),
+                    "values_space": "physical",
+                    "trajectory_horizon_days": self.config.trajectory_horizon_days,
+                    "metrics": metrics,
+                },
+                os.path.join(samples_dir, f"epoch_{epoch:04d}_structured_ensemble.pt"),
+            )
+        return metrics
+
     def save_samples(self, epoch: int):
+        if self.config.training_objective == "structured_joint_state_flow":
+            self._report_structured_trajectory_dashboard(epoch)
+            return
         self.model.eval()
         raw_batch = next(iter(self.val_dataloader))
         batch = self._batch_to_device(raw_batch)
         one = {key: value[:1] for key, value in batch.items()}
         with self._sampling_model() as sample_model:
-            sampler = Sampler(sample_model)
+            sampler = self._make_sampler(sample_model)
             sample = sampler.sample_conditioned(
                 background=one["background"],
                 background_mask=torch.ones_like(one["background"]),
@@ -1027,6 +1592,8 @@ class UNetTrainer:
 
     @torch.no_grad()
     def report_unconditional_dashboard_sample(self, epoch: int):
+        if self.config.training_objective == "structured_joint_state_flow":
+            return
         if self.config.sample_every_n_epochs <= 0:
             return
         if epoch % self.config.sample_every_n_epochs != 0:
@@ -1053,7 +1620,7 @@ class UNetTrainer:
         initial_noise = torch.randn_like(dashboard_batch["background"])
 
         with self._sampling_model() as sample_model:
-            sampler = Sampler(sample_model)
+            sampler = self._make_sampler(sample_model)
             unconditional = sampler.sample_conditioned(
                 background=zero_background,
                 background_mask=torch.zeros_like(dashboard_batch["background"]),
@@ -1154,6 +1721,9 @@ class UNetTrainer:
             return
         if epoch % _DASHBOARD_EVERY_N_EPOCHS != 0:
             return
+        if self.config.training_objective == "structured_joint_state_flow":
+            self._report_structured_trajectory_dashboard(epoch)
+            return
 
         weights_label = self._sampling_weight_label()
         _debug(f"dashboard sampling start epoch={epoch} weights={weights_label}")
@@ -1171,7 +1741,7 @@ class UNetTrainer:
         dashboard_batch = self._dashboard_batch(cases)
 
         with self._sampling_model() as sample_model:
-            sampler = Sampler(sample_model)
+            sampler = self._make_sampler(sample_model)
             initial_noise = torch.randn_like(dashboard_batch["background"])
             zero_background = torch.zeros_like(dashboard_batch["background"])
             zero_obs_values = torch.zeros_like(dashboard_batch["obs_values"])
@@ -1334,6 +1904,91 @@ class UNetTrainer:
         self._report_dashboard_history()
         _debug(f"dashboard sampling done epoch={epoch}")
 
+    @torch.no_grad()
+    def _report_structured_trajectory_dashboard(self, epoch: int) -> None:
+        with self._structured_diagnostic_rng(epoch, stream_index=41):
+            self._report_structured_trajectory_dashboard_isolated(epoch)
+
+    @torch.no_grad()
+    def _report_structured_trajectory_dashboard_isolated(self, epoch: int) -> None:
+        self.model.eval()
+        try:
+            raw_batch = next(iter(self.val_dataloader))
+        except StopIteration:
+            return
+        batch = self._batch_to_device(raw_batch)
+        one = {key: value[:1] for key, value in batch.items()}
+        sample_seed = self._structured_diagnostic_seed(
+            epoch, case_index=0, member_index=0, stream_index=23
+        )
+        generator = torch.Generator(device=self.accelerator.device)
+        generator.manual_seed(sample_seed)
+        initial_noise = torch.randn(
+            (1, self.config.out_channels, *self.config.image_size),
+            dtype=one["background"].dtype,
+            device=self.accelerator.device,
+            generator=generator,
+        )
+        with self._sampling_model() as sample_model:
+            try:
+                sample = sample_structured_batch(
+                    self._make_sampler(sample_model),
+                    one,
+                    stats=self.config.structured_state_stats,
+                    size=self.config.image_size,
+                    num_timesteps=self.config.num_sample_timesteps,
+                    device=self.accelerator.device,
+                    method=self.config.sample_method,
+                    rtol=self.config.sample_rtol,
+                    atol=self.config.sample_atol,
+                    initial_noise=initial_noise,
+                )[0]
+            except StructuredDecodeSaturationError as error:
+                raise StructuredDecodeSaturationError(
+                    f"dashboard epoch={epoch}: {error}",
+                    {
+                        **error.diagnostics,
+                        "epoch": int(epoch),
+                        "case_index": 0,
+                        "member_index": 0,
+                        "member_seed": int(sample_seed),
+                    },
+                ) from error
+        samples_dir = os.path.join(self.output_dir, "samples")
+        os.makedirs(samples_dir, exist_ok=True)
+        weights_label = self._sampling_weight_label()
+        figure = make_structured_trajectory_figure(
+            one["structured_physical_truth"][0],
+            one["structured_physical_background"][0],
+            sample,
+            one["valid_mask"][0],
+            title=f"joint SIC/SIT trajectory d..d+{self.config.trajectory_horizon_days}, epoch {epoch}, {weights_label}",
+        )
+        path = os.path.join(samples_dir, f"epoch_{epoch:04d}_structured_trajectory.png")
+        figure.savefig(path, dpi=_DASHBOARD_DPI, bbox_inches="tight")
+        import matplotlib.pyplot as plt
+
+        plt.close(figure)
+        torch.save(
+            {
+                "sample": sample.detach().cpu(),
+                "truth": one["structured_physical_truth"][0].detach().cpu(),
+                "background": one["structured_physical_background"][0].detach().cpu(),
+                "valid_mask": one["valid_mask"][0].detach().cpu(),
+                "lag0_mask": one["structured_lag0_mask"][0].detach().cpu(),
+                "values_space": "physical",
+            },
+            os.path.join(samples_dir, f"epoch_{epoch:04d}_structured_trajectory.pt"),
+        )
+        if self.clearml is not None:
+            self.clearml.report_image(
+                title="dashboard/structured_joint_trajectory",
+                series="truth_background_member",
+                path=path,
+                iteration=epoch,
+            )
+        _debug(f"structured trajectory dashboard saved: {path}")
+
     def train_loop(self):
         start_epoch, global_step = self._training_loop_start()
         if not 0 <= start_epoch <= self.config.num_epochs or global_step < 0:
@@ -1362,22 +2017,33 @@ class UNetTrainer:
 
                 with self.accelerator.accumulate(self.model):
                     model_input = self._make_model_input(
-                        model_state,
+                        self._structured_model_state(model_state, timesteps),
                         batch,
                         background=background,
                         background_mask=background_mask,
                         obs_values=obs_values,
                         obs_mask=obs_mask,
                     )
-                    v_pred = self.model(model_input, timesteps * 1000, return_dict=False)[0]
+                    model_output = self.model(
+                        model_input, timesteps * 1000, return_dict=False
+                    )[0]
+                    v_pred = self._reconstruct_model_velocity(
+                        model_output, model_state, timesteps
+                    )
                     loss_full = self._flow_matching_loss(v_pred, v_real, batch)
                     loss_obs = torch.zeros_like(loss_full)
                     loss_smooth = torch.zeros_like(loss_full)
                     loss = loss_full
-
+                    case_ids = raw_batch.get("meta", {}).get("case_id", "unavailable")
+                    provenance = (
+                        f"epoch={epoch} batch_index={batch_index} global_step={global_step} "
+                        f"case_id={case_ids!r}"
+                    )
+                    _require_finite_loss(loss, provenance)
                     self.accelerator.backward(loss)
                     if self.accelerator.sync_gradients:
                         self.accelerator.clip_grad_norm_(self.model.parameters(), 1.0)
+                        _require_finite_gradients(self.model, provenance)
                     self.optimizer.step()
                     self.lr_scheduler.step()
                     self.optimizer.zero_grad()
@@ -1389,7 +2055,8 @@ class UNetTrainer:
                         f"loss={loss.item():.6f} full={loss_full.item():.6f} "
                         f"obs={loss_obs.item():.6f} smooth={loss_smooth.item():.6f}"
                     )
-                    self._report_condition_diagnostics(raw_batch, global_step, "train")
+                    with self._structured_diagnostic_rng(epoch, stream_index=31):
+                        self._report_condition_diagnostics(raw_batch, global_step, "train")
                 self._report_train_metrics(loss, loss_full, loss_obs, loss_smooth, global_step)
                 if self.config.tracker:
                     self.accelerator.log(
@@ -1407,14 +2074,10 @@ class UNetTrainer:
 
             progress_bar.close()
             val_loss_full, val_loss_obs, val_loss = self.compute_val_loss()
-            sample_metrics = {}
-            if (
-                self.accelerator.is_main_process
-                and self.config.metric_every_n_epochs > 0
-                and epoch % self.config.metric_every_n_epochs == 0
-            ):
-                sample_metrics = self.compute_sample_validation_metrics(epoch=epoch)
-
+            if not all(math.isfinite(value) for value in (val_loss_full, val_loss_obs, val_loss)):
+                raise FloatingPointError(
+                    f"non-finite validation loss at epoch={epoch} global_step={global_step}"
+                )
             history_entry = {
                 "epoch": epoch,
                 "val_loss": val_loss,
@@ -1423,7 +2086,6 @@ class UNetTrainer:
                 "step": global_step,
                 "timestamp": datetime.now().isoformat(),
             }
-            history_entry.update(sample_metrics)
             self.val_history.append(history_entry)
             if self.config.tracker:
                 self.accelerator.log(
@@ -1435,33 +2097,142 @@ class UNetTrainer:
                     step=global_step,
                 )
             self._report_val_metrics(val_loss_full, val_loss_obs, val_loss, global_step)
-            self._report_sample_validation_metrics(sample_metrics, global_step)
-            try:
-                self._report_condition_diagnostics(next(iter(self.val_dataloader)), global_step, "validation")
-            except StopIteration:
-                pass
             _debug(f"epoch {epoch} validation total={val_loss:.6f}")
             logger.info(
                 "Epoch %d val_loss %.6f full %.6f obs %.6f", epoch, val_loss, val_loss_full, val_loss_obs
             )
 
             if self.accelerator.is_main_process:
-                with open(os.path.join(self.output_dir, "metrics.json"), "w") as f:
-                    json.dump(self.val_history, f, indent=4)
+                _atomic_json(Path(self.output_dir) / "metrics.json", self.val_history)
                 _debug("saved metrics.json")
                 self.save_model_custom("last_model.pth")
                 _debug("saved last checkpoint")
-                self.report_unconditional_dashboard_sample(epoch)
-                self.report_dashboard_samples(epoch)
                 if val_loss < self.best_val_loss:
                     self.best_val_loss = val_loss
                     self.save_model_custom("best_model.pth")
                     _debug("saved best checkpoint")
                     if self.clearml is not None:
                         self.clearml.report_single_value("best_val_loss", val_loss)
+                # Commit the complete train state before any sampling, plotting, or
+                # external reporting that may fail for reasons unrelated to optimization.
+                self._save_structured_recovery(epoch + 1, global_step)
+
+                with self._structured_diagnostic_rng(epoch, stream_index=37):
+                    sample_metrics = {}
+                    metric_due = (
+                        self.config.metric_every_n_epochs > 0
+                        and epoch % self.config.metric_every_n_epochs == 0
+                    )
+                    structured = self.config.training_objective == "structured_joint_state_flow"
+                    dashboard_due = (
+                        self.config.sample_every_n_epochs > 0
+                        and epoch % self.config.sample_every_n_epochs == 0
+                        and _DASHBOARD_EVERY_N_EPOCHS > 0
+                        and epoch % _DASHBOARD_EVERY_N_EPOCHS == 0
+                    )
+                    structured_sampling_due = structured and (metric_due or dashboard_due)
+                    try:
+                        self._report_condition_diagnostics(
+                            next(iter(self.val_dataloader)), global_step, "validation"
+                        )
+                    except StopIteration:
+                        pass
+                    if (
+                        structured_sampling_due
+                        and global_step < self.config.diagnostic_min_optimizer_steps
+                    ):
+                        history_entry["structured_sampling_diagnostic"] = {
+                            "status": "skipped_warmup",
+                            "epoch": int(epoch),
+                            "global_step": int(global_step),
+                            "minimum_step": int(
+                                self.config.diagnostic_min_optimizer_steps
+                            ),
+                            "partial_metrics_permitted": False,
+                        }
+                        _atomic_json(Path(self.output_dir) / "metrics.json", self.val_history)
+                    else:
+                        try:
+                            if metric_due:
+                                sample_metrics = self.compute_sample_validation_metrics(
+                                    epoch=epoch
+                                )
+                            self.report_unconditional_dashboard_sample(epoch)
+                            self.report_dashboard_samples(epoch)
+                        except StructuredDecodeSaturationError as error:
+                            if not structured:
+                                raise
+                            history_entry["structured_sampling_diagnostic"] = {
+                                "status": "failed_decode_saturation",
+                                "epoch": int(epoch),
+                                "global_step": int(global_step),
+                                "checkpoint": self.config.recovery_checkpoint_name,
+                                "error": str(error),
+                                "diagnostics": jsonable(error.diagnostics),
+                                "partial_metrics_permitted": False,
+                                "optimization_continues": True,
+                                "publication_ready": False,
+                            }
+                            _atomic_json(
+                                Path(self.output_dir) / "metrics.json", self.val_history
+                            )
+                            if self.clearml is not None:
+                                self.clearml.report_single_value(
+                                    "structured_sampling_diagnostic_valid", 0.0
+                                )
+                            _debug(
+                                "structured sampling diagnostic failed nonfatally "
+                                f"at epoch={epoch} step={global_step}: {error}"
+                            )
+                        else:
+                            if metric_due:
+                                history_entry.update(sample_metrics)
+                                self._report_sample_validation_metrics(
+                                    sample_metrics, global_step
+                                )
+                            if structured_sampling_due:
+                                history_entry["structured_sampling_diagnostic"] = {
+                                    "status": "passed",
+                                    "epoch": int(epoch),
+                                    "global_step": int(global_step),
+                                    "partial_metrics_permitted": False,
+                                }
+                                if self.clearml is not None:
+                                    self.clearml.report_single_value(
+                                        "structured_sampling_diagnostic_valid", 1.0
+                                    )
+                            if metric_due or structured_sampling_due:
+                                _atomic_json(
+                                    Path(self.output_dir) / "metrics.json",
+                                    self.val_history,
+                                )
             self._after_training_epoch(epoch, global_step)
 
         if self.accelerator.is_main_process:
+            if self.config.training_objective == "structured_joint_state_flow":
+                diagnostic_records = [
+                    entry["structured_sampling_diagnostic"]
+                    for entry in self.val_history
+                    if "structured_sampling_diagnostic" in entry
+                ]
+                physical_sampling_validated = _latest_structured_sampling_valid(
+                    diagnostic_records
+                )
+                completion = {
+                    "optimization_complete": True,
+                    "completed_optimizer_steps": int(global_step),
+                    "physical_sampling_validated": physical_sampling_validated,
+                    "diagnostic_records": diagnostic_records,
+                    "publication_ready": False,
+                    "publication_blocker": (
+                        "standalone frozen publication evaluation and equal-information "
+                        "baselines remain required"
+                    ),
+                }
+                _atomic_json(
+                    Path(self.output_dir) / "structured_training_completion.json",
+                    completion,
+                )
             _debug("uploading ClearML artifacts")
             self._upload_clearml_artifacts()
             if self.clearml is not None:

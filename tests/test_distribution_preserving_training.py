@@ -141,6 +141,46 @@ class CalendarPairingTests(unittest.TestCase):
         self.assertEqual(item["meta"]["background_offset_days"], 365)
         self.assertEqual(item["meta"]["background_strategy"], "calendar_year_ago")
 
+    def test_indexed_background_tensor_and_metadata_use_the_selected_record(self) -> None:
+        self._write_forecast("2018-12-30", 0.2)
+        self._write_forecast("2019-01-01", 0.9)  # decoy previous-calendar date
+        self._write_forecast("2020-01-01", 0.7)
+        config = self._config()
+        config["background_strategy"] = "indexed"
+        config["train"] = {
+            "back_start_day": "2018-12-30",
+            "back_end_day": "2018-12-30",
+            "obs_start_day": "2020-01-01",
+            "obs_end_day": "2020-01-01",
+        }
+        item = M2MForecastDataset(config, split="train")[0]
+        self.assertEqual(item["meta"]["background_date"], "2018-12-30")
+        self.assertTrue(item["meta"]["background_path"].endswith("2018-12-30.npy"))
+        self.assertTrue(torch.allclose(item["background"], torch.full_like(item["background"], -0.6)))
+
+    def test_year_ago_jitter_uses_365_day_record_not_calendar_decoy(self) -> None:
+        self._write_forecast("2019-03-01", 0.9)  # calendar-year decoy
+        self._write_forecast("2019-03-02", 0.2)  # exactly target minus 365 days
+        self._write_forecast("2020-03-01", 0.7)
+        config = self._config()
+        config.update(
+            {
+                "background_strategy": "year_ago_jitter",
+                "background_year_offset_days": 365,
+                "background_jitter_days": 0,
+            }
+        )
+        config["train"] = {
+            "back_start_day": "2019-03-01",
+            "back_end_day": "2019-03-02",
+            "obs_start_day": "2020-03-01",
+            "obs_end_day": "2020-03-01",
+        }
+        item = M2MForecastDataset(config, split="train")[0]
+        self.assertEqual(item["meta"]["background_date"], "2019-03-02")
+        self.assertTrue(item["meta"]["background_path"].endswith("2019-03-02.npy"))
+        self.assertTrue(torch.allclose(item["background"], torch.full_like(item["background"], -0.6)))
+
     def test_epoch_conditioned_mask_rng_is_reproducible_and_changes(self) -> None:
         self._write_forecast("2020-03-01", 0.2)
         self._write_forecast("2021-03-01", 0.7)

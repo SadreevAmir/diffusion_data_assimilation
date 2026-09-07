@@ -1,0 +1,28 @@
+{
+  "schema_version": "structured_joint_gpu_smoke_extension_sha256_v1",
+  "verified_at": "2026-09-07",
+  "server_worktree": "/home/a.madreev/diffusion_data_assimilation/autoresearch_worktrees/structured_joint_forecast_v2_20260907_0255",
+  "server_container_image_id": "sha256:6461c778a994df485f968da62fb9992a800f91ad58d455e0db20bd31d8ecc9e5",
+  "server_cpu_tests_status": "passed",
+  "server_cpu_tests": {
+    "focused": "21/21 PASS",
+    "tests_directory": "111/111 PASS",
+    "cuda_visible_devices": "empty",
+    "network": "none",
+    "cpu_limit": 2,
+    "omp_num_threads": 1,
+    "mkl_num_threads": 1
+  },
+  "verification": {
+    "local_server_byte_identical": true,
+    "protocol_excluded_to_avoid_hash_dependency_cycle": true,
+    "gpu_executed": false,
+    "live_training_run_touched": false
+  },
+  "files": {
+    "assim_lib/structured_joint_gpu_admission.py": "db6da95ce135bb1218bd5ac99adc98cfc7a095d7d394aa977ed36f30ddd7363d",
+    "scripts/run_structured_joint_gpu_admission_container.sh": "d7ee6f7d68caa5a2dc42655194fcc92db0ffe58f3a4c235f3c76e096381dfff2",
+    "scripts/run_structured_joint_gpu_admission_smoke.sh": "16e3d0550a6bf69c2674aac534fba97955c8a1026f34245314cc4ea9582ce2b7",
+    "tests/test_structured_joint_gpu_admission.py": "eeecae6301b8e0a9c1a25d98925f78dbdc2b976a1ec7a8b3a1ae5a9e9dc0fe0e"
+  }
+}

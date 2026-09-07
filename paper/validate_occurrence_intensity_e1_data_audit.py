@@ -4,17 +4,17 @@
 from __future__ import annotations
 
 import argparse
-from datetime import date, timedelta
 import hashlib
 import json
-from pathlib import Path
 import struct
-from typing import Any
 import zlib
+from datetime import date, timedelta
+from pathlib import Path
+from typing import Any
 
 MODE = "occurrence_intensity_e1_real_data_audit"
 FROZEN_CASES = [
-    {"case_id": "2022-01-01_h23", "target_date": "2022-01-01", "hour": 23, "coverage_slot": "winter_early"},
+    {"case_id": "2022-01-02_h23", "target_date": "2022-01-02", "hour": 23, "coverage_slot": "winter_early"},
     {"case_id": "2022-01-26_h23", "target_date": "2022-01-26", "hour": 23, "coverage_slot": "winter_late"},
     {"case_id": "2022-02-25_h23", "target_date": "2022-02-25", "hour": 23, "coverage_slot": "spring_early"},
     {"case_id": "2022-03-22_h23", "target_date": "2022-03-22", "hour": 23, "coverage_slot": "spring_late"},
@@ -23,6 +23,7 @@ FROZEN_CASES = [
     {"case_id": "2022-06-15_h23", "target_date": "2022-06-15", "hour": 23, "coverage_slot": "melt_late"},
     {"case_id": "2022-07-15_h23", "target_date": "2022-07-15", "hour": 23, "coverage_slot": "summer_early"},
 ]
+FROZEN_SELECTION_VERSION = "e1_real_cases_v2"
 FROZEN_LANDMARKS = [
     {"name": "western_arctic_grid_landmark", "row": 32, "column": 32},
     {"name": "greenland_sector_grid_landmark", "row": 287, "column": 223},
@@ -46,7 +47,7 @@ FROZEN_CONFIG = {
 }
 
 FROZEN_SELECTION_RULE = (
-    "eight_fixed_temporal_coverage_slots_from_forecast_and_sral_metadata_only"
+    "eight_fixed_temporal_coverage_slots_with_complete_lag_source_metadata_only"
 )
 
 
@@ -57,9 +58,12 @@ def _load(path: Path) -> Any:
 def _validate_manifest_contract(manifest: Any) -> None:
     """Independently enforce pre-truth case selection in compact evidence."""
     if not isinstance(manifest, dict) or set(manifest) != {
-        "selection_rule", "truth_values_consulted", "cases", "orientation_landmarks",
+        "selection_version", "selection_rule", "truth_values_consulted", "cases",
+        "orientation_landmarks",
     }:
         raise ValueError("case manifest keys must match the frozen selection contract")
+    if manifest["selection_version"] != FROZEN_SELECTION_VERSION:
+        raise ValueError("case manifest uses an unreviewed selection version")
     if manifest["selection_rule"] != FROZEN_SELECTION_RULE:
         raise ValueError("case manifest uses an unreviewed selection rule")
     if manifest["truth_values_consulted"] is not False:
@@ -227,6 +231,8 @@ def validate_compact_audit(config_path: Path, output: Path) -> str:
         "valid_domain_sha256", "source_inventory_sha256",
         "source_inventory", "dataset_provenance", "truth_values_consulted_for_selection", "lags_days",
         "sral_footprint_semantics", "panel_layout", "panel_landmark_overlay",
+        "observed_channels", "occurrence_encoder_value_space",
+        "case_selection_version", "background_missing_sic_policy",
     }
     if set(metadata) != expected_metadata:
         raise ValueError("metadata keys must be exact")
@@ -242,6 +248,18 @@ def validate_compact_audit(config_path: Path, output: Path) -> str:
         raise ValueError("metadata does not bind a canonical valid-domain mask")
     if metadata["truth_values_consulted_for_selection"] is not False:
         raise ValueError("truth-dependent case selection is forbidden")
+    if metadata["case_selection_version"] != FROZEN_SELECTION_VERSION:
+        raise ValueError("metadata does not identify the reviewed case selection")
+    if metadata["observed_channels"] != [0]:
+        raise ValueError("E1 data audit must observe SIC channel 0 only")
+    if metadata["occurrence_encoder_value_space"] != "physical_0_1":
+        raise ValueError("E1 occurrence encoder did not receive physical SIC")
+    if metadata["background_missing_sic_policy"] != "physical_zero_padding_allowed_and_counted":
+        raise ValueError("E1 background missing-SIC policy drift")
+    if metadata["sral_footprint_semantics"] != (
+        "finite_after_transform_11_valid_domain_and_target_raw_finite_sic"
+    ):
+        raise ValueError("E1 target raw-finite footprint policy drift")
     if metadata["lags_days"] != [0, 1, 2] or metadata["panel_layout"] != [
         "truth", "background_lag0", "mask_lag0", "background_lag1", "mask_lag1",
         "background_lag2", "mask_lag2",
@@ -296,24 +314,44 @@ def validate_compact_audit(config_path: Path, output: Path) -> str:
         target_date = date.fromisoformat(audit_case.get("target_date", ""))
         for source, audit_lag, expected_lag in zip(sources, audit_lags, (0, 1, 2)):
             if set(source) != {
-                "lag", "date", "forecast_path", "forecast_sha256", "sral_paths", "sral_sha256",
+                "lag", "value_date", "value_forecast_path", "value_forecast_sha256",
+                "background_date", "background_forecast_path", "background_forecast_sha256",
+                "sral_paths", "sral_sha256",
             }:
                 raise ValueError("source inventory lag keys must be exact")
-            expected_date = (target_date - timedelta(days=expected_lag)).isoformat()
+            expected_value_date = target_date - timedelta(days=expected_lag)
+            try:
+                expected_background_date = expected_value_date.replace(
+                    year=expected_value_date.year - 1
+                )
+            except ValueError as error:
+                raise ValueError("lag has no exact previous-calendar-year background date") from error
             if (
                 not isinstance(audit_lag, dict)
                 or source["lag"] != expected_lag
-                or source["date"] != expected_date
-                or source["date"] != audit_lag.get("source_date")
+                or source["value_date"] != expected_value_date.isoformat()
+                or source["background_date"] != expected_background_date.isoformat()
+                or source["value_date"] != audit_lag.get("value_source_date")
+                or source["background_date"] != audit_lag.get("background_source_date")
             ):
                 raise ValueError("source inventory lag/date differs from the per-case audit")
-            if not _is_sha256(source["forecast_sha256"]):
-                raise ValueError("invalid forecast source hash")
-            if not isinstance(source["forecast_path"], str) or not source["forecast_path"]:
-                raise ValueError("forecast source path must be explicit")
-            forecast_path = Path(source["forecast_path"])
-            if not forecast_path.is_file() or hashlib.sha256(forecast_path.read_bytes()).hexdigest() != source["forecast_sha256"]:
-                raise ValueError("forecast source path does not match its sealed hash")
+            for role in ("value", "background"):
+                forecast_hash = source[f"{role}_forecast_sha256"]
+                forecast_path_text = source[f"{role}_forecast_path"]
+                if not _is_sha256(forecast_hash):
+                    raise ValueError(f"invalid {role} forecast source hash")
+                if not isinstance(forecast_path_text, str) or not forecast_path_text:
+                    raise ValueError(f"{role} forecast source path must be explicit")
+                forecast_path = Path(forecast_path_text)
+                if (
+                    not forecast_path.is_file()
+                    or hashlib.sha256(forecast_path.read_bytes()).hexdigest() != forecast_hash
+                ):
+                    raise ValueError(f"{role} forecast source path does not match its sealed hash")
+            if Path(source["value_forecast_path"]).resolve() == Path(
+                source["background_forecast_path"]
+            ).resolve():
+                raise ValueError("value and background forecasts must be distinct sources")
             sral_paths = source["sral_paths"]
             sral_hashes = source["sral_sha256"]
             if (
@@ -361,23 +399,65 @@ def validate_compact_audit(config_path: Path, output: Path) -> str:
             raise ValueError("lag order changed")
         for lag in case["lags"]:
             if set(lag) != {
-                "lag_days", "source_date", "footprint_pixels", "finite_on_observed",
+                "lag_days", "value_source_date", "background_source_date",
+                "sral_footprint_pixels", "footprint_pixels", "finite_on_observed",
+                "target_raw_nonfinite_sral_pixels",
+                "background_raw_finite_observed_pixels",
+                "background_padding_observed_pixels",
+                "background_raw_finite_required_for_innovation",
                 "nan_outside_observed", "geometry_provenance", "value_provenance",
+                "occurrence_encoder_value_space", "innovation_nonzero_pixels",
                 "future_date_leakage",
             }:
                 raise ValueError("lag audit keys must be exact")
             if lag["finite_on_observed"] is not True or lag["nan_outside_observed"] is not True:
                 raise ValueError("NaN-safe observed-pixel invariant failed")
+            counts = (
+                lag["sral_footprint_pixels"], lag["footprint_pixels"],
+                lag["target_raw_nonfinite_sral_pixels"],
+                lag["background_raw_finite_observed_pixels"],
+                lag["background_padding_observed_pixels"],
+            )
+            if any(
+                isinstance(value, bool) or not isinstance(value, int) or value < 0
+                for value in counts
+            ):
+                raise ValueError("raw-finite audit counts must be non-negative integers")
+            if (
+                lag["sral_footprint_pixels"]
+                != lag["footprint_pixels"] + lag["target_raw_nonfinite_sral_pixels"]
+            ):
+                raise ValueError("target raw-finite footprint accounting is inconsistent")
+            if (
+                lag["footprint_pixels"]
+                != lag["background_raw_finite_observed_pixels"]
+                + lag["background_padding_observed_pixels"]
+            ):
+                raise ValueError("background raw-finite footprint accounting is inconsistent")
+            if lag["background_raw_finite_required_for_innovation"] is not False:
+                raise ValueError("background raw-finite innovation policy drift")
             if lag["future_date_leakage"] is not False:
                 raise ValueError("future-date leakage detected")
-            if lag["geometry_provenance"] != "real_sral_footprint" or lag["value_provenance"] != "forecast_value_at_real_sral_footprint":
+            if (
+                lag["geometry_provenance"] != "real_sral_footprint"
+                or lag["value_provenance"] != "target_year_m2m_forecast_at_real_sral_footprint"
+                or lag["occurrence_encoder_value_space"] != "physical_0_1"
+            ):
                 raise ValueError("geometry/value provenance drift")
+            if (
+                isinstance(lag["innovation_nonzero_pixels"], bool)
+                or not isinstance(lag["innovation_nonzero_pixels"], int)
+                or lag["innovation_nonzero_pixels"] < 0
+            ):
+                raise ValueError("invalid innovation nonzero-pixel evidence")
             if (
                 isinstance(lag["footprint_pixels"], bool)
                 or not isinstance(lag["footprint_pixels"], int)
                 or lag["footprint_pixels"] <= 0
             ):
                 raise ValueError("real lag footprint must be non-empty")
+        if sum(lag["innovation_nonzero_pixels"] for lag in case["lags"]) == 0:
+            raise ValueError("lagged forecast innovations are identically zero")
         expected_panel = f"panels/{case['case_id']}_truth_background_lag_masks.png"
         if case["panel"] != expected_panel:
             raise ValueError("compact orientation panel path is not bound to its frozen case")

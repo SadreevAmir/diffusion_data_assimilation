@@ -5,20 +5,21 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import struct
+import zlib
+from collections.abc import Callable
 from datetime import date, timedelta
 from pathlib import Path
-import struct
-from typing import Any, Callable
-import zlib
+from typing import Any
 
 import numpy as np
 import torch
 
 from .config import load_json
-from .data import build_dataset
+from .data import build_dataset, previous_calendar_date
 from .forecast import field_at_hour
 from .structured_sic import make_lagged_observation_channels
-from .transforms import prepare_model_field
+from .transforms import channel_denormalize, prepare_model_field
 
 MODE = "occurrence_intensity_e1_real_data_audit"
 CONFIG_KEYS = {
@@ -28,7 +29,7 @@ CONFIG_KEYS = {
 }
 OUTPUT_FILES = ("run_status.json", "metadata.json", "per_case_audit.json")
 FROZEN_CASES = [
-    {"case_id": "2022-01-01_h23", "target_date": "2022-01-01", "hour": 23, "coverage_slot": "winter_early"},
+    {"case_id": "2022-01-02_h23", "target_date": "2022-01-02", "hour": 23, "coverage_slot": "winter_early"},
     {"case_id": "2022-01-26_h23", "target_date": "2022-01-26", "hour": 23, "coverage_slot": "winter_late"},
     {"case_id": "2022-02-25_h23", "target_date": "2022-02-25", "hour": 23, "coverage_slot": "spring_early"},
     {"case_id": "2022-03-22_h23", "target_date": "2022-03-22", "hour": 23, "coverage_slot": "spring_late"},
@@ -37,6 +38,10 @@ FROZEN_CASES = [
     {"case_id": "2022-06-15_h23", "target_date": "2022-06-15", "hour": 23, "coverage_slot": "melt_late"},
     {"case_id": "2022-07-15_h23", "target_date": "2022-07-15", "hour": 23, "coverage_slot": "summer_early"},
 ]
+FROZEN_SELECTION_VERSION = "e1_real_cases_v2"
+FROZEN_SELECTION_RULE = (
+    "eight_fixed_temporal_coverage_slots_with_complete_lag_source_metadata_only"
+)
 FROZEN_LANDMARKS = [
     {"name": "western_arctic_grid_landmark", "row": 32, "column": 32},
     {"name": "greenland_sector_grid_landmark", "row": 287, "column": 223},
@@ -96,9 +101,14 @@ def validate_audit_config(config: dict[str, Any]) -> None:
 
 
 def validate_case_manifest(manifest: dict[str, Any]) -> None:
-    if set(manifest) != {"selection_rule", "truth_values_consulted", "cases", "orientation_landmarks"}:
+    if set(manifest) != {
+        "selection_version", "selection_rule", "truth_values_consulted", "cases",
+        "orientation_landmarks",
+    }:
         raise ValueError("E1 real-case manifest keys must be exact")
-    if manifest["selection_rule"] != "eight_fixed_temporal_coverage_slots_from_forecast_and_sral_metadata_only":
+    if manifest["selection_version"] != FROZEN_SELECTION_VERSION:
+        raise ValueError("unreviewed E1 case-selection version")
+    if manifest["selection_rule"] != FROZEN_SELECTION_RULE:
         raise ValueError("unreviewed E1 case-selection rule")
     if manifest["truth_values_consulted"] is not False:
         raise ValueError("E1 cases must be frozen without consulting truth values")
@@ -173,7 +183,8 @@ def _panel(fields: list[torch.Tensor], landmarks: list[dict[str, Any]]) -> np.nd
             array = (array - lo) / (hi - lo) if hi > lo else np.zeros_like(array)
         arrays.append(_mark_landmarks(np.nan_to_num(array, nan=0.0), landmarks))
     separator = np.ones((arrays[0].shape[0], 4), dtype=np.float32)
-    return np.concatenate([item for pair in zip(arrays, [separator] * len(arrays)) for item in pair][:-1], axis=1)
+    interleaved = [item for pair in zip(arrays, [separator] * len(arrays)) for item in pair]
+    return np.concatenate(interleaved[:-1], axis=1)
 
 
 def _dataset_index(dataset: Any, case: dict[str, Any]) -> int:
@@ -186,35 +197,78 @@ def _dataset_index(dataset: Any, case: dict[str, Any]) -> int:
     raise ValueError(f"predeclared case is absent from dataset metadata: {case['case_id']}")
 
 
-def _lag_background(dataset: Any, target_date: date, hour: int, lag: int) -> tuple[torch.Tensor, Path]:
-    record = dataset.records_by_date.get(target_date - timedelta(days=lag))
+def _physical_sic_at_date(
+    dataset: Any, source_date: date, hour: int, observed_channel: int,
+) -> tuple[torch.Tensor, torch.Tensor, Path]:
+    """Load physical SIC plus its raw-finite mask, preserving zero padding."""
+    record = dataset.records_by_date.get(source_date)
     if record is None:
-        raise ValueError(f"missing lag-specific background for lag={lag}")
-    field, finite = prepare_model_field(
-        field_at_hour(record.path, hour, dataset.indices), None, dataset.means, dataset.stds,
-        dataset.padding_values, dataset.image_size,
+        raise ValueError(f"missing model forecast for {source_date.isoformat()}")
+    source_index = dataset.indices[observed_channel]
+    mean = dataset.means[observed_channel]
+    std = dataset.stds[observed_channel]
+    padding = dataset.padding_values[observed_channel]
+    normalized, finite = prepare_model_field(
+        field_at_hour(record.path, hour, [source_index]), None, [mean], [std],
+        [padding], dataset.image_size,
     )
-    if not torch.all(torch.isfinite(field)) or not torch.all(finite[0][dataset.base_valid_mask[0] > 0]):
-        raise ValueError(f"non-finite lag-specific background for lag={lag}")
-    return field[0], Path(record.path)
+    physical = channel_denormalize(normalized, [mean], [std])[0]
+    raw_finite = finite[0].bool()
+    valid = dataset.base_valid_mask[observed_channel] > 0
+    if not torch.all(torch.isfinite(physical[valid])):
+        raise ValueError(f"non-finite padded SIC forecast for {source_date.isoformat()}")
+    finite_valid = valid & raw_finite
+    if not torch.all((physical[finite_valid] >= 0) & (physical[finite_valid] <= 1)):
+        raise ValueError(f"SIC forecast is outside physical [0,1] for {source_date.isoformat()}")
+    physical_padding = torch.as_tensor(padding, dtype=physical.dtype, device=physical.device)
+    if not torch.all(physical[valid & ~raw_finite] == physical_padding):
+        raise ValueError(f"raw-missing SIC did not map to physical padding for {source_date.isoformat()}")
+    return physical, raw_finite, Path(record.path)
+
+
+def _lag_forecast_pair(
+    dataset: Any, target_date: date, hour: int, lag: int, observed_channel: int,
+) -> tuple[torch.Tensor, torch.Tensor, Path, date, torch.Tensor, torch.Tensor, Path]:
+    """Return physical ``y_{t-k}`` and exact previous-calendar-year ``b_{t-k}``."""
+    value_date = target_date - timedelta(days=lag)
+    background_date = previous_calendar_date(value_date)
+    if background_date is None:
+        raise ValueError(f"no previous-calendar-year date for lag={lag}")
+    value, value_finite, value_path = _physical_sic_at_date(
+        dataset, value_date, hour, observed_channel
+    )
+    background, background_finite, background_path = _physical_sic_at_date(
+        dataset, background_date, hour, observed_channel
+    )
+    return (
+        value, value_finite, value_path, background_date,
+        background, background_finite, background_path,
+    )
 
 
 def _verify_runtime_sources(dataset: Any, target: date, sealed_source: dict[str, Any]) -> None:
     """Bind post-truth runtime reads to the corresponding pre-truth source seal."""
     lag = int(sealed_source["lag"])
-    source_date = target - timedelta(days=lag)
-    record = dataset.records_by_date.get(source_date)
-    if record is None:
-        raise ValueError(f"missing sealed runtime forecast source for lag={lag}")
-    forecast_path = Path(record.path)
-    if (
-        record.date != source_date
-        or forecast_path.resolve() != Path(sealed_source["forecast_path"]).resolve()
-        or sha256_file(forecast_path) != sealed_source["forecast_sha256"]
-    ):
-        raise ValueError(f"runtime forecast source differs from pre-truth seal for lag={lag}")
+    value_date = target - timedelta(days=lag)
+    background_date = previous_calendar_date(value_date)
+    if background_date is None:
+        raise ValueError(f"no previous-calendar-year date for lag={lag}")
+    for role, source_date in (("value", value_date), ("background", background_date)):
+        record = dataset.records_by_date.get(source_date)
+        if record is None:
+            raise ValueError(f"missing sealed runtime {role} forecast source for lag={lag}")
+        forecast_path = Path(record.path)
+        if (
+            record.date != source_date
+            or sealed_source[f"{role}_date"] != source_date.isoformat()
+            or forecast_path.resolve() != Path(sealed_source[f"{role}_forecast_path"]).resolve()
+            or sha256_file(forecast_path) != sealed_source[f"{role}_forecast_sha256"]
+        ):
+            raise ValueError(
+                f"runtime forecast source differs from pre-truth seal for lag={lag} role={role}"
+            )
 
-    runtime_sral_paths = [Path(path) for path in dataset.sral_records.get(source_date, [])]
+    runtime_sral_paths = [Path(path) for path in dataset.sral_records.get(value_date, [])]
     sealed_sral_paths = [Path(path) for path in sealed_source["sral_paths"]]
     if (
         len(runtime_sral_paths) != len(sealed_sral_paths)
@@ -255,12 +309,15 @@ def run_real_data_audit(
     data_config = dict(data_config)
     data_config["hour_mode"] = "all"
     data_config["assimilation_range"] = 3
+    data_config["observed_channels"] = [0]
     data_config["observation_mask"] = {
         "kind": "sral_tracks", "sral_transform_index": config["sral_transform_index"],
         "synthetic_probability": 0.0, "empty_probability": 0.0,
         "require_finite_model_values": True,
     }
     dataset = dataset_builder(data_config, config["dataset_split"])
+    if list(dataset.observed_channels) != [config["observed_channel"]]:
+        raise ValueError("E1 data audit must observe SIC channel 0 only")
 
     valid_domain = (
         dataset.base_valid_mask[config["observed_channel"]]
@@ -275,23 +332,31 @@ def run_real_data_audit(
         target = date.fromisoformat(case["target_date"])
         sources = []
         for lag in config["lags_days"]:
-            source_date = target - timedelta(days=lag)
-            record = dataset.records_by_date.get(source_date)
-            if record is None:
-                raise ValueError(f"missing pre-truth source metadata for {case['case_id']} lag={lag}")
-            if record.date != source_date:
+            value_date = target - timedelta(days=lag)
+            background_date = previous_calendar_date(value_date)
+            if background_date is None:
+                raise ValueError(f"no previous-calendar-year date for {case['case_id']} lag={lag}")
+            value_record = dataset.records_by_date.get(value_date)
+            background_record = dataset.records_by_date.get(background_date)
+            if value_record is None or background_record is None:
+                raise ValueError(f"missing pre-truth forecast metadata for {case['case_id']} lag={lag}")
+            if value_record.date != value_date or background_record.date != background_date:
                 raise ValueError(
                     f"forecast record date differs from requested lag for {case['case_id']} lag={lag}"
                 )
-            sral_paths = dataset.sral_records.get(source_date, [])
+            sral_paths = dataset.sral_records.get(value_date, [])
             if not sral_paths:
                 raise ValueError(
                     f"missing pre-truth SRAL source metadata for {case['case_id']} lag={lag}"
                 )
             sources.append({
-                "lag": lag, "date": record.date.isoformat(),
-                "forecast_path": str(record.path),
-                "forecast_sha256": sha256_file(record.path),
+                "lag": lag,
+                "value_date": value_record.date.isoformat(),
+                "value_forecast_path": str(value_record.path),
+                "value_forecast_sha256": sha256_file(value_record.path),
+                "background_date": background_record.date.isoformat(),
+                "background_forecast_path": str(background_record.path),
+                "background_forecast_sha256": sha256_file(background_record.path),
                 "sral_paths": [str(path) for path in sral_paths],
                 "sral_sha256": [sha256_file(path) for path in sral_paths],
             })
@@ -309,12 +374,17 @@ def run_real_data_audit(
         item = dataset[index]
         if item["meta"]["case_id"] != case["case_id"]:
             raise ValueError("dataset case identity changed after metadata seal")
-        sealed_truth_path = Path(sealed_case["sources"][0]["forecast_path"])
+        sealed_truth_path = Path(sealed_case["sources"][0]["value_forecast_path"])
         actual_truth_path = Path(item["meta"].get("target_path", ""))
         if not actual_truth_path.is_file() or actual_truth_path.resolve() != sealed_truth_path.resolve():
             raise ValueError("dataset truth source differs from the pre-truth source seal")
         target = date.fromisoformat(case["target_date"])
-        truth = item["truth"][config["observed_channel"]]
+        truth_normalized = item["truth"][config["observed_channel"]]
+        truth = channel_denormalize(
+            truth_normalized.unsqueeze(0),
+            [dataset.means[config["observed_channel"]]],
+            [dataset.stds[config["observed_channel"]]],
+        )[0]
         valid = item["valid_mask"][config["observed_channel"]].bool()
         sealed_valid = dataset.base_valid_mask[config["observed_channel"]].bool()
         if valid.shape != sealed_valid.shape or not torch.equal(valid.cpu(), sealed_valid.cpu()):
@@ -323,6 +393,8 @@ def run_real_data_audit(
             raise ValueError("truth and sealed valid domain are not co-registered")
         if not torch.all(torch.isfinite(truth[valid])):
             raise ValueError("truth is non-finite inside the valid domain")
+        if not torch.all((truth[valid] >= 0) & (truth[valid] <= 1)):
+            raise ValueError("truth SIC is outside physical [0,1]")
         lag_masks, backgrounds, background_sources, lag_values_with_nan = [], [], [], []
         lag_rows = []
         for lag, sealed_source in zip(config["lags_days"], sealed_case["sources"]):
@@ -334,33 +406,64 @@ def run_real_data_audit(
                 raise ValueError(
                     f"missing real SRAL footprint for {case['case_id']} lag={lag}"
                 )
-            mask = mask.to(torch.float32)
+            sral_mask = mask.to(torch.float32)
             if (
-                not torch.any(mask > 0)
-                or not torch.all((mask == 0) | (mask == 1))
-                or not torch.all(mask[~valid] == 0)
+                not torch.any(sral_mask > 0)
+                or not torch.all((sral_mask == 0) | (sral_mask == 1))
+                or not torch.all(sral_mask[~valid] == 0)
             ):
                 raise ValueError("SRAL footprint violates exact binary/valid-domain semantics")
-            background, background_path = _lag_background(dataset, target, int(case["hour"]), lag)
+            (
+                lag_values, value_raw_finite, value_path, background_date,
+                background, background_raw_finite, background_path,
+            ) = _lag_forecast_pair(
+                dataset, target, int(case["hour"]), lag, config["observed_channel"]
+            )
+            # Match require_finite_model_values: SRAL supplies geometry, while
+            # only raw-finite target-year M2M values become observations.
+            mask = sral_mask * value_raw_finite.to(sral_mask.dtype)
+            if not torch.any(mask > 0):
+                raise ValueError(
+                    f"real SRAL footprint has no raw-finite target-year SIC for "
+                    f"{case['case_id']} lag={lag}"
+                )
             observed = mask.bool()
             # The E1 observation value at each lag is the co-registered forecast
             # value on that lag's exact real footprint. Missing pixels remain NaN
             # until the NaN-safe channel constructor applies torch.where.
-            lag_values = background
             finite_on = bool(torch.all(torch.isfinite(lag_values[observed])))
             nan_outside = torch.full_like(lag_values, math.nan)
             nan_outside[observed] = lag_values[observed]
             lag_rows.append({
-                "lag_days": lag, "source_date": (target - timedelta(days=lag)).isoformat(),
+                "lag_days": lag,
+                "value_source_date": (target - timedelta(days=lag)).isoformat(),
+                "background_source_date": background_date.isoformat(),
+                "sral_footprint_pixels": int(sral_mask.sum()),
                 "footprint_pixels": int(mask.sum()), "finite_on_observed": finite_on,
+                "target_raw_nonfinite_sral_pixels": int(
+                    (sral_mask.bool() & ~value_raw_finite).sum().item()
+                ),
+                "background_raw_finite_observed_pixels": int(
+                    background_raw_finite[observed].sum().item()
+                ),
+                "background_padding_observed_pixels": int(
+                    (~background_raw_finite[observed]).sum().item()
+                ),
+                "background_raw_finite_required_for_innovation": False,
                 "nan_outside_observed": False, "geometry_provenance": "real_sral_footprint",
-                "value_provenance": "forecast_value_at_real_sral_footprint",
+                "value_provenance": "target_year_m2m_forecast_at_real_sral_footprint",
+                "occurrence_encoder_value_space": "physical_0_1",
+                "innovation_nonzero_pixels": int(
+                    torch.count_nonzero((lag_values - background)[observed]).item()
+                ),
                 "future_date_leakage": bool(target - timedelta(days=lag) > target),
             })
             lag_masks.append(mask)
             backgrounds.append(background)
             lag_values_with_nan.append(nan_outside)
             background_sources.append(str(background_path))
+            if Path(value_path).resolve() == Path(background_path).resolve():
+                raise ValueError("E1 value and background forecasts must be distinct sources")
         masks_tensor = torch.stack(lag_masks).unsqueeze(0)
         backgrounds_tensor = torch.stack(backgrounds).unsqueeze(0)
         values_tensor = torch.stack(lag_values_with_nan).unsqueeze(0)
@@ -381,7 +484,16 @@ def run_real_data_audit(
                 or not torch.all(emitted_values[~observed] == 0)
             ):
                 raise ValueError("E1 observation channels violate NaN-safe masking")
+            emitted_innovation = channels[0, lag_index, 0]
+            expected_innovation = values_tensor[0, lag_index] - backgrounds_tensor[0, lag_index]
+            if (
+                not torch.equal(emitted_innovation[observed], expected_innovation[observed])
+                or not torch.all(emitted_innovation[~observed] == 0)
+            ):
+                raise ValueError("E1 innovation channels violate the lagged forecast protocol")
             lag_rows[lag_index]["nan_outside_observed"] = True
+        if sum(row["innovation_nonzero_pixels"] for row in lag_rows) == 0:
+            raise ValueError("E1 lagged forecast innovations are identically zero for the case")
         landmark_values = []
         for landmark in manifest["orientation_landmarks"]:
             row, column = int(landmark["row"]), int(landmark["column"])
@@ -418,7 +530,13 @@ def run_real_data_audit(
         "source_inventory_sha256": hashlib.sha256(inventory_bytes).hexdigest(),
         "source_inventory": source_inventory,
         "dataset_provenance": dataset.provenance(), "truth_values_consulted_for_selection": False,
-        "lags_days": [0, 1, 2], "sral_footprint_semantics": "finite_after_transform_11_and_valid_domain",
+        "case_selection_version": FROZEN_SELECTION_VERSION,
+        "observed_channels": [0], "occurrence_encoder_value_space": "physical_0_1",
+        "background_missing_sic_policy": "physical_zero_padding_allowed_and_counted",
+        "lags_days": [0, 1, 2],
+        "sral_footprint_semantics": (
+            "finite_after_transform_11_valid_domain_and_target_raw_finite_sic"
+        ),
         "panel_layout": [
             "truth", "background_lag0", "mask_lag0", "background_lag1", "mask_lag1",
             "background_lag2", "mask_lag2",

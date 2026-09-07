@@ -1,0 +1,30 @@
+{
+  "schema_version": "structured_paired_pilot_panel_v1",
+  "status": "frozen_before_candidate_training",
+  "split": "valid_2022_only",
+  "test_2023_permitted": false,
+  "data_config_sha256": "f8ed0a4c1db42b151a9ebf2797524c96d4c1b9b12762a47e9bf5518144b5d441",
+  "selection_rule": "first eligible validation trajectory on or after the previous selected anchor plus 45 days",
+  "seasonal_coverage": "two fixed anchors in each meteorological season",
+  "cases": [
+    {"dataset_index": 0, "case_id": "2022-01-02_slice23", "anchor_date": "2022-01-02", "season": "DJF"},
+    {"dataset_index": 45, "case_id": "2022-02-16_slice23", "anchor_date": "2022-02-16", "season": "DJF"},
+    {"dataset_index": 90, "case_id": "2022-04-02_slice23", "anchor_date": "2022-04-02", "season": "MAM"},
+    {"dataset_index": 135, "case_id": "2022-05-17_slice23", "anchor_date": "2022-05-17", "season": "MAM"},
+    {"dataset_index": 180, "case_id": "2022-07-01_slice23", "anchor_date": "2022-07-01", "season": "JJA"},
+    {"dataset_index": 225, "case_id": "2022-08-15_slice23", "anchor_date": "2022-08-15", "season": "JJA"},
+    {"dataset_index": 270, "case_id": "2022-09-29_slice23", "anchor_date": "2022-09-29", "season": "SON"},
+    {"dataset_index": 315, "case_id": "2022-11-13_slice23", "anchor_date": "2022-11-13", "season": "SON"}
+  ],
+  "member_seeds": [16002861, 16002962, 16003063, 16003164, 16003265, 16003366, 16003467, 16003568],
+  "initial_noise": {
+    "shape": [1, 16, 320, 256],
+    "dtype": "float32",
+    "generator_device": "cuda:0",
+    "reuse_contract": "For each case/member, generate once before either model is sampled, record SHA-256 of contiguous CPU float32 bytes, and pass clones of that exact tensor to raw and candidate samplers."
+  },
+  "reference_checkpoint": "raw_velocity_epoch_0016_recovery_after_zero_based_epoch_15",
+  "candidate_checkpoint": "gaussian_preconditioned_epoch_0016_recovery_after_zero_based_epoch_15",
+  "solver": {"method": "rk4", "timepoints": 65, "intervals": 64},
+  "selection_or_seed_changes_permitted": false
+}
