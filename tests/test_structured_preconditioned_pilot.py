@@ -1,0 +1,200 @@
+from __future__ import annotations
+
+import copy
+import hashlib
+import json
+import os
+import subprocess
+import tempfile
+import unittest
+from pathlib import Path
+from unittest import mock
+
+import torch
+
+from assim_lib import structured_preconditioned_pilot as pilot
+from assim_lib.config import load_json
+
+
+def _metrics(value: float = 1.0) -> dict:
+    return {
+        "support": {
+            "ensemble_support_violation_count": 0,
+            "truth_support_violation_count": 0,
+            "background_support_violation_count": 0,
+            "lag0_exact_max_abs_error": 0.0,
+            "decode_saturation_count": 0,
+        },
+        "leads": {
+            ("d0" if lead == 0 else f"d+{lead}"): {
+                "fields": {
+                    field: {
+                        "fair_crps": value,
+                        "ensemble_mean_rmse": value,
+                        "rank_tv_to_uniform": value,
+                        "central_coverage_absolute_error": {
+                            "central_50": value,
+                            "central_80": value,
+                            "central_90": value,
+                        },
+                    }
+                    for field in ("sic", "sit")
+                }
+            }
+            for lead in range(4)
+        },
+        "temporal": {
+            "transitions": {
+                f"d+{lead}_to_d+{lead + 1}": {
+                    "fields": {
+                        field: {
+                            "increment_fair_crps": value,
+                            "ensemble_mean_increment_rmse": value,
+                        }
+                        for field in ("sic", "sit")
+                    }
+                }
+                for lead in range(3)
+            },
+            "trajectory_variogram": {
+                field: {"trajectory_variogram_score": value}
+                for field in ("sic", "sit")
+            },
+        },
+    }
+
+
+class StructuredPreconditionedPilotTests(unittest.TestCase):
+    def test_complete_quantitative_gate_passes_but_never_unlocks_full_training(self) -> None:
+        raw = _metrics()
+        candidate = _metrics(0.69)
+        raw_spatial = {"aggregate": {f"lag{lag}": 1.0 for lag in pilot.SPATIAL_LAGS}}
+        candidate_spatial = {"aggregate": {f"lag{lag}": 0.70 for lag in pilot.SPATIAL_LAGS}}
+        result = pilot.paired_pilot_gate(raw, candidate, raw_spatial, candidate_spatial)
+        self.assertEqual(result["status"], "quantitative_pass")
+        self.assertTrue(result["quantitative_passed"])
+        self.assertEqual(result["visual_review_status"], "pending_independent_review")
+        self.assertFalse(result["full_training_permitted"])
+        self.assertFalse(result["test_2023_used"])
+        self.assertEqual(len(result["checks"]), 59)
+
+    def test_gate_fails_closed_on_missing_nonfinite_and_regression(self) -> None:
+        raw = _metrics()
+        candidate = _metrics()
+        spatial = {"aggregate": {f"lag{lag}": 1.0 for lag in pilot.SPATIAL_LAGS}}
+        adverse = copy.deepcopy(candidate)
+        del adverse["leads"]["d+2"]["fields"]["sit"]["fair_crps"]
+        self.assertEqual(
+            pilot.paired_pilot_gate(raw, adverse, spatial, spatial)["status"],
+            "quantitative_fail",
+        )
+        adverse = copy.deepcopy(candidate)
+        adverse["temporal"]["transitions"]["d+1_to_d+2"]["fields"]["sic"]["increment_fair_crps"] = float("nan")
+        self.assertEqual(
+            pilot.paired_pilot_gate(raw, adverse, spatial, spatial)["status"],
+            "quantitative_fail",
+        )
+        adverse = copy.deepcopy(candidate)
+        adverse["support"]["ensemble_support_violation_count"] = 1
+        self.assertEqual(
+            pilot.paired_pilot_gate(raw, adverse, spatial, spatial)["status"],
+            "quantitative_fail",
+        )
+
+    def test_frozen_panel_builds_validation_only_contract(self) -> None:
+        repo = Path(__file__).resolve().parents[1]
+        data = load_json(repo / "config/data/m2m_2f_structured_joint_real_lagged.json")
+        contract, indices, panel = pilot._load_panel_contract(
+            repo / "paper/STRUCTURED_PAIRED_PILOT_PANEL.json",
+            repo / "paper/STRUCTURED_GAUSSIAN_PRECONDITIONED_PILOT_PROTOCOL.json",
+            data,
+        )
+        self.assertEqual(indices, [0, 45, 90, 135, 180, 225, 270, 315])
+        self.assertEqual(len(contract.cases), 8)
+        self.assertEqual(len(contract.member_seeds), 8)
+        self.assertEqual(contract.blockers, ())
+        self.assertFalse(panel["test_2023_permitted"])
+
+    def test_spatial_variogram_uses_both_spatial_axes(self) -> None:
+        truth = torch.zeros((1, 8, 8, 9))
+        truth[:, :, :, 1:] = 1.0
+        ensemble = truth[:, None].repeat(1, 2, 1, 1, 1)
+        valid = torch.ones((1, 1, 8, 9))
+        lag0 = torch.zeros_like(valid)
+        result = pilot._spatial_variogram_errors(ensemble, truth, valid, lag0)
+        self.assertEqual(result["aggregate"], {"lag1": 0.0, "lag2": 0.0, "lag4": 0.0})
+
+    def test_training_mode_disables_internal_sampling_and_keeps_exact_budget(self) -> None:
+        repo = Path(__file__).resolve().parents[1]
+        experiment = repo / "config/experiments/train_structured_joint_gaussian_preconditioned_pilot.json"
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "output"
+            output.mkdir()
+            (output / ".structured_pilot_owner").write_text("attempt\n", encoding="utf-8")
+
+            def fake_train(runtime, _config_dir):
+                training = runtime["training"]
+                self.assertEqual(training["sample_every_n_epochs"], 0)
+                self.assertEqual(training["metric_every_n_epochs"], 0)
+                self.assertFalse(training["metric_save_ensemble_samples"])
+                run = Path(training["base_output_dir"]) / training["run_name"]
+                recovery = run / "structured_recovery/epoch_0016"
+                recovery.mkdir(parents=True)
+                (run / "metadata.json").write_text("{}", encoding="utf-8")
+                (recovery / "ema_state.pth").write_bytes(b"ema")
+                (recovery / "resume.json").write_text(
+                    json.dumps({"next_epoch": 16, "global_step": 2128}),
+                    encoding="utf-8",
+                )
+                return {"output_dir": str(run), "metrics_path": str(run / "metrics.json")}
+
+            with mock.patch.dict(os.environ, {"STRUCTURED_PILOT_ATTEMPT": "attempt"}), mock.patch.object(
+                pilot.torch.cuda, "device_count", return_value=1
+            ), mock.patch.object(pilot, "train_main", side_effect=fake_train):
+                result = pilot.run_training(experiment, output)
+            self.assertEqual(result["optimizer_steps"], 2128)
+            self.assertTrue(result["internal_sampling_disabled"])
+
+    def test_wrapper_refuses_existing_output_and_preserves_clearml_connectivity(self) -> None:
+        repo = Path(__file__).resolve().parents[1]
+        script = repo / "scripts/run_structured_preconditioned_pilot.sh"
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            raw = root / "raw/structured_recovery/epoch_0016"
+            raw.mkdir(parents=True)
+            (raw.parents[1] / "metadata.json").write_text("{}", encoding="utf-8")
+            (raw / "ema_state.pth").write_bytes(b"ema")
+            (raw / "resume.json").write_text("{}", encoding="utf-8")
+            refinement = root / "refinement"
+            refinement.mkdir()
+            result_path = refinement / "solver_control.json"
+            gate_path = refinement / "solver_gate.json"
+            result_path.write_text("{}", encoding="utf-8")
+            gate_path.write_text("{}", encoding="utf-8")
+            output = root / "existing"
+            output.mkdir()
+            sentinel = output / "sentinel"
+            sentinel.write_text("keep", encoding="utf-8")
+            env = {
+                **os.environ,
+                "REPO_DIR": str(repo), "RAW_RUN_DIR": str(raw.parents[1]),
+                "REFINEMENT_RESULT_DIR": str(refinement), "OUTPUT_DIR": str(output),
+                "RAW_METADATA_SHA256": "0" * 64, "RAW_EMA_SHA256": "1" * 64,
+                "RAW_RESUME_SHA256": "2" * 64,
+                "REFINEMENT_SOLVER_CONTROL_SHA256": hashlib.sha256(result_path.read_bytes()).hexdigest(),
+                "REFINEMENT_SOLVER_GATE_SHA256": hashlib.sha256(gate_path.read_bytes()).hexdigest(),
+            }
+            completed = subprocess.run(
+                ["bash", str(script)], env=env, capture_output=True, text=True, check=False
+            )
+            self.assertEqual(completed.returncode, 73)
+            self.assertEqual(sentinel.read_text(encoding="utf-8"), "keep")
+        source = script.read_text(encoding="utf-8")
+        self.assertIn("PILOT_TIMEOUT_SECONDS=86400", source)
+        self.assertIn("--kill-after=\"${PILOT_KILL_GRACE_SECONDS}s\"", source)
+        self.assertNotIn("CLEARML_OFFLINE_MODE", source)
+        self.assertIn("--refinement-result-sha256", source)
+
+
+if __name__ == "__main__":
+    unittest.main()

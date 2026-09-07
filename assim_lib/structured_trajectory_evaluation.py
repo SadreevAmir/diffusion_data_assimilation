@@ -1585,6 +1585,7 @@ def make_structured_trajectory_figure(
     valid_mask: torch.Tensor,
     *,
     title: str,
+    origin: str = "lower",
 ):
     """Large per-lead truth/background/member figure in physical units."""
     import matplotlib.pyplot as plt
@@ -1620,7 +1621,7 @@ def make_structured_trajectory_figure(
             display = np.where(valid, field, np.nan)
             image = axes[lead, column].imshow(
                 display,
-                origin="lower",
+                origin=origin,
                 cmap="Blues" if column < 3 else "viridis",
                 vmin=0.0,
                 vmax=1.0 if column < 3 else sit_max,

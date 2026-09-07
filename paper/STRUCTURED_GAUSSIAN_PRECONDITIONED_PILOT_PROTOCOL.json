@@ -50,6 +50,7 @@
     "solver_stability_gate": "aggregate physical scores change by at most 1 percent and event probabilities by at most 1 percentage point from 64 to 128 RK4 intervals",
     "spatial_gate": "lag-1/2/4 variogram error decreases by at least 30 percent relative to the paired raw-velocity epoch-15 reference and no temporal-increment regression",
     "proper_score_gate": "fieldwise per-lead fair CRPS and ensemble-mean RMSE do not degrade by more than 2 percent",
+    "calibration_gate": "fieldwise per-lead rank-TV to uniform and mean absolute central 50/80/90 coverage error do not regress relative to the paired raw-velocity reference",
     "visual_gate": "fixed paired SIC/SIT member panels show no salt-and-pepper, track imprint, or disconnected granular texture"
   },
   "automatic_full_training_permitted": false,
