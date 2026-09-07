@@ -125,6 +125,7 @@ class StructuredSolverControlTests(unittest.TestCase):
                 **comparison,
             },
         }
+        baseline_comparisons = copy.deepcopy(comparisons)
         self.assertEqual(control._solver_gate(variants, comparisons)["status"], "converged")
         comparisons["rk4_64_intervals_bf16_vs_fp32"]["events"][
             "lead0_occurrence"
@@ -138,7 +139,8 @@ class StructuredSolverControlTests(unittest.TestCase):
             "lead3_sit_fair_crps"
         ]
         self.assertEqual(
-            control._solver_gate(adverse_variants, comparisons)["status"], "failed"
+            control._solver_gate(adverse_variants, baseline_comparisons)["status"],
+            "failed",
         )
 
         for key, value in (
@@ -150,11 +152,11 @@ class StructuredSolverControlTests(unittest.TestCase):
             with self.subTest(key=key, value=value):
                 adverse_variants = copy.deepcopy(variants)
                 adverse_variants["rk4_64_intervals_bf16"]["metrics"][key] = value
-                gate = control._solver_gate(adverse_variants, comparisons)
+                gate = control._solver_gate(adverse_variants, baseline_comparisons)
                 self.assertEqual(gate["status"], "failed")
                 self.assertFalse(gate["pilot_permitted"])
 
-        adverse_comparisons = copy.deepcopy(comparisons)
+        adverse_comparisons = copy.deepcopy(baseline_comparisons)
         del adverse_comparisons[
             "rk4_64_intervals_bf16_vs_fp32"
         ]["events"]["lead3_cap"]
