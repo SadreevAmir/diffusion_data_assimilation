@@ -508,7 +508,7 @@ class StructuredConditioningTests(unittest.TestCase):
             "assim_lib.two_stage_native_speed_admission._available_shared_memory_bytes",
             return_value=1,
         ):
-            with self.assertRaisesRegex(RuntimeError, "shared-memory safety budget"):
+            with self.assertRaisesRegex(RuntimeError, "shared memory safety budget"):
                 _ipc_preflight(dataset, batch_size=8, num_workers=2, prefetch_factor=1)
         self.assertEqual(dataset.reads, 1)
         self.assertEqual(dataset.assert_index, 0)
