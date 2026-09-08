@@ -56,7 +56,7 @@ def run_preflight(experiment_path: str | Path, *, build_model: bool = True) -> d
         raise ValueError("train-only stats do not match the exact train pair manifest")
     if config.in_channels != train_dataset.conditioned_input_channels:
         raise ValueError("configured input channels do not match the dataset contract")
-    expected_outputs = LATENT_CHANNELS * (config.trajectory_horizon_days + 1)
+    expected_outputs = LATENT_CHANNELS * len(config.trajectory_lead_days)
     if config.out_channels != expected_outputs:
         raise ValueError("configured output channels do not match the structured codec")
     batches_per_epoch = dataloader_batch_count(
@@ -71,7 +71,7 @@ def run_preflight(experiment_path: str | Path, *, build_model: bool = True) -> d
         min(config.ema_decay, (1.0 + ema_step) / (10.0 + ema_step)),
     )
     audit = stats.get("audit", {})
-    expected_samples = len(train_dataset) * (config.trajectory_horizon_days + 1)
+    expected_samples = len(train_dataset) * len(config.trajectory_lead_days)
     if int(audit.get("sample_count", -1)) != expected_samples:
         raise ValueError(
             f"stats sample_count={audit.get('sample_count')} does not match train size={expected_samples}"

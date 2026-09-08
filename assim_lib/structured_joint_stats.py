@@ -107,8 +107,10 @@ def build_structured_state_stats(data_config: dict, data_config_path: str | Path
     tolerance = max(np.finfo(np.float32).eps * max(cap, 1.0) * 2.0, 1e-7)
 
     for _, anchor_record in dataset.calendar_pairs:
-        for horizon in range(dataset.future_horizon_days + 1):
-            target_record = dataset.records_by_date[anchor_record.date + timedelta(days=horizon)]
+        for lead_days in dataset.trajectory_lead_days:
+            target_record = dataset.records_by_date[
+                anchor_record.date + timedelta(days=lead_days)
+            ]
             distinct_target_paths.add(str(target_record.path))
             for hour in hours:
                 raw = field_at_hour(target_record.path, hour, dataset.indices, copy=False)
@@ -221,7 +223,8 @@ def build_structured_state_stats(data_config: dict, data_config_path: str | Path
         "audit": {
             "sample_count": sample_count,
             "anchor_count": len(dataset),
-            "trajectory_steps": dataset.future_horizon_days + 1,
+            "trajectory_steps": len(dataset.trajectory_lead_days),
+            "trajectory_lead_days": list(dataset.trajectory_lead_days),
             "distinct_target_record_count": len(distinct_target_paths),
             "valid_value_count": valid_count,
             "ice_value_count": ice_count,

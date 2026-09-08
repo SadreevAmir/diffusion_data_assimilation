@@ -103,7 +103,7 @@ def main(config: dict, config_dir: Path, *, trainer_class=None, scheduler_factor
             f"input channels={expected_in_channels}"
         )
     expected_out_channels = (
-        4 * (train_config.trajectory_horizon_days + 1)
+        4 * len(train_config.trajectory_lead_days)
         if train_config.training_objective == "structured_joint_state_flow"
         else len(getattr(train_dataset, "indices", ()))
     )

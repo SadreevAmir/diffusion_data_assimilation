@@ -5,7 +5,7 @@ import json
 import hashlib
 import tempfile
 import unittest
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -284,6 +284,41 @@ class StructuredConditioningTests(unittest.TestCase):
         self._track("2020-03-01", (0, 0))
         self._track("2020-03-03", (3, 3))
 
+    def _assimilation_config(self) -> dict:
+        config = self._trajectory_config()
+        config.update(
+            {
+                "conditioning_layout": "structured_sic_sit_assimilation_v1",
+                "future_horizon_days": 0,
+                "trajectory_lead_days": [0],
+                "trajectory_semantics": "analysis_snapshot_only",
+            }
+        )
+        config["train"] = {
+            **config["train"],
+            "obs_end_day": "2020-03-01",
+        }
+        return config
+
+    def _dynamics_config(self) -> dict:
+        config = self._trajectory_config()
+        config.update(
+            {
+                "conditioning_layout": "structured_sic_sit_dynamics_v1",
+                "background_strategy": "none",
+                "assimilation_range": 1,
+                "future_horizon_days": 9,
+                "trajectory_lead_days": [3, 6, 9],
+                "trajectory_semantics": "state_only_forecast_snapshots_d_plus_3_6_9",
+                "observation_mask": {"kind": "none"},
+            }
+        )
+        config["train"] = {
+            **config["train"],
+            "obs_end_day": "2020-03-10",
+        }
+        return config
+
     def test_lags_are_separate_feb29_is_missing_and_nan_open_water_is_observed(self) -> None:
         self._forecast("2019-02-28", 0.3, 0.8)
         self._forecast("2019-03-01", 0.4, 0.9)
@@ -342,6 +377,46 @@ class StructuredConditioningTests(unittest.TestCase):
         self.assertEqual(
             [Path(value).name for value in first["meta"]["background_trajectory_paths"]],
             [f"ocean+atmosphere_24_2019-03-{day:02d}.npy" for day in range(1, 5)],
+        )
+
+    def test_assimilation_has_one_target_and_no_future_background(self) -> None:
+        self._write_trajectory_fixture()
+        dataset = M2MForecastDataset(self._assimilation_config(), split="train")
+        item = dataset[0]
+        self.assertEqual(dataset.conditioned_input_channels, 29)
+        self.assertEqual(tuple(item["truth"].shape), (2, 4, 4))
+        self.assertEqual(tuple(item["structured_physical_truth"].shape), (2, 4, 4))
+        self.assertEqual(tuple(item["structured_conditioning"].shape), (23, 4, 4))
+        self.assertEqual(tuple(item["structured_flow_mask"].shape), (4, 4, 4))
+        self.assertEqual(len(item["meta"]["background_trajectory_paths"]), 1)
+        self.assertEqual(item["meta"]["trajectory_lead_days"], [0])
+
+    def test_dynamics_uses_exact_initial_state_and_only_d3_d6_d9_targets(self) -> None:
+        for offset in range(-2, 10):
+            day = date(2020, 3, 1) + timedelta(days=offset)
+            self._forecast(
+                day.isoformat(),
+                0.50 + 0.01 * (offset + 2),
+                1.00 + 0.02 * (offset + 2),
+            )
+        dataset = M2MForecastDataset(self._dynamics_config(), split="train")
+        item = dataset[0]
+        self.assertEqual(dataset.conditioned_input_channels, 21)
+        self.assertEqual(tuple(item["truth"].shape), (6, 4, 4))
+        self.assertEqual(tuple(item["structured_physical_truth"].shape), (6, 4, 4))
+        self.assertEqual(tuple(item["structured_conditioning"].shape), (7, 4, 4))
+        self.assertEqual(tuple(item["structured_flow_mask"].shape), (12, 4, 4))
+        self.assertNotIn("structured_lag0_mask", item)
+        self.assertTrue(torch.all(item["obs_mask"] == 0))
+        self.assertEqual(item["meta"]["trajectory_lead_days"], [3, 6, 9])
+        self.assertEqual(item["meta"]["background_role"], "persistence_baseline_not_model_condition")
+        self.assertEqual(
+            [Path(value).name for value in item["meta"]["target_trajectory_paths"]],
+            [
+                "ocean+atmosphere_24_2020-03-04.npy",
+                "ocean+atmosphere_24_2020-03-07.npy",
+                "ocean+atmosphere_24_2020-03-10.npy",
+            ],
         )
 
     def test_truth_free_forecast_builder_needs_no_future_target_files(self) -> None:

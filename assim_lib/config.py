@@ -127,6 +127,7 @@ class TrainingConfig:
     structured_velocity_parameterization: str = "raw"
     validation_seed: int = 2718
     trajectory_horizon_days: int = 0
+    trajectory_lead_days: tuple[int, ...] = ()
 
     @classmethod
     def from_dict(cls, config: Mapping[str, Any]) -> TrainingConfig:
@@ -148,10 +149,15 @@ class TrainingConfig:
             "down_block_types",
             "up_block_types",
             "clearml_tags",
+            "trajectory_lead_days",
         }
         for key in tuple_keys & values.keys():
             values[key] = tuple(values[key])
         parsed = cls(**values)
+        if not parsed.trajectory_lead_days:
+            parsed.trajectory_lead_days = tuple(
+                range(parsed.trajectory_horizon_days + 1)
+            )
         parsed.validate()
         return parsed
 
@@ -207,7 +213,22 @@ class TrainingConfig:
         if self.training_objective == "structured_joint_state_flow":
             from .structured_joint_state import LATENT_CHANNELS, validate_structured_state_stats
 
-            expected_latent_channels = LATENT_CHANNELS * (self.trajectory_horizon_days + 1)
+            if (
+                not self.trajectory_lead_days
+                or any(value < 0 for value in self.trajectory_lead_days)
+                or tuple(sorted(set(self.trajectory_lead_days)))
+                != self.trajectory_lead_days
+            ):
+                raise ValueError(
+                    "trajectory_lead_days must be a non-empty increasing tuple of unique non-negative days"
+                )
+            if max(self.trajectory_lead_days) != self.trajectory_horizon_days:
+                raise ValueError(
+                    "trajectory_horizon_days must equal max(trajectory_lead_days)"
+                )
+            expected_latent_channels = LATENT_CHANNELS * len(
+                self.trajectory_lead_days
+            )
             if self.trajectory_horizon_days < 0:
                 raise ValueError("trajectory_horizon_days must be non-negative")
             if self.out_channels != expected_latent_channels:
