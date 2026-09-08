@@ -21,6 +21,7 @@ from .data import build_dataset
 from .main import _debug
 from .model_io import build_unet
 from .runtime import add_noise, build_dataloader, seed_everything
+from .runtime import make_normalized_xy_grid
 from .trainer import UNetTrainer, _atomic_json
 from .transforms import channel_denormalize
 
@@ -398,7 +399,50 @@ class DirectDynamicsTrainer(UNetTrainer):
                 raise RuntimeError("epoch-1 automatic safety gate failed: " + "; ".join(gate_reasons))
 
 
-def run(config_path: Path) -> dict:
+def _gpu_batch_smoke(model, train_loader, config: TrainingConfig) -> dict:
+    """Exercise the exact large-backbone batch shape without an optimizer step."""
+    device = torch.device("cuda")
+    torch.cuda.reset_peak_memory_stats(device)
+    model = model.to(device).train()
+    raw = next(iter(train_loader))
+    truth = raw["truth"].to(device)
+    valid = raw["valid_mask"][:, :1].to(device).expand_as(truth) > 0
+    condition = raw["structured_conditioning"].to(device)
+    clean = torch.where(valid, truth, torch.zeros_like(truth))
+    noise = torch.where(valid, torch.randn_like(clean), torch.zeros_like(clean))
+    time = torch.linspace(0.05, 0.95, truth.shape[0], device=device)
+    state = (1.0 - time[:, None, None, None]) * clean + time[:, None, None, None] * noise
+    target = noise - clean
+    grid = make_normalized_xy_grid(*config.image_size, device=device).expand(
+        truth.shape[0], -1, -1, -1
+    )
+    model_input = torch.cat((state, grid, condition), dim=1)
+    if model_input.shape[1] != DIRECT_INPUT_CHANNELS:
+        raise ValueError("GPU smoke constructed the wrong direct model input")
+    with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
+        prediction = model(model_input, time * 1000, return_dict=False)[0]
+        loss = ((prediction - target).square() * valid).sum() / valid.sum().clamp(min=1)
+    if not torch.isfinite(loss):
+        raise FloatingPointError("GPU smoke produced a non-finite loss")
+    loss.backward()
+    for parameter in model.parameters():
+        if parameter.grad is not None and not torch.isfinite(parameter.grad).all():
+            raise FloatingPointError("GPU smoke produced a non-finite gradient")
+    result = {
+        "status": "passed",
+        "batch_size": int(truth.shape[0]),
+        "model_input_shape": list(model_input.shape),
+        "model_output_shape": list(prediction.shape),
+        "loss": float(loss.detach().item()),
+        "peak_gpu_memory_mib": float(torch.cuda.max_memory_allocated(device) / 2**20),
+        "activation_checkpointing": bool(config.activation_checkpointing),
+    }
+    del loss, prediction, model_input, state, target, clean, noise, condition, truth, raw, model
+    torch.cuda.empty_cache()
+    return result
+
+
+def run(config_path: Path, *, preflight_only: bool = False) -> dict:
     experiment = load_json(config_path)
     config_dir = config_path.resolve().parent
     data_path = resolve_path(experiment["data_config"], config_dir)
@@ -440,10 +484,6 @@ def run(config_path: Path) -> dict:
         "train": validate_direct_dataset(train_dataset),
         "valid": validate_direct_dataset(valid_dataset),
     }
-    output_root = Path(train_config.base_output_dir) / (train_config.run_name or "run")
-    if output_root.exists() or output_root.is_symlink():
-        raise FileExistsError(f"refusing to reuse direct training output: {output_root}")
-    _atomic_json(output_root / "direct_dataset_sentinel.json", sentinel)
     train_loader = build_dataloader(
         train_dataset,
         train_config.train_batch_size,
@@ -468,6 +508,20 @@ def run(config_path: Path) -> dict:
     model = build_unet(train_config)
     parameter_count = sum(parameter.numel() for parameter in model.parameters())
     _debug(f"direct dynamics parameters={parameter_count:,}")
+    if preflight_only:
+        result = {
+            "status": "preflight_passed",
+            "parameter_count": parameter_count,
+            "steps_per_epoch": len(train_loader),
+            "planned_optimizer_steps": expected_steps,
+            "dataset_sentinel": sentinel,
+            "gpu_batch_smoke": _gpu_batch_smoke(model, train_loader, train_config),
+        }
+        return result
+    output_root = Path(train_config.base_output_dir) / (train_config.run_name or "run")
+    if output_root.exists() or output_root.is_symlink():
+        raise FileExistsError(f"refusing to reuse direct training output: {output_root}")
+    _atomic_json(output_root / "direct_dataset_sentinel.json", sentinel)
     optimizer = torch.optim.AdamW(model.parameters(), lr=train_config.learning_rate)
     from diffusers.optimization import get_cosine_schedule_with_warmup
 
@@ -505,8 +559,14 @@ def run(config_path: Path) -> dict:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", required=True, type=Path)
+    parser.add_argument("--preflight-only", action="store_true")
     arguments = parser.parse_args()
-    print(json.dumps(run(arguments.config.resolve()), indent=2))
+    print(
+        json.dumps(
+            run(arguments.config.resolve(), preflight_only=arguments.preflight_only),
+            indent=2,
+        )
+    )
 
 
 if __name__ == "__main__":
