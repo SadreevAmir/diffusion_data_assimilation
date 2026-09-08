@@ -21,6 +21,8 @@ class StructuredGaussianPilotContractTests(unittest.TestCase):
     def test_current_contract_passes(self) -> None:
         contract = validate()
         self.assertFalse(contract["launch_authorized"])
+        self.assertIsNone(contract["experiment_id"])
+        self.assertFalse(contract["durable_identity_audit"]["retry_suffix_permitted"])
         self.assertEqual(contract["training_semantics"]["minimum_optimizer_steps"], 2128)
         self.assertEqual(contract["evaluation"]["cases"], 8)
         self.assertEqual(contract["evaluation"]["ensemble_size"], 8)
@@ -67,6 +69,27 @@ class StructuredGaussianPilotContractTests(unittest.TestCase):
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(json.dumps(contract), encoding="utf-8")
             with self.assertRaisesRegex(ValueError, "not launch-authorized"):
+                validate(fixture, validate_git=False)
+
+    def test_embedded_or_retried_experiment_identity_fails_closed(self) -> None:
+        contract = json.loads(CONTRACT.read_text(encoding="utf-8"))
+        contract["experiment_id"] = "structured_joint_gaussian_checkpointed_pilot_retry2"
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = Path(temporary)
+            target = fixture / CONTRACT.relative_to(ROOT)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(json.dumps(contract), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "unapproved experiment id"):
+                validate(fixture, validate_git=False)
+
+        contract["experiment_id"] = None
+        contract["durable_identity_audit"]["retry_suffix_permitted"] = True
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = Path(temporary)
+            target = fixture / CONTRACT.relative_to(ROOT)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(json.dumps(contract), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "identity audit"):
                 validate(fixture, validate_git=False)
 
     def test_boundary_stop_go_cannot_be_removed(self) -> None:

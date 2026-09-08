@@ -12,6 +12,7 @@ import time
 from pathlib import Path
 
 import torch
+from diffusers.training_utils import EMAModel
 
 from .clearml_tracking import ClearMLTracker
 from .config import TrainingConfig, load_json
@@ -74,6 +75,7 @@ def _masked_mse(prediction: torch.Tensor, target: torch.Tensor, mask: torch.Tens
 def _one_step(
     model,
     optimizer,
+    ema_model,
     batch: dict,
     config: TrainingConfig,
     grid: torch.Tensor,
@@ -114,6 +116,7 @@ def _one_step(
     loss.backward()
     torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
     optimizer.step()
+    ema_model.step(model.parameters())
     return float(loss.detach().item())
 
 
@@ -154,6 +157,8 @@ def _benchmark_variant(
     if checkpointed:
         raise RuntimeError("activation checkpointing must be empty")
     optimizer = torch.optim.AdamW(model.parameters(), lr=config.learning_rate)
+    ema_model = EMAModel(model.parameters(), decay=0.999)
+    ema_model.to("cuda")
     grid = make_normalized_xy_grid(*config.image_size, batch_size=batch_size, device="cuda")
     generator = torch.Generator(device="cuda").manual_seed(config.seed + 91)
     iterator = iter(loader)
@@ -171,7 +176,7 @@ def _benchmark_variant(
         fetch_elapsed = time.perf_counter() - fetch_start
         torch.cuda.synchronize()
         step_start = time.perf_counter()
-        loss = _one_step(model, optimizer, batch, config, grid, generator)
+        loss = _one_step(model, optimizer, ema_model, batch, config, grid, generator)
         torch.cuda.synchronize()
         step_elapsed = time.perf_counter() - step_start
         if step >= WARMUP_STEPS:
@@ -188,6 +193,7 @@ def _benchmark_variant(
         "parameter_count": sum(parameter.numel() for parameter in model.parameters()),
         "activation_checkpointing": False,
         "checkpointed_modules": [],
+        "ema_in_benchmark": True,
         "workers_train": config.num_workers_train,
         "median_fetch_seconds": float(torch.tensor(fetch_seconds).median().item()),
         "median_step_seconds": float(torch.tensor(step_seconds).median().item()),
@@ -211,7 +217,7 @@ def _benchmark_variant(
         )
     ):
         raise FloatingPointError(f"{name}: non-finite benchmark result")
-    del iterator, loader, dataset, optimizer, model, grid
+    del iterator, loader, dataset, optimizer, ema_model, model, grid
     gc.collect()
     torch.cuda.empty_cache()
     return result
@@ -311,7 +317,33 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output-dir", required=True, type=Path)
     args = parser.parse_args()
-    result = run(args.output_dir.resolve())
+    output_dir = args.output_dir.resolve()
+    output_dir.mkdir(parents=True, exist_ok=True)
+    _atomic_json(
+        output_dir / "run_status.json",
+        {"schema_version": SCHEMA_VERSION, "status": "running"},
+    )
+    try:
+        result = run(output_dir)
+    except Exception as error:
+        _atomic_json(
+            output_dir / "run_status.json",
+            {
+                "schema_version": SCHEMA_VERSION,
+                "status": "failed",
+                "error_type": type(error).__name__,
+                "error": str(error)[:2000],
+            },
+        )
+        raise
+    _atomic_json(
+        output_dir / "run_status.json",
+        {
+            "schema_version": SCHEMA_VERSION,
+            "status": "completed",
+            "variant_count": len(result["variants"]),
+        },
+    )
     print(json.dumps(result, indent=2, sort_keys=True))
 
 
