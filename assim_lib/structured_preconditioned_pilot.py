@@ -586,6 +586,26 @@ def paired_pilot_gate(
                 ok = _finite_nonnegative(raw) and _finite_nonnegative(candidate) and float(candidate) <= float(raw)
                 checks[name] = {"passed": ok, "raw": raw, "candidate": candidate, "maximum_ratio": 1.0}
                 passed = passed and ok
+        for event in ("ice_occurrence", "sic_archive_cap"):
+            for score in ("brier_score", "reliability_l1"):
+                name = f"boundary/{label}/{event}/{score}"
+                try:
+                    raw = raw_metrics["leads"][label]["events"][event][score]
+                    candidate = candidate_metrics["leads"][label]["events"][event][score]
+                except (KeyError, TypeError):
+                    raw = candidate = None
+                ok = (
+                    _finite_nonnegative(raw)
+                    and _finite_nonnegative(candidate)
+                    and float(candidate) <= float(raw)
+                )
+                checks[name] = {
+                    "passed": ok,
+                    "raw": raw,
+                    "candidate": candidate,
+                    "maximum_ratio": 1.0,
+                }
+                passed = passed and ok
     for lag in SPATIAL_LAGS:
         for field in ("sic", "sit"):
             name = f"spatial_variogram/lag{lag}/{field}"

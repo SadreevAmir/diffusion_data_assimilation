@@ -2,31 +2,23 @@
 set -Eeuo pipefail
 
 : "${REPO_DIR:?missing immutable publication worktree}"
-: "${RAW_RUN_DIR:?missing frozen raw structured run}"
-: "${REFINEMENT_RESULT_DIR:?missing frozen strict-FP32 refinement result}"
 : "${OUTPUT_DIR:?missing isolated pilot result directory}"
-: "${RAW_METADATA_SHA256:?missing frozen raw metadata SHA-256}"
-: "${RAW_EMA_SHA256:?missing frozen raw EMA SHA-256}"
-: "${RAW_RESUME_SHA256:?missing frozen raw resume SHA-256}"
-: "${REFINEMENT_SOLVER_CONTROL_SHA256:?missing refinement result SHA-256}"
-: "${REFINEMENT_SOLVER_GATE_SHA256:?missing refinement gate SHA-256}"
 
 EXPERIMENT="${REPO_DIR}/config/experiments/train_structured_joint_gaussian_preconditioned_checkpointed_pilot.json"
 RAW_EXPERIMENT="${REPO_DIR}/config/experiments/train_structured_joint_d0_d3_real_lagged_31e.json"
 PANEL="${REPO_DIR}/paper/STRUCTURED_PAIRED_PILOT_PANEL.json"
 PROTOCOL="${REPO_DIR}/paper/STRUCTURED_GAUSSIAN_PRECONDITIONED_PILOT_PROTOCOL.json"
+CONTRACT_VALIDATOR="${REPO_DIR}/paper/validate_structured_gaussian_pilot_contract.py"
 PYTHON_BIN="/opt/conda/bin/python"
-PILOT_TIMEOUT_SECONDS=86400
+PILOT_TIMEOUT_SECONDS=86340
 PILOT_KILL_GRACE_SECONDS=60
 
 export PYTHONDONTWRITEBYTECODE=1
 export HF_HUB_OFFLINE=1
 export TRANSFORMERS_OFFLINE=1
 export WANDB_MODE=offline
+export CLEARML_REQUIRE_ONLINE=1
 export STRUCTURED_PILOT_ATTEMPT="structured-pilot-$$"
-export PYTHON_BIN EXPERIMENT RAW_EXPERIMENT RAW_RUN_DIR OUTPUT_DIR PANEL PROTOCOL
-export RAW_METADATA_SHA256 RAW_EMA_SHA256 RAW_RESUME_SHA256
-export REFINEMENT_RESULT_DIR REFINEMENT_SOLVER_CONTROL_SHA256 REFINEMENT_SOLVER_GATE_SHA256
 OUTPUT_OWNED=false
 
 write_failure_status() {
@@ -63,7 +55,42 @@ on_exit() {
 }
 trap on_exit EXIT
 
+# Establish an exact, attempt-owned terminal-status location before any scientific
+# preflight.  Existing paths (including symlinks) are never adopted or modified.
+if [[ -e "${OUTPUT_DIR}" || -L "${OUTPUT_DIR}" ]]; then
+    echo "pilot output already exists: ${OUTPUT_DIR}" >&2
+    exit 73
+fi
+if ! mkdir "${OUTPUT_DIR}"; then
+    echo "could not create exact pilot output: ${OUTPUT_DIR}" >&2
+    exit 73
+fi
+OUTPUT_OWNED=true
+printf '%s\n' "${STRUCTURED_PILOT_ATTEMPT}" > "${OUTPUT_DIR}/.structured_pilot_owner"
+
+: "${RAW_RUN_DIR:?missing frozen raw structured run}"
+: "${REFINEMENT_RESULT_DIR:?missing frozen strict-FP32 refinement result}"
+: "${RAW_METADATA_SHA256:?missing frozen raw metadata SHA-256}"
+: "${RAW_EMA_SHA256:?missing frozen raw EMA SHA-256}"
+: "${RAW_RESUME_SHA256:?missing frozen raw resume SHA-256}"
+: "${REFINEMENT_SOLVER_CONTROL_SHA256:?missing refinement result SHA-256}"
+: "${REFINEMENT_SOLVER_GATE_SHA256:?missing refinement gate SHA-256}"
+: "${MEMORY_ADMISSION_RESULT:?missing passed memory admission result}"
+: "${MEMORY_ADMISSION_RESULT_SHA256:?missing memory admission result SHA-256}"
+export PYTHON_BIN EXPERIMENT RAW_EXPERIMENT RAW_RUN_DIR OUTPUT_DIR PANEL PROTOCOL
+export RAW_METADATA_SHA256 RAW_EMA_SHA256 RAW_RESUME_SHA256
+export REFINEMENT_RESULT_DIR REFINEMENT_SOLVER_CONTROL_SHA256 REFINEMENT_SOLVER_GATE_SHA256
+export MEMORY_ADMISSION_RESULT MEMORY_ADMISSION_RESULT_SHA256
+
+# A parent environment can silently force ClearML offline before Task.init().
+# This pilot is publication-bound and must fail before its first optimizer step.
+if [[ "${CLEARML_OFFLINE_MODE+x}" == x ]]; then
+    echo "CLEARML_OFFLINE_MODE must be absent for the online pilot" >&2
+    exit 78
+fi
+
 for path in "${EXPERIMENT}" "${RAW_EXPERIMENT}" "${PANEL}" "${PROTOCOL}" \
+    "${CONTRACT_VALIDATOR}" "${MEMORY_ADMISSION_RESULT}" \
     "${RAW_RUN_DIR}/metadata.json" \
     "${RAW_RUN_DIR}/structured_recovery/epoch_0016/ema_state.pth" \
     "${RAW_RUN_DIR}/structured_recovery/epoch_0016/resume.json" \
@@ -71,14 +98,12 @@ for path in "${EXPERIMENT}" "${RAW_EXPERIMENT}" "${PANEL}" "${PROTOCOL}" \
     "${REFINEMENT_RESULT_DIR}/solver_gate.json"; do
     test -f "${path}" && test ! -L "${path}"
 done
-if ! mkdir "${OUTPUT_DIR}"; then
-    echo "pilot output already exists: ${OUTPUT_DIR}" >&2
-    exit 73
-fi
-OUTPUT_OWNED=true
-printf '%s\n' "${STRUCTURED_PILOT_ATTEMPT}" > "${OUTPUT_DIR}/.structured_pilot_owner"
 
 cd "${REPO_DIR}"
+"${PYTHON_BIN}" "${CONTRACT_VALIDATOR}" \
+    --memory-admission-result "${MEMORY_ADMISSION_RESULT}" \
+    --memory-admission-sha256 "${MEMORY_ADMISSION_RESULT_SHA256}"
+
 "${PYTHON_BIN}" - "${REFINEMENT_RESULT_DIR}" \
     "${REFINEMENT_SOLVER_CONTROL_SHA256}" "${REFINEMENT_SOLVER_GATE_SHA256}" <<'PY'
 import hashlib

@@ -39,7 +39,14 @@ def _metrics(value: float = 1.0) -> dict:
                         },
                     }
                     for field in ("sic", "sit")
-                }
+                },
+                "events": {
+                    event: {
+                        "brier_score": value,
+                        "reliability_l1": value,
+                    }
+                    for event in ("ice_occurrence", "sic_archive_cap")
+                },
             }
             for lead in range(4)
         },
@@ -89,7 +96,36 @@ class StructuredPreconditionedPilotTests(unittest.TestCase):
         self.assertEqual(result["visual_review_status"], "pending_independent_review")
         self.assertFalse(result["full_training_permitted"])
         self.assertFalse(result["test_2023_used"])
-        self.assertEqual(len(result["checks"]), 63)
+        self.assertEqual(len(result["checks"]), 79)
+
+    def test_boundary_gate_fails_closed_on_worse_missing_and_nonfinite(self) -> None:
+        raw = _metrics()
+        candidate = _metrics(0.69)
+        raw_spatial = _spatial(1.0)
+        candidate_spatial = _spatial(0.70)
+        solver = {"status": "converged", "pilot_permitted": True}
+
+        mutations = []
+        worse = copy.deepcopy(candidate)
+        worse["leads"]["d+1"]["events"]["ice_occurrence"]["brier_score"] = 1.01
+        mutations.append(worse)
+        missing = copy.deepcopy(candidate)
+        del missing["leads"]["d+2"]["events"]["sic_archive_cap"]["reliability_l1"]
+        mutations.append(missing)
+        nan = copy.deepcopy(candidate)
+        nan["leads"]["d+3"]["events"]["ice_occurrence"]["reliability_l1"] = float("nan")
+        mutations.append(nan)
+        infinite = copy.deepcopy(candidate)
+        infinite["leads"]["d0"]["events"]["sic_archive_cap"]["brier_score"] = float("inf")
+        mutations.append(infinite)
+
+        for adverse in mutations:
+            with self.subTest(adverse=adverse):
+                result = pilot.paired_pilot_gate(
+                    raw, adverse, raw_spatial, candidate_spatial, solver
+                )
+                self.assertEqual(result["status"], "quantitative_fail")
+                self.assertFalse(result["quantitative_passed"])
 
     def test_gate_fails_closed_on_missing_nonfinite_and_regression(self) -> None:
         raw = _metrics()
@@ -304,9 +340,12 @@ class StructuredPreconditionedPilotTests(unittest.TestCase):
             self.assertEqual(completed.returncode, 73)
             self.assertEqual(sentinel.read_text(encoding="utf-8"), "keep")
         source = script.read_text(encoding="utf-8")
-        self.assertIn("PILOT_TIMEOUT_SECONDS=86400", source)
+        self.assertIn("PILOT_TIMEOUT_SECONDS=86340", source)
         self.assertIn("--kill-after=\"${PILOT_KILL_GRACE_SECONDS}s\"", source)
-        self.assertNotIn("CLEARML_OFFLINE_MODE", source)
+        self.assertIn('[[ "${CLEARML_OFFLINE_MODE+x}" == x ]]', source)
+        self.assertIn("export CLEARML_REQUIRE_ONLINE=1", source)
+        self.assertIn("--memory-admission-result", source)
+        self.assertIn("validate_structured_gaussian_pilot_contract.py", source)
         self.assertIn("--refinement-result-sha256", source)
 
 

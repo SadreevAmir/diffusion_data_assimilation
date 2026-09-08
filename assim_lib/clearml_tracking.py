@@ -50,6 +50,11 @@ class ClearMLTracker:
         env_path: str | None = None,
     ):
         _debug(f"initializing project={project_name} task={task_name}")
+        require_online = os.environ.get("CLEARML_REQUIRE_ONLINE") == "1"
+        if require_online and "CLEARML_OFFLINE_MODE" in os.environ:
+            raise RuntimeError(
+                "Online ClearML was required but CLEARML_OFFLINE_MODE is inherited"
+            )
         load_clearml_env(env_path)
         validate_clearml_env()
         try:
@@ -65,6 +70,10 @@ class ClearMLTracker:
             _debug("created new ClearML task")
         else:
             _debug("using current ClearML task")
+        if require_online and Task.is_offline():
+            raise RuntimeError("Online ClearML was required but the active Task is offline")
+        if require_online and not str(getattr(task, "id", "")):
+            raise RuntimeError("Online ClearML Task has no server task id")
         self.task = task
         _debug(f"task id={getattr(self.task, 'id', None)}")
         try:

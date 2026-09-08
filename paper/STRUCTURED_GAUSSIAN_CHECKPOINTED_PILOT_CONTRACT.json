@@ -3,7 +3,18 @@
   "status": "prepared_for_separate_astra_go",
   "immutable": true,
   "launch_authorized": false,
-  "science_head": "62aafc4eaea483fc598d151c032dfb8eaaa00851",
+  "base_science_head": "62aafc4eaea483fc598d151c032dfb8eaaa00851",
+  "execution_commit_pinned_externally": true,
+  "required_changes_from_base": [
+    "assim_lib/clearml_tracking.py",
+    "assim_lib/structured_preconditioned_pilot.py",
+    "paper/STRUCTURED_GAUSSIAN_CHECKPOINTED_PILOT_CONTRACT.json",
+    "paper/test_validate_structured_gaussian_pilot_contract.py",
+    "paper/validate_structured_gaussian_pilot_contract.py",
+    "scripts/run_structured_preconditioned_pilot.sh",
+    "tests/test_clearml_tracking.py",
+    "tests/test_structured_preconditioned_pilot.py"
+  ],
   "experiment_id": "structured_joint_gaussian_checkpointed_pilot_valid",
   "mode": "validation_structured_gaussian_preconditioned_pilot",
   "mechanism_id": "learned_joint",
@@ -25,11 +36,22 @@
     "config/methods/structured_joint_gaussian_preconditioned_checkpointed_pilot_2f.json": "a0f594936b4fe25b0081be0379124b25dcc1d9a3b158de74a4d746706568ca1a",
     "config/data/m2m_2f_structured_joint_real_lagged.json": "67462c51b9cf8feaf44c757a5f92358c1dde0879aec810989587666c03065cbe",
     "config/data/m2m_2f_structured_joint_train_stats.json": "42551e8888c51b79f4e94ee441d9ec7e2bc373afaaa7e96750896a5c8fa82c14",
-    "assim_lib/structured_preconditioned_pilot.py": "8512a0e4dea2d76f8904dc9ca1dfdda40cc1e7e8ede931a6a6ac6cface5618fd",
-    "scripts/run_structured_preconditioned_pilot.sh": "ef3cecac2ae00e8e8cf10e9d62639532ab553d1a411af80fa0a21d37c3d2e883",
+    "assim_lib/structured_preconditioned_pilot.py": "c3e6cd591b1d64c7f4064aa2cd5d9f8846cc9f19ffcb29df9ff8841643058b04",
+    "scripts/run_structured_preconditioned_pilot.sh": "21dd3d1ed12d0a514c6da2e9d0c9a918d3ff72b6baf12a8e6a724092f57d417b",
     "paper/STRUCTURED_PAIRED_PILOT_PANEL.json": "232af0176ced9acc1eaf85a2bd9f9349ba1a5293731301df1ea417df2a258331",
     "paper/STRUCTURED_GAUSSIAN_PRECONDITIONED_PILOT_PROTOCOL.json": "42162dc5fead36b831e8e054b7619a0dfa00ba12dfdf3f3470253f590cde3094",
-    "paper/validate_structured_gaussian_pilot_contract.py": "522ad2894accc5b6a0cb355bd993db4bc5e4889bb6c927e998b61ef34838360a"
+    "paper/validate_structured_gaussian_pilot_contract.py": "19d8e74c7606bf050366fb7e3263ea92fecfcdcbc48fa7c61de3391784af6b1f",
+    "assim_lib/clearml_tracking.py": "a1d56b23529f1f0c3c5b957f399445fc8cbd823290c80f394fd3226ab81a26dc"
+  },
+  "memory_admission": {
+    "result_sha256": "0257a54eaf2ce1f5b4aa0ab8e3fd8a77834eaa04bcca5b83b8060cc56e9a733f",
+    "schema_version": "structured_gaussian_memory_admission_v1",
+    "status": "passed",
+    "purpose": "execution_memory_only_not_model_quality",
+    "method_config": "config/methods/structured_joint_gaussian_preconditioned_checkpointed_pilot_2f.json",
+    "method_config_sha256": "a0f594936b4fe25b0081be0379124b25dcc1d9a3b158de74a4d746706568ca1a",
+    "protocol": "paper/STRUCTURED_GAUSSIAN_MEMORY_ADMISSION_PROTOCOL.json",
+    "protocol_sha256": "49098cc26c3558cce6d027b8ee863ce4eb8d95b0d96399ef17a88a7ffd4bf70d"
   },
   "scientific_hypothesis": "Gaussian-path velocity preconditioning reduces nuisance regression and granular member texture while preserving the exact target law and improving calibration without compensating losses in proper, boundary, spatial, temporal or physical diagnostics.",
   "single_scientific_change": "structured_velocity_parameterization=gaussian_path_preconditioned",
@@ -73,6 +95,7 @@
   "quantitative_stop_go": {
     "proper": "each field/lead fair_crps and ensemble_mean_rmse candidate/raw ratio <= 1.02",
     "rank": "each field/lead rank_tv_to_uniform and mean absolute central 50/80/90 coverage error must not exceed the paired raw reference",
+    "boundary": "each lead ice_occurrence and sic_archive_cap brier_score and reliability_l1 must not exceed the paired raw reference",
     "spatial": "each SIC and SIT lag-1/2/4 variogram error candidate/raw ratio <= 0.70",
     "temporal": "each field transition increment_fair_crps, ensemble_mean_increment_rmse and trajectory_variogram_score must not exceed the paired raw reference",
     "physical": "zero nonfinite, decoded-support, joint-support, decode-saturation or paired day-0 observation violations",
