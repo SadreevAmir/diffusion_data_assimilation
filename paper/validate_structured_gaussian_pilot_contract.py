@@ -71,9 +71,10 @@ def _validate_git_contract(root: Path, contract: dict[str, Any]) -> str:
     required = contract.get("required_changes_from_base")
     if not isinstance(required, list) or not all(isinstance(item, str) for item in required):
         raise ValueError("required changes from base are absent")
-    if changed != set(required):
+    missing = set(required) - changed
+    if missing:
         raise ValueError(
-            f"changes from base differ: actual={sorted(changed)} expected={sorted(required)}"
+            f"required changes from base are absent: {sorted(missing)}"
         )
     return head
 

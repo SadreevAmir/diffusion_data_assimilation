@@ -41,6 +41,20 @@ class StructuredGaussianPilotContractTests(unittest.TestCase):
             contract = validate()
         self.assertTrue(contract["validated_current_head"])
 
+    def test_later_unrelated_changes_do_not_invalidate_frozen_identities(self) -> None:
+        contract = json.loads(CONTRACT.read_text(encoding="utf-8"))
+        required = set(contract["required_changes_from_base"])
+        with mock.patch(
+            "paper.validate_structured_gaussian_pilot_contract._git_output",
+            side_effect=["f" * 40, "\n".join(sorted(required | {"paper/later_work.md"})), ""],
+        ), mock.patch("subprocess.run") as run:
+            run.return_value.returncode = 0
+            head = __import__(
+                "paper.validate_structured_gaussian_pilot_contract",
+                fromlist=["_validate_git_contract"],
+            )._validate_git_contract(ROOT, contract)
+        self.assertEqual(head, "f" * 40)
+
     def test_identity_drift_fails_closed(self) -> None:
         contract = json.loads(CONTRACT.read_text(encoding="utf-8"))
         changed = next(iter(contract["required_identity_sha256"]))
