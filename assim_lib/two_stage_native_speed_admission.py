@@ -124,13 +124,46 @@ def _ipc_preflight(dataset, batch_size: int, num_workers: int, prefetch_factor: 
     available = _available_shared_memory_bytes()
     if estimated_peak > SHM_SAFETY_FRACTION * available:
         raise RuntimeError(
-            "compact DataLoader IPC estimate exceeds shared-memory safety budget: "
+            "compact DataLoader IPC estimate exceeds shared memory safety budget: "
             f"estimated={estimated_peak}, available={available}"
         )
     return {
         "single_sample_bytes": single_sample_bytes,
         "estimated_peak_ipc_bytes": estimated_peak,
         "shared_memory_available_bytes": available,
+    }
+
+
+def _select_loader_plan(
+    dataset,
+    batch_size: int,
+    preferred_workers: int,
+    prefetch_factor: int,
+) -> dict:
+    probe_batch = _compact_training_collate([dataset[0]])
+    single_sample_bytes = _tensor_bytes(probe_batch)
+    available = _available_shared_memory_bytes()
+    for workers in range(preferred_workers, 0, -1):
+        estimated_peak = _estimated_peak_ipc_bytes(
+            single_sample_bytes,
+            batch_size,
+            workers,
+            prefetch_factor,
+        )
+        if estimated_peak <= SHM_SAFETY_FRACTION * available:
+            return {
+                "num_workers": workers,
+                "single_sample_bytes": single_sample_bytes,
+                "estimated_peak_ipc_bytes": estimated_peak,
+                "shared_memory_available_bytes": available,
+                "fallback_reason": None,
+            }
+    return {
+        "num_workers": 0,
+        "single_sample_bytes": single_sample_bytes,
+        "estimated_peak_ipc_bytes": 0,
+        "shared_memory_available_bytes": available,
+        "fallback_reason": "multiprocess batches exceed the shared memory safety budget",
     }
 
 
@@ -323,7 +356,7 @@ def _benchmark_variant(
     dataset = build_dataset(data_config, split="train")
     if dataset.conditioned_input_channels != config.in_channels:
         raise ValueError(f"{name}: model/data input channel mismatch")
-    ipc = _ipc_preflight(
+    loader_plan = _select_loader_plan(
         dataset,
         config.train_batch_size,
         config.num_workers_train,
@@ -333,7 +366,7 @@ def _benchmark_variant(
     loader = build_dataloader(
         dataset,
         config.train_batch_size,
-        config.num_workers_train,
+        loader_plan["num_workers"],
         shuffle=True,
         collate_fn=_compact_training_collate,
         prefetch_factor=1,
@@ -342,7 +375,7 @@ def _benchmark_variant(
     iterator = iter(loader)
     first_batch = next(iterator)
     batch_bytes = _tensor_bytes(first_batch)
-    if batch_bytes > ipc["single_sample_bytes"] * config.train_batch_size:
+    if batch_bytes > loader_plan["single_sample_bytes"] * config.train_batch_size:
         raise RuntimeError("observed compact batch exceeds pre-worker IPC estimate")
     model = build_unet(config).cuda().train()
     checkpointed = configure_activation_checkpointing(model, config.activation_checkpointing)
@@ -388,12 +421,14 @@ def _benchmark_variant(
         "activation_checkpointing": False,
         "checkpointed_modules": [],
         "ema_in_benchmark": True,
-        "workers_train": config.num_workers_train,
+        "preferred_workers_train": config.num_workers_train,
+        "workers_train": loader_plan["num_workers"],
+        "worker_fallback_reason": loader_plan["fallback_reason"],
         "prefetch_factor": 1,
         "compact_batch_keys": list(TRAINING_BATCH_KEYS),
         "compact_batch_bytes": batch_bytes,
-        "estimated_peak_ipc_bytes": ipc["estimated_peak_ipc_bytes"],
-        "shared_memory_available_bytes": ipc["shared_memory_available_bytes"],
+        "estimated_peak_ipc_bytes": loader_plan["estimated_peak_ipc_bytes"],
+        "shared_memory_available_bytes": loader_plan["shared_memory_available_bytes"],
         "shared_memory_safety_fraction": SHM_SAFETY_FRACTION,
         "median_fetch_seconds": float(torch.tensor(fetch_seconds).median().item()),
         "median_step_seconds": float(torch.tensor(step_seconds).median().item()),

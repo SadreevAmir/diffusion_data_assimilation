@@ -51,6 +51,7 @@ from assim_lib.two_stage_native_speed_admission import (
     _compact_training_collate,
     _estimated_peak_ipc_bytes,
     _ipc_preflight,
+    _select_loader_plan,
     _tensor_bytes,
 )
 
@@ -511,6 +512,31 @@ class StructuredConditioningTests(unittest.TestCase):
                 _ipc_preflight(dataset, batch_size=8, num_workers=2, prefetch_factor=1)
         self.assertEqual(dataset.reads, 1)
         self.assertEqual(dataset.assert_index, 0)
+
+    def test_speed_admission_falls_back_without_creating_unsafe_workers(self) -> None:
+        class ProbeDataset:
+            def __init__(self) -> None:
+                self.reads = 0
+
+            def __getitem__(self, index: int) -> dict:
+                self.reads += 1
+                return {
+                    "structured_physical_truth": torch.zeros((2, 3, 4)),
+                    "valid_mask": torch.ones((1, 3, 4)),
+                    "structured_flow_mask": torch.ones((4, 3, 4)),
+                    "structured_conditioning": torch.zeros((17, 3, 4)),
+                }
+
+        dataset = ProbeDataset()
+        with patch(
+            "assim_lib.two_stage_native_speed_admission._available_shared_memory_bytes",
+            return_value=1,
+        ):
+            plan = _select_loader_plan(dataset, 8, preferred_workers=2, prefetch_factor=1)
+        self.assertEqual(dataset.reads, 1)
+        self.assertEqual(plan["num_workers"], 0)
+        self.assertEqual(plan["estimated_peak_ipc_bytes"], 0)
+        self.assertIn("shared memory", plan["fallback_reason"])
 
     def test_dynamics_uses_exact_initial_state_and_only_d3_d6_d9_targets(self) -> None:
         for offset in range(-2, 10):

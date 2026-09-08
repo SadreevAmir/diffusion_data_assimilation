@@ -26,7 +26,8 @@ export TRANSFORMERS_OFFLINE=1
 /opt/conda/bin/python -m unittest \
   tests.test_structured_joint_training.StructuredConditioningTests.test_assimilation_pads_raw_lag0_before_applying_padded_track_mask \
   tests.test_structured_joint_training.StructuredConditioningTests.test_speed_admission_collate_excludes_non_training_payload \
-  tests.test_structured_joint_training.StructuredConditioningTests.test_speed_admission_ipc_gate_fails_before_worker_iteration
+  tests.test_structured_joint_training.StructuredConditioningTests.test_speed_admission_ipc_gate_fails_before_worker_iteration \
+  tests.test_structured_joint_training.StructuredConditioningTests.test_speed_admission_falls_back_without_creating_unsafe_workers
 exec /opt/conda/bin/python -m assim_lib.two_stage_native_speed_admission \
   --output-dir "$OUTPUT_DIR" \
   --reuse-contract-dir \
