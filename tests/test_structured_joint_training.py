@@ -315,6 +315,61 @@ class StructuredConditioningTests(unittest.TestCase):
         }
         return config
 
+    def test_structured_stats_pair_contract_separates_assimilation_and_dynamics(self) -> None:
+        dynamics = {"conditioning_layout": "structured_sic_sit_dynamics_v1"}
+        structured_stats_module._validate_training_pair_contract(
+            SimpleNamespace(background_strategy="none", config=dynamics)
+        )
+        with self.assertRaisesRegex(ValueError, "forbid a background"):
+            structured_stats_module._validate_training_pair_contract(
+                SimpleNamespace(background_strategy="calendar_year_ago", config=dynamics)
+            )
+        with self.assertRaisesRegex(ValueError, "require calendar-year"):
+            structured_stats_module._validate_training_pair_contract(
+                SimpleNamespace(
+                    background_strategy="none",
+                    config={"conditioning_layout": "structured_sic_sit_assimilation_v1"},
+                )
+            )
+
+    def test_real_dynamics_stats_need_no_background_or_sral(self) -> None:
+        for offset in range(10):
+            day = date(2020, 3, 1) + timedelta(days=offset)
+            self._forecast(day.isoformat(), 0.45 + 0.01 * offset, 0.9 + 0.02 * offset)
+            path = self.preds / f"ocean+atmosphere_24_{day.isoformat()}.npy"
+            field = np.load(path)
+            field[0, :, 0, 0] = np.nan
+            field[1, :, 0, 0] = np.nan
+            field[0, :, 0, 1] = 0.75
+            for index in (6, 7, 13, 14):
+                field[index] += np.float16(0.1 * offset)
+                field[index, :, 1, 1] += np.float16(0.25)
+            np.save(path, field)
+        open_npy_mmap.cache_clear()
+
+        config = self._dynamics_config()
+        config["valid"] = dict(config["train"])
+        config["test"] = dict(config["train"])
+        config.update(
+            {
+                "structured_sic_cap": 0.75,
+                "candidate_dynamic_indices": [6, 7, 13, 14],
+                "archive_semantics_audit_path": str(self.root / "dynamics_audit.json"),
+                "archive_semantics_audit_sha256": "pending",
+            }
+        )
+        audit = build_archive_semantics_audit(config)
+        audit_path = Path(config["archive_semantics_audit_path"])
+        audit_path.write_text(json.dumps(audit, indent=2) + "\n", encoding="utf-8")
+        config["archive_semantics_audit_sha256"] = hashlib.sha256(audit_path.read_bytes()).hexdigest()
+        config_path = self.root / "dynamics_data.json"
+        config_path.write_text(json.dumps(config), encoding="utf-8")
+
+        stats = structured_stats_module.build_structured_state_stats(config, config_path)
+        self.assertEqual(stats["audit"]["trajectory_lead_days"], [3, 6, 9])
+        self.assertEqual(stats["dynamic_forcing_normalization"]["indices"], [6, 7, 13, 14])
+        self.assertEqual(stats["audit"]["anchor_count"], 1)
+
     def test_lags_are_separate_feb29_is_missing_and_nan_open_water_is_observed(self) -> None:
         self._forecast("2019-02-28", 0.3, 0.8)
         self._forecast("2019-03-01", 0.4, 0.9)

@@ -15,7 +15,7 @@ from pathlib import Path
 import numpy as np
 
 from .config import load_json
-from .data import M2MForecastDataset
+from .data import STRUCTURED_DYNAMICS_CONDITIONING_LAYOUT, M2MForecastDataset
 from .forecast import field_at_hour
 from .structured_archive_audit import validate_bound_archive_audit
 from .structured_joint_state import (
@@ -75,6 +75,15 @@ class _StreamingMomentHistogram:
         return mean, std
 
 
+def _validate_training_pair_contract(dataset: M2MForecastDataset) -> None:
+    dynamics_layout = dataset.config.get("conditioning_layout") == STRUCTURED_DYNAMICS_CONDITIONING_LAYOUT
+    if dynamics_layout:
+        if dataset.background_strategy != "none":
+            raise ValueError("structured dynamics statistics forbid a background field")
+    elif dataset.background_strategy != "calendar_year_ago":
+        raise ValueError("structured assimilation statistics require calendar-year train pairs")
+
+
 def build_structured_state_stats(data_config: dict, data_config_path: str | Path) -> dict:
     """Stream the exact configured train pairs and construct the codec contract."""
     archive_audit = validate_bound_archive_audit(data_config, Path(data_config_path).resolve())
@@ -88,8 +97,7 @@ def build_structured_state_stats(data_config: dict, data_config_path: str | Path
     dataset.validate_structured_sral_audit_contract(archive_audit)
     if dataset.indices != [0, 1]:
         raise ValueError("structured statistics require data indices [0, 1] (SIC, SIT)")
-    if dataset.background_strategy != "calendar_year_ago":
-        raise ValueError("structured statistics require exact calendar-year train pairs")
+    _validate_training_pair_contract(dataset)
 
     sic_interior = _StreamingMomentHistogram(*_SIC_LOGIT_RANGE)
     sit_positive = _StreamingMomentHistogram(*_SIT_LOG_RANGE)
