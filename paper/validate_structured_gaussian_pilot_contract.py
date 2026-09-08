@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
 import subprocess
 from pathlib import Path
@@ -28,9 +29,20 @@ def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def _sanitized_git_environment() -> dict[str, str]:
+    """Bind Git discovery to ``cwd``, never inherited remote checkout overrides."""
+
+    return {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+
+
 def _git_output(root: Path, *args: str) -> str:
     return subprocess.run(
-        ["git", *args], cwd=root, check=True, capture_output=True, text=True
+        ["git", *args],
+        cwd=root,
+        env=_sanitized_git_environment(),
+        check=True,
+        capture_output=True,
+        text=True,
     ).stdout.strip()
 
 
@@ -44,6 +56,7 @@ def _validate_git_contract(root: Path, contract: dict[str, Any]) -> str:
         subprocess.run(
             ["git", "merge-base", "--is-ancestor", base, "HEAD"],
             cwd=root,
+            env=_sanitized_git_environment(),
             check=True,
             capture_output=True,
             text=True,

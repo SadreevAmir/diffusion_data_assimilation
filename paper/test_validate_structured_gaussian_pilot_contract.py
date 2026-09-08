@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from paper.validate_structured_gaussian_pilot_contract import (
     CONTRACT,
@@ -26,6 +28,17 @@ class StructuredGaussianPilotContractTests(unittest.TestCase):
             contract["base_science_head"],
             "62aafc4eaea483fc598d151c032dfb8eaaa00851",
         )
+        self.assertTrue(contract["validated_current_head"])
+
+    def test_git_validation_ignores_poisoned_repository_environment(self) -> None:
+        poisoned = {
+            "GIT_DIR": "/definitely/not/the/publication/repository/.git",
+            "GIT_WORK_TREE": "/definitely/not/the/publication/repository",
+            "GIT_INDEX_FILE": "/definitely/not/the/publication/repository/index",
+            "GIT_COMMON_DIR": "/definitely/not/the/publication/repository/common",
+        }
+        with mock.patch.dict(os.environ, poisoned, clear=False):
+            contract = validate()
         self.assertTrue(contract["validated_current_head"])
 
     def test_identity_drift_fails_closed(self) -> None:
