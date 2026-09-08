@@ -2028,7 +2028,7 @@ class UNetTrainer:
             one["valid_mask"][0],
             title=(
                 "joint SIC/SIT trajectory "
-                f"d..d+{self.config.trajectory_horizon_days}, epoch {epoch}, {weights_label}"
+                f"leads={list(self.config.trajectory_lead_days)}, epoch {epoch}, {weights_label}"
             ),
         )
         path = os.path.join(samples_dir, f"epoch_{epoch:04d}_structured_trajectory.png")

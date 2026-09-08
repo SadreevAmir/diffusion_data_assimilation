@@ -1,0 +1,94 @@
+{
+  "schema_version": "two_stage_assimilation_dynamics_protocol_v1",
+  "status": "preregistered_before_server_measurements",
+  "data_split": {
+    "train": "2016-01-01..2021-12-31",
+    "validation": "2022-01-01..2022-12-31",
+    "test": "2023 remains sealed until final freeze"
+  },
+  "assimilation": {
+    "target_law": "q_A(X_d | B_d, Y_d, Y_d-1, Y_d-2, masks, calendar, grid)",
+    "target_lead_days": [0],
+    "conditioning_channels": 17,
+    "model_input_channels": 23,
+    "model_output_latent_channels": 4,
+    "background": "exact previous-calendar-year SIC/SIT for d only",
+    "observations": "error-free OSSE values from archive reference on real SRAL geometry; three lags remain separate",
+    "forbidden_inputs": [
+      "future background",
+      "future tracks",
+      "lag-specific previous-year innovations"
+    ]
+  },
+  "dynamics": {
+    "target_law": "q_D(X_d+3, X_d+6, X_d+9 | X_d, F_d, masks, calendar, grid)",
+    "target_lead_days": [3, 6, 9],
+    "conditioning_channels": 15,
+    "model_input_channels": 29,
+    "model_output_latent_channels": 12,
+    "initial_state": "exact archive-reference SIC/SIT at d during training and oracle validation",
+    "forcing_indices": [6, 7, 13, 14],
+    "forcing_policy": "d-only values with per-field finite masks and train-only normalization",
+    "forcing_claim": "signed archive grid-displacement components until sign/orientation/units audit passes",
+    "forbidden_inputs": [
+      "previous-calendar-year background",
+      "observation tracks",
+      "reference forcing after d",
+      "future target fields as conditioning"
+    ]
+  },
+  "composition": {
+    "law": "q_AD(X_d,X_d+3,X_d+6,X_d+9|C)=q_A(X_d|C)q_D(X_d+3,X_d+6,X_d+9|X_d,F_d)",
+    "sampling": "one independent assimilation member followed by one joint dynamics trajectory per ensemble member",
+    "required_reports": ["assimilation only", "oracle dynamics", "assimilation-to-dynamics"]
+  },
+  "native_architecture_candidates": [
+    {
+      "id": "assimilation_s_native",
+      "canvas": [320, 256],
+      "block_out_channels": [32, 64, 128, 128],
+      "parameter_count": 4335108,
+      "batch_size_for_speed_admission": 8
+    },
+    {
+      "id": "dynamics_s_native",
+      "canvas": [320, 256],
+      "block_out_channels": [32, 64, 128, 128],
+      "parameter_count": 4339148,
+      "batch_size_for_speed_admission": 8
+    },
+    {
+      "id": "dynamics_m_native",
+      "canvas": [320, 256],
+      "block_out_channels": [64, 128, 256, 256],
+      "parameter_count": 17302412,
+      "batch_size_for_speed_admission": 4
+    }
+  ],
+  "shared_architecture": {
+    "layers_per_block": 1,
+    "attention": "bottleneck only",
+    "normalization": "GroupNorm-16",
+    "activation_checkpointing": false,
+    "train_workers": 2,
+    "validation_workers": 1,
+    "mixed_precision": "bf16"
+  },
+  "speed_admission": {
+    "warmup_optimizer_steps": 10,
+    "measured_optimizer_steps": 30,
+    "selection": "non-dominated wall-time, examples/s and peak-memory candidates only",
+    "no_hidden_retry": true,
+    "one_gpu_maximum": true
+  },
+  "coarse_resolution_policy": {
+    "status": "blocked_pending_physical_regrid_contract",
+    "reason": "native archive is 311x225 padded to 320x256; changing canvas is not a resize implementation",
+    "requirements": [
+      "area-aware ocean regrid",
+      "volume-consistent SIC/SIT aggregation",
+      "coarse observation operator with representativeness error",
+      "new train-only statistics"
+    ]
+  }
+}

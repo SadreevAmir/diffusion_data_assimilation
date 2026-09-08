@@ -45,15 +45,11 @@ def main(config: dict, config_dir: Path, *, trainer_class=None, scheduler_factor
         archive_audit = validate_bound_archive_audit(data_config, data_config_path)
         stats_path_value = model_config.get("structured_state_stats_path")
         if not stats_path_value:
-            raise ValueError(
-                "structured_joint_state_flow requires structured_state_stats_path"
-            )
+            raise ValueError("structured_joint_state_flow requires structured_state_stats_path")
         stats_path = resolve_path(stats_path_value, model_config_path.resolve().parent)
         _debug(f"loading structured train-only statistics: {stats_path}")
         model_config["structured_state_stats"] = load_json(stats_path)
-        validate_conditioning_normalization(
-            data_config, model_config["structured_state_stats"]
-        )
+        validate_conditioning_normalization(data_config, model_config["structured_state_stats"])
         expected_data_hash = model_config["structured_state_stats"].get("data_config_sha256")
         actual_data_hash = canonical_mapping_sha256(data_config)
         if expected_data_hash != actual_data_hash:

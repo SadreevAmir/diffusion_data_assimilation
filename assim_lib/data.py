@@ -259,9 +259,7 @@ class M2MForecastDataset(Dataset):
         self.stds = self.config["stds"]
         self.padding_values = self.config["padding_values"]
         self.image_size = tuple(int(v) for v in self.config.get("image_size", [320, 256]))
-        self.hour_index = int(
-            self.config.get("target_slice_index", self.config.get("target_hour_index", 23))
-        )
+        self.hour_index = int(self.config.get("target_slice_index", self.config.get("target_hour_index", 23)))
         self.hour_mode = str(self.config.get("hour_mode", "fixed"))
         if self.hour_mode not in ("fixed", "all"):
             raise ValueError(f"Unknown hour_mode={self.hour_mode!r}; expected 'fixed' or 'all'")
@@ -275,6 +273,9 @@ class M2MForecastDataset(Dataset):
         if unexpected_calendar_features:
             raise ValueError(f"Unknown calendar_features: {sorted(unexpected_calendar_features)}")
         self.observed_channels = [int(v) for v in self.config.get("observed_channels", [0])]
+        self.dynamic_forcing_indices = tuple(
+            int(value) for value in self.config.get("dynamic_forcing_indices", ())
+        )
         self.assimilation_range = int(self.config.get("assimilation_range", 1))
         self.future_horizon_days = int(self.config.get("future_horizon_days", 0))
         if self.future_horizon_days < 0:
@@ -288,7 +289,9 @@ class M2MForecastDataset(Dataset):
             or any(value < 0 for value in self.trajectory_lead_days)
             or tuple(sorted(set(self.trajectory_lead_days))) != self.trajectory_lead_days
         ):
-            raise ValueError("trajectory_lead_days must be a non-empty increasing list of unique non-negative days")
+            raise ValueError(
+                "trajectory_lead_days must be a non-empty increasing list of unique non-negative days"
+            )
         self.obs_shift = max(0, self.assimilation_range - 1)
         split_seed_offset = {"train": 0, "valid": 10000, "test": 20000}.get(split, 30000)
         self.seed = int(self.config.get("seed", 1234)) + split_seed_offset
@@ -321,7 +324,7 @@ class M2MForecastDataset(Dataset):
         obs_start = self.target_start - timedelta(days=self.obs_shift)
         obs_end = self.target_end + timedelta(days=1)
         self.obs_data = records_in_range(records, obs_start, obs_end)
-        if len(self.back_data) == 0 or len(self.obs_data) == 0:
+        if (self.background_strategy != "none" and len(self.back_data) == 0) or len(self.obs_data) == 0:
             raise ValueError("No forecast records selected for M2M date ranges")
         indexed_range_too_short = (
             self.background_strategy == "indexed"
@@ -340,8 +343,7 @@ class M2MForecastDataset(Dataset):
         )
         self.calendar_pairs = (
             self._build_calendar_pairs()
-            if (self.background_strategy == "calendar_year_ago" or structured_dynamics)
-            and not forecast_only
+            if (self.background_strategy == "calendar_year_ago" or structured_dynamics) and not forecast_only
             else []
         )
         self.forecast_only = bool(forecast_only)
@@ -351,9 +353,7 @@ class M2MForecastDataset(Dataset):
         self._validate_structured_sral_coverage()
 
     def _build_calendar_pairs(self):
-        dynamics_layout = (
-            self.config.get("conditioning_layout") == STRUCTURED_DYNAMICS_CONDITIONING_LAYOUT
-        )
+        dynamics_layout = self.config.get("conditioning_layout") == STRUCTURED_DYNAMICS_CONDITIONING_LAYOUT
         pairs = []
         for target_record in self.obs_data:
             if not self.target_start <= target_record.date <= self.target_end:
@@ -438,9 +438,7 @@ class M2MForecastDataset(Dataset):
         uses_tracks = layout != STRUCTURED_DYNAMICS_CONDITIONING_LAYOUT
         expected = {
             "indices": [0, 1],
-            "observed_channels": (
-                [0, 1] if layout in STRUCTURED_SIC_SIT_LAYOUTS else [0]
-            ),
+            "observed_channels": ([0, 1] if layout in STRUCTURED_SIC_SIT_LAYOUTS else [0]),
             "assimilation_range": 3 if uses_tracks else 1,
             "background_strategy": (
                 "none" if layout == STRUCTURED_DYNAMICS_CONDITIONING_LAYOUT else "calendar_year_ago"
@@ -454,7 +452,9 @@ class M2MForecastDataset(Dataset):
             "sral_transform_index": 1 if uses_tracks else 11,
             "synthetic_probability": 0.0,
             "empty_probability": 0.0,
-            "require_finite_model_values": False,
+            "require_finite_model_values": (
+                True if layout == STRUCTURED_DYNAMICS_CONDITIONING_LAYOUT else False
+            ),
         }
         actual = {
             "indices": self.indices,
@@ -468,9 +468,7 @@ class M2MForecastDataset(Dataset):
             ),
             "synthetic_probability": float(mask_config.get("synthetic_probability", 0.0)),
             "empty_probability": float(mask_config.get("empty_probability", 0.0)),
-            "require_finite_model_values": bool(
-                mask_config.get("require_finite_model_values", True)
-            ),
+            "require_finite_model_values": bool(mask_config.get("require_finite_model_values", True)),
         }
         if layout in STRUCTURED_SIC_SIT_LAYOUTS:
             expected.update(
@@ -493,14 +491,10 @@ class M2MForecastDataset(Dataset):
                     "source_array_dtype": self.config.get("source_array_dtype"),
                     "model_nan_semantics": self.config.get("model_nan_semantics"),
                     "target_slice_index": self.config.get("target_slice_index"),
-                    "utc_time_coordinate_verified": self.config.get(
-                        "utc_time_coordinate_verified"
-                    ),
+                    "utc_time_coordinate_verified": self.config.get("utc_time_coordinate_verified"),
                     "time_claim_policy": self.config.get("time_claim_policy"),
                     "forbidden_time_labels": self.config.get("forbidden_time_labels"),
-                    "dynamic_forcing_indices": self.config.get(
-                        "dynamic_forcing_indices"
-                    ),
+                    "dynamic_forcing_indices": self.config.get("dynamic_forcing_indices"),
                 }
             )
         if layout == STRUCTURED_TRAJECTORY_CONDITIONING_LAYOUT:
@@ -530,6 +524,7 @@ class M2MForecastDataset(Dataset):
                 }
             )
         elif layout == STRUCTURED_DYNAMICS_CONDITIONING_LAYOUT:
+            expected["dynamic_forcing_indices"] = list(self.dynamic_forcing_indices)
             expected.update(
                 {
                     "trajectory_lead_days": (3, 6, 9),
@@ -542,19 +537,21 @@ class M2MForecastDataset(Dataset):
                     "trajectory_semantics": self.config.get("trajectory_semantics"),
                 }
             )
+            if tuple(sorted(set(self.dynamic_forcing_indices))) != self.dynamic_forcing_indices or not set(
+                self.dynamic_forcing_indices
+            ).issubset({6, 7, 13, 14}):
+                raise ValueError(
+                    "dynamics forcing indices must be an increasing unique subset of [6,7,13,14]"
+                )
         mismatches = {
             key: (actual[key], expected_value)
             for key, expected_value in expected.items()
             if actual[key] != expected_value
         }
         if mismatches:
-            raise ValueError(
-                f"{layout} has an incompatible data protocol: {mismatches}"
-            )
+            raise ValueError(f"{layout} has an incompatible data protocol: {mismatches}")
         if self.future_horizon_days != max(self.trajectory_lead_days):
-            raise ValueError(
-                "future_horizon_days must equal max(trajectory_lead_days)"
-            )
+            raise ValueError("future_horizon_days must equal max(trajectory_lead_days)")
 
     def _load_base_valid_mask(self) -> torch.Tensor:
         channels = len(self.indices)
@@ -569,8 +566,7 @@ class M2MForecastDataset(Dataset):
 
     def _load_sral_records(self) -> dict[date, list[Path]]:
         requires_sral = (
-            self.config.get("observation_mask", {}).get("kind", "generated_track")
-            == "sral_tracks"
+            self.config.get("observation_mask", {}).get("kind", "generated_track") == "sral_tracks"
         )
         sral_dir = self.config.get("sral_dir")
         if not sral_dir:
@@ -627,11 +623,13 @@ class M2MForecastDataset(Dataset):
             candidate_dates = set()
             for _, target_record in self.calendar_pairs:
                 value_date = target_record.date - timedelta(days=lag)
+                needs_lag_background = (
+                    self.config.get("conditioning_layout") == STRUCTURED_TRAJECTORY_CONDITIONING_LAYOUT
+                )
                 background_date = previous_calendar_date(value_date)
-                if (
-                    value_date in self.records_by_date
-                    and background_date is not None
-                    and background_date in self.records_by_date
+                if value_date in self.records_by_date and (
+                    not needs_lag_background
+                    or (background_date is not None and background_date in self.records_by_date)
                 ):
                     candidate_dates.add(value_date)
             available_dates = candidate_dates & set(self.sral_records)
@@ -645,9 +643,7 @@ class M2MForecastDataset(Dataset):
                 "candidate_date_count": len(candidate_dates),
                 "available_file_date_count": len(available_dates),
                 "missing_date_count": len(missing_dates),
-                "missing_fraction": (
-                    len(missing_dates) / len(candidate_dates) if candidate_dates else None
-                ),
+                "missing_fraction": (len(missing_dates) / len(candidate_dates) if candidate_dates else None),
             }
 
     @classmethod
@@ -679,13 +675,9 @@ class M2MForecastDataset(Dataset):
             background_date = previous_calendar_date(target_date + timedelta(days=lead))
             record = self.records_by_date.get(background_date) if background_date else None
             if record is None:
-                raise FileNotFoundError(
-                    f"missing exact previous-calendar-year background for d+{lead}"
-                )
+                raise FileNotFoundError(f"missing exact previous-calendar-year background for d+{lead}")
             background_records.append(record)
-        raw_backgrounds = [
-            field_at_hour(record.path, hour, self.indices) for record in background_records
-        ]
+        raw_backgrounds = [field_at_hour(record.path, hour, self.indices) for record in background_records]
         for record, raw in zip(background_records, raw_backgrounds, strict=True):
             self._validate_structured_raw_field(raw, record.path)
         normalized_backgrounds = [
@@ -702,9 +694,7 @@ class M2MForecastDataset(Dataset):
         background = torch.cat(normalized_backgrounds, dim=0)
         valid_mask = self.base_valid_mask.clone()
         condition, obs_values, obs_mask, flow_mask, lag0_physical, diagnostics = (
-            self._structured_trajectory_conditioning(
-                target_date, hour, background, valid_mask
-            )
+            self._structured_trajectory_conditioning(target_date, hour, background, valid_mask)
         )
         physical_backgrounds = []
         padding = torch.as_tensor(self.padding_values, dtype=torch.float32).view(-1, 1, 1)
@@ -741,9 +731,7 @@ class M2MForecastDataset(Dataset):
                 "target_date": target_date.isoformat(),
                 "archive_slice_index": hour,
                 "trajectory_semantics": self.config["trajectory_semantics"],
-                "background_trajectory_paths": [
-                    str(record.path) for record in background_records
-                ],
+                "background_trajectory_paths": [str(record.path) for record in background_records],
                 "target_trajectory_paths": [],
                 "truth_free_forecast_builder": True,
                 **diagnostics,
@@ -771,17 +759,17 @@ class M2MForecastDataset(Dataset):
         }:
             trajectory_steps = len(self.trajectory_lead_days)
             state_channels = 4 * trajectory_steps
-            background_steps = (
-                trajectory_steps
+            condition_channels = (
+                3 * trajectory_steps + 3 * 5 + 1 + 4
                 if layout == STRUCTURED_TRAJECTORY_CONDITIONING_LAYOUT
-                else 1
+                else 3 + 3 * 3 + 1 + 4
             )
-            condition_channels = 3 * background_steps + 3 * 5 + 1 + 4
             return state_channels + 2 + condition_channels
         if layout == STRUCTURED_DYNAMICS_CONDITIONING_LAYOUT:
             state_channels = 4 * len(self.trajectory_lead_days)
-            # Initial SIC/SIT, valid-ocean mask, and four cyclic calendar channels.
-            return state_channels + 2 + 2 + 1 + 4
+            # Initial SIC/SIT, valid-ocean mask, forcing values and per-field
+            # availability masks, plus four cyclic calendar channels.
+            return state_channels + 2 + 2 + 1 + 2 * len(self.dynamic_forcing_indices) + 4
         if self.config.get("conditioning_layout") == STRUCTURED_CONDITIONING_LAYOUT:
             # Four structured state coordinates, two xy coordinates, and the
             # immutable 17-channel condition tensor defined below.
@@ -796,8 +784,7 @@ class M2MForecastDataset(Dataset):
             pair_lines = []
             for background, target in self.calendar_pairs:
                 trajectory = ",".join(
-                    (target.date + timedelta(days=lead)).isoformat()
-                    for lead in self.trajectory_lead_days
+                    (target.date + timedelta(days=lead)).isoformat() for lead in self.trajectory_lead_days
                 )
                 pair_lines.append(
                     f"{self.background_strategy},{background.date.isoformat()},"
@@ -829,9 +816,7 @@ class M2MForecastDataset(Dataset):
             "future_horizon_days": self.future_horizon_days,
             "trajectory_lead_days": list(self.trajectory_lead_days),
             "target_slice_index": self.hour_index,
-            "utc_time_coordinate_verified": self.config.get(
-                "utc_time_coordinate_verified"
-            ),
+            "utc_time_coordinate_verified": self.config.get("utc_time_coordinate_verified"),
             "trajectory_semantics": self.config.get("trajectory_semantics", "unspecified"),
             "time_claim_policy": self.config.get("time_claim_policy", "unspecified"),
             "source_array_dtype": self.config.get("source_array_dtype", "unspecified"),
@@ -839,9 +824,7 @@ class M2MForecastDataset(Dataset):
             "sral_source": {
                 "declared_root": self.config.get("sral_dir"),
                 "resolved_root": (
-                    str(Path(self.config["sral_dir"]).resolve())
-                    if self.config.get("sral_dir")
-                    else None
+                    str(Path(self.config["sral_dir"]).resolve()) if self.config.get("sral_dir") else None
                 ),
                 "dated_record_count": len(self.sral_records),
                 "file_count": sum(len(paths) for paths in self.sral_records.values()),
@@ -851,7 +834,10 @@ class M2MForecastDataset(Dataset):
 
     def validate_structured_sral_audit_contract(self, audit: Mapping) -> None:
         """Match runtime source inventory/availability to the admitted full audit."""
-        if self.config.get("conditioning_layout") != STRUCTURED_TRAJECTORY_CONDITIONING_LAYOUT:
+        if self.config.get("conditioning_layout") not in {
+            STRUCTURED_TRAJECTORY_CONDITIONING_LAYOUT,
+            STRUCTURED_ASSIMILATION_CONDITIONING_LAYOUT,
+        }:
             return
         expected_source = audit["sral_provenance"]
         actual_source = self.provenance()["sral_source"]
@@ -884,9 +870,7 @@ class M2MForecastDataset(Dataset):
         sic_nan = np.isnan(raw[0]) & valid
         sit_nan = np.isnan(raw[1]) & valid
         if not np.array_equal(sic_nan, sit_nan):
-            raise ValueError(
-                f"mismatched SIC/SIT missingness on water in {source}"
-            )
+            raise ValueError(f"mismatched SIC/SIT missingness on water in {source}")
         if np.any(np.isinf(raw)):
             raise ValueError(f"Inf is forbidden in structured SIC/SIT source {source}")
 
@@ -1170,8 +1154,7 @@ class M2MForecastDataset(Dataset):
 
         feature_values = calendar_feature_values(target_date, hour, self.calendar_features)
         calendar_channels = [
-            torch.full((1, *self.image_size), value, dtype=torch.float32)
-            for value in feature_values
+            torch.full((1, *self.image_size), value, dtype=torch.float32) for value in feature_values
         ]
         background_condition = torch.where(valid_mask > 0, background, torch.zeros_like(background))
         condition = torch.cat(
@@ -1235,11 +1218,7 @@ class M2MForecastDataset(Dataset):
             background_date = previous_calendar_date(value_date)
             value_record = self.records_by_date.get(value_date)
             background_record = self.records_by_date.get(background_date) if background_date else None
-            if (
-                value_record is None
-                or background_record is None
-                or value_date not in self.sral_records
-            ):
+            if value_record is None or background_record is None or value_date not in self.sral_records:
                 lag_channels.extend((zero_field.clone(), zero_field.clone(), zero_mask.clone()))
                 lag_available.append(False)
                 lag_obs_count.append(0)
@@ -1290,9 +1269,7 @@ class M2MForecastDataset(Dataset):
                     raw_physical,
                     torch.zeros_like(raw_physical),
                 )
-                raw_physical = pad_to_size(
-                    raw_physical, self.image_size, fill_value=(0.0, 0.0)
-                )
+                raw_physical = pad_to_size(raw_physical, self.image_size, fill_value=(0.0, 0.0))
                 lag0_physical = torch.where(
                     mask.expand_as(raw_physical) > 0,
                     raw_physical,
@@ -1301,17 +1278,14 @@ class M2MForecastDataset(Dataset):
 
         feature_values = calendar_feature_values(target_date, hour, self.calendar_features)
         calendar_channels = [
-            torch.full((1, *self.image_size), value, dtype=torch.float32)
-            for value in feature_values
+            torch.full((1, *self.image_size), value, dtype=torch.float32) for value in feature_values
         ]
         background_channels: list[torch.Tensor] = []
         background_steps = background_trajectory.shape[0] // 2
         if background_trajectory.shape[0] != 2 * background_steps:
             raise ValueError("structured background trajectory must contain SIC/SIT pairs")
         for lead_index in range(background_steps):
-            lead_background = background_trajectory[
-                2 * lead_index : 2 * lead_index + 2
-            ]
+            lead_background = background_trajectory[2 * lead_index : 2 * lead_index + 2]
             background_channels.extend(
                 (
                     torch.where(
@@ -1353,10 +1327,123 @@ class M2MForecastDataset(Dataset):
         diagnostics.update({"lag_available": lag_available, "lag_obs_count": lag_obs_count})
         return condition, obs_values, obs_mask, flow_mask, lag0_physical, diagnostics
 
+    def _structured_assimilation_conditioning(
+        self,
+        target_date: date,
+        hour: int,
+        background: torch.Tensor,
+        valid_mask: torch.Tensor,
+    ) -> tuple[
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        dict,
+    ]:
+        """Build d0 assimilation inputs without hidden lag-background fields."""
+        zero_field = torch.zeros((2, *self.image_size), dtype=torch.float32)
+        zero_mask = torch.zeros((1, *self.image_size), dtype=torch.float32)
+        lag_channels: list[torch.Tensor] = []
+        lag_available: list[bool] = []
+        lag_obs_count: list[int] = []
+        lag0_mask = zero_mask.clone()
+        lag0_physical = zero_field.clone()
+        for lag in range(3):
+            value_date = target_date - timedelta(days=lag)
+            value_record = self.records_by_date.get(value_date)
+            if value_record is None or value_date not in self.sral_records:
+                lag_channels.extend((zero_field.clone(), zero_mask.clone()))
+                lag_available.append(False)
+                lag_obs_count.append(0)
+                continue
+            spatial_mask = self.sral_spatial_mask(target_date, day_offsets=(lag,), transform_index=1)
+            if spatial_mask is None:
+                raise ValueError(
+                    f"SRAL geometry has no finite valid coverage for required lag date {value_date}"
+                )
+            value_raw = field_at_hour(value_record.path, hour, self.indices)
+            self._validate_structured_raw_field(value_raw, value_record.path)
+            value, _ = prepare_model_field(
+                value_raw,
+                None,
+                self.means,
+                self.stds,
+                self.padding_values,
+                self.image_size,
+            )
+            mask = ((spatial_mask > 0) & (valid_mask[:1] > 0)).to(torch.float32)
+            observed = torch.where(mask.expand_as(value) > 0, value, zero_field)
+            lag_channels.extend((observed, mask))
+            lag_available.append(True)
+            lag_obs_count.append(int(mask.sum().item()))
+            if lag == 0:
+                lag0_mask = mask
+                raw_physical = torch.as_tensor(value_raw, dtype=torch.float32)
+                raw_physical = torch.where(
+                    torch.isfinite(raw_physical),
+                    raw_physical,
+                    torch.zeros_like(raw_physical),
+                )
+                lag0_physical = torch.where(
+                    mask.expand_as(raw_physical) > 0,
+                    pad_to_size(
+                        raw_physical,
+                        self.image_size,
+                        fill_value=(0.0, 0.0),
+                    ),
+                    zero_field,
+                )
+
+        feature_values = calendar_feature_values(target_date, hour, self.calendar_features)
+        calendar_channels = [
+            torch.full((1, *self.image_size), value, dtype=torch.float32) for value in feature_values
+        ]
+        background_condition = torch.where(
+            valid_mask[:1].expand_as(background) > 0,
+            background,
+            torch.zeros_like(background),
+        )
+        condition = torch.cat(
+            [
+                background_condition,
+                valid_mask[:1],
+                *lag_channels,
+                valid_mask[:1],
+                *calendar_channels,
+            ],
+            dim=0,
+        )
+        if condition.shape[0] != 17:
+            raise RuntimeError(f"assimilation conditioning expected 17 channels, got {condition.shape[0]}")
+        obs_values = torch.zeros((2, *self.image_size), dtype=torch.float32)
+        obs_mask = torch.zeros_like(obs_values)
+        obs_values[:] = lag_channels[0]
+        obs_mask[:] = lag_channels[1].expand_as(obs_mask)
+        flow_mask = valid_mask[:1].repeat(4, 1, 1)
+        flow_mask *= 1.0 - lag0_mask
+        diagnostics = self._observation_diagnostics(
+            "structured_model_truth_pseudo_obs_sic_sit_on_real_sral_geometry",
+            obs_mask,
+            valid_mask,
+            empty_obs_days=sum(not available for available in lag_available),
+        )
+        diagnostics.update(
+            {
+                "lag_available": lag_available,
+                "lag_obs_count": lag_obs_count,
+                "lag_background_innovations_used": False,
+                "background_used_by_model": True,
+            }
+        )
+        return condition, obs_values, obs_mask, flow_mask, lag0_physical, diagnostics
+
     def _structured_dynamics_conditioning(
         self,
         target_date: date,
         initial_state: torch.Tensor,
+        forcing_values: torch.Tensor,
+        forcing_masks: torch.Tensor,
         valid_mask: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, dict]:
         """Condition a state-only forecast on the exact physical analysis at d0.
@@ -1369,25 +1456,28 @@ class M2MForecastDataset(Dataset):
             initial_state,
             torch.zeros_like(initial_state),
         )
-        feature_values = calendar_feature_values(
-            target_date, self.hour_index, self.calendar_features
-        )
+        feature_values = calendar_feature_values(target_date, self.hour_index, self.calendar_features)
         calendar_channels = [
-            torch.full((1, *self.image_size), value, dtype=torch.float32)
-            for value in feature_values
+            torch.full((1, *self.image_size), value, dtype=torch.float32) for value in feature_values
         ]
         condition = torch.cat(
-            [initial_condition, valid_mask[:1], *calendar_channels], dim=0
+            [
+                initial_condition,
+                valid_mask[:1],
+                forcing_values,
+                forcing_masks,
+                *calendar_channels,
+            ],
+            dim=0,
         )
-        if condition.shape[0] != 7:
+        expected_channels = 7 + 2 * len(self.dynamic_forcing_indices)
+        if condition.shape[0] != expected_channels:
             raise RuntimeError(
-                f"dynamics conditioning expected 7 channels, got {condition.shape[0]}"
+                f"dynamics conditioning expected {expected_channels} channels, got {condition.shape[0]}"
             )
         obs_values = torch.zeros((2, *self.image_size), dtype=torch.float32)
         obs_mask = torch.zeros_like(obs_values)
-        flow_mask = valid_mask[:1].repeat(
-            4 * len(self.trajectory_lead_days), 1, 1
-        )
+        flow_mask = valid_mask[:1].repeat(4 * len(self.trajectory_lead_days), 1, 1)
         diagnostics = {
             "observation_semantics": "none_state_only_dynamics",
             "trajectory_lead_days": list(self.trajectory_lead_days),
@@ -1395,6 +1485,44 @@ class M2MForecastDataset(Dataset):
             "background_used_by_model": False,
         }
         return condition, obs_values, obs_mask, flow_mask, diagnostics
+
+    def _normalized_dynamic_forcing(
+        self, record, hour: int, valid_mask: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        count = len(self.dynamic_forcing_indices)
+        if count == 0:
+            empty = torch.empty((0, *self.image_size), dtype=torch.float32)
+            return empty, empty.clone()
+        normalization = self.config.get("dynamic_forcing_stats")
+        if not isinstance(normalization, Mapping):
+            raise ValueError("non-empty dynamic_forcing_indices require train-only dynamic_forcing_stats")
+        means = tuple(float(value) for value in normalization.get("means", ()))
+        stds = tuple(float(value) for value in normalization.get("stds", ()))
+        normalized_indices = tuple(int(value) for value in normalization.get("indices", ()))
+        if (
+            normalized_indices != self.dynamic_forcing_indices
+            or len(means) != count
+            or len(stds) != count
+            or any(not np.isfinite(value) or value <= 0.0 for value in stds)
+        ):
+            raise ValueError("dynamic_forcing_stats do not match the forcing channels")
+        raw = np.asarray(
+            field_at_hour(record.path, hour, self.dynamic_forcing_indices),
+            dtype=np.float32,
+        )
+        if np.any(np.isinf(raw)):
+            raise ValueError(f"Inf is forbidden in dynamic forcing source {record.path}")
+        finite = torch.as_tensor(np.isfinite(raw), dtype=torch.float32)
+        values = torch.as_tensor(np.where(np.isfinite(raw), raw, 0.0), dtype=torch.float32)
+        mean = torch.as_tensor(means, dtype=torch.float32).view(-1, 1, 1)
+        std = torch.as_tensor(stds, dtype=torch.float32).view(-1, 1, 1)
+        values = torch.where(finite > 0, (values - mean) / std, torch.zeros_like(values))
+        values = pad_to_size(values, self.image_size, fill_value=[0.0] * count)
+        masks = pad_to_size(finite, self.image_size, fill_value=[0.0] * count)
+        ocean = valid_mask[:1].expand_as(values)
+        masks *= ocean
+        values = torch.where(masks > 0, values, torch.zeros_like(values))
+        return values, masks
 
     def _nearest_record(self, target: date):
         if not self._sorted_record_dates:
@@ -1462,42 +1590,43 @@ class M2MForecastDataset(Dataset):
                 background_records = [back_record]
             else:
                 background_records = [
-                    self.records_by_date[
-                        previous_calendar_date(target_record.date + timedelta(days=lead))
-                    ]
+                    self.records_by_date[previous_calendar_date(target_record.date + timedelta(days=lead))]
                     for lead in trajectory_leads
                 ]
         else:
             background_records = [back_record]
         target_records = [
-            self.records_by_date[target_record.date + timedelta(days=lead)]
-            for lead in trajectory_leads
+            self.records_by_date[target_record.date + timedelta(days=lead)] for lead in trajectory_leads
         ]
-        background_fields = [
-            field_at_hour(record.path, hour, self.indices) for record in background_records
-        ]
+        background_fields = [field_at_hour(record.path, hour, self.indices) for record in background_records]
         target_fields = [field_at_hour(record.path, hour, self.indices) for record in target_records]
         if trajectory_layout:
             for record, field in zip(background_records, background_fields, strict=True):
                 self._validate_structured_raw_field(field, record.path)
             for record, field in zip(target_records, target_fields, strict=True):
                 self._validate_structured_raw_field(field, record.path)
-        normalized_background = [prepare_model_field(
-            field,
-            None,
-            self.means,
-            self.stds,
-            self.padding_values,
-            self.image_size,
-        )[0] for field in background_fields]
-        normalized_truth = [prepare_model_field(
-            field,
-            None,
-            self.means,
-            self.stds,
-            self.padding_values,
-            self.image_size,
-        )[0] for field in target_fields]
+        normalized_background = [
+            prepare_model_field(
+                field,
+                None,
+                self.means,
+                self.stds,
+                self.padding_values,
+                self.image_size,
+            )[0]
+            for field in background_fields
+        ]
+        normalized_truth = [
+            prepare_model_field(
+                field,
+                None,
+                self.means,
+                self.stds,
+                self.padding_values,
+                self.image_size,
+            )[0]
+            for field in target_fields
+        ]
         background = torch.cat(normalized_background, dim=0)
         truth = torch.cat(normalized_truth, dim=0)
         valid_mask = self.base_valid_mask.clone()
@@ -1518,6 +1647,7 @@ class M2MForecastDataset(Dataset):
                 self.padding_values,
                 self.image_size,
             )[0]
+            forcing_values, forcing_masks = self._normalized_dynamic_forcing(target_record, hour, valid_mask)
             (
                 structured_conditioning,
                 obs_values,
@@ -1527,6 +1657,22 @@ class M2MForecastDataset(Dataset):
             ) = self._structured_dynamics_conditioning(
                 target_record.date,
                 initial_state,
+                forcing_values,
+                forcing_masks,
+                valid_mask,
+            )
+        elif layout == STRUCTURED_ASSIMILATION_CONDITIONING_LAYOUT:
+            (
+                structured_conditioning,
+                obs_values,
+                obs_mask,
+                structured_flow_mask,
+                structured_lag0_physical_values,
+                obs_diagnostics,
+            ) = self._structured_assimilation_conditioning(
+                target_record.date,
+                hour,
+                background,
                 valid_mask,
             )
         elif trajectory_layout:
@@ -1613,22 +1759,12 @@ class M2MForecastDataset(Dataset):
                 # never a UTC or issue-time claim.
                 "hour": hour,
                 "time_index": hour,
-                "utc_time_coordinate_verified": bool(
-                    self.config.get("utc_time_coordinate_verified", False)
-                ),
-                "trajectory_semantics": self.config.get(
-                    "trajectory_semantics", "unspecified"
-                ),
-                "time_claim_policy": self.config.get(
-                    "time_claim_policy", "unspecified"
-                ),
+                "utc_time_coordinate_verified": bool(self.config.get("utc_time_coordinate_verified", False)),
+                "trajectory_semantics": self.config.get("trajectory_semantics", "unspecified"),
+                "time_claim_policy": self.config.get("time_claim_policy", "unspecified"),
                 "trajectory_archive_date_labels": [
                     *[
-                        (
-                            "analysis_snapshot_d"
-                            if lead == 0
-                            else f"forecast_archive_day_d_plus_{lead}"
-                        )
+                        ("analysis_snapshot_d" if lead == 0 else f"forecast_archive_day_d_plus_{lead}")
                         for lead in trajectory_leads
                     ]
                 ],
@@ -1637,9 +1773,7 @@ class M2MForecastDataset(Dataset):
                 "background_trajectory_paths": [str(record.path) for record in background_records],
                 "target_trajectory_paths": [str(record.path) for record in target_records],
                 "background_role": (
-                    "persistence_baseline_not_model_condition"
-                    if dynamics_layout
-                    else "model_condition"
+                    "persistence_baseline_not_model_condition" if dynamics_layout else "model_condition"
                 ),
                 "trajectory_lead_days": list(trajectory_leads),
                 "split": self.split,
@@ -1651,9 +1785,7 @@ class M2MForecastDataset(Dataset):
             physical_targets = []
             physical_backgrounds = []
             padding = torch.as_tensor(self.padding_values, dtype=torch.float32).view(-1, 1, 1)
-            for target_field, background_field in zip(
-                target_fields, background_fields, strict=True
-            ):
+            for target_field, background_field in zip(target_fields, background_fields, strict=True):
                 physical_truth = torch.as_tensor(target_field, dtype=torch.float32)
                 physical_truth = torch.where(torch.isfinite(physical_truth), physical_truth, padding)
                 physical_targets.append(
@@ -1674,7 +1806,14 @@ class M2MForecastDataset(Dataset):
             item["structured_physical_background"] = torch.cat(physical_backgrounds, dim=0)
         if structured_flow_mask is not None:
             item["structured_flow_mask"] = structured_flow_mask
-            if not dynamics_layout:
+            if dynamics_layout:
+                # Sampling/evaluation APIs accept a common optional-hard-data
+                # interface.  Zero masks make this an exact no-op for D.
+                item["structured_lag0_mask"] = torch.zeros((1, *self.image_size), dtype=torch.float32)
+                item["structured_lag0_physical_values"] = torch.zeros(
+                    (2, *self.image_size), dtype=torch.float32
+                )
+            else:
                 lag0_mask = 1.0 - structured_flow_mask[:1]
                 lag0_mask *= valid_mask[:1]
                 item["structured_lag0_mask"] = lag0_mask

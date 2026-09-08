@@ -17,6 +17,7 @@ import numpy as np
 from .config import load_json
 from .data import M2MForecastDataset
 from .forecast import field_at_hour
+from .structured_archive_audit import validate_bound_archive_audit
 from .structured_joint_state import (
     INACTIVE_FILLER_LAW,
     INTERIOR_VALUE_LAW,
@@ -25,7 +26,6 @@ from .structured_joint_state import (
     dequantized_logit_moments,
     validate_structured_state_stats,
 )
-from .structured_archive_audit import validate_bound_archive_audit
 
 _SIC_LOGIT_RANGE = (-24.0, 24.0)
 _SIT_LOG_RANGE = (-24.0, 8.0)
@@ -74,11 +74,10 @@ class _StreamingMomentHistogram:
             raise ValueError("structured statistic has zero or invalid variance")
         return mean, std
 
+
 def build_structured_state_stats(data_config: dict, data_config_path: str | Path) -> dict:
     """Stream the exact configured train pairs and construct the codec contract."""
-    archive_audit = validate_bound_archive_audit(
-        data_config, Path(data_config_path).resolve()
-    )
+    archive_audit = validate_bound_archive_audit(data_config, Path(data_config_path).resolve())
     if "structured_sic_cap" not in data_config:
         raise ValueError("data config must explicitly declare structured_sic_cap")
     cap = float(data_config["structured_sic_cap"])
@@ -102,15 +101,30 @@ def build_structured_state_stats(data_config: dict, data_config_path: str | Path
     physical_total = np.zeros(2, dtype=np.float64)
     physical_total_square = np.zeros(2, dtype=np.float64)
     distinct_target_paths: set[str] = set()
+    forcing_indices = tuple(dataset.dynamic_forcing_indices)
+    forcing_total = np.zeros(len(forcing_indices), dtype=np.float64)
+    forcing_total_square = np.zeros(len(forcing_indices), dtype=np.float64)
+    forcing_count = np.zeros(len(forcing_indices), dtype=np.int64)
     hours = range(24) if dataset.hour_mode == "all" else (dataset.hour_index,)
     base_valid = dataset.base_valid_mask[0].detach().cpu().numpy() > 0
     tolerance = max(np.finfo(np.float32).eps * max(cap, 1.0) * 2.0, 1e-7)
 
     for _, anchor_record in dataset.calendar_pairs:
+        if forcing_indices:
+            for hour in hours:
+                raw_forcing = np.asarray(field_at_hour(anchor_record.path, hour, forcing_indices, copy=False))
+                if np.any(np.isinf(raw_forcing)):
+                    raise ValueError(f"infinite dynamic forcing value in {anchor_record.path}")
+                ocean = base_valid[: raw_forcing.shape[-2], : raw_forcing.shape[-1]]
+                for channel, values in enumerate(raw_forcing):
+                    selected = np.asarray(values, dtype=np.float64)[ocean & np.isfinite(values)]
+                    if selected.size == 0:
+                        continue
+                    forcing_total[channel] += selected.sum(dtype=np.float64)
+                    forcing_total_square[channel] += np.square(selected).sum(dtype=np.float64)
+                    forcing_count[channel] += selected.size
         for lead_days in dataset.trajectory_lead_days:
-            target_record = dataset.records_by_date[
-                anchor_record.date + timedelta(days=lead_days)
-            ]
+            target_record = dataset.records_by_date[anchor_record.date + timedelta(days=lead_days)]
             distinct_target_paths.add(str(target_record.path))
             for hour in hours:
                 raw = field_at_hour(target_record.path, hour, dataset.indices, copy=False)
@@ -170,9 +184,7 @@ def build_structured_state_stats(data_config: dict, data_config_path: str | Path
                 sample_count += 1
 
     if not 0 < ice_count < valid_count or not 0 < cap_count < ice_count:
-        raise ValueError(
-            "training data must contain open water, ice, capped ice, and non-capped ice"
-        )
+        raise ValueError("training data must contain open water, ice, capped ice, and non-capped ice")
     occurrence_probability = ice_count / valid_count
     cap_probability = cap_count / ice_count
     occurrence_mean, occurrence_std = dequantized_logit_moments(occurrence_probability)
@@ -189,6 +201,23 @@ def build_structured_state_stats(data_config: dict, data_config_path: str | Path
     normalized_data_config = dict(data_config)
     normalized_data_config["means"] = conditioning_means.tolist()
     normalized_data_config["stds"] = conditioning_stds.tolist()
+    dynamic_forcing_stats = None
+    if forcing_indices:
+        if np.any(forcing_count < 2):
+            raise ValueError("dynamic forcing has fewer than two finite train values")
+        forcing_means = forcing_total / forcing_count
+        forcing_variances = np.maximum(forcing_total_square / forcing_count - np.square(forcing_means), 0.0)
+        forcing_stds = np.sqrt(forcing_variances)
+        if not np.all(np.isfinite(forcing_stds)) or np.any(forcing_stds <= 0.0):
+            raise ValueError("train-only dynamic forcing normalization is degenerate")
+        dynamic_forcing_stats = {
+            "source_split": "train",
+            "indices": list(forcing_indices),
+            "means": forcing_means.tolist(),
+            "stds": forcing_stds.tolist(),
+            "finite_value_count_per_field": forcing_count.tolist(),
+        }
+        normalized_data_config["dynamic_forcing_stats"] = dynamic_forcing_stats
     stats = {
         "schema_version": SCHEMA_VERSION,
         "source_split": "train",
@@ -207,8 +236,10 @@ def build_structured_state_stats(data_config: dict, data_config_path: str | Path
             "data_config_update_required": {
                 "means": conditioning_means.tolist(),
                 "stds": conditioning_stds.tolist(),
+                "dynamic_forcing_stats": dynamic_forcing_stats,
             },
         },
+        "dynamic_forcing_normalization": dynamic_forcing_stats,
         "sic_cap": cap,
         "occurrence_probability": occurrence_probability,
         "cap_probability_given_ice": cap_probability,
@@ -235,9 +266,7 @@ def build_structured_state_stats(data_config: dict, data_config_path: str | Path
             "hour_mode": dataset.hour_mode,
             "target_slice_index": dataset.hour_index,
             "trajectory_semantics": data_config.get("trajectory_semantics"),
-            "utc_time_coordinate_verified": data_config.get(
-                "utc_time_coordinate_verified"
-            ),
+            "utc_time_coordinate_verified": data_config.get("utc_time_coordinate_verified"),
             "histogram_bins": _HISTOGRAM_BINS,
             "sic_interior_logit_range": list(_SIC_LOGIT_RANGE),
             "sit_positive_log_range": list(_SIT_LOG_RANGE),

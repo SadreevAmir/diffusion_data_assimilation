@@ -155,9 +155,7 @@ class TrainingConfig:
             values[key] = tuple(values[key])
         parsed = cls(**values)
         if not parsed.trajectory_lead_days:
-            parsed.trajectory_lead_days = tuple(
-                range(parsed.trajectory_horizon_days + 1)
-            )
+            parsed.trajectory_lead_days = tuple(range(parsed.trajectory_horizon_days + 1))
         parsed.validate()
         return parsed
 
@@ -183,12 +181,8 @@ class TrainingConfig:
             raise ValueError(f"Training values must be positive: {invalid}")
         if self.num_workers_train < 0 or self.num_workers_val < 0:
             raise ValueError("DataLoader worker counts must be non-negative")
-        if self.preserve_persistent_worker_rng and (
-            self.num_workers_train != 0 or self.num_workers_val != 0
-        ):
-            raise ValueError(
-                "preserve_persistent_worker_rng requires zero train and validation workers"
-            )
+        if self.preserve_persistent_worker_rng and (self.num_workers_train != 0 or self.num_workers_val != 0):
+            raise ValueError("preserve_persistent_worker_rng requires zero train and validation workers")
         if self.lr_scheduler_total_steps < 0:
             raise ValueError("lr_scheduler_total_steps must be non-negative")
         if self.training_objective not in {
@@ -216,19 +210,14 @@ class TrainingConfig:
             if (
                 not self.trajectory_lead_days
                 or any(value < 0 for value in self.trajectory_lead_days)
-                or tuple(sorted(set(self.trajectory_lead_days)))
-                != self.trajectory_lead_days
+                or tuple(sorted(set(self.trajectory_lead_days))) != self.trajectory_lead_days
             ):
                 raise ValueError(
                     "trajectory_lead_days must be a non-empty increasing tuple of unique non-negative days"
                 )
             if max(self.trajectory_lead_days) != self.trajectory_horizon_days:
-                raise ValueError(
-                    "trajectory_horizon_days must equal max(trajectory_lead_days)"
-                )
-            expected_latent_channels = LATENT_CHANNELS * len(
-                self.trajectory_lead_days
-            )
+                raise ValueError("trajectory_horizon_days must equal max(trajectory_lead_days)")
+            expected_latent_channels = LATENT_CHANNELS * len(self.trajectory_lead_days)
             if self.trajectory_horizon_days < 0:
                 raise ValueError("trajectory_horizon_days must be non-negative")
             if self.out_channels != expected_latent_channels:
@@ -237,9 +226,7 @@ class TrainingConfig:
                     f"out_channels={expected_latent_channels}, got {self.out_channels}"
                 )
             if self.timestep_sampler != "stratified_uniform":
-                raise ValueError(
-                    "structured_joint_state_flow requires timestep_sampler='stratified_uniform'"
-                )
+                raise ValueError("structured_joint_state_flow requires timestep_sampler='stratified_uniform'")
             if self.loss_domain != "valid":
                 raise ValueError("structured_joint_state_flow requires loss_domain='valid'")
             if self.obs_loss_weight != 0.0 or self.smoothness_loss_weight != 0.0:
@@ -257,9 +244,7 @@ class TrainingConfig:
             if self.sample_cfg_mode != "none":
                 raise ValueError("structured_joint_state_flow requires sample_cfg_mode='none'")
             if self.background_dropout_probability != 0.0:
-                raise ValueError(
-                    "structured_joint_state_flow requires background_dropout_probability=0"
-                )
+                raise ValueError("structured_joint_state_flow requires background_dropout_probability=0")
             probabilities = self.conditioning_mode_probabilities
             if probabilities not in (None, {"both": 1.0}):
                 raise ValueError(
@@ -293,9 +278,7 @@ class TrainingConfig:
                     "so each EMA update follows an optimizer update"
                 )
             if self.resume_from_checkpoint not in {"", "auto"}:
-                raise ValueError(
-                    "structured_joint_state_flow supports only empty or 'auto' resume policy"
-                )
+                raise ValueError("structured_joint_state_flow supports only empty or 'auto' resume policy")
             if not self.run_name:
                 raise ValueError(
                     "structured_joint_state_flow requires a stable run_name for fail-safe resume"
@@ -308,8 +291,7 @@ class TrainingConfig:
                 raise ValueError("recovery_checkpoint_name must be one safe directory name")
         elif self.structured_velocity_parameterization != RAW_VELOCITY:
             raise ValueError(
-                "structured velocity preconditioning is only valid for "
-                "structured_joint_state_flow"
+                "structured velocity preconditioning is only valid for structured_joint_state_flow"
             )
         elif self.validation_weight_source not in {"raw", "ema"}:
             raise ValueError("validation_weight_source must be 'raw' or 'ema'")

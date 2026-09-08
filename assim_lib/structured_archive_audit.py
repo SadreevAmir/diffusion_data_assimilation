@@ -31,6 +31,11 @@ VARIABLES = {
 
 AUDIT_SCHEMA_VERSION = "structured_archive_semantics_audit_v3"
 TRAJECTORY_SEMANTICS = "consecutive_daily_archive_snapshots"
+ALLOWED_TRAJECTORY_SEMANTICS = {
+    TRAJECTORY_SEMANTICS: (0, 1, 2, 3),
+    "analysis_snapshot_only": (0,),
+    "state_only_forecast_snapshots_d_plus_3_6_9": (3, 6, 9),
+}
 TIME_CLAIM_POLICY = "archive_date_only_no_utc_or_operational_lead_claim"
 FORBIDDEN_TIME_LABELS = ["operational_lead", "23:00_UTC", "24h_issue_time"]
 
@@ -46,9 +51,22 @@ def _trajectory_date_audit(config: dict, records) -> dict:
     """Prove the exact date law used by every retained trajectory anchor."""
     records_by_date = {record.date: record for record in records}
     duplicate_date_count = len(records) - len(records_by_date)
-    horizon = int(config.get("future_horizon_days", 0))
+    lead_days = tuple(
+        int(value)
+        for value in config.get(
+            "trajectory_lead_days",
+            range(int(config.get("future_horizon_days", 0)) + 1),
+        )
+    )
+    horizon = max(lead_days) if lead_days else -1
+    needs_background = config.get("background_strategy") == "calendar_year_ago"
     split_results = {}
-    all_verified = duplicate_date_count == 0 and horizon >= 1
+    all_verified = (
+        duplicate_date_count == 0
+        and bool(lead_days)
+        and tuple(sorted(set(lead_days))) == lead_days
+        and all(value >= 0 for value in lead_days)
+    )
 
     for split_name in ("train", "valid", "test"):
         split = config[split_name]
@@ -56,25 +74,24 @@ def _trajectory_date_audit(config: dict, records) -> dict:
         background_end = as_date(split["back_end_day"])
         target_start = as_date(split["obs_start_day"])
         target_end = as_date(split["obs_end_day"])
-        target_records = sorted(
-            value for value in records_by_date if target_start <= value <= target_end
-        )
+        target_records = sorted(value for value in records_by_date if target_start <= value <= target_end)
         contained_candidates = [
-            value
-            for value in target_records
-            if value + timedelta(days=horizon) <= target_end
+            value for value in target_records if value + timedelta(days=horizon) <= target_end
         ]
         eligible = []
         missing_target_trajectory = 0
         missing_exact_background_trajectory = 0
         for anchor in contained_candidates:
-            target_dates = [anchor + timedelta(days=lead) for lead in range(horizon + 1)]
-            background_dates = [_previous_calendar_date(value) for value in target_dates]
+            target_dates = [anchor + timedelta(days=lead) for lead in lead_days]
+            background_target_dates = (
+                target_dates
+                if config.get("conditioning_layout") == "structured_sic_sit_trajectory_v1"
+                else [anchor]
+            )
+            background_dates = [_previous_calendar_date(value) for value in background_target_dates]
             targets_ok = all(value in records_by_date for value in target_dates)
-            backgrounds_ok = all(
-                value is not None
-                and background_start <= value <= background_end
-                and value in records_by_date
+            backgrounds_ok = not needs_background or all(
+                value is not None and background_start <= value <= background_end and value in records_by_date
                 for value in background_dates
             )
             if not targets_ok:
@@ -85,9 +102,7 @@ def _trajectory_date_audit(config: dict, records) -> dict:
                 eligible.append(anchor)
 
         split_verified = bool(eligible) and all(
-            target_start <= anchor
-            and anchor + timedelta(days=horizon) <= target_end
-            for anchor in eligible
+            target_start <= anchor and anchor + timedelta(days=horizon) <= target_end for anchor in eligible
         )
         all_verified = all_verified and split_verified
         split_results[split_name] = {
@@ -100,21 +115,19 @@ def _trajectory_date_audit(config: dict, records) -> dict:
             ),
             "first_eligible_anchor": eligible[0].isoformat() if eligible else None,
             "last_eligible_anchor": eligible[-1].isoformat() if eligible else None,
-            "all_retained_targets_are_consecutive_archive_dates": split_verified,
+            "all_retained_targets_match_declared_lead_days": split_verified,
             "all_retained_trajectories_stay_inside_split": split_verified,
-            "all_retained_backgrounds_are_exact_previous_calendar_dates": split_verified,
+            "all_required_backgrounds_are_exact_previous_calendar_dates": split_verified,
         }
 
     return {
         "status": "verified" if all_verified else "rejected",
         "trajectory_horizon_days": horizon,
+        "trajectory_lead_days": list(lead_days),
         "duplicate_archive_date_count": duplicate_date_count,
         "lead_labels": [
-            "analysis_snapshot_d",
-            *[
-                f"forecast_archive_day_d_plus_{lead}"
-                for lead in range(1, horizon + 1)
-            ],
+            "analysis_snapshot_d" if lead == 0 else f"forecast_archive_day_d_plus_{lead}"
+            for lead in lead_days
         ],
         "splits": split_results,
     }
@@ -122,8 +135,23 @@ def _trajectory_date_audit(config: dict, records) -> dict:
 
 def validate_trajectory_time_contract(config: dict, audit: dict) -> None:
     """Admit the narrow archive-date law without making an unproved UTC claim."""
+    semantics = config.get("trajectory_semantics")
+    expected_leads = ALLOWED_TRAJECTORY_SEMANTICS.get(semantics)
+    if expected_leads is None:
+        raise ValueError(f"unknown structured trajectory semantics: {semantics!r}")
+    actual_leads = tuple(
+        int(value)
+        for value in config.get(
+            "trajectory_lead_days",
+            range(int(config.get("future_horizon_days", 0)) + 1),
+        )
+    )
+    if actual_leads != expected_leads:
+        raise ValueError(
+            f"trajectory semantics {semantics!r} requires lead days {expected_leads}, got {actual_leads}"
+        )
     expected = {
-        "trajectory_semantics": TRAJECTORY_SEMANTICS,
+        "trajectory_semantics": semantics,
         "target_slice_index": 23,
         "utc_time_coordinate_verified": False,
         "time_claim_policy": TIME_CLAIM_POLICY,
@@ -139,7 +167,7 @@ def validate_trajectory_time_contract(config: dict, audit: dict) -> None:
         raise ValueError(f"unproved or incompatible archive-time contract: {mismatches}")
     if audit.get("trajectory_date_audit", {}).get("status") != "verified":
         raise ValueError("consecutive archive-date trajectory audit did not pass")
-    if audit.get("trajectory_semantics") != TRAJECTORY_SEMANTICS:
+    if audit.get("trajectory_semantics") != semantics:
         raise ValueError("archive audit trajectory semantics do not match the launch contract")
     if int(audit.get("target_slice_index", -1)) != 23:
         raise ValueError("archive audit did not bind target_slice_index=23")
@@ -162,6 +190,7 @@ def _protocol_payload(config: dict) -> dict:
             "archive_semantics_audit_sha256",
             "means",
             "stds",
+            "dynamic_forcing_stats",
         }
     }
 
@@ -203,11 +232,15 @@ def _static_mask_provenance(config: dict) -> tuple[np.ndarray, dict]:
 
 def _candidate_sral_lag_dates(config: dict, records) -> dict[str, dict[int, set[date]]]:
     records_by_date = {record.date: record for record in records}
-    horizon = int(config["future_horizon_days"])
-    candidates = {
-        split_name: {lag: set() for lag in range(3)}
-        for split_name in ("train", "valid", "test")
-    }
+    lead_days = tuple(
+        int(value)
+        for value in config.get(
+            "trajectory_lead_days",
+            range(int(config["future_horizon_days"]) + 1),
+        )
+    )
+    uses_lag_background = config.get("conditioning_layout") == "structured_sic_sit_trajectory_v1"
+    candidates = {split_name: {lag: set() for lag in range(3)} for split_name in ("train", "valid", "test")}
     for split_name in ("train", "valid", "test"):
         split = config[split_name]
         background_start = as_date(split["back_start_day"])
@@ -217,23 +250,21 @@ def _candidate_sral_lag_dates(config: dict, records) -> dict[str, dict[int, set[
         for anchor in sorted(records_by_date):
             if not target_start <= anchor <= target_end:
                 continue
-            target_dates = [anchor + timedelta(days=lead) for lead in range(horizon + 1)]
-            if target_dates[-1] > target_end or not all(
-                value in records_by_date for value in target_dates
-            ):
+            target_dates = [anchor + timedelta(days=lead) for lead in lead_days]
+            if max(target_dates) > target_end or not all(value in records_by_date for value in target_dates):
                 continue
-            background_dates = [_previous_calendar_date(value) for value in target_dates]
+            background_dates = [_previous_calendar_date(anchor)]
             if not all(
-                value is not None
-                and background_start <= value <= background_end
-                and value in records_by_date
+                value is not None and background_start <= value <= background_end and value in records_by_date
                 for value in background_dates
             ):
                 continue
             for lag in range(3):
                 value_date = anchor - timedelta(days=lag)
                 background_date = _previous_calendar_date(value_date)
-                if value_date in records_by_date and background_date in records_by_date:
+                if value_date in records_by_date and (
+                    not uses_lag_background or background_date in records_by_date
+                ):
                     candidates[split_name][lag].add(value_date)
     return candidates
 
@@ -252,6 +283,12 @@ def _pixel_coverage_summary(values: list[int]) -> dict[str, float | int | None]:
 
 
 def _sral_provenance(config: dict, records, ocean_full: np.ndarray) -> dict:
+    if config.get("observation_mask", {}).get("kind") == "none":
+        return {
+            "used_by_model": False,
+            "selection": "none",
+            "availability_by_split_and_lag": {},
+        }
     root = Path(config["sral_dir"])
     if not root.is_dir():
         raise ValueError(f"SRAL geometry directory is missing: {root}")
@@ -285,9 +322,7 @@ def _sral_provenance(config: dict, records, ocean_full: np.ndarray) -> dict:
         dtype_counts[array.dtype.name] += 1
         relative = path.relative_to(root).as_posix()
         file_sha = _sha256_file(path)
-        digest.update(
-            f"{relative}\0{path.stat().st_size}\0{file_sha}\n".encode("utf-8")
-        )
+        digest.update(f"{relative}\0{path.stat().st_size}\0{file_sha}\n".encode())
     if len(shape_counts) != 1:
         raise ValueError(f"SRAL archive shape is inconsistent: {dict(shape_counts)}")
     for parsed, paths in sorted(paths_by_date.items()):
@@ -298,9 +333,7 @@ def _sral_provenance(config: dict, records, ocean_full: np.ndarray) -> dict:
         height, width = geometry.shape
         if height > ocean_full.shape[0] or width > ocean_full.shape[1]:
             raise ValueError(f"SRAL geometry {geometry.shape} exceeds static mask {ocean_full.shape}")
-        valid_geometry = int(
-            (np.isfinite(geometry) & ocean_full[:height, :width]).sum()
-        )
+        valid_geometry = int((np.isfinite(geometry) & ocean_full[:height, :width]).sum())
         if valid_geometry <= 0:
             raise ValueError(
                 f"SRAL date {parsed} has files but no usable geometry after runtime combine/transform"
@@ -317,9 +350,7 @@ def _sral_provenance(config: dict, records, ocean_full: np.ndarray) -> dict:
         availability_by_split_and_lag[split_name] = {}
         for lag, candidates in split_lags.items():
             available = candidates & set(date_counts)
-            usable = {
-                value for value in available if date_finite_valid_geometry[value] > 0
-            }
+            usable = {value for value in available if date_finite_valid_geometry[value] > 0}
             missing = candidates - usable
             if candidates and not usable:
                 raise ValueError(
@@ -341,9 +372,7 @@ def _sral_provenance(config: dict, records, ocean_full: np.ndarray) -> dict:
                 "last_usable_date": max(usable).isoformat() if usable else None,
                 "candidate_dates": [value.isoformat() for value in sorted(candidates)],
                 "available_file_dates": [value.isoformat() for value in sorted(available)],
-                "usable_nonempty_geometry_dates": [
-                    value.isoformat() for value in sorted(usable)
-                ],
+                "usable_nonempty_geometry_dates": [value.isoformat() for value in sorted(usable)],
                 "missing_dates": [value.isoformat() for value in sorted(missing)],
                 "pixel_coverage_distribution": _pixel_coverage_summary(
                     [date_finite_valid_geometry[value] for value in sorted(usable)]
@@ -372,9 +401,7 @@ def _manifest_lines(records) -> list[str]:
     lines = []
     for record in records:
         stat = record.path.stat()
-        lines.append(
-            f"{record.date.isoformat()},{record.path.name},{stat.st_size},{stat.st_mtime_ns}\n"
-        )
+        lines.append(f"{record.date.isoformat()},{record.path.name},{stat.st_size},{stat.st_mtime_ns}\n")
     return lines
 
 
@@ -392,7 +419,7 @@ def _update_forecast_content_hash(
         (
             f"{record.date.isoformat()}\0{record.path.name}\0{array.dtype.name}\0"
             f"{tuple(int(value) for value in array.shape)}\0{time_index}\n"
-        ).encode("utf-8")
+        ).encode()
     )
     for index in VARIABLES:
         values = np.ascontiguousarray(array[index, time_index])
@@ -496,15 +523,17 @@ def build_archive_semantics_audit(config: dict) -> dict:
     }
     cap = float(config["structured_sic_cap"])
     tolerance = max(np.finfo(np.float32).eps * max(cap, 1.0) * 2.0, 1e-7)
-    forecast_content_digest = hashlib.sha256(
-        b"structured_forecast_audited_content_v1\0"
-    )
+    forecast_content_digest = hashlib.sha256(b"structured_forecast_audited_content_v1\0")
 
     for record in selected:
         array = np.load(record.path, mmap_mode="r")
         dtype_counts[array.dtype.name] += 1
         shape_counts[str(tuple(int(value) for value in array.shape))] += 1
-        if array.ndim != 4 or array.shape[0] <= max(VARIABLES) or not -array.shape[1] <= time_index < array.shape[1]:
+        if (
+            array.ndim != 4
+            or array.shape[0] <= max(VARIABLES)
+            or not -array.shape[1] <= time_index < array.shape[1]
+        ):
             raise ValueError(f"unexpected archive shape {array.shape} in {record.path}")
         _update_forecast_content_hash(forecast_content_digest, record, array, time_index)
         height, width = array.shape[-2:]
@@ -548,16 +577,15 @@ def build_archive_semantics_audit(config: dict) -> dict:
         and pair["ocean_sic_outside_declared_support_after_joint_nan_to_zero"] == 0
         and pair["ocean_negative_sit_after_joint_nan_to_zero"] == 0
         and all(
-            int(values["ocean_inf"]) == 0 and int(values["land_inf"]) == 0
-            for values in per_variable.values()
+            int(values["ocean_inf"]) == 0 and int(values["land_inf"]) == 0 for values in per_variable.values()
         )
         and trajectory_date_audit["status"] == "verified"
-        and config.get("trajectory_semantics") == TRAJECTORY_SEMANTICS
+        and config.get("trajectory_semantics") in ALLOWED_TRAJECTORY_SEMANTICS
         and time_index == 23
         and config.get("utc_time_coordinate_verified") is False
         and config.get("time_claim_policy") == TIME_CLAIM_POLICY
         and config.get("forbidden_time_labels") == FORBIDDEN_TIME_LABELS
-        and config.get("dynamic_forcing_indices") == []
+        and tuple(config.get("dynamic_forcing_indices", ())) in {(), (6, 7, 13, 14)}
     )
     return {
         "schema_version": AUDIT_SCHEMA_VERSION,
@@ -567,9 +595,7 @@ def build_archive_semantics_audit(config: dict) -> dict:
         "forecast_audited_content_sha256": forecast_content_digest.hexdigest(),
         "forecast_content_scope": "variables_0_1_6_7_13_14_at_target_slice_index",
         "forecast_declared_root": str(Path(config["dataset_dir"]) / "preds"),
-        "forecast_resolved_root": str(
-            (Path(config["dataset_dir"]) / "preds").resolve()
-        ),
+        "forecast_resolved_root": str((Path(config["dataset_dir"]) / "preds").resolve()),
         "static_mask_provenance": static_mask_provenance,
         "sral_provenance": sral_provenance,
         "record_count": len(selected),
@@ -589,7 +615,9 @@ def build_archive_semantics_audit(config: dict) -> dict:
             "candidate_indices": list(config.get("candidate_dynamic_indices", [])),
             "enabled_indices": list(config.get("dynamic_forcing_indices", [])),
             "nan_rule": "missing_with_explicit_mask; no imputation",
-            "physical_units_claim": "none; transformed signed grid displacement requires separate sign/orientation audit",
+            "physical_units_claim": (
+                "none; transformed signed grid displacement requires separate sign/orientation audit"
+            ),
         },
         "sic_sit_missingness_rule": (
             "static mask excludes land; paired SIC/SIT NaN on valid ocean is physical open water zero; "
@@ -612,22 +640,16 @@ def validate_bound_archive_audit(config: dict, data_config_path: str | Path) -> 
     actual_sha = hashlib.sha256(raw).hexdigest()
     expected_sha = config.get("archive_semantics_audit_sha256")
     if actual_sha != expected_sha:
-        raise ValueError(
-            f"archive semantics audit hash mismatch: expected {expected_sha}, got {actual_sha}"
-        )
+        raise ValueError(f"archive semantics audit hash mismatch: expected {expected_sha}, got {actual_sha}")
     audit = json.loads(raw)
     if audit.get("schema_version") != AUDIT_SCHEMA_VERSION:
-        raise ValueError(
-            f"archive semantics audit schema is stale; expected {AUDIT_SCHEMA_VERSION}"
-        )
+        raise ValueError(f"archive semantics audit schema is stale; expected {AUDIT_SCHEMA_VERSION}")
     if audit.get("status") != "data_semantics_verified":
         raise ValueError("archive semantics audit did not verify the data")
     expected_protocol = canonical_mapping_sha256(_protocol_payload(config))
     if audit.get("data_protocol_sha256") != expected_protocol:
         raise ValueError("archive semantics audit was built for a different data protocol")
-    records = forecast_records(
-        Path(config["dataset_dir"]) / "preds", int(config["lead_time_hours"])
-    )
+    records = forecast_records(Path(config["dataset_dir"]) / "preds", int(config["lead_time_hours"]))
     selected, _ = _selected_records_and_ranges(config, records)
     if not selected:
         raise ValueError("forecast archive selection became empty after the full-dataset audit")
@@ -647,11 +669,7 @@ def validate_bound_archive_audit(config: dict, data_config_path: str | Path) -> 
     if static_mask_provenance != audit.get("static_mask_provenance"):
         raise ValueError("static land mask content/provenance drifted after the full-dataset audit")
     raw_land, _ = _static_mask_provenance(config)
-    ocean_full = (
-        raw_land <= 0
-        if bool(config.get("mask_true_is_invalid", True))
-        else raw_land > 0
-    )
+    ocean_full = raw_land <= 0 if bool(config.get("mask_true_is_invalid", True)) else raw_land > 0
     if _sral_provenance(config, records, ocean_full) != audit.get("sral_provenance"):
         raise ValueError("SRAL geometry content/provenance drifted after the full-dataset audit")
     validate_trajectory_time_contract(config, audit)

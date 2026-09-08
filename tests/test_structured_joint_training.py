@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import math
-import json
 import hashlib
+import json
+import math
 import tempfile
 import unittest
 from datetime import date, timedelta
@@ -13,10 +13,12 @@ from unittest.mock import patch
 import numpy as np
 import torch
 
+from assim_lib import structured_joint_stats as structured_stats_module
 from assim_lib.config import TrainingConfig
 from assim_lib.data import M2MForecastDataset
 from assim_lib.forecast import ForecastRecord, open_npy_mmap
 from assim_lib.model_io import build_unet, load_sampler
+from assim_lib.runtime import dataloader_batch_count, optimizer_step_budget
 from assim_lib.sampler import Sampler
 from assim_lib.structured_archive_audit import (
     _sral_provenance,
@@ -33,18 +35,16 @@ from assim_lib.structured_joint_state import (
     encode_structured_joint_trajectory,
     validate_structured_state_stats,
 )
-from assim_lib import structured_joint_stats as structured_stats_module
+from assim_lib.structured_trajectory_evaluation import (
+    make_structured_trajectory_figure,
+    structured_trajectory_metrics,
+)
 from assim_lib.trainer import (
     UNetTrainer,
     _latest_structured_sampling_valid,
     _require_finite_gradients,
     _require_finite_loss,
     _validate_existing_structured_run_files,
-)
-from assim_lib.runtime import dataloader_batch_count, optimizer_step_budget
-from assim_lib.structured_trajectory_evaluation import (
-    make_structured_trajectory_figure,
-    structured_trajectory_metrics,
 )
 
 
@@ -124,9 +124,7 @@ class StructuredCodecTests(unittest.TestCase):
         self.assertGreater(torch.unique(latent[:, 3]).numel(), 4000)
 
     def test_trajectory_codec_round_trip_preserves_all_leads(self) -> None:
-        one = torch.tensor(
-            [[[[0.0, 0.25]], [[0.0, 1.0]]]], dtype=torch.float32
-        )
+        one = torch.tensor([[[[0.0, 0.25]], [[0.0, 1.0]]]], dtype=torch.float32)
         physical = torch.cat((one, one, one, one), dim=1)
         latent = encode_structured_joint_trajectory(
             physical,
@@ -135,22 +133,16 @@ class StructuredCodecTests(unittest.TestCase):
             generator=torch.Generator().manual_seed(17),
         )
         self.assertEqual(tuple(latent.shape), (1, 16, 1, 2))
-        self.assertTrue(
-            torch.allclose(decode_structured_joint_trajectory(latent, _stats()), physical)
-        )
+        self.assertTrue(torch.allclose(decode_structured_joint_trajectory(latent, _stats()), physical))
 
     def test_decoder_rejects_float32_active_branch_saturation(self) -> None:
         interior_overflow = torch.tensor([[[[1.0]], [[-1.0]], [[1.0e38]], [[0.0]]]])
-        with self.assertRaisesRegex(
-            StructuredDecodeSaturationError, "interior SIC saturated"
-        ) as caught:
+        with self.assertRaisesRegex(StructuredDecodeSaturationError, "interior SIC saturated") as caught:
             decode_structured_joint_state(interior_overflow, _stats())
         self.assertEqual(caught.exception.diagnostics["sic_saturation_count"], 1)
         self.assertEqual(caught.exception.diagnostics["sit_saturation_count"], 0)
         sit_underflow = torch.tensor([[[[1.0]], [[1.0]], [[0.0]], [[-1.0e38]]]])
-        with self.assertRaisesRegex(
-            StructuredDecodeSaturationError, "active SIT saturated"
-        ):
+        with self.assertRaisesRegex(StructuredDecodeSaturationError, "active SIT saturated"):
             decode_structured_joint_state(sit_underflow, _stats())
 
         trajectory = torch.zeros((1, 8, 1, 1), dtype=torch.float32)
@@ -164,17 +156,13 @@ class StructuredCodecTests(unittest.TestCase):
         nonfinite_later[:, 7] = torch.nan
         with self.assertRaisesRegex(ValueError, "finite before per-lead") as nonfinite_error:
             decode_structured_joint_trajectory(nonfinite_later, _stats())
-        self.assertNotIsInstance(
-            nonfinite_error.exception, StructuredDecodeSaturationError
-        )
+        self.assertNotIsInstance(nonfinite_error.exception, StructuredDecodeSaturationError)
 
     def test_physical_sampling_completion_uses_latest_record_only(self) -> None:
         self.assertFalse(_latest_structured_sampling_valid([]))
         self.assertTrue(_latest_structured_sampling_valid([{"status": "passed"}]))
         self.assertFalse(
-            _latest_structured_sampling_valid(
-                [{"status": "passed"}, {"status": "failed_decode_saturation"}]
-            )
+            _latest_structured_sampling_valid([{"status": "passed"}, {"status": "failed_decode_saturation"}])
         )
 
 
@@ -193,9 +181,13 @@ class StructuredConditioningTests(unittest.TestCase):
         self.temporary.cleanup()
 
     def _forecast(self, day: str, sic: float, sit: float, *, nan_at=None) -> None:
-        field = np.empty((2, 24, 4, 4), dtype=np.float16)
+        field = np.zeros((15, 24, 4, 4), dtype=np.float16)
         field[0] = sic
         field[1] = sit
+        field[6] = 1.0
+        field[7] = 2.0
+        field[13] = 3.0
+        field[14] = 4.0
         if nan_at is not None:
             field[:, :, nan_at[0], nan_at[1]] = np.nan
         np.save(self.preds / f"ocean+atmosphere_24_{day}.npy", field)
@@ -271,9 +263,7 @@ class StructuredConditioningTests(unittest.TestCase):
         return config
 
     def _write_trajectory_fixture(self) -> None:
-        for offset, day in enumerate(
-            ("2019-02-28", "2019-03-01", "2019-03-02", "2019-03-03", "2019-03-04")
-        ):
+        for offset, day in enumerate(("2019-02-28", "2019-03-01", "2019-03-02", "2019-03-03", "2019-03-04")):
             self._forecast(day, 0.25 + 0.01 * offset, 0.75 + 0.02 * offset)
         for offset, day in enumerate(
             ("2020-02-28", "2020-02-29", "2020-03-01", "2020-03-02", "2020-03-03", "2020-03-04")
@@ -311,6 +301,12 @@ class StructuredConditioningTests(unittest.TestCase):
                 "trajectory_lead_days": [3, 6, 9],
                 "trajectory_semantics": "state_only_forecast_snapshots_d_plus_3_6_9",
                 "observation_mask": {"kind": "none"},
+                "dynamic_forcing_indices": [6, 7, 13, 14],
+                "dynamic_forcing_stats": {
+                    "indices": [6, 7, 13, 14],
+                    "means": [0.0, 0.0, 0.0, 0.0],
+                    "stds": [1.0, 1.0, 1.0, 1.0],
+                },
             }
         )
         config["train"] = {
@@ -383,13 +379,14 @@ class StructuredConditioningTests(unittest.TestCase):
         self._write_trajectory_fixture()
         dataset = M2MForecastDataset(self._assimilation_config(), split="train")
         item = dataset[0]
-        self.assertEqual(dataset.conditioned_input_channels, 29)
+        self.assertEqual(dataset.conditioned_input_channels, 23)
         self.assertEqual(tuple(item["truth"].shape), (2, 4, 4))
         self.assertEqual(tuple(item["structured_physical_truth"].shape), (2, 4, 4))
-        self.assertEqual(tuple(item["structured_conditioning"].shape), (23, 4, 4))
+        self.assertEqual(tuple(item["structured_conditioning"].shape), (17, 4, 4))
         self.assertEqual(tuple(item["structured_flow_mask"].shape), (4, 4, 4))
         self.assertEqual(len(item["meta"]["background_trajectory_paths"]), 1)
         self.assertEqual(item["meta"]["trajectory_lead_days"], [0])
+        self.assertFalse(item["meta"]["lag_background_innovations_used"])
 
     def test_dynamics_uses_exact_initial_state_and_only_d3_d6_d9_targets(self) -> None:
         for offset in range(-2, 10):
@@ -401,15 +398,18 @@ class StructuredConditioningTests(unittest.TestCase):
             )
         dataset = M2MForecastDataset(self._dynamics_config(), split="train")
         item = dataset[0]
-        self.assertEqual(dataset.conditioned_input_channels, 21)
+        self.assertEqual(dataset.conditioned_input_channels, 29)
         self.assertEqual(tuple(item["truth"].shape), (6, 4, 4))
         self.assertEqual(tuple(item["structured_physical_truth"].shape), (6, 4, 4))
-        self.assertEqual(tuple(item["structured_conditioning"].shape), (7, 4, 4))
+        self.assertEqual(tuple(item["structured_conditioning"].shape), (15, 4, 4))
         self.assertEqual(tuple(item["structured_flow_mask"].shape), (12, 4, 4))
-        self.assertNotIn("structured_lag0_mask", item)
+        self.assertTrue(torch.all(item["structured_lag0_mask"] == 0))
+        self.assertTrue(torch.all(item["structured_lag0_physical_values"] == 0))
         self.assertTrue(torch.all(item["obs_mask"] == 0))
         self.assertEqual(item["meta"]["trajectory_lead_days"], [3, 6, 9])
         self.assertEqual(item["meta"]["background_role"], "persistence_baseline_not_model_condition")
+        self.assertTrue(torch.equal(item["structured_conditioning"][3:7, 0, 0], torch.arange(1.0, 5.0)))
+        self.assertTrue(torch.all(item["structured_conditioning"][7:11] == 1))
         self.assertEqual(
             [Path(value).name for value in item["meta"]["target_trajectory_paths"]],
             [
@@ -424,18 +424,14 @@ class StructuredConditioningTests(unittest.TestCase):
         for day in ("2020-03-02", "2020-03-03", "2020-03-04"):
             (self.preds / f"ocean+atmosphere_24_{day}.npy").unlink()
         open_npy_mmap.cache_clear()
-        item = M2MForecastDataset.build_structured_forecast_item(
-            self._trajectory_config(), "2020-03-01"
-        )
+        item = M2MForecastDataset.build_structured_forecast_item(self._trajectory_config(), "2020-03-01")
         self.assertNotIn("truth", item)
         self.assertNotIn("structured_physical_truth", item)
         self.assertEqual(tuple(item["background"].shape), (8, 4, 4))
         self.assertEqual(tuple(item["structured_conditioning"].shape), (32, 4, 4))
         self.assertEqual(item["meta"]["target_trajectory_paths"], [])
         self.assertTrue(item["meta"]["truth_free_forecast_builder"])
-        self.assertFalse(
-            any("2020-03-0" in value for value in item["meta"]["background_trajectory_paths"])
-        )
+        self.assertFalse(any("2020-03-0" in value for value in item["meta"]["background_trajectory_paths"]))
 
     def test_exact_lag0_uses_raw_float16_pair_without_denormalization(self) -> None:
         self._write_trajectory_fixture()
@@ -454,9 +450,7 @@ class StructuredConditioningTests(unittest.TestCase):
 
         config = self._trajectory_config()
         training = M2MForecastDataset(config, split="train")[0]
-        forecast = M2MForecastDataset.build_structured_forecast_item(
-            config, "2020-03-01"
-        )
+        forecast = M2MForecastDataset.build_structured_forecast_item(config, "2020-03-01")
         expected = torch.zeros((2, 4, 4), dtype=torch.float32)
         expected[0, 0, 0] = float(tiny_sic)
         expected[1, 0, 0] = 0.25
@@ -465,11 +459,14 @@ class StructuredConditioningTests(unittest.TestCase):
             self.assertGreater(float(item["structured_lag0_physical_values"][0, 0, 0]), 0.0)
             self.assertEqual(float(item["structured_lag0_physical_values"][:, 0, 1].sum()), 0.0)
         self.assertTrue(
-            torch.equal(training["structured_physical_truth"][:2, :, :], torch.where(
-                torch.isfinite(torch.as_tensor(current[:, 23], dtype=torch.float32)),
-                torch.as_tensor(current[:, 23], dtype=torch.float32),
-                torch.zeros((2, 4, 4), dtype=torch.float32),
-            ))
+            torch.equal(
+                training["structured_physical_truth"][:2, :, :],
+                torch.where(
+                    torch.isfinite(torch.as_tensor(current[:2, 23], dtype=torch.float32)),
+                    torch.as_tensor(current[:2, 23], dtype=torch.float32),
+                    torch.zeros((2, 4, 4), dtype=torch.float32),
+                ),
+            )
         )
 
     def test_every_structured_background_and_lag_fails_on_raw_semantic_drift(self) -> None:
@@ -509,16 +506,14 @@ class StructuredConditioningTests(unittest.TestCase):
             "sral_provenance": {
                 **provenance["sral_source"],
                 "availability_by_split_and_lag": {
-                    "train": json.loads(
-                        json.dumps(provenance["sral_availability_by_lag"])
-                    )
+                    "train": json.loads(json.dumps(provenance["sral_availability_by_lag"]))
                 },
             }
         }
         dataset.validate_structured_sral_audit_contract(admitted)
-        admitted["sral_provenance"]["availability_by_split_and_lag"]["train"][
-            "lag0"
-        ]["missing_date_count"] += 1
+        admitted["sral_provenance"]["availability_by_split_and_lag"]["train"]["lag0"][
+            "missing_date_count"
+        ] += 1
         with self.assertRaisesRegex(ValueError, "runtime SRAL availability"):
             dataset.validate_structured_sral_audit_contract(admitted)
 
@@ -540,9 +535,7 @@ class StructuredTrainingAndSamplingTests(unittest.TestCase):
                 "out_channels": 16,
                 "trajectory_horizon_days": 3,
                 "training_objective": "structured_joint_state_flow",
-                "structured_velocity_parameterization": (
-                    "gaussian_path_preconditioned"
-                ),
+                "structured_velocity_parameterization": ("gaussian_path_preconditioned"),
                 "timestep_sampler": "stratified_uniform",
                 "loss_domain": "valid",
                 "obs_loss_weight": 0.0,
@@ -610,13 +603,11 @@ class StructuredTrainingAndSamplingTests(unittest.TestCase):
 
     def test_structured_diagnostics_do_not_advance_training_rng(self) -> None:
         trainer = SimpleNamespace(
-            config=SimpleNamespace(
-                training_objective="structured_joint_state_flow", validation_seed=2701
-            ),
+            config=SimpleNamespace(training_objective="structured_joint_state_flow", validation_seed=2701),
             accelerator=SimpleNamespace(device=torch.device("cpu")),
         )
-        trainer._structured_diagnostic_seed = lambda epoch, **kwargs: (
-            UNetTrainer._structured_diagnostic_seed(trainer, epoch, **kwargs)
+        trainer._structured_diagnostic_seed = lambda epoch, **kwargs: UNetTrainer._structured_diagnostic_seed(
+            trainer, epoch, **kwargs
         )
         torch.manual_seed(12345)
         expected = torch.rand(7)
@@ -637,9 +628,7 @@ class StructuredTrainingAndSamplingTests(unittest.TestCase):
             (root / "config.json").write_bytes(original_config)
             (root / "metadata.json").write_bytes(original_metadata)
             with self.assertRaisesRegex(ValueError, "config identity differs"):
-                _validate_existing_structured_run_files(
-                    root, {"run": "different"}, "new"
-                )
+                _validate_existing_structured_run_files(root, {"run": "different"}, "new")
             self.assertEqual((root / "config.json").read_bytes(), original_config)
             self.assertEqual((root / "metadata.json").read_bytes(), original_metadata)
 
@@ -825,11 +814,7 @@ class StructuredTrainingAndSamplingTests(unittest.TestCase):
         )
         prediction = torch.ones((1, 4, 2, 2))
         target = torch.zeros_like(prediction)
-        batch = {
-            "valid_mask": torch.tensor(
-                [[[[1.0, 0.0], [0.0, 0.0]], [[1.0, 0.0], [0.0, 0.0]]]]
-            )
-        }
+        batch = {"valid_mask": torch.tensor([[[[1.0, 0.0], [0.0, 0.0]], [[1.0, 0.0], [0.0, 0.0]]]])}
         loss = UNetTrainer._flow_matching_loss(trainer, prediction, target, batch)
         self.assertEqual(float(loss), 1.0)
 
@@ -951,7 +936,9 @@ class StructuredTrainingAndSamplingTests(unittest.TestCase):
             timesteps=torch.tensor([0.4]),
             generator=torch.Generator().manual_seed(4),
         )
-        prediction = model(UNetTrainer._make_model_input(trainer, state, batch), torch.tensor([400.0]), return_dict=False)[0]
+        prediction = model(
+            UNetTrainer._make_model_input(trainer, state, batch), torch.tensor([400.0]), return_dict=False
+        )[0]
         loss = UNetTrainer._masked_mse(prediction, target, flow_mask)
         loss.backward()
         optimizer.step()
@@ -974,9 +961,7 @@ class StructuredTrainingAndSamplingTests(unittest.TestCase):
             reloaded = load_sampler(run_dir, "last_model.pth", config.__dict__, device="cpu")
             self.assertEqual(reloaded.structured_velocity_parameterization, "raw")
             mismatched = dict(config.__dict__)
-            mismatched["structured_velocity_parameterization"] = (
-                "gaussian_path_preconditioned"
-            )
+            mismatched["structured_velocity_parameterization"] = "gaussian_path_preconditioned"
             with self.assertRaisesRegex(ValueError, "parameterization differs"):
                 load_sampler(run_dir, "last_model.pth", mismatched, device="cpu")
             lag0_mask = torch.zeros((1, 1, 8, 8))
@@ -1027,18 +1012,14 @@ class StructuredTrainingAndSamplingTests(unittest.TestCase):
         truth = torch.zeros((1, 2, 1, width), dtype=torch.float32)
         ensemble = torch.zeros((1, 5, 2, 1, width), dtype=torch.float32)
         valid = torch.ones((1, 1, 1, width), dtype=torch.float32)
-        metrics = structured_trajectory_metrics(
-            ensemble, truth, truth, valid, sic_cap=0.9970703125
-        )
+        metrics = structured_trajectory_metrics(ensemble, truth, truth, valid, sic_cap=0.9970703125)
         counts = metrics["lead0_sic_rank_counts"]
         self.assertAlmostEqual(sum(counts), float(width), places=8)
         self.assertTrue(all(abs(value - width / 6) < 1e-8 for value in counts))
         bad = ensemble.clone()
         bad[:, :, 0, 0, 0] = 0.5
         with self.assertRaisesRegex(ValueError, "joint SIC/SIT support"):
-            structured_trajectory_metrics(
-                bad, truth, truth, valid, sic_cap=0.9970703125
-            )
+            structured_trajectory_metrics(bad, truth, truth, valid, sic_cap=0.9970703125)
         bad = ensemble.clone()
         bad[..., -1] = float("nan")
         valid[..., -1] = 0.0
@@ -1144,13 +1125,9 @@ class StructuredArchiveAuditTests(unittest.TestCase):
                 patch.object(
                     structured_stats_module,
                     "parse_args",
-                    return_value=SimpleNamespace(
-                        data_config=str(data_path), output=str(output_path)
-                    ),
+                    return_value=SimpleNamespace(data_config=str(data_path), output=str(output_path)),
                 ),
-                patch.object(
-                    structured_stats_module, "load_json", return_value=config
-                ) as loader,
+                patch.object(structured_stats_module, "load_json", return_value=config) as loader,
                 patch.object(
                     structured_stats_module,
                     "build_structured_state_stats",
@@ -1237,9 +1214,7 @@ class StructuredArchiveAuditTests(unittest.TestCase):
                 audit["trajectory_date_audit"]["splits"]["train"]["eligible_anchor_count"],
                 2,
             )
-            train_lag0 = audit["sral_provenance"]["availability_by_split_and_lag"][
-                "train"
-            ]["lag0"]
+            train_lag0 = audit["sral_provenance"]["availability_by_split_and_lag"]["train"]["lag0"]
             self.assertEqual(train_lag0["candidate_date_count"], 2)
             self.assertEqual(train_lag0["usable_nonempty_geometry_date_count"], 1)
             self.assertEqual(train_lag0["missing_dates"], ["2020-01-02"])
@@ -1249,9 +1224,7 @@ class StructuredArchiveAuditTests(unittest.TestCase):
             )
             audit_path = root / "audit.json"
             audit_path.write_text(json.dumps(audit, indent=2) + "\n")
-            config["archive_semantics_audit_sha256"] = hashlib.sha256(
-                audit_path.read_bytes()
-            ).hexdigest()
+            config["archive_semantics_audit_sha256"] = hashlib.sha256(audit_path.read_bytes()).hexdigest()
             config_path = root / "data.json"
             config_path.write_text(json.dumps(config))
             self.assertEqual(
@@ -1275,9 +1248,7 @@ class StructuredArchiveAuditTests(unittest.TestCase):
             # are also cryptographically admitted rather than trusted by name.
             audit = build_archive_semantics_audit(config)
             audit_path.write_text(json.dumps(audit, indent=2) + "\n")
-            config["archive_semantics_audit_sha256"] = hashlib.sha256(
-                audit_path.read_bytes()
-            ).hexdigest()
+            config["archive_semantics_audit_sha256"] = hashlib.sha256(audit_path.read_bytes()).hexdigest()
             config_path.write_text(json.dumps(config))
             original_stat = mask_path.stat()
             mask = np.load(mask_path)
@@ -1289,9 +1260,7 @@ class StructuredArchiveAuditTests(unittest.TestCase):
 
             audit = build_archive_semantics_audit(config)
             audit_path.write_text(json.dumps(audit, indent=2) + "\n")
-            config["archive_semantics_audit_sha256"] = hashlib.sha256(
-                audit_path.read_bytes()
-            ).hexdigest()
+            config["archive_semantics_audit_sha256"] = hashlib.sha256(audit_path.read_bytes()).hexdigest()
             config_path.write_text(json.dumps(config))
             track_path = sral / "sral_2020-01-01.npy"
             track_stat = track_path.stat()

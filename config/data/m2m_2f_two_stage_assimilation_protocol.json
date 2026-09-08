@@ -1,0 +1,59 @@
+{
+  "dataset_name": "M2MForecastDataset",
+  "dataset_dir": "/mnt/sciml/data_assimilation/da_arctic_2015-2024_v0.1",
+  "sral_dir": "/mnt/sciml/data_assimilation/sral_si/sral_new_format",
+  "mask_path": "/mnt/sciml/data_assimilation/land_mask.npy",
+  "mask_true_is_invalid": true,
+  "lead_time_hours": 24,
+  "fields": ["siconc", "sithic"],
+  "indices": [0, 1],
+  "means": [0.19301218262209952, 0.18969311571248842],
+  "stds": [0.36890927421384667, 0.4359687842884708],
+  "padding_values": [0.0, 0.0],
+  "source_array_dtype": "float16",
+  "model_nan_semantics": "joint_sic_sit_nan_means_open_water_zero",
+  "trajectory_semantics": "analysis_snapshot_only",
+  "trajectory_lead_days": [0],
+  "target_slice_index": 23,
+  "utc_time_coordinate_verified": false,
+  "time_claim_policy": "archive_date_only_no_utc_or_operational_lead_claim",
+  "forbidden_time_labels": ["operational_lead", "23:00_UTC", "24h_issue_time"],
+  "candidate_dynamic_indices": [6, 7, 13, 14],
+  "dynamic_forcing_indices": [],
+  "structured_sic_cap": 0.9970703125,
+  "image_size": [320, 256],
+  "hour_mode": "fixed",
+  "background_strategy": "calendar_year_ago",
+  "calendar_features": ["day_of_year", "time_index"],
+  "conditioning_layout": "structured_sic_sit_assimilation_v1",
+  "future_horizon_days": 0,
+  "resample_observation_masks_each_epoch": false,
+  "observed_channels": [0, 1],
+  "assimilation_range": 3,
+  "split_protocol": "3dvar_main_200d",
+  "observation_mask": {
+    "kind": "sral_tracks",
+    "sral_transform_index": 1,
+    "synthetic_probability": 0.0,
+    "empty_probability": 0.0,
+    "require_finite_model_values": false
+  },
+  "train": {
+    "back_start_day": "2015-01-01",
+    "back_end_day": "2020-12-31",
+    "obs_start_day": "2016-01-01",
+    "obs_end_day": "2021-12-31"
+  },
+  "valid": {
+    "back_start_day": "2021-01-01",
+    "back_end_day": "2021-12-31",
+    "obs_start_day": "2022-01-01",
+    "obs_end_day": "2022-12-31"
+  },
+  "test": {
+    "back_start_day": "2022-01-01",
+    "back_end_day": "2022-07-19",
+    "obs_start_day": "2023-01-01",
+    "obs_end_day": "2023-07-19"
+  }
+}
