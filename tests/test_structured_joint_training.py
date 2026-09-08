@@ -46,6 +46,13 @@ from assim_lib.trainer import (
     _require_finite_loss,
     _validate_existing_structured_run_files,
 )
+from assim_lib.two_stage_native_speed_admission import (
+    TRAINING_BATCH_KEYS,
+    _compact_training_collate,
+    _estimated_peak_ipc_bytes,
+    _ipc_preflight,
+    _tensor_bytes,
+)
 
 
 def _stats() -> dict:
@@ -454,6 +461,56 @@ class StructuredConditioningTests(unittest.TestCase):
         self.assertGreater(float(item["structured_lag0_physical_values"][:, :4, :4].sum()), 0.0)
         self.assertEqual(float(item["structured_lag0_physical_values"][:, 4:, :].sum()), 0.0)
         self.assertEqual(float(item["structured_lag0_physical_values"][:, :, 4:].sum()), 0.0)
+
+    def test_speed_admission_collate_excludes_non_training_payload(self) -> None:
+        samples = []
+        for value in (1.0, 2.0):
+            samples.append(
+                {
+                    "structured_physical_truth": torch.full((2, 3, 4), value),
+                    "valid_mask": torch.ones((1, 3, 4)),
+                    "structured_flow_mask": torch.ones((4, 3, 4)),
+                    "structured_conditioning": torch.full((17, 3, 4), value),
+                    "structured_physical_background": torch.empty((64, 3, 4)),
+                    "meta": {"large": "payload" * 1000},
+                }
+            )
+
+        batch = _compact_training_collate(samples)
+
+        self.assertEqual(tuple(batch), TRAINING_BATCH_KEYS)
+        self.assertEqual(tuple(batch["structured_conditioning"].shape), (2, 17, 3, 4))
+        for sample_index, sample in enumerate(samples):
+            for key in TRAINING_BATCH_KEYS:
+                self.assertTrue(torch.equal(batch[key][sample_index], sample[key]))
+        expected_bytes = sum(tensor.numel() * tensor.element_size() for tensor in batch.values())
+        self.assertEqual(_tensor_bytes(batch), expected_bytes)
+        self.assertEqual(_estimated_peak_ipc_bytes(expected_bytes // 2, 8, 2, 1), expected_bytes * 12)
+
+    def test_speed_admission_ipc_gate_fails_before_worker_iteration(self) -> None:
+        class ProbeDataset:
+            def __init__(self) -> None:
+                self.reads = 0
+
+            def __getitem__(self, index: int) -> dict:
+                self.reads += 1
+                self.assert_index = index
+                return {
+                    "structured_physical_truth": torch.zeros((2, 3, 4)),
+                    "valid_mask": torch.ones((1, 3, 4)),
+                    "structured_flow_mask": torch.ones((4, 3, 4)),
+                    "structured_conditioning": torch.zeros((17, 3, 4)),
+                }
+
+        dataset = ProbeDataset()
+        with patch(
+            "assim_lib.two_stage_native_speed_admission._available_shared_memory_bytes",
+            return_value=1,
+        ):
+            with self.assertRaisesRegex(RuntimeError, "shared-memory safety budget"):
+                _ipc_preflight(dataset, batch_size=8, num_workers=2, prefetch_factor=1)
+        self.assertEqual(dataset.reads, 1)
+        self.assertEqual(dataset.assert_index, 0)
 
     def test_dynamics_uses_exact_initial_state_and_only_d3_d6_d9_targets(self) -> None:
         for offset in range(-2, 10):

@@ -125,7 +125,18 @@ def add_noise(images: torch.Tensor, timesteps: torch.Tensor) -> tuple[torch.Tens
     return noisy_images, noise - images
 
 
-def build_dataloader(dataset, batch_size: int, num_workers: int, *, shuffle: bool) -> DataLoader:
+def build_dataloader(
+    dataset,
+    batch_size: int,
+    num_workers: int,
+    *,
+    shuffle: bool,
+    collate_fn=None,
+    prefetch_factor: int = 4,
+    generator: torch.Generator | None = None,
+) -> DataLoader:
+    if prefetch_factor < 1:
+        raise ValueError("prefetch_factor must be positive")
     kwargs = {
         "batch_size": batch_size,
         "shuffle": shuffle,
@@ -134,6 +145,10 @@ def build_dataloader(dataset, batch_size: int, num_workers: int, *, shuffle: boo
         "persistent_workers": num_workers > 0,
         "drop_last": shuffle,
     }
+    if collate_fn is not None:
+        kwargs["collate_fn"] = collate_fn
+    if generator is not None:
+        kwargs["generator"] = generator
     if num_workers > 0:
-        kwargs["prefetch_factor"] = 4
+        kwargs["prefetch_factor"] = prefetch_factor
     return DataLoader(dataset, **kwargs)

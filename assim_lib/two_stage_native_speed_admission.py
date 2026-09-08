@@ -13,6 +13,7 @@ from pathlib import Path
 
 import torch
 from diffusers.training_utils import EMAModel
+from torch.utils.data import default_collate
 
 from .clearml_tracking import ClearMLTracker
 from .config import TrainingConfig, load_json
@@ -20,10 +21,20 @@ from .data import build_dataset
 from .flow_parameterization import reconstruct_velocity, velocity_model_state
 from .model_io import build_unet
 from .runtime import build_dataloader, make_normalized_xy_grid, seed_everything
-from .structured_archive_audit import build_archive_semantics_audit
+from .forecast import forecast_records
+from .structured_archive_audit import (
+    _manifest_sha256,
+    _selected_records_and_ranges,
+    _sral_provenance,
+    _static_mask_provenance,
+    build_archive_semantics_audit,
+    validate_trajectory_time_contract,
+)
 from .structured_joint_state import (
     canonical_mapping_sha256,
     encode_structured_joint_trajectory,
+    validate_conditioning_normalization,
+    validate_structured_state_stats,
 )
 from .structured_joint_stats import build_structured_state_stats
 from .trainer import configure_activation_checkpointing
@@ -31,6 +42,25 @@ from .trainer import configure_activation_checkpointing
 SCHEMA_VERSION = "two_stage_native_speed_admission_v1"
 WARMUP_STEPS = 10
 MEASURED_STEPS = 30
+SHM_SAFETY_FRACTION = 0.70
+TRAINING_BATCH_KEYS = (
+    "structured_physical_truth",
+    "valid_mask",
+    "structured_flow_mask",
+    "structured_conditioning",
+)
+REUSED_CONTRACT_SHA256S = {
+    "assimilation": {
+        "archive_audit": "b65c122488f3a9b27f8a4eaa9d88f2239dbd074233c672d9aa0341209a647959",
+        "data": "7b6d05fcd690c9670d9dd5c0821225bb2e09ca75ff7ab76471507529c483f9d8",
+        "stats": "5b87df05d93930b05a0f52625bd9293b553dfb187c8396e32a53c3c1bd3ead14",
+    },
+    "dynamics": {
+        "archive_audit": "00155552aac6a9e7439e5e7d8143eb710182e8af8562d88ae91dee311077e526",
+        "data": "cb1737273a80a2dc58363dc1216556bdc0b6f6d556ae8b0b119a267e67d9f668",
+        "stats": "d1603a841b8126aa5f8d6499076d2a6f3197a998ab114dbc1e4caeda7f7ac7bc",
+    },
+}
 
 
 def _atomic_json(path: Path, payload: object) -> None:
@@ -45,6 +75,148 @@ def _atomic_json(path: Path, payload: object) -> None:
 
 def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _compact_training_collate(samples: list[dict]) -> dict[str, torch.Tensor]:
+    if not samples:
+        raise ValueError("speed-admission collate requires at least one sample")
+    missing = [key for key in TRAINING_BATCH_KEYS if any(key not in sample for sample in samples)]
+    if missing:
+        raise KeyError(f"speed-admission samples miss required keys: {missing}")
+    return {
+        key: default_collate([sample[key] for sample in samples])
+        for key in TRAINING_BATCH_KEYS
+    }
+
+
+def _tensor_bytes(batch: dict[str, torch.Tensor]) -> int:
+    if set(batch) != set(TRAINING_BATCH_KEYS):
+        raise ValueError("speed-admission batch contains non-training payload")
+    return sum(value.numel() * value.element_size() for value in batch.values())
+
+
+def _estimated_peak_ipc_bytes(
+    single_sample_bytes: int,
+    batch_size: int,
+    num_workers: int,
+    prefetch_factor: int,
+) -> int:
+    if min(single_sample_bytes, batch_size) <= 0 or num_workers < 0 or prefetch_factor < 1:
+        raise ValueError("invalid DataLoader IPC estimate inputs")
+    retained_batches = 1 + num_workers * prefetch_factor
+    return single_sample_bytes * batch_size * retained_batches
+
+
+def _available_shared_memory_bytes() -> int:
+    stats = os.statvfs("/dev/shm")
+    return int(stats.f_bavail * stats.f_frsize)
+
+
+def _ipc_preflight(dataset, batch_size: int, num_workers: int, prefetch_factor: int) -> dict:
+    probe_batch = _compact_training_collate([dataset[0]])
+    single_sample_bytes = _tensor_bytes(probe_batch)
+    estimated_peak = _estimated_peak_ipc_bytes(
+        single_sample_bytes,
+        batch_size,
+        num_workers,
+        prefetch_factor,
+    )
+    available = _available_shared_memory_bytes()
+    if estimated_peak > SHM_SAFETY_FRACTION * available:
+        raise RuntimeError(
+            "compact DataLoader IPC estimate exceeds shared-memory safety budget: "
+            f"estimated={estimated_peak}, available={available}"
+        )
+    return {
+        "single_sample_bytes": single_sample_bytes,
+        "estimated_peak_ipc_bytes": estimated_peak,
+        "shared_memory_available_bytes": available,
+    }
+
+
+def _load_reused_contract(
+    protocol_path: Path,
+    output_dir: Path,
+    reuse_contract_dir: Path,
+) -> tuple[dict, dict]:
+    role = "assimilation" if "assimilation" in protocol_path.stem else "dynamics"
+    expected = REUSED_CONTRACT_SHA256S[role]
+    paths = {
+        "archive_audit": reuse_contract_dir / f"{role}_archive_audit.json",
+        "data": reuse_contract_dir / f"{role}_data.json",
+        "stats": reuse_contract_dir / f"{role}_stats.json",
+    }
+    pinned_bytes: dict[str, bytes] = {}
+    pinned_json: dict[str, dict] = {}
+    for kind, path in paths.items():
+        if path.is_symlink() or not path.is_file():
+            raise ValueError(f"trusted reused {role} {kind} is missing")
+        raw = path.read_bytes()
+        if hashlib.sha256(raw).hexdigest() != expected[kind]:
+            raise ValueError(f"trusted reused {role} {kind} hash differs")
+        value = json.loads(raw)
+        if not isinstance(value, dict):
+            raise ValueError(f"trusted reused {role} {kind} must be an object")
+        pinned_bytes[kind] = raw
+        pinned_json[kind] = value
+
+    protocol = load_json(protocol_path)
+    config = pinned_json["data"]
+    stats = pinned_json["stats"]
+    audit = pinned_json["archive_audit"]
+    derived = {
+        "archive_semantics_audit_path",
+        "archive_semantics_audit_sha256",
+        "means",
+        "stds",
+        "dynamic_forcing_stats",
+    }
+    if {key: value for key, value in config.items() if key not in derived} != {
+        key: value for key, value in protocol.items() if key not in derived
+    }:
+        raise ValueError(f"trusted reused {role} protocol differs from current source")
+    if audit.get("status") != "data_semantics_verified":
+        raise ValueError(f"trusted reused {role} archive audit did not pass")
+    if config.get("archive_semantics_audit_sha256") != expected["archive_audit"]:
+        raise ValueError(f"trusted reused {role} audit binding differs")
+    validate_structured_state_stats(stats)
+    validate_conditioning_normalization(config, stats)
+    if canonical_mapping_sha256(config) != stats["data_config_sha256"]:
+        raise ValueError(f"trusted reused {role} data/stats binding differs")
+
+    records = forecast_records(
+        Path(config["dataset_dir"]) / "preds",
+        int(config["lead_time_hours"]),
+    )
+    selected, _ = _selected_records_and_ranges(config, records)
+    if (
+        len(selected) != int(audit.get("record_count", -1))
+        or not selected
+        or selected[0].date.isoformat() != audit.get("first_record_date")
+        or selected[-1].date.isoformat() != audit.get("last_record_date")
+        or _manifest_sha256(selected) != audit.get("forecast_metadata_manifest_sha256")
+    ):
+        raise ValueError(f"trusted reused {role} forecast inventory drifted")
+    raw_land, static_provenance = _static_mask_provenance(config)
+    if static_provenance != audit.get("static_mask_provenance"):
+        raise ValueError(f"trusted reused {role} static mask drifted")
+    ocean = raw_land <= 0 if bool(config.get("mask_true_is_invalid", True)) else raw_land > 0
+    if _sral_provenance(config, records, ocean) != audit.get("sral_provenance"):
+        raise ValueError(f"trusted reused {role} SRAL provenance drifted")
+    validate_trajectory_time_contract(config, audit)
+    dataset = build_dataset(config, split="train")
+    dataset.validate_structured_sral_audit_contract(audit)
+    if dataset.provenance()["pair_manifest_sha256"] != stats["pair_manifest_sha256"]:
+        raise ValueError(f"trusted reused {role} train pair manifest drifted")
+
+    for kind in paths:
+        target_name = f"{role}_{kind}.json" if kind != "archive_audit" else f"{role}_archive_audit.json"
+        target = output_dir / "contracts" / target_name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        temporary = target.with_name(f".{target.name}.{os.getpid()}.tmp")
+        temporary.write_bytes(pinned_bytes[kind])
+        os.replace(temporary, target)
+    return config, stats
 
 
 def _bind_data_contract(protocol_path: Path, output_dir: Path) -> tuple[dict, dict]:
@@ -147,11 +319,31 @@ def _benchmark_variant(
         }
     )
     config = TrainingConfig.from_dict(method)
+    seed_everything(config.seed)
     dataset = build_dataset(data_config, split="train")
     if dataset.conditioned_input_channels != config.in_channels:
         raise ValueError(f"{name}: model/data input channel mismatch")
-    loader = build_dataloader(dataset, config.train_batch_size, config.num_workers_train, shuffle=True)
-    seed_everything(config.seed)
+    ipc = _ipc_preflight(
+        dataset,
+        config.train_batch_size,
+        config.num_workers_train,
+        1,
+    )
+    loader_generator = torch.Generator().manual_seed(config.seed)
+    loader = build_dataloader(
+        dataset,
+        config.train_batch_size,
+        config.num_workers_train,
+        shuffle=True,
+        collate_fn=_compact_training_collate,
+        prefetch_factor=1,
+        generator=loader_generator,
+    )
+    iterator = iter(loader)
+    first_batch = next(iterator)
+    batch_bytes = _tensor_bytes(first_batch)
+    if batch_bytes > ipc["single_sample_bytes"] * config.train_batch_size:
+        raise RuntimeError("observed compact batch exceeds pre-worker IPC estimate")
     model = build_unet(config).cuda().train()
     checkpointed = configure_activation_checkpointing(model, config.activation_checkpointing)
     if checkpointed:
@@ -161,18 +353,20 @@ def _benchmark_variant(
     ema_model.to("cuda")
     grid = make_normalized_xy_grid(*config.image_size, batch_size=batch_size, device="cuda")
     generator = torch.Generator(device="cuda").manual_seed(config.seed + 91)
-    iterator = iter(loader)
     fetch_seconds = []
     step_seconds = []
     losses = []
     torch.cuda.reset_peak_memory_stats()
     for step in range(WARMUP_STEPS + MEASURED_STEPS):
         fetch_start = time.perf_counter()
-        try:
-            batch = next(iterator)
-        except StopIteration:
-            iterator = iter(loader)
-            batch = next(iterator)
+        if step == 0:
+            batch = first_batch
+        else:
+            try:
+                batch = next(iterator)
+            except StopIteration:
+                iterator = iter(loader)
+                batch = next(iterator)
         fetch_elapsed = time.perf_counter() - fetch_start
         torch.cuda.synchronize()
         step_start = time.perf_counter()
@@ -195,6 +389,12 @@ def _benchmark_variant(
         "checkpointed_modules": [],
         "ema_in_benchmark": True,
         "workers_train": config.num_workers_train,
+        "prefetch_factor": 1,
+        "compact_batch_keys": list(TRAINING_BATCH_KEYS),
+        "compact_batch_bytes": batch_bytes,
+        "estimated_peak_ipc_bytes": ipc["estimated_peak_ipc_bytes"],
+        "shared_memory_available_bytes": ipc["shared_memory_available_bytes"],
+        "shared_memory_safety_fraction": SHM_SAFETY_FRACTION,
         "median_fetch_seconds": float(torch.tensor(fetch_seconds).median().item()),
         "median_step_seconds": float(torch.tensor(step_seconds).median().item()),
         "p95_step_seconds": float(torch.tensor(step_seconds).quantile(0.95).item()),
@@ -223,7 +423,7 @@ def _benchmark_variant(
     return result
 
 
-def run(output_dir: Path) -> dict:
+def run(output_dir: Path, reuse_contract_dir: Path | None = None) -> dict:
     if torch.cuda.device_count() != 1:
         raise RuntimeError("speed admission requires exactly one visible GPU")
     tracker = ClearMLTracker(
@@ -234,13 +434,26 @@ def run(output_dir: Path) -> dict:
     root = Path(__file__).resolve().parents[1]
     variants = []
     try:
-        assimilation_data, assimilation_stats = _bind_data_contract(
-            root / "config/data/m2m_2f_two_stage_assimilation_protocol.json",
-            output_dir,
+        bind = (
+            (lambda path: _load_reused_contract(path, output_dir, reuse_contract_dir))
+            if reuse_contract_dir is not None
+            else (lambda path: _bind_data_contract(path, output_dir))
         )
-        dynamics_data, dynamics_stats = _bind_data_contract(
-            root / "config/data/m2m_2f_two_stage_dynamics_protocol.json",
-            output_dir,
+        assimilation_data, assimilation_stats = bind(
+            root / "config/data/m2m_2f_two_stage_assimilation_protocol.json"
+        )
+        dynamics_data, dynamics_stats = bind(
+            root / "config/data/m2m_2f_two_stage_dynamics_protocol.json"
+        )
+        progress_path = output_dir / "speed_admission_progress.json"
+        _atomic_json(
+            progress_path,
+            {
+                "schema_version": SCHEMA_VERSION,
+                "status": "contracts_ready",
+                "reused_contracts": reuse_contract_dir is not None,
+                "variants": [],
+            },
         )
         declarations = (
             (
@@ -279,6 +492,15 @@ def run(output_dir: Path) -> dict:
                     batch_size=batch_size,
                 )
                 variants.append(result)
+                _atomic_json(
+                    progress_path,
+                    {
+                        "schema_version": SCHEMA_VERSION,
+                        "status": "benchmarking",
+                        "reused_contracts": reuse_contract_dir is not None,
+                        "variants": variants,
+                    },
+                )
                 for metric in (
                     "median_fetch_seconds",
                     "median_step_seconds",
@@ -295,6 +517,15 @@ def run(output_dir: Path) -> dict:
                         "status": "cuda_out_of_memory",
                         "error": str(error)[:1000],
                     }
+                )
+                _atomic_json(
+                    progress_path,
+                    {
+                        "schema_version": SCHEMA_VERSION,
+                        "status": "benchmarking",
+                        "reused_contracts": reuse_contract_dir is not None,
+                        "variants": variants,
+                    },
                 )
                 gc.collect()
                 torch.cuda.empty_cache()
@@ -316,6 +547,7 @@ def run(output_dir: Path) -> dict:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output-dir", required=True, type=Path)
+    parser.add_argument("--reuse-contract-dir", type=Path)
     args = parser.parse_args()
     output_dir = args.output_dir.resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -324,7 +556,8 @@ def main() -> None:
         {"schema_version": SCHEMA_VERSION, "status": "running"},
     )
     try:
-        result = run(output_dir)
+        reuse_contract_dir = args.reuse_contract_dir.resolve() if args.reuse_contract_dir else None
+        result = run(output_dir, reuse_contract_dir)
     except Exception as error:
         _atomic_json(
             output_dir / "run_status.json",
