@@ -1,0 +1,108 @@
+{
+  "schema_version": "structured_gaussian_checkpointed_pilot_contract_v1",
+  "status": "prepared_for_separate_astra_go",
+  "immutable": true,
+  "launch_authorized": false,
+  "science_head": "62aafc4eaea483fc598d151c032dfb8eaaa00851",
+  "experiment_id": "structured_joint_gaussian_checkpointed_pilot_valid",
+  "mode": "validation_structured_gaussian_preconditioned_pilot",
+  "mechanism_id": "learned_joint",
+  "variant_id": "gaussian_path_preconditioned_checkpointed_2128_steps",
+  "source_experiment": "structured_joint_solver_fp32_refinement_epoch15_v1",
+  "purpose": "one_2128_step_scientific_pilot_only",
+  "resource_kind": "server_gpu",
+  "automatic_full_training_permitted": false,
+  "paths": {
+    "experiment": "config/experiments/train_structured_joint_gaussian_preconditioned_checkpointed_pilot.json",
+    "method": "config/methods/structured_joint_gaussian_preconditioned_checkpointed_pilot_2f.json",
+    "runner": "scripts/run_structured_preconditioned_pilot.sh",
+    "implementation": "assim_lib/structured_preconditioned_pilot.py",
+    "panel": "paper/STRUCTURED_PAIRED_PILOT_PANEL.json",
+    "protocol": "paper/STRUCTURED_GAUSSIAN_PRECONDITIONED_PILOT_PROTOCOL.json"
+  },
+  "required_identity_sha256": {
+    "config/experiments/train_structured_joint_gaussian_preconditioned_checkpointed_pilot.json": "21094a49157c7bdbb0fe787f4695a600082905c4baf35f8528caaf9ea10b4ab8",
+    "config/methods/structured_joint_gaussian_preconditioned_checkpointed_pilot_2f.json": "a0f594936b4fe25b0081be0379124b25dcc1d9a3b158de74a4d746706568ca1a",
+    "config/data/m2m_2f_structured_joint_real_lagged.json": "67462c51b9cf8feaf44c757a5f92358c1dde0879aec810989587666c03065cbe",
+    "config/data/m2m_2f_structured_joint_train_stats.json": "42551e8888c51b79f4e94ee441d9ec7e2bc373afaaa7e96750896a5c8fa82c14",
+    "assim_lib/structured_preconditioned_pilot.py": "8512a0e4dea2d76f8904dc9ca1dfdda40cc1e7e8ede931a6a6ac6cface5618fd",
+    "scripts/run_structured_preconditioned_pilot.sh": "ef3cecac2ae00e8e8cf10e9d62639532ab553d1a411af80fa0a21d37c3d2e883",
+    "paper/STRUCTURED_PAIRED_PILOT_PANEL.json": "232af0176ced9acc1eaf85a2bd9f9349ba1a5293731301df1ea417df2a258331",
+    "paper/STRUCTURED_GAUSSIAN_PRECONDITIONED_PILOT_PROTOCOL.json": "42162dc5fead36b831e8e054b7619a0dfa00ba12dfdf3f3470253f590cde3094",
+    "paper/validate_structured_gaussian_pilot_contract.py": "522ad2894accc5b6a0cb355bd993db4bc5e4889bb6c927e998b61ef34838360a"
+  },
+  "scientific_hypothesis": "Gaussian-path velocity preconditioning reduces nuisance regression and granular member texture while preserving the exact target law and improving calibration without compensating losses in proper, boundary, spatial, temporal or physical diagnostics.",
+  "single_scientific_change": "structured_velocity_parameterization=gaussian_path_preconditioned",
+  "execution_only_change": "non_reentrant_activation_checkpointing_with_rng_state_preservation",
+  "target_law": {
+    "path": "unchanged_linear_gaussian_path",
+    "conditioning": "unchanged_full_joint_background_and_track",
+    "reconstructed_velocity_loss": "unchanged",
+    "data_order_timestep_draws_and_seeds": "unchanged"
+  },
+  "training_semantics": {
+    "train_batch_size": 16,
+    "eval_batch_size": 8,
+    "gradient_accumulation_steps": 1,
+    "mixed_precision": "bf16",
+    "minimum_optimizer_steps": 2128,
+    "lr_scheduler_total_steps": 4123,
+    "learning_rate": 0.0001,
+    "ema_decay": 0.999,
+    "ema_use_warmup": false,
+    "ema_update_after_step": 0,
+    "validation_weight_source": "ema",
+    "structured_velocity_parameterization": "gaussian_path_preconditioned",
+    "activation_checkpointing": true
+  },
+  "optimizer_update_law": "one backward reduction, Adam update, LR-scheduler update and EMA update per original batch, in the original order, for exactly 2128 updates",
+  "evaluation": {
+    "cases": 8,
+    "ensemble_size": 8,
+    "paired_initial_noise": true,
+    "strict_fp32": true,
+    "rk4_intervals": 64,
+    "rank_histograms": ["sic", "sit"],
+    "coverage_levels": [0.5, 0.8, 0.9],
+    "spatial_variogram_lags": [1, 2, 4],
+    "temporal_increment_transitions": 3,
+    "physical_support_hard_veto": true,
+    "large_actual_sic_sit_visual_gate": true,
+    "visual_review_required": true
+  },
+  "quantitative_stop_go": {
+    "proper": "each field/lead fair_crps and ensemble_mean_rmse candidate/raw ratio <= 1.02",
+    "rank": "each field/lead rank_tv_to_uniform and mean absolute central 50/80/90 coverage error must not exceed the paired raw reference",
+    "spatial": "each SIC and SIT lag-1/2/4 variogram error candidate/raw ratio <= 0.70",
+    "temporal": "each field transition increment_fair_crps, ensemble_mean_increment_rmse and trajectory_variogram_score must not exceed the paired raw reference",
+    "physical": "zero nonfinite, decoded-support, joint-support, decode-saturation or paired day-0 observation violations",
+    "solver": "strict-FP32 candidate RK4-64 versus RK4-128 must pass the frozen one-percent score/spatial and one-percentage-point event thresholds"
+  },
+  "visual_stop_go": {
+    "artifacts": [
+      "visual_qc/raw_case00_member00.png",
+      "visual_qc/candidate_case00_member00.png",
+      "visual_qc/paired_rank_histograms.png",
+      "visual_qc/paired_seasonal_member00.png"
+    ],
+    "actual_fields": ["sic", "sit"],
+    "large_panel": "36x14 inch seasonal truth/raw/candidate panel at 180 dpi for fixed member 0 and leads d0/d+3",
+    "hard_vetoes": [
+      "salt_and_pepper_texture",
+      "track_imprint",
+      "disconnected_granular_texture",
+      "physically_implausible_sic_sit_co_structure"
+    ],
+    "independent_review_required": true
+  },
+  "success_criterion": "GO only if every quantitative check passes and independent review passes every visual hard veto; no family may compensate for another.",
+  "failure_interpretation": "A failure rejects Gaussian-path preconditioning at the frozen 2128-step budget and closes this recovery line; it does not authorize smoothing, clipping, seed selection, gate relaxation, another retry or full training.",
+  "artifact_policy": "summary_only",
+  "server_side_visuals_required_for_review": true,
+  "prelaunch_requirements": [
+    "separate_new_astra_go",
+    "exact_science_head_and_identity_validation",
+    "completed_hash_bound_strict_fp32_refinement",
+    "passed_single_memory_admission"
+  ]
+}

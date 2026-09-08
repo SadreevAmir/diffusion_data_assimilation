@@ -11,7 +11,7 @@ set -Eeuo pipefail
 : "${REFINEMENT_SOLVER_CONTROL_SHA256:?missing refinement result SHA-256}"
 : "${REFINEMENT_SOLVER_GATE_SHA256:?missing refinement gate SHA-256}"
 
-EXPERIMENT="${REPO_DIR}/config/experiments/train_structured_joint_gaussian_preconditioned_pilot.json"
+EXPERIMENT="${REPO_DIR}/config/experiments/train_structured_joint_gaussian_preconditioned_checkpointed_pilot.json"
 RAW_EXPERIMENT="${REPO_DIR}/config/experiments/train_structured_joint_d0_d3_real_lagged_31e.json"
 PANEL="${REPO_DIR}/paper/STRUCTURED_PAIRED_PILOT_PANEL.json"
 PROTOCOL="${REPO_DIR}/paper/STRUCTURED_GAUSSIAN_PRECONDITIONED_PILOT_PROTOCOL.json"
