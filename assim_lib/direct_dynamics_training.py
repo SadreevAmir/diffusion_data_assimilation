@@ -10,6 +10,8 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import os
+import re
 from pathlib import Path
 
 import torch
@@ -164,20 +166,64 @@ class DirectDynamicsTrainer(UNetTrainer):
         denominator = mask_y.sum() + mask_x.sum()
         return float((numerator / denominator.clamp(min=1)).item())
 
+    @staticmethod
+    def _require_finite_on_valid(
+        value: torch.Tensor, valid: torch.Tensor, *, label: str
+    ) -> None:
+        mask = valid.expand_as(value) > 0
+        if not torch.any(mask):
+            raise ValueError(f"{label} has no valid ocean points")
+        invalid = ~torch.isfinite(value)
+        count = int((invalid & mask).sum().item())
+        if count:
+            raise FloatingPointError(
+                f"{label} contains {count} NaN/Inf values on valid ocean points"
+            )
+
+    @classmethod
+    def _raw_support_metrics(
+        cls, raw_ensemble: torch.Tensor, valid: torch.Tensor
+    ) -> dict[str, float]:
+        expanded_valid = valid[:, None].expand_as(raw_ensemble)
+        cls._require_finite_on_valid(
+            raw_ensemble, expanded_valid, label="raw direct-dynamics ensemble"
+        )
+        sic = raw_ensemble[:, :, 0::2]
+        sit = raw_ensemble[:, :, 1::2]
+        support = valid[:, None].expand_as(sic) > 0
+        denominator = max(int(support.sum().item()), 1)
+        sic_bad = ((sic < 0.0) | (sic > 1.0)) & support
+        sit_bad = (sit < 0.0) & support
+        return {
+            "sic_raw_support_violation_fraction": float(sic_bad.sum().item() / denominator),
+            "sit_raw_support_violation_fraction": float(sit_bad.sum().item() / denominator),
+            "joint_raw_support_violation_fraction": float(
+                (sic_bad | sit_bad).sum().item() / denominator
+            ),
+        }
+
     def _fixed_validation_batch(self) -> dict[str, torch.Tensor]:
         if self._direct_validation_batch is None:
             raw = next(iter(self.val_dataloader))
             batch = self._batch_to_device(raw)
             self._direct_validation_batch = {
-                key: value[:1] for key, value in batch.items() if torch.is_tensor(value)
+                key: value[: min(3, value.shape[0])]
+                for key, value in batch.items()
+                if torch.is_tensor(value)
             }
         return self._direct_validation_batch
 
     @torch.no_grad()
-    def _direct_diagnostic(self, step: int, label: str) -> dict[str, float]:
+    def _direct_diagnostic(
+        self, step: int, label: str, *, case_count: int = 1
+    ) -> dict[str, float]:
         from .structured_trajectory_evaluation import make_structured_trajectory_figure
 
         batch = self._fixed_validation_batch()
+        case_count = min(int(case_count), batch["truth"].shape[0])
+        if case_count <= 0:
+            raise ValueError("direct diagnostic requires at least one validation case")
+        batch = {key: value[:case_count] for key, value in batch.items()}
         valid = batch["valid_mask"][:, :1]
         members = []
         was_training = self.model.training
@@ -188,7 +234,7 @@ class DirectDynamicsTrainer(UNetTrainer):
                 generator = torch.Generator(device=self.accelerator.device)
                 generator.manual_seed(99173 + 1009 * member)
                 initial_noise = torch.randn(
-                    (1, DIRECT_OUTPUT_CHANNELS, *self.config.image_size),
+                    (case_count, DIRECT_OUTPUT_CHANNELS, *self.config.image_size),
                     dtype=batch["truth"].dtype,
                     device=self.accelerator.device,
                     generator=generator,
@@ -218,32 +264,37 @@ class DirectDynamicsTrainer(UNetTrainer):
             self.model.train()
 
         raw_ensemble = torch.stack(members, dim=1)
-        ensemble = self._project_for_display(raw_ensemble.flatten(0, 1)).unflatten(0, (1, 2))
-        truth = batch["structured_physical_truth"]
-        persistence = batch["structured_physical_background"]
-        mean = ensemble.mean(dim=1)
-        raw_sic = raw_ensemble[:, :, 0::2]
-        raw_sit = raw_ensemble[:, :, 1::2]
-        support_mask = valid[:, None].expand_as(raw_sic) > 0
-        support_bad = ((raw_sic < 0) | (raw_sic > 1) | (raw_sit < 0)) & support_mask
         metrics: dict[str, float] = {
             "step": float(step),
-            "sic_raw_support_violation_fraction": float(
-                support_bad.sum().item() / max(support_mask.sum().item(), 1)
-            ),
+            "diagnostic_case_count": float(case_count),
+            **self._raw_support_metrics(raw_ensemble, valid),
         }
+        ensemble = self._project_for_display(raw_ensemble.flatten(0, 1)).unflatten(
+            0, (case_count, 2)
+        )
+        truth = batch["structured_physical_truth"]
+        persistence = batch["structured_physical_background"]
+        raw_mean = raw_ensemble.mean(dim=1)
+        display_mean = ensemble.mean(dim=1)
+        self._require_finite_on_valid(truth, valid, label="direct diagnostic truth")
+        self._require_finite_on_valid(persistence, valid, label="direct diagnostic persistence")
         for lead_index, lead_day in enumerate(DIRECT_LEADS):
             for field_offset, field_name in enumerate(("sic", "sit")):
                 channel = 2 * lead_index + field_offset
                 key = f"d{lead_day}_{field_name}"
-                metrics[f"{key}_mean_rmse"] = self._masked_rmse(
-                    mean[:, channel : channel + 1], truth[:, channel : channel + 1], valid
+                metrics[f"{key}_raw_mean_rmse"] = self._masked_rmse(
+                    raw_mean[:, channel : channel + 1], truth[:, channel : channel + 1], valid
+                )
+                metrics[f"{key}_projected_mean_rmse_display_only"] = self._masked_rmse(
+                    display_mean[:, channel : channel + 1],
+                    truth[:, channel : channel + 1],
+                    valid,
                 )
                 metrics[f"{key}_persistence_rmse"] = self._masked_rmse(
                     persistence[:, channel : channel + 1], truth[:, channel : channel + 1], valid
                 )
                 metrics[f"{key}_member_roughness"] = self._roughness(
-                    ensemble[0, 0, channel : channel + 1], valid[0]
+                    raw_ensemble[:, 0, channel : channel + 1], valid
                 )
                 metrics[f"{key}_truth_roughness"] = self._roughness(
                     truth[0, channel : channel + 1], valid[0]
@@ -264,7 +315,13 @@ class DirectDynamicsTrainer(UNetTrainer):
             },
             payload_path,
         )
-        for series, sample in (("member0", ensemble[0, 0]), ("ensemble_mean", mean[0])):
+        figure_series = (
+            ("raw_member0", raw_ensemble[0, 0]),
+            ("projected_member0_display_only", ensemble[0, 0]),
+            ("raw_ensemble_mean", raw_mean[0]),
+            ("projected_ensemble_mean_display_only", display_mean[0]),
+        )
+        for series, sample in figure_series:
             figure = make_structured_trajectory_figure(
                 truth[0],
                 persistence[0],
@@ -300,9 +357,45 @@ class DirectDynamicsTrainer(UNetTrainer):
 
     def _after_training_epoch(self, epoch: int, global_step: int) -> None:
         if self.accelerator.is_main_process:
-            metrics = self._direct_diagnostic(global_step, f"epoch_{epoch + 1:04d}")
+            metrics = self._direct_diagnostic(
+                global_step, f"epoch_{epoch + 1:04d}", case_count=3
+            )
             self.val_history[-1]["direct_physical_diagnostic"] = metrics
+            if epoch == 0:
+                gate_reasons = []
+                if metrics["joint_raw_support_violation_fraction"] >= 0.95:
+                    gate_reasons.append("at least 95% of raw predictions violate physical support")
+                roughness_ratios = []
+                for lead_day in DIRECT_LEADS:
+                    for field_name in ("sic", "sit"):
+                        prefix = f"d{lead_day}_{field_name}"
+                        truth_roughness = metrics[f"{prefix}_truth_roughness"]
+                        member_roughness = metrics[f"{prefix}_member_roughness"]
+                        roughness_ratios.append(member_roughness / max(truth_roughness, 1e-8))
+                if max(roughness_ratios) >= 50.0:
+                    gate_reasons.append("raw sample roughness exceeds truth by at least 50x")
+                gate = {
+                    "status": "failed" if gate_reasons else "passed",
+                    "epoch": 1,
+                    "global_step": int(global_step),
+                    "decision": "stop" if gate_reasons else "continue",
+                    "criteria": {
+                        "finite_raw_values_required": True,
+                        "max_joint_support_violation_fraction_exclusive": 0.95,
+                        "max_member_to_truth_roughness_ratio_exclusive": 50.0,
+                    },
+                    "reasons": gate_reasons,
+                    "diagnostic_case_count": 3,
+                }
+                self.val_history[-1]["epoch_1_automatic_safety_gate"] = gate
+                _atomic_json(Path(self.output_dir) / "epoch_1_gate.json", gate)
+                if self.clearml is not None:
+                    self.clearml.report_single_value(
+                        "epoch_1_automatic_safety_gate_passed", float(not gate_reasons)
+                    )
             _atomic_json(Path(self.output_dir) / "metrics.json", self.val_history)
+            if epoch == 0 and gate_reasons:
+                raise RuntimeError("epoch-1 automatic safety gate failed: " + "; ".join(gate_reasons))
 
 
 def run(config_path: Path) -> dict:
@@ -313,6 +406,14 @@ def run(config_path: Path) -> dict:
     data_config = merge_config_overrides(load_json(data_path), experiment.get("data_overrides"))
     model_raw = load_json(model_path)
     model_config = {**model_raw, **experiment.get("training", {})}
+    launch_id = os.environ.get("DIRECT_DYNAMICS_LAUNCH_ID", "").strip()
+    if launch_id:
+        if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,63}", launch_id) is None:
+            raise ValueError("DIRECT_DYNAMICS_LAUNCH_ID is not a safe identifier")
+        base_run_name = str(model_config.get("run_name") or "run")
+        model_config["run_name"] = f"{base_run_name}-{launch_id}"
+        experiment = dict(experiment)
+        experiment["task_name"] = f"{experiment['task_name']}-{launch_id}"
     clearml = experiment.get("clearml", {})
     model_config.update(
         {
@@ -340,6 +441,8 @@ def run(config_path: Path) -> dict:
         "valid": validate_direct_dataset(valid_dataset),
     }
     output_root = Path(train_config.base_output_dir) / (train_config.run_name or "run")
+    if output_root.exists() or output_root.is_symlink():
+        raise FileExistsError(f"refusing to reuse direct training output: {output_root}")
     _atomic_json(output_root / "direct_dataset_sentinel.json", sentinel)
     train_loader = build_dataloader(
         train_dataset,
