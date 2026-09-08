@@ -1442,6 +1442,7 @@ class M2MForecastDataset(Dataset):
     def _structured_dynamics_conditioning(
         self,
         target_date: date,
+        hour: int,
         initial_state: torch.Tensor,
         forcing_values: torch.Tensor,
         forcing_masks: torch.Tensor,
@@ -1457,7 +1458,10 @@ class M2MForecastDataset(Dataset):
             initial_state,
             torch.zeros_like(initial_state),
         )
-        feature_values = calendar_feature_values(target_date, self.hour_index, self.calendar_features)
+        # In all-hour mode every sample must carry its resolved archive-slice
+        # index.  Using ``self.hour_index`` here silently labelled all 24 slices
+        # as slice 23 even though d0, forcing, and targets came from ``hour``.
+        feature_values = calendar_feature_values(target_date, hour, self.calendar_features)
         calendar_channels = [
             torch.full((1, *self.image_size), value, dtype=torch.float32) for value in feature_values
         ]
@@ -1657,6 +1661,7 @@ class M2MForecastDataset(Dataset):
                 obs_diagnostics,
             ) = self._structured_dynamics_conditioning(
                 target_record.date,
+                hour,
                 initial_state,
                 forcing_values,
                 forcing_masks,
