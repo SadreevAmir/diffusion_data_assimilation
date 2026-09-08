@@ -43,6 +43,7 @@ SCHEMA_VERSION = "two_stage_native_speed_admission_v1"
 WARMUP_STEPS = 10
 MEASURED_STEPS = 30
 SHM_SAFETY_FRACTION = 0.70
+PREFETCH_FACTOR = 4
 TRAINING_BATCH_KEYS = (
     "structured_physical_truth",
     "valid_mask",
@@ -340,8 +341,6 @@ def _benchmark_variant(
             "block_out_channels": list(widths),
             "train_batch_size": batch_size,
             "eval_batch_size": min(batch_size, 4),
-            "num_workers_train": 2,
-            "num_workers_val": 1,
             "activation_checkpointing": False,
             "structured_state_stats": stats,
             "minimum_optimizer_steps": 1,
@@ -360,7 +359,7 @@ def _benchmark_variant(
         dataset,
         config.train_batch_size,
         config.num_workers_train,
-        1,
+        PREFETCH_FACTOR,
     )
     loader_generator = torch.Generator().manual_seed(config.seed)
     loader = build_dataloader(
@@ -369,7 +368,7 @@ def _benchmark_variant(
         loader_plan["num_workers"],
         shuffle=True,
         collate_fn=_compact_training_collate,
-        prefetch_factor=1,
+        prefetch_factor=PREFETCH_FACTOR,
         generator=loader_generator,
     )
     iterator = iter(loader)
@@ -424,7 +423,7 @@ def _benchmark_variant(
         "preferred_workers_train": config.num_workers_train,
         "workers_train": loader_plan["num_workers"],
         "worker_fallback_reason": loader_plan["fallback_reason"],
-        "prefetch_factor": 1,
+        "prefetch_factor": PREFETCH_FACTOR,
         "compact_batch_keys": list(TRAINING_BATCH_KEYS),
         "compact_batch_bytes": batch_bytes,
         "estimated_peak_ipc_bytes": loader_plan["estimated_peak_ipc_bytes"],

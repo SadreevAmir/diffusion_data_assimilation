@@ -538,6 +538,35 @@ class StructuredConditioningTests(unittest.TestCase):
         self.assertEqual(plan["estimated_peak_ipc_bytes"], 0)
         self.assertIn("shared memory", plan["fallback_reason"])
 
+    def test_speed_admission_uses_configured_workers_with_full_shared_memory(self) -> None:
+        class ProbeDataset:
+            def __getitem__(self, index: int) -> dict:
+                del index
+                return {
+                    "structured_physical_truth": torch.zeros((2, 3, 4)),
+                    "valid_mask": torch.ones((1, 3, 4)),
+                    "structured_flow_mask": torch.ones((4, 3, 4)),
+                    "structured_conditioning": torch.zeros((17, 3, 4)),
+                }
+
+        with patch(
+            "assim_lib.two_stage_native_speed_admission._available_shared_memory_bytes",
+            return_value=48 * 1024**3,
+        ):
+            plan = _select_loader_plan(
+                ProbeDataset(),
+                batch_size=8,
+                preferred_workers=4,
+                prefetch_factor=4,
+            )
+        self.assertEqual(plan["num_workers"], 4)
+        self.assertIsNone(plan["fallback_reason"])
+        self.assertEqual(
+            plan["estimated_peak_ipc_bytes"],
+            plan["single_sample_bytes"] * 8 * 17,
+        )
+        self.assertLess(plan["estimated_peak_ipc_bytes"], 0.70 * 48 * 1024**3)
+
     def test_dynamics_uses_exact_initial_state_and_only_d3_d6_d9_targets(self) -> None:
         for offset in range(-2, 10):
             day = date(2020, 3, 1) + timedelta(days=offset)
