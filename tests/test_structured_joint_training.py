@@ -443,6 +443,18 @@ class StructuredConditioningTests(unittest.TestCase):
         self.assertEqual(item["meta"]["trajectory_lead_days"], [0])
         self.assertFalse(item["meta"]["lag_background_innovations_used"])
 
+    def test_assimilation_pads_raw_lag0_before_applying_padded_track_mask(self) -> None:
+        self._write_trajectory_fixture()
+        config = self._assimilation_config()
+        config["image_size"] = [6, 7]
+
+        item = M2MForecastDataset(config, split="train")[0]
+
+        self.assertEqual(tuple(item["structured_lag0_physical_values"].shape), (2, 6, 7))
+        self.assertGreater(float(item["structured_lag0_physical_values"][:, :4, :4].sum()), 0.0)
+        self.assertEqual(float(item["structured_lag0_physical_values"][:, 4:, :].sum()), 0.0)
+        self.assertEqual(float(item["structured_lag0_physical_values"][:, :, 4:].sum()), 0.0)
+
     def test_dynamics_uses_exact_initial_state_and_only_d3_d6_d9_targets(self) -> None:
         for offset in range(-2, 10):
             day = date(2020, 3, 1) + timedelta(days=offset)

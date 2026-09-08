@@ -1385,13 +1385,14 @@ class M2MForecastDataset(Dataset):
                     raw_physical,
                     torch.zeros_like(raw_physical),
                 )
+                raw_physical = pad_to_size(
+                    raw_physical,
+                    self.image_size,
+                    fill_value=(0.0, 0.0),
+                )
                 lag0_physical = torch.where(
                     mask.expand_as(raw_physical) > 0,
-                    pad_to_size(
-                        raw_physical,
-                        self.image_size,
-                        fill_value=(0.0, 0.0),
-                    ),
+                    raw_physical,
                     zero_field,
                 )
 
