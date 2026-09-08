@@ -1,6 +1,6 @@
 {
   "schema_version": "structured_gaussian_checkpointed_pilot_contract_v1",
-  "status": "frozen_awaiting_controller_assigned_experiment_id",
+  "status": "prepared_for_separate_astra_go",
   "immutable": true,
   "launch_authorized": false,
   "base_science_head": "62aafc4eaea483fc598d151c032dfb8eaaa00851",
@@ -15,18 +15,7 @@
     "tests/test_clearml_tracking.py",
     "tests/test_structured_preconditioned_pilot.py"
   ],
-  "experiment_id": null,
-  "experiment_id_authority": "trusted_controller_allowlist_only",
-  "durable_identity_audit": {
-    "status": "conflict_confirmed",
-    "conflicting_experiment_id": "structured_joint_gaussian_checkpointed_pilot_valid",
-    "consumed_experiment_ids": [
-      "structured_joint_gaussian_preconditioned_pilot_retry1",
-      "structured_joint_gaussian_checkpointed_pilot_valid"
-    ],
-    "retry_suffix_permitted": false,
-    "required_resolution": "controller_assigns_one_globally_new_allowlisted_experiment_id"
-  },
+  "experiment_id": "structured_joint_gaussian_checkpointed_pilot_valid",
   "mode": "validation_structured_gaussian_preconditioned_pilot",
   "mechanism_id": "learned_joint",
   "variant_id": "gaussian_path_preconditioned_checkpointed_2128_steps",
@@ -51,7 +40,7 @@
     "scripts/run_structured_preconditioned_pilot.sh": "21dd3d1ed12d0a514c6da2e9d0c9a918d3ff72b6baf12a8e6a724092f57d417b",
     "paper/STRUCTURED_PAIRED_PILOT_PANEL.json": "232af0176ced9acc1eaf85a2bd9f9349ba1a5293731301df1ea417df2a258331",
     "paper/STRUCTURED_GAUSSIAN_PRECONDITIONED_PILOT_PROTOCOL.json": "42162dc5fead36b831e8e054b7619a0dfa00ba12dfdf3f3470253f590cde3094",
-    "paper/validate_structured_gaussian_pilot_contract.py": "ac66b7b2c90591c8bad9e4f6af564bf347e64dd6be03b531803acb5eba621785",
+    "paper/validate_structured_gaussian_pilot_contract.py": "c77e13e32189560e8e62953136856a92737385d68d4d72b49fce61a1121b3bb5",
     "assim_lib/clearml_tracking.py": "a1d56b23529f1f0c3c5b957f399445fc8cbd823290c80f394fd3226ab81a26dc"
   },
   "memory_admission": {

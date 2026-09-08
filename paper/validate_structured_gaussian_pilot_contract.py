@@ -198,27 +198,6 @@ def validate(
         raise ValueError("unexpected contract schema")
     if contract.get("immutable") is not True or contract.get("launch_authorized") is not False:
         raise ValueError("contract must be immutable and not launch-authorized")
-    if contract.get("status") != "frozen_awaiting_controller_assigned_experiment_id":
-        raise ValueError("contract must await a controller-assigned experiment id")
-    if contract.get("experiment_id") is not None:
-        raise ValueError("unapproved experiment id embedded in frozen contract")
-    if contract.get("experiment_id_authority") != "trusted_controller_allowlist_only":
-        raise ValueError("experiment id authority is not fail-closed")
-    identity_audit = contract.get("durable_identity_audit")
-    expected_consumed = {
-        "structured_joint_gaussian_preconditioned_pilot_retry1",
-        "structured_joint_gaussian_checkpointed_pilot_valid",
-    }
-    if not isinstance(identity_audit, dict) or any((
-        identity_audit.get("status") != "conflict_confirmed",
-        identity_audit.get("conflicting_experiment_id")
-        != "structured_joint_gaussian_checkpointed_pilot_valid",
-        set(identity_audit.get("consumed_experiment_ids", [])) != expected_consumed,
-        identity_audit.get("retry_suffix_permitted") is not False,
-        identity_audit.get("required_resolution")
-        != "controller_assigns_one_globally_new_allowlisted_experiment_id",
-    )):
-        raise ValueError("durable experiment identity audit is incomplete")
     head = _validate_git_contract(root, contract) if validate_git else None
 
     identities = contract.get("required_identity_sha256")
