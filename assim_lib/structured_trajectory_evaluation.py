@@ -1586,6 +1586,7 @@ def make_structured_trajectory_figure(
     *,
     title: str,
     origin: str = "lower",
+    lead_days: Sequence[int] | None = None,
 ):
     """Large per-lead truth/background/member figure in physical units."""
     import matplotlib.pyplot as plt
@@ -1595,10 +1596,23 @@ def make_structured_trajectory_figure(
     )]
     valid = valid_mask[:1].detach().to(device="cpu").numpy()[0] > 0
     leads = truth.shape[0] // 2
+    displayed_leads = tuple(range(leads)) if lead_days is None else tuple(lead_days)
+    if len(displayed_leads) != leads:
+        raise ValueError("lead_days must match the trajectory channel count")
     fig, axes = plt.subplots(leads, 6, figsize=(25, 4.2 * leads), constrained_layout=True)
     if leads == 1:
         axes = np.asarray(axes)[None, :]
-    column_labels = ("truth SIC", "background SIC", "sample SIC", "truth SIT", "background SIT", "sample SIT")
+    background_label = (
+        "initial d0 / persistence" if displayed_leads[0] > 0 else "background"
+    )
+    column_labels = (
+        "truth SIC",
+        f"{background_label} SIC",
+        "sample SIC",
+        "truth SIT",
+        f"{background_label} SIT",
+        "sample SIT",
+    )
     sic_images = []
     sit_images = []
     sit_max = max(
@@ -1627,7 +1641,8 @@ def make_structured_trajectory_figure(
                 vmax=1.0 if column < 3 else sit_max,
             )
             axes[lead, column].set_title(column_labels[column])
-            axes[lead, column].set_ylabel(f"d+{lead}")
+            day = displayed_leads[lead]
+            axes[lead, column].set_ylabel("d0" if day == 0 else f"d+{day}")
             axes[lead, column].set_xticks([])
             axes[lead, column].set_yticks([])
             (sic_images if column < 3 else sit_images).append(image)

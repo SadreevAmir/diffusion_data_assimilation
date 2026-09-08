@@ -1428,6 +1428,10 @@ class UNetTrainer:
             torch.cat(valid_masks, dim=0),
             lag0_mask=torch.cat(lag0_masks, dim=0),
             sic_cap=float(self.config.structured_state_stats["sic_cap"]),
+            exclude_lag0_from_day0_scores=(
+                bool(self.config.trajectory_lead_days)
+                and self.config.trajectory_lead_days[0] == 0
+            ),
         )
         metrics.update(
             {
@@ -1779,16 +1783,16 @@ class UNetTrainer:
     def report_dashboard_samples(self, epoch: int):
         if self.config.sample_every_n_epochs <= 0:
             return
+        if self.config.training_objective == "structured_joint_state_flow":
+            if (epoch + 1) % self.config.sample_every_n_epochs == 0:
+                self._report_structured_trajectory_dashboard(epoch)
+            return
         if epoch % self.config.sample_every_n_epochs != 0:
             return
         if _DASHBOARD_EVERY_N_EPOCHS <= 0:
             return
         if epoch % _DASHBOARD_EVERY_N_EPOCHS != 0:
             return
-        if self.config.training_objective == "structured_joint_state_flow":
-            self._report_structured_trajectory_dashboard(epoch)
-            return
-
         weights_label = self._sampling_weight_label()
         _debug(f"dashboard sampling start epoch={epoch} weights={weights_label}")
         if self.clearml is not None:
@@ -2030,6 +2034,7 @@ class UNetTrainer:
                 "joint SIC/SIT trajectory "
                 f"leads={list(self.config.trajectory_lead_days)}, epoch {epoch}, {weights_label}"
             ),
+            lead_days=self.config.trajectory_lead_days,
         )
         path = os.path.join(samples_dir, f"epoch_{epoch:04d}_structured_trajectory.png")
         figure.savefig(path, dpi=_DASHBOARD_DPI, bbox_inches="tight")
@@ -2186,16 +2191,20 @@ class UNetTrainer:
 
                 with self._structured_diagnostic_rng(epoch, stream_index=37):
                     sample_metrics = {}
-                    metric_due = (
-                        self.config.metric_every_n_epochs > 0
-                        and epoch % self.config.metric_every_n_epochs == 0
-                    )
                     structured = self.config.training_objective == "structured_joint_state_flow"
-                    dashboard_due = (
-                        self.config.sample_every_n_epochs > 0
-                        and epoch % self.config.sample_every_n_epochs == 0
-                        and _DASHBOARD_EVERY_N_EPOCHS > 0
-                        and epoch % _DASHBOARD_EVERY_N_EPOCHS == 0
+                    metric_due = self.config.metric_every_n_epochs > 0 and (
+                        (epoch + 1) % self.config.metric_every_n_epochs == 0
+                        if structured
+                        else epoch % self.config.metric_every_n_epochs == 0
+                    )
+                    dashboard_due = self.config.sample_every_n_epochs > 0 and (
+                        (epoch + 1) % self.config.sample_every_n_epochs == 0
+                        if structured
+                        else (
+                            _DASHBOARD_EVERY_N_EPOCHS > 0
+                            and epoch % self.config.sample_every_n_epochs == 0
+                            and epoch % _DASHBOARD_EVERY_N_EPOCHS == 0
+                        )
                     )
                     structured_sampling_due = structured and (metric_due or dashboard_due)
                     try:
