@@ -437,6 +437,9 @@ def _gpu_batch_smoke(model, train_loader, config: TrainingConfig) -> dict:
         "peak_gpu_memory_mib": float(torch.cuda.max_memory_allocated(device) / 2**20),
         "activation_checkpointing": bool(config.activation_checkpointing),
     }
+    for parameter in model.parameters():
+        parameter.grad = None
+    model.to("cpu")
     del loss, prediction, model_input, state, target, clean, noise, condition, truth, raw, model
     torch.cuda.empty_cache()
     return result
@@ -505,6 +508,11 @@ def run(config_path: Path, *, preflight_only: bool = False) -> dict:
         f"direct all-hour dataset train={len(train_dataset)} valid={len(valid_dataset)} "
         f"batches={len(train_loader)} planned_steps={expected_steps}"
     )
+    output_root = Path(train_config.base_output_dir) / (train_config.run_name or "run")
+    if not preflight_only:
+        if output_root.exists() or output_root.is_symlink():
+            raise FileExistsError(f"refusing to reuse direct training output: {output_root}")
+        _atomic_json(output_root / "direct_dataset_sentinel.json", sentinel)
     model = build_unet(train_config)
     parameter_count = sum(parameter.numel() for parameter in model.parameters())
     _debug(f"direct dynamics parameters={parameter_count:,}")
@@ -518,10 +526,8 @@ def run(config_path: Path, *, preflight_only: bool = False) -> dict:
             "gpu_batch_smoke": _gpu_batch_smoke(model, train_loader, train_config),
         }
         return result
-    output_root = Path(train_config.base_output_dir) / (train_config.run_name or "run")
-    if output_root.exists() or output_root.is_symlink():
-        raise FileExistsError(f"refusing to reuse direct training output: {output_root}")
-    _atomic_json(output_root / "direct_dataset_sentinel.json", sentinel)
+    gpu_smoke = _gpu_batch_smoke(model, train_loader, train_config)
+    _atomic_json(output_root / "gpu_batch_smoke.json", gpu_smoke)
     optimizer = torch.optim.AdamW(model.parameters(), lr=train_config.learning_rate)
     from diffusers.optimization import get_cosine_schedule_with_warmup
 
