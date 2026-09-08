@@ -166,6 +166,35 @@ class StructuredCodecTests(unittest.TestCase):
             decode_structured_joint_trajectory(nonfinite_later, _stats())
         self.assertNotIsInstance(nonfinite_error.exception, StructuredDecodeSaturationError)
 
+    def test_float64_physical_decode_preserves_representable_interior_tail(self) -> None:
+        # sigmoid(20) is mathematically interior but rounds to exactly one in
+        # float32.  Diagnostic decoding must preserve the target-law branch
+        # without clipping or changing the latent trajectory.
+        finite_tail = torch.tensor([[[[1.0]], [[-1.0]], [[20.0]], [[0.0]]]])
+        original = finite_tail.clone()
+        with self.assertRaises(StructuredDecodeSaturationError):
+            decode_structured_joint_state(finite_tail, _stats())
+
+        decoded = decode_structured_joint_state(
+            finite_tail,
+            _stats(),
+            physical_dtype=torch.float64,
+        )
+        self.assertEqual(decoded.dtype, torch.float64)
+        self.assertGreater(float(decoded[0, 0, 0, 0]), 0.0)
+        self.assertLess(float(decoded[0, 0, 0, 0]), _stats()["sic_cap"])
+        self.assertTrue(torch.isfinite(decoded).all())
+        self.assertTrue(torch.equal(finite_tail, original))
+
+        trajectory = torch.cat((finite_tail, finite_tail), dim=1)
+        decoded_trajectory = decode_structured_joint_trajectory(
+            trajectory,
+            _stats(),
+            physical_dtype=torch.float64,
+        )
+        self.assertEqual(decoded_trajectory.dtype, torch.float64)
+        self.assertTrue(torch.all(decoded_trajectory[:, 0::2] < _stats()["sic_cap"]))
+
     def test_physical_sampling_completion_uses_latest_record_only(self) -> None:
         self.assertFalse(_latest_structured_sampling_valid([]))
         self.assertTrue(_latest_structured_sampling_valid([{"status": "passed"}]))

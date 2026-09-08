@@ -227,21 +227,46 @@ def encode_structured_joint_state(
     return latent
 
 
-def decode_structured_joint_state(latent: torch.Tensor, stats: Mapping) -> torch.Tensor:
-    """Decode four flow coordinates to exact joint SIC/SIT support without clipping."""
+def decode_structured_joint_state(
+    latent: torch.Tensor,
+    stats: Mapping,
+    *,
+    physical_dtype: torch.dtype | None = None,
+) -> torch.Tensor:
+    """Decode four flow coordinates to exact joint SIC/SIT support without clipping.
+
+    ``float32`` cannot represent sigmoid values strictly below one once the
+    corresponding logit is only moderately large (about 17 near unit SIC).
+    Diagnostics that distinguish the continuous interior from the archive cap
+    may therefore request ``float64`` physical tensors.  The latent and the
+    neural/ODE computation are unchanged; only unstandardization and the
+    physical decoder use the requested dtype.
+    """
     validate_structured_state_stats(stats)
     if latent.ndim != 4 or latent.shape[1] != LATENT_CHANNELS:
         raise ValueError(f"latent must have shape [B,{LATENT_CHANNELS},H,W]")
     if not torch.all(torch.isfinite(latent)):
         raise ValueError("latent must be finite")
 
-    occurrence_logit = _unstandardize(latent[:, 0:1], stats, "occurrence_logit")
-    cap_logit = _unstandardize(latent[:, 1:2], stats, "cap_logit")
+    if physical_dtype is None:
+        physical_dtype = latent.dtype
+    if physical_dtype not in (torch.float32, torch.float64):
+        raise ValueError("physical_dtype must be torch.float32 or torch.float64")
+    decode_latent = latent.to(dtype=physical_dtype)
+
+    occurrence_logit = _unstandardize(
+        decode_latent[:, 0:1], stats, "occurrence_logit"
+    )
+    cap_logit = _unstandardize(decode_latent[:, 1:2], stats, "cap_logit")
     occurrence = occurrence_logit >= 0.0
     capped = occurrence & (cap_logit >= 0.0)
     cap = _finite_scalar(stats, "sic_cap")
-    interior_logit = _unstandardize(latent[:, 2:3], stats, "sic_interior_logit")
-    positive_sit_log = _unstandardize(latent[:, 3:4], stats, "sit_positive_log")
+    interior_logit = _unstandardize(
+        decode_latent[:, 2:3], stats, "sic_interior_logit"
+    )
+    positive_sit_log = _unstandardize(
+        decode_latent[:, 3:4], stats, "sit_positive_log"
+    )
     interior_sic = cap * torch.sigmoid(interior_logit)
     positive_sit = torch.exp(positive_sit_log)
     interior = occurrence & ~capped
@@ -299,7 +324,12 @@ def encode_structured_joint_trajectory(
     return torch.cat(latents, dim=1)
 
 
-def decode_structured_joint_trajectory(latent: torch.Tensor, stats: Mapping) -> torch.Tensor:
+def decode_structured_joint_trajectory(
+    latent: torch.Tensor,
+    stats: Mapping,
+    *,
+    physical_dtype: torch.dtype | None = None,
+) -> torch.Tensor:
     """Decode flattened four-coordinate trajectory into paired physical fields."""
     if latent.ndim != 4 or latent.shape[1] % LATENT_CHANNELS != 0:
         raise ValueError("latent trajectory must have shape [B,4*T,H,W]")
@@ -309,7 +339,11 @@ def decode_structured_joint_trajectory(latent: torch.Tensor, stats: Mapping) -> 
     for lead, start in enumerate(range(0, latent.shape[1], LATENT_CHANNELS)):
         try:
             physical.append(
-                decode_structured_joint_state(latent[:, start : start + 4], stats)
+                decode_structured_joint_state(
+                    latent[:, start : start + 4],
+                    stats,
+                    physical_dtype=physical_dtype,
+                )
             )
         except StructuredDecodeSaturationError as error:
             raise StructuredDecodeSaturationError(

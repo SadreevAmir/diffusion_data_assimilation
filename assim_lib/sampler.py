@@ -376,7 +376,9 @@ class Sampler:
         rtol: float = 1e-5,
         atol: float = 1e-6,
         initial_noise: torch.Tensor | None = None,
-    ) -> torch.Tensor:
+        physical_dtype: torch.dtype | None = None,
+        return_latent: bool = False,
+    ) -> torch.Tensor | tuple[torch.Tensor, torch.Tensor]:
         """Sample one joint trajectory and insert exact paired lag-0 observations."""
         state_channels = int(flow_mask.shape[1])
         zeros = torch.zeros_like(background_trajectory)
@@ -400,12 +402,19 @@ class Sampler:
             state_mask=flow_mask,
             end_time=0.0,
         )
-        physical = decode_structured_joint_trajectory(latent, stats)
+        physical = decode_structured_joint_trajectory(
+            latent,
+            stats,
+            physical_dtype=physical_dtype,
+        )
         exact_mask = lag0_mask.to(device=physical.device, dtype=physical.dtype)
         exact_values = lag0_physical_values.to(device=physical.device, dtype=physical.dtype)
         physical[:, :2] = torch.where(exact_mask > 0, exact_values, physical[:, :2])
         physical_valid = valid_mask[:, :1].to(device=physical.device) > 0
-        return torch.where(physical_valid, physical, torch.zeros_like(physical))
+        physical = torch.where(physical_valid, physical, torch.zeros_like(physical))
+        if return_latent:
+            return physical, latent
+        return physical
 
     def _sample_guided_euler(
         self,

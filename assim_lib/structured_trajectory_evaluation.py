@@ -257,7 +257,9 @@ def sample_structured_batch(
     rtol: float,
     atol: float,
     initial_noise: torch.Tensor | None = None,
-) -> torch.Tensor:
+    physical_dtype: torch.dtype | None = None,
+    return_latent: bool = False,
+) -> torch.Tensor | tuple[torch.Tensor, torch.Tensor]:
     required = (
         "background",
         "structured_conditioning",
@@ -284,6 +286,8 @@ def sample_structured_batch(
         rtol=rtol,
         atol=atol,
         initial_noise=initial_noise,
+        physical_dtype=physical_dtype,
+        return_latent=return_latent,
     )
 
 
