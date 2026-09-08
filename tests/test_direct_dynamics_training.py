@@ -32,6 +32,7 @@ class DirectDynamicsContractTests(unittest.TestCase):
         dataset.image_size = (2, 2)
         dataset.calendar_features = ("day_of_year", "time_index")
         dataset.dynamic_forcing_indices = (6, 7, 13, 14)
+        dataset.trajectory_lead_days = (3, 6, 9)
         initial = torch.zeros((2, 2, 2))
         forcing = torch.zeros((4, 2, 2))
         masks = torch.ones((4, 2, 2))
