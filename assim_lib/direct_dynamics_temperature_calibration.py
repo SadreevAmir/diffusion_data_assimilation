@@ -423,14 +423,16 @@ def run(run_dir: Path, output: Path) -> dict[str, Any]:
             "bootstrap_replicates": BOOTSTRAP_REPLICATES,
         },
     )
-    all_indices = sorted(set(CALIBRATION_INDICES) | set(CONFIRMATION_INDICES) | {12, 23})
+    # Confirmation data is deliberately loaded only after a candidate is selected.
+    # This preserves the scientific firewall and avoids spending roughly half the
+    # archive-I/O budget when tau=1.05 already fails the predeclared tail gate.
+    all_indices = sorted(set(CALIBRATION_INDICES) | {12, 23})
     cache = {}
     for position, dataset_index in enumerate(all_indices):
         print(f"[temperature] preparing case={position + 1}/{len(all_indices)} index={dataset_index}", flush=True)
         cache[dataset_index] = dataset[dataset_index]
     sentinel = validate_direct_dataset(dataset, item_cache=cache)
     calibration = [(order, index, cache[index]) for order, index in enumerate(CALIBRATION_INDICES)]
-    confirmation = [(100 + order, index, cache[index]) for order, index in enumerate(CONFIRMATION_INDICES)]
     stress_positions = [CALIBRATION_INDICES.index(index) for index in STRESS_DATASET_INDICES]
     result: dict[str, Any] = {
         "schema_version": "direct_dynamics_ema6_temperature_calibration_v1",
@@ -528,6 +530,17 @@ def run(run_dir: Path, output: Path) -> dict[str, Any]:
             selected_temperature = min(candidates)[1]
             selected_label = f"tau_{selected_temperature:.2f}"
             result["selected_on_calibration"] = selected_label
+            for position, dataset_index in enumerate(CONFIRMATION_INDICES):
+                print(
+                    f"[temperature] preparing confirmation case="
+                    f"{position + 1}/{len(CONFIRMATION_INDICES)} index={dataset_index}",
+                    flush=True,
+                )
+                cache[dataset_index] = dataset[dataset_index]
+            confirmation = [
+                (100 + order, index, cache[index])
+                for order, index in enumerate(CONFIRMATION_INDICES)
+            ]
             confirmation_samples = {}
             for temperature in (1.0, selected_temperature):
                 label = f"tau_{temperature:.2f}"
