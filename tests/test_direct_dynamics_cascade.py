@@ -52,6 +52,20 @@ class DirectDynamicsCascadeTests(unittest.TestCase):
         valid = self.mask.expand_as(lift) > 0
         self.assertTrue(torch.allclose(lift[valid], torch.full_like(lift[valid], 3.25), atol=1e-6))
 
+    def test_partial_coastal_cells_with_one_two_three_ocean_pixels(self) -> None:
+        mask = torch.zeros(1, 1, 4, 6)
+        mask[0, 0, 0, 0] = 1
+        mask[0, 0, 0, 2:4] = 1
+        mask[0, 0, 0, 4:6] = 1
+        mask[0, 0, 1, 4] = 1
+        mask[0, 0, 2:, :] = 1
+        value = torch.full((1, 6, 4, 6), 2.5)
+        coarse, fraction = masked_block_average(value, mask)
+        self.assertTrue(torch.equal(fraction[0, 0, 0], torch.tensor([0.25, 0.5, 0.75])))
+        lift = smooth_right_inverse(coarse, mask)
+        valid = mask.expand_as(lift) > 0
+        self.assertTrue(torch.allclose(lift[valid], torch.full_like(lift[valid], 2.5), atol=1e-6))
+
     def test_fractional_fine_mask_is_rejected(self) -> None:
         mask = self.mask.clone()
         mask[0, 0, 3, 3] = 1e-8
@@ -116,6 +130,36 @@ class DirectDynamicsCascadeTests(unittest.TestCase):
         recovered = reconstruct(state, self.mask.double())
         valid = self.mask.expand_as(value) > 0
         self.assertTrue(torch.allclose(recovered[valid], value[valid], atol=1e-14, rtol=0))
+
+    def test_projected_gaussian_covariance_and_rk4_oracle(self) -> None:
+        mask = torch.ones(16, 1, 4, 4, dtype=torch.float64)
+        basis = torch.eye(16, dtype=torch.float64).reshape(16, 1, 4, 4)
+        projected_columns = project_detail(basis, mask).reshape(16, 16).T
+        self.assertTrue(
+            torch.allclose(
+                projected_columns @ projected_columns,
+                projected_columns,
+                atol=2e-14,
+                rtol=0,
+            )
+        )
+        covariance = projected_columns @ projected_columns.T
+        self.assertEqual(int(torch.linalg.matrix_rank(covariance, atol=1e-12)), 12)
+        self.assertGreaterEqual(float(torch.linalg.eigvalsh(covariance).min()), -1e-12)
+
+        clean = torch.randn(2, 6, 8, 10, generator=self.generator, dtype=torch.float64)
+        noise = torch.randn(2, 6, 8, 10, generator=self.generator, dtype=torch.float64)
+        state, velocity, clean_detail, _ = residual_flow_pair(
+            clean, noise, self.mask.double(), torch.ones(2, dtype=torch.float64)
+        )
+        step = -1.0 / 4
+        for _ in range(4):
+            k1 = velocity
+            k2 = velocity
+            k3 = velocity
+            k4 = velocity
+            state = state + step * (k1 + 2 * k2 + 2 * k3 + k4) / 6
+        self.assertTrue(torch.allclose(state, clean_detail, atol=2e-14, rtol=0))
 
 
 if __name__ == "__main__":
