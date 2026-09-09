@@ -33,6 +33,11 @@ from .censored_joint_energy_overfit import (
     _sha256,
     joint_field_energy_score,
 )
+from .censored_joint_multiscale_score import (
+    PATCHES_PER_CONDITION,
+    multiscale_joint_energy_score,
+    sample_valid_centres,
+)
 from .censored_joint_spatial_diagnostics import (
     OUTPUT_NAMES,
     SPATIAL_LAGS,
@@ -87,6 +92,9 @@ VALIDATION_MANIFEST = (
 )
 REFERENCE_COMMIT = "b3d534dca25484347565c3942b98c84759cd5c1e"
 DIAGNOSTIC_SEED_OFFSET = 202
+PATCH_TRAIN_SEED_OFFSET = 909
+PATCH_DIAGNOSTIC_SEED_OFFSET = 1001
+DIAGNOSTIC_PATCH_CENTRES = 128
 EXPECTED_TRAIN_CASES = 51_792
 EXPECTED_TRAIN_BATCHES = 6_474
 EXPECTED_INVENTORY_SHA256 = {
@@ -140,6 +148,22 @@ def _enforce_train_envelope(train_cases: int, train_batches: int) -> None:
             "full train envelope differs: "
             f"cases={train_cases}, batches={train_batches}"
         )
+
+
+def _validate_objective_setup(
+    objective: str,
+    step_zero_checkpoint: Path | None,
+    expected_step_zero_sha256: str | None,
+) -> None:
+    if objective not in {"global", "multiscale"}:
+        raise ValueError("objective must be global or multiscale")
+    if objective == "multiscale":
+        if step_zero_checkpoint is None or expected_step_zero_sha256 is None:
+            raise ValueError("multiscale objective requires frozen step-zero identity")
+        if _sha256(step_zero_checkpoint) != expected_step_zero_sha256:
+            raise ValueError("step-zero checkpoint SHA differs from frozen baseline")
+    elif step_zero_checkpoint is not None or expected_step_zero_sha256 is not None:
+        raise ValueError("global baseline does not accept a step-zero override")
 
 
 class _RunBoundary:
@@ -359,9 +383,25 @@ def evaluate_group(payload: dict[str, torch.Tensor]) -> dict[str, Any]:
                         persistence[case : case + 1, channel], case_valid, lag
                     ),
                 }
-            atom = {"member_zero": float((members == 0).float().mean()), "truth_zero": float((target == 0).float().mean())}
+            probability_zero = (members == 0).float().mean(dim=0)
+            truth_zero = (target == 0).float()
+            atom = {
+                "member_zero": float(probability_zero.mean()),
+                "truth_zero": float(truth_zero.mean()),
+                "zero_brier": float((probability_zero - truth_zero).square().mean()),
+            }
             if name.endswith("_sic"):
-                atom.update({"member_one": float((members == 1).float().mean()), "truth_one": float((target == 1).float().mean())})
+                probability_one = (members == 1).float().mean(dim=0)
+                truth_one = (target == 1).float()
+                atom.update(
+                    {
+                        "member_one": float(probability_one.mean()),
+                        "truth_one": float(truth_one.mean()),
+                        "one_brier": float(
+                            (probability_one - truth_one).square().mean()
+                        ),
+                    }
+                )
             case_records[name].append(
                 {
                     "case": case,
@@ -393,6 +433,18 @@ def evaluate_group(payload: dict[str, torch.Tensor]) -> dict[str, Any]:
             "fair_crps_ratio": crps / persistence_mae if persistence_mae > 0 else None,
             "fair_crps_ratio_null_reason": None if persistence_mae > 0 else "zero_baseline_score",
             "rank_histogram": [sum(values) / len(values) for values in zip(*rank_histograms, strict=True)],
+            "rank_total_variation_from_uniform": 0.5
+            * sum(
+                abs(value - 1.0 / (DIAGNOSTIC_MEMBERS + 1))
+                for value in [
+                    sum(values) / len(values)
+                    for values in zip(*rank_histograms, strict=True)
+                ]
+            ),
+            "boundary_events": {
+                key: sum(record["atoms"][key] for record in records) / len(records)
+                for key in records[0]["atoms"]
+            },
             "cases": records,
         }
 
@@ -433,6 +485,32 @@ def evaluate_group(payload: dict[str, torch.Tensor]) -> dict[str, Any]:
     return result
 
 
+def _case_equal_multiscale_diagnostic(
+    payload: dict[str, torch.Tensor],
+    *,
+    stds: tuple[float, ...],
+    centres: torch.Tensor,
+) -> tuple[float, dict[str, float]]:
+    totals = []
+    component_values: dict[str, list[float]] = {}
+    for case in range(payload["truth"].shape[0]):
+        total, components = multiscale_joint_energy_score(
+            payload["physical_ensemble"][case : case + 1],
+            payload["truth"][case : case + 1],
+            payload["valid_mask"][case : case + 1],
+            stds=stds,
+            centres=centres[case : case + 1],
+            expected_centres=None,
+        )
+        totals.append(float(total))
+        for name, value in components.items():
+            component_values.setdefault(name, []).append(float(value))
+    return sum(totals) / len(totals), {
+        name: sum(values) / len(values)
+        for name, values in component_values.items()
+    }
+
+
 def _slice_tensor_batch(batch: dict[str, Any], case: int) -> dict[str, Any]:
     return {
         key: value[case : case + 1] if torch.is_tensor(value) else value
@@ -455,6 +533,7 @@ def _diagnose_group(
     stds: tuple[float, ...],
     checkpoint: dict[str, Any],
     device: torch.device,
+    score_centres: torch.Tensor | None = None,
 ) -> dict[str, Any]:
     was_training = model.training
     model.eval()
@@ -500,10 +579,31 @@ def _diagnose_group(
             "group": group,
             "update": update,
         }
+        if score_centres is not None:
+            payload["multiscale_score_centres"] = score_centres
+            identity["multiscale_score_centres_sha256"] = _tensor_sha256(
+                score_centres
+            )
+
+        def diagnostic_evaluator(values: dict[str, torch.Tensor]) -> dict[str, Any]:
+            evaluated = evaluate_group(values)
+            if score_centres is not None:
+                multiscale_score, multiscale_components = (
+                    _case_equal_multiscale_diagnostic(
+                        values,
+                        stds=stds,
+                        centres=score_centres,
+                    )
+                )
+                evaluated["multiscale_score"] = multiscale_score
+                evaluated["multiscale_components"] = multiscale_components
+            return evaluated
+
         metrics = _save_then_evaluate_diagnostic(
             stage=stage,
             payload=payload,
             identity=identity,
+            evaluator=diagnostic_evaluator,
         )
         metrics.update(
             {
@@ -550,12 +650,38 @@ def _diagnose_group(
                 value = values[metric]
                 if value is not None:
                     tracker.report_scalar(f"censored_joint_heldout/{group}/{metric}", name, value, update)
+        if "multiscale_score" in metrics:
+            tracker.report_scalar(
+                f"censored_joint_heldout/{group}/multiscale_score",
+                "total",
+                metrics["multiscale_score"],
+                update,
+            )
+            for component_name, component_value in metrics[
+                "multiscale_components"
+            ].items():
+                tracker.report_scalar(
+                    f"censored_joint_heldout/{group}/multiscale_components",
+                    component_name,
+                    component_value,
+                    update,
+                )
         return metrics
     finally:
         model.train(was_training)
 
 
-def run(config_path: Path, output_dir: Path) -> dict[str, Any]:
+def run(
+    config_path: Path,
+    output_dir: Path,
+    *,
+    objective: str = "global",
+    step_zero_checkpoint: Path | None = None,
+    expected_step_zero_sha256: str | None = None,
+) -> dict[str, Any]:
+    _validate_objective_setup(
+        objective, step_zero_checkpoint, expected_step_zero_sha256
+    )
     if torch.cuda.device_count() != 1:
         raise RuntimeError("heldout feasibility pilot requires exactly one visible GPU")
     if os.environ.get("CLEARML_REQUIRE_ONLINE") != "1":
@@ -599,8 +725,8 @@ def run(config_path: Path, output_dir: Path) -> dict[str, Any]:
     output_dir.mkdir(parents=True, exist_ok=False)
     tracker = ClearMLTracker(
         "sea_ice_two_stage",
-        f"censored_joint_energy_heldout_{output_dir.name}",
-        tags=["censored-joint-law", "energy-score", "heldout-feasibility", "validation-2022-exploratory", "one-gpu", "no-ode", "no-member-mse", "dropout-zero"],
+        f"censored_joint_{objective}_heldout_{output_dir.name}",
+        tags=["censored-joint-law", f"{objective}-energy-score", "heldout-feasibility", "validation-2022-exploratory", "one-gpu", "no-ode", "no-member-mse", "dropout-zero"],
         env_path=experiment.get("clearml", {}).get("env_path"),
     )
     contract = {
@@ -623,7 +749,34 @@ def run(config_path: Path, output_dir: Path) -> dict[str, Any]:
         "workers": TRAIN_WORKERS,
         "prefetch_factor": PREFETCH_FACTOR,
         "ipc_preflight": ipc_preflight,
-        "objective": "unbiased_joint_energy_score",
+        "objective": (
+            "unbiased_joint_energy_score"
+            if objective == "global"
+            else "global_plus_multiscale_patch_unbiased_joint_energy_score"
+        ),
+        "objective_mode": objective,
+        "step_zero_checkpoint": (
+            None
+            if step_zero_checkpoint is None
+            else {
+                "path": str(step_zero_checkpoint),
+                "sha256": expected_step_zero_sha256,
+            }
+        ),
+        "patch_training": (
+            None
+            if objective == "global"
+            else {
+                "sizes": [8, 16],
+                "centres_per_condition": PATCHES_PER_CONDITION,
+                "weights": {"global": 0.5, "patch_8": 0.25, "patch_16": 0.25},
+                "seed_offset": PATCH_TRAIN_SEED_OFFSET,
+                "selection": "uniform_valid_ocean_with_replacement_nested",
+            }
+        ),
+        "diagnostic_patch_centres": (
+            None if objective == "global" else DIAGNOSTIC_PATCH_CENTRES
+        ),
         "generator": "persistence_centered_censored_joint_residual",
         "optimizer": "AdamW",
         "learning_rate": BASE_LEARNING_RATE,
@@ -653,11 +806,27 @@ def run(config_path: Path, output_dir: Path) -> dict[str, Any]:
         device = torch.device("cuda:0")
         model = build_unet(model_config).to(device)
         head_init = _initialize_small_nonzero_head(model, seed=model_config.seed + 313)
+        if objective == "multiscale":
+            try:
+                step_zero_state = torch.load(
+                    step_zero_checkpoint, map_location="cpu", weights_only=True
+                )
+            except TypeError:
+                step_zero_state = torch.load(step_zero_checkpoint, map_location="cpu")
+            model.load_state_dict(step_zero_state)
+            head_init = {
+                **head_init,
+                "overridden_by_frozen_step_zero": True,
+                "frozen_step_zero_sha256": expected_step_zero_sha256,
+            }
         optimizer = torch.optim.AdamW(model.parameters(), lr=BASE_LEARNING_RATE)
         means = _repeat_field_stats(train_dataset.means)
         stds = _repeat_field_stats(train_dataset.stds)
         grid = make_normalized_xy_grid(*model_config.image_size, device=device)
         training_noise = torch.Generator(device=device).manual_seed(model_config.seed + 101)
+        patch_generator = torch.Generator(device=device).manual_seed(
+            model_config.seed + PATCH_TRAIN_SEED_OFFSET
+        )
         diagnostic_generator = torch.Generator(device="cpu").manual_seed(
             model_config.seed + DIAGNOSTIC_SEED_OFFSET
         )
@@ -683,6 +852,28 @@ def run(config_path: Path, output_dir: Path) -> dict[str, Any]:
         train_control_batch = default_collate(train_control_items)
         validation_metadata = [item["meta"] for item in validation_items]
         train_control_metadata = [item["meta"] for item in train_control_items]
+        diagnostic_patch_generator = torch.Generator(device="cpu").manual_seed(
+            model_config.seed + PATCH_DIAGNOSTIC_SEED_OFFSET
+        )
+        validation_score_centres = (
+            None
+            if objective == "global"
+            else sample_valid_centres(
+                validation_batch["valid_mask"][:, :1],
+                DIAGNOSTIC_PATCH_CENTRES,
+                generator=diagnostic_patch_generator,
+            )
+        )
+        train_control_score_centres = (
+            None
+            if objective == "global"
+            else sample_valid_centres(
+                train_control_batch["valid_mask"][:, :1],
+                DIAGNOSTIC_PATCH_CENTRES,
+                generator=diagnostic_patch_generator,
+            )
+        )
+        patch_centres_log: list[torch.Tensor] = []
 
         def snapshot(update: int) -> None:
             checkpoint_path = output_dir / f"model_step_{update:04d}.pth"
@@ -693,6 +884,27 @@ def run(config_path: Path, output_dir: Path) -> dict[str, Any]:
                 "update": update,
                 "weight_source": "raw",
             }
+            if objective == "multiscale":
+                patch_history_path = (
+                    output_dir / f"patch_centres_through_step_{update:04d}.pth"
+                )
+                patch_history = (
+                    torch.stack(patch_centres_log)
+                    if patch_centres_log
+                    else torch.empty(
+                        0,
+                        CONDITION_BATCH_SIZE,
+                        PATCHES_PER_CONDITION,
+                        2,
+                        dtype=torch.int64,
+                    )
+                )
+                _atomic_torch_save(patch_history, patch_history_path)
+                checkpoint["patch_centres"] = {
+                    "path": str(patch_history_path),
+                    "sha256": _sha256(patch_history_path),
+                    "completed_updates": len(patch_centres_log),
+                }
             checkpoints[update] = checkpoint
             _atomic_json(output_dir / f"model_step_{update:04d}.json", checkpoint)
             tracker.connect(f"censored_joint_heldout_snapshot_{update:04d}", checkpoint)
@@ -710,6 +922,7 @@ def run(config_path: Path, output_dir: Path) -> dict[str, Any]:
                     stds=stds,
                     checkpoint=checkpoint,
                     device=device,
+                    score_centres=validation_score_centres,
                 ),
                 "train_control": _diagnose_group(
                     model=model,
@@ -724,6 +937,7 @@ def run(config_path: Path, output_dir: Path) -> dict[str, Any]:
                     stds=stds,
                     checkpoint=checkpoint,
                     device=device,
+                    score_centres=train_control_score_centres,
                 ),
             }
 
@@ -740,7 +954,28 @@ def run(config_path: Path, output_dir: Path) -> dict[str, Any]:
             valid = batch["valid_mask"][:, :1].float()
             noise = torch.randn((CONDITION_BATCH_SIZE, ENSEMBLE_MEMBERS, DIRECT_OUTPUT_CHANNELS, *model_config.image_size), generator=training_noise, device=device)
             members, _ = _generate_members(model, condition=batch["structured_conditioning"].float(), background=batch["background"].float(), valid=valid, noise=noise, grid=grid, means=means, stds=stds)
-            loss = joint_field_energy_score(members, batch["structured_physical_truth"].float(), valid, stds=stds)
+            if objective == "global":
+                loss = joint_field_energy_score(
+                    members,
+                    batch["structured_physical_truth"].float(),
+                    valid,
+                    stds=stds,
+                )
+                loss_components = {"global": loss}
+            else:
+                patch_centres = sample_valid_centres(
+                    valid,
+                    PATCHES_PER_CONDITION,
+                    generator=patch_generator,
+                )
+                patch_centres_log.append(patch_centres.detach().cpu())
+                loss, loss_components = multiscale_joint_energy_score(
+                    members,
+                    batch["structured_physical_truth"].float(),
+                    valid,
+                    stds=stds,
+                    centres=patch_centres,
+                )
             optimizer.zero_grad(set_to_none=True)
             loss.backward()
             gradient_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), 10.0)
@@ -756,12 +991,20 @@ def run(config_path: Path, output_dir: Path) -> dict[str, Any]:
             if update == 1 or update % 8 == 0:
                 tracker.report_scalar("censored_joint_heldout/train", "energy_score", value, update)
                 tracker.report_scalar("censored_joint_heldout/train", "learning_rate", learning_rate, update)
+                for component_name, component_value in loss_components.items():
+                    tracker.report_scalar(
+                        "censored_joint_heldout/train_components",
+                        component_name,
+                        float(component_value.detach()),
+                        update,
+                    )
             if update in DIAGNOSTIC_UPDATES:
                 snapshot(update)
                 _atomic_json(output_dir / "losses.json", losses)
         result = {
             "status": "complete_pending_independent_review",
             "clearml_task_id": str(tracker.task.id),
+            "objective_mode": objective,
             "parameter_count": sum(parameter.numel() for parameter in model.parameters()),
             "head_initialization": head_init,
             "contract": contract,
@@ -781,8 +1024,24 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=Path, default=Path("config/experiments/train_direct_dynamics_all_hours_v1.json"))
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument(
+        "--objective", choices=("global", "multiscale"), default="global"
+    )
+    parser.add_argument("--step-zero-checkpoint", type=Path)
+    parser.add_argument("--expected-step-zero-sha256")
     arguments = parser.parse_args()
-    print(json.dumps(run(arguments.config, arguments.output), indent=2))
+    print(
+        json.dumps(
+            run(
+                arguments.config,
+                arguments.output,
+                objective=arguments.objective,
+                step_zero_checkpoint=arguments.step_zero_checkpoint,
+                expected_step_zero_sha256=arguments.expected_step_zero_sha256,
+            ),
+            indent=2,
+        )
+    )
 
 
 if __name__ == "__main__":

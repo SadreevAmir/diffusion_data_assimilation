@@ -36,30 +36,37 @@ def _validate_shapes(
         raise ValueError("valid mask must be exactly binary")
 
 
-def _energy_score_with_mask(
+def _active_inputs_are_finite(
+    members: torch.Tensor,
+    truth: torch.Tensor,
+    valid: torch.Tensor,
+) -> bool:
+    active = valid.bool()
+    active_members = active[:, None].expand_as(members)
+    active_truth = active.expand_as(truth)
+    return bool(
+        torch.all(torch.isfinite(members[active_members]))
+        and torch.all(torch.isfinite(truth[active_truth]))
+    )
+
+
+def _energy_score_core(
     members: torch.Tensor,
     truth: torch.Tensor,
     valid: torch.Tensor,
     stds: Sequence[float],
 ) -> torch.Tensor:
-    """Case-equal unbiased ES after physical censoring and std normalization."""
+    """Energy-score arithmetic after a single outer validation/finite gate."""
 
-    _validate_shapes(members, truth, valid, stds)
     batch, member_count, channels = members.shape[:3]
     active = valid.bool()
     active_members = active[:, None].expand_as(members)
     active_truth = active.expand_as(truth)
-    if not torch.all(torch.isfinite(members[active_members])):
-        raise FloatingPointError("active members contain NaN/Inf")
-    if not torch.all(torch.isfinite(truth[active_truth])):
-        raise FloatingPointError("active truth contains NaN/Inf")
     safe_members = torch.where(active_members, members, torch.zeros_like(members))
     safe_truth = torch.where(active_truth, truth, torch.zeros_like(truth))
     scale = members.new_tensor(stds).view(1, 1, channels, 1, 1)
     mask = active.to(dtype=members.dtype).unsqueeze(1)
     valid_counts = valid.sum(dim=(-2, -1)).reshape(batch)
-    if torch.any(valid_counts <= 0):
-        raise ValueError("every scored region must contain a valid pixel")
     normalizer = torch.sqrt(valid_counts.to(members.dtype) * channels)
 
     observation_difference = ((safe_members - safe_truth[:, None]) / scale) * mask
@@ -77,7 +84,28 @@ def _energy_score_with_mask(
     case_score = observation_distance.mean(dim=1) - pair_distance.sum(
         dim=(1, 2)
     ) / (2.0 * member_count * (member_count - 1))
-    result = case_score.mean()
+    return case_score.mean()
+
+
+def _energy_score_with_mask(
+    members: torch.Tensor,
+    truth: torch.Tensor,
+    valid: torch.Tensor,
+    stds: Sequence[float],
+) -> torch.Tensor:
+    """Case-equal unbiased ES after physical censoring and std normalization."""
+
+    _validate_shapes(members, truth, valid, stds)
+    if torch.any(valid.sum(dim=(-2, -1)) <= 0):
+        raise ValueError("every scored region must contain a valid pixel")
+    active = valid.bool()
+    active_members = active[:, None].expand_as(members)
+    active_truth = active.expand_as(truth)
+    if not torch.all(torch.isfinite(members[active_members])):
+        raise FloatingPointError("active members contain NaN/Inf")
+    if not torch.all(torch.isfinite(truth[active_truth])):
+        raise FloatingPointError("active truth contains NaN/Inf")
+    result = _energy_score_core(members, truth, valid, stds)
     if not torch.isfinite(result):
         raise FloatingPointError("energy-score result is NaN/Inf")
     return result
@@ -123,6 +151,8 @@ def patch_energy_score(
     """Mean proper ES over already-generated full-field patches."""
 
     _validate_shapes(members, truth, valid, stds)
+    if not _active_inputs_are_finite(members, truth, valid):
+        raise FloatingPointError("active patch-score inputs contain NaN/Inf")
     if centres.ndim != 3 or centres.shape[0] != members.shape[0] or centres.shape[2] != 2:
         raise ValueError("centres must have shape [condition, patch, (y, x)]")
     if centres.dtype not in (
@@ -133,17 +163,29 @@ def patch_energy_score(
         torch.uint8,
     ):
         raise ValueError("patch centres must be integer coordinates")
+    if centres.device != members.device:
+        raise ValueError("patch centres and scored fields must share a device")
     if patch_size <= 0:
         raise ValueError("patch_size must be positive")
     height, width = members.shape[-2:]
+    in_bounds = (
+        (centres[..., 0] >= 0)
+        & (centres[..., 0] < height)
+        & (centres[..., 1] >= 0)
+        & (centres[..., 1] < width)
+    )
+    if not torch.all(in_bounds):
+        raise ValueError("patch centre lies outside the image")
+    case_indices = torch.arange(members.shape[0], device=centres.device)[:, None]
+    centre_valid = valid[
+        case_indices, 0, centres[..., 0].long(), centres[..., 1].long()
+    ]
+    if not torch.all(centre_valid == 1):
+        raise ValueError("every patch centre must be a valid-ocean pixel")
     scores = []
     half = patch_size // 2
     for case in range(members.shape[0]):
         for centre_y, centre_x in centres[case].tolist():
-            if not (0 <= centre_y < height and 0 <= centre_x < width):
-                raise ValueError("patch centre lies outside the image")
-            if not bool(valid[case, 0, centre_y, centre_x] > 0):
-                raise ValueError("every patch centre must be a valid-ocean pixel")
             top = centre_y - half
             left = centre_x - half
             bottom = top + patch_size
@@ -151,14 +193,17 @@ def patch_energy_score(
             y0, y1 = max(0, top), min(height, bottom)
             x0, x1 = max(0, left), min(width, right)
             scores.append(
-                _energy_score_with_mask(
+                _energy_score_core(
                     members[case : case + 1, :, :, y0:y1, x0:x1],
                     truth[case : case + 1, :, y0:y1, x0:x1],
                     valid[case : case + 1, :, y0:y1, x0:x1],
                     stds,
                 )
             )
-    return torch.stack(scores).mean()
+    result = torch.stack(scores).mean()
+    if not torch.isfinite(result):
+        raise FloatingPointError("patch energy-score result is NaN/Inf")
+    return result
 
 
 def multiscale_joint_energy_score(
@@ -168,6 +213,7 @@ def multiscale_joint_energy_score(
     *,
     stds: Sequence[float],
     centres: torch.Tensor,
+    expected_centres: int | None = PATCHES_PER_CONDITION,
 ) -> tuple[torch.Tensor, dict[str, torch.Tensor]]:
     """Frozen 1/2 global + 1/4 8px patch + 1/4 16px patch objective."""
 
@@ -175,9 +221,9 @@ def multiscale_joint_energy_score(
         raise RuntimeError("patch scales and weights differ")
     if not math.isclose(GLOBAL_WEIGHT + sum(PATCH_SCALE_WEIGHTS), 1.0):
         raise RuntimeError("multiscale objective weights must sum to one")
-    if centres.shape[1] != PATCHES_PER_CONDITION:
+    if expected_centres is not None and centres.shape[1] != expected_centres:
         raise ValueError(
-            f"expected {PATCHES_PER_CONDITION} patch centres per condition"
+            f"expected {expected_centres} patch centres per condition"
         )
     components = {
         "global": _energy_score_with_mask(members, truth, valid, stds)

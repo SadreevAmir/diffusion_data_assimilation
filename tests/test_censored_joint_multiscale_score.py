@@ -3,6 +3,7 @@ import unittest
 
 import torch
 
+from assim_lib.censored_joint_energy_overfit import joint_field_energy_score
 from assim_lib.censored_joint_multiscale_score import (
     PATCHES_PER_CONDITION,
     _energy_score_with_mask,
@@ -27,6 +28,17 @@ class CensoredJointMultiscaleScoreTests(unittest.TestCase):
         valid = torch.ones(1, 1, 1, 1, dtype=torch.float64)
         score = _energy_score_with_mask(members, truth, valid, (1.0,))
         self.assertAlmostEqual(float(score), 0.0)
+
+    def test_global_component_matches_frozen_baseline_score(self) -> None:
+        members = torch.rand(3, 2, 6, 5, 7, dtype=torch.float64)
+        truth = torch.rand(3, 6, 5, 7, dtype=torch.float64)
+        valid = torch.randint(0, 2, (3, 1, 5, 7), dtype=torch.int64).double()
+        valid[:, :, 0, 0] = 1
+        baseline = joint_field_energy_score(
+            members, truth, valid, stds=self.stds
+        )
+        candidate = _energy_score_with_mask(members, truth, valid, self.stds)
+        self.assertAlmostEqual(float(baseline), float(candidate), places=12)
 
     def test_zero_distance_backward_is_finite(self) -> None:
         members = torch.zeros(1, 2, 6, 4, 4, dtype=torch.float64, requires_grad=True)

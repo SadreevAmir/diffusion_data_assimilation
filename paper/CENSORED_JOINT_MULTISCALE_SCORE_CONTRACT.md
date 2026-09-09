@@ -10,6 +10,11 @@ of heldout baseline `118d003`, without losing its calibration and skill? The dat
 generator, censoring, architecture, initialization, optimizer, train order, model-noise
 stream, diagnostic cases and diagnostic-noise stream remain identical to the baseline.
 
+The candidate must load baseline run
+`heldout_energy_118d003_20260909T193003Z/model_step_0000.pth` with SHA-256
+`8a89a40bb335738124a26e823166bca85a8e288705a48ee30bfe1106337c1802`.
+Recreating a merely similar initialization is not sufficient.
+
 The generated physical law is unchanged:
 
 1. predict a normalized joint residual for all six `(SIC, SIT) × (d+3,d+6,d+9)`
@@ -57,9 +62,12 @@ baseline step-zero checkpoint, train order, model-noise stream, and fixed diagno
 noise. Save raw physical members and uncensored latents before evaluation, plus all
 checkpoint/noise/patch identities and failure evidence. Test-2023 remains closed.
 
-For evaluation, preserve the baseline metrics and add fixed 128 centres/case for the
-candidate score, directional autocorrelation/spectrum probes, and stride-phase shift
-equivariance probes on the interior.
+For evaluation, the runner preserves the baseline metrics, adds fixed 128 centres/case
+for the candidate score, and reports boundary-event Brier scores. Directional
+autocorrelation/spectrum and stride-phase shift-equivariance probes are a separate,
+frozen CPU postprocess over the saved raw members/checkpoints. That postprocess must be
+implemented, audited and completed for baseline and candidate before any scientific
+verdict; a successful training exit alone cannot pass the review gates.
 
 ## Predeclared review gates
 
