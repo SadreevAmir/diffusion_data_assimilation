@@ -174,6 +174,42 @@ def _mean(values: list[float]) -> float:
     return float(sum(values) / len(values))
 
 
+def _save_stress_samples(
+    output: Path,
+    label: str,
+    ensemble: torch.Tensor,
+    truth: torch.Tensor,
+    persistence: torch.Tensor,
+    mask: torch.Tensor,
+    identities: list[dict[str, Any]],
+    stress_positions: list[int],
+    temperature: float,
+    *,
+    prefix: str = "calibration",
+    solver_steps: int = 33,
+) -> Path:
+    path = output / f"{prefix}_{label}_stress_raw.pt"
+    temporary = output / f".{path.name}.incomplete"
+    torch.save(
+        {
+            "raw_ensemble": ensemble[stress_positions],
+            "truth": truth[stress_positions],
+            "persistence": persistence[stress_positions],
+            "valid_mask": mask[stress_positions],
+            "case_identities": [identities[position] for position in stress_positions],
+            "temperature": temperature,
+            "member_noise_seed_rule": "314159 + 1000003*calibration_case_order + 1009*member_index",
+            "noise_transform": "initial_noise = temperature * fixed_base_gaussian_noise",
+            "checkpoint": EMA6_CHECKPOINT,
+            "solver": f"NN/ODE FP32; TF32 off; RK4-{solver_steps}",
+            "primary_role": "raw_unclipped_stress_evidence",
+        },
+        temporary,
+    )
+    os.replace(temporary, path)
+    return path
+
+
 def score_cases_equal(
     ensemble: torch.Tensor,
     truth: torch.Tensor,
@@ -185,28 +221,37 @@ def score_cases_equal(
         for i in range(ensemble.shape[0])
     ]
     aggregate: dict[str, Any] = {"leads": {}}
-    scalar_names = (
-        "ensemble_mean_rmse",
-        "persistence_rmse",
+    mean_scalar_names = (
         "fair_crps",
         "persistence_point_mass_crps",
-        "spread",
-        "spread_skill_ratio",
-        "rank_tv_to_uniform",
         "normalized_mean_rank",
         "member_roughness",
     )
     for lead in ("d3", "d6", "d9"):
         aggregate["leads"][lead] = {}
         for field in ("sic", "sit"):
-            values = {name: _mean([case["leads"][lead][field][name] for case in per_case]) for name in scalar_names}
+            case_values = [case["leads"][lead][field] for case in per_case]
+            values = {name: _mean([case[name] for case in case_values]) for name in mean_scalar_names}
+            values["ensemble_mean_rmse"] = math.sqrt(
+                _mean([case["ensemble_mean_rmse"] ** 2 for case in case_values])
+            )
+            values["persistence_rmse"] = math.sqrt(
+                _mean([case["persistence_rmse"] ** 2 for case in case_values])
+            )
+            values["spread"] = math.sqrt(_mean([case["spread"] ** 2 for case in case_values]))
+            values["spread_skill_ratio"] = values["spread"] / max(
+                values["ensemble_mean_rmse"], 1e-12
+            )
             probabilities = []
             for case in per_case:
                 counts = torch.tensor(case["leads"][lead][field]["fractional_rank_counts"], dtype=torch.float64)
                 probabilities.append(counts / counts.sum())
-            values["equal_case_rank_probabilities"] = [
-                float(value) for value in torch.stack(probabilities).mean(dim=0)
-            ]
+            equal_probabilities = torch.stack(probabilities).mean(dim=0)
+            values["equal_case_rank_probabilities"] = [float(value) for value in equal_probabilities]
+            uniform = torch.full_like(equal_probabilities, 1.0 / len(equal_probabilities))
+            values["rank_tv_to_uniform"] = float(
+                0.5 * (equal_probabilities - uniform).abs().sum().item()
+            )
             aggregate["leads"][lead][field] = values
     return {"aggregate": aggregate, "per_case": per_case}
 
@@ -427,8 +472,39 @@ def run(run_dir: Path, output: Path) -> dict[str, Any]:
                 entry["tail_gate"] = tail_gate(tails, result["calibration"]["tau_1.00"]["tails"])
                 entry["stress_tail_gate"] = tail_gate(stress_tails, result["calibration"]["tau_1.00"]["stress_tails"])
             result["calibration"][label] = entry
+            stress_path = _save_stress_samples(
+                output,
+                label,
+                ensemble,
+                truth,
+                persistence,
+                mask,
+                identities,
+                stress_positions,
+                temperature,
+            )
+            entry["stress_raw_samples_path"] = str(stress_path)
+            tracker.upload_artifact(f"{label}_stress_raw", stress_path)
             for path in _save_visuals(output, f"calibration_{label}_raw", ensemble[:1], truth[:1], persistence[:1], mask[:1]):
                 tracker.report_image("temperature/raw_individual_samples", f"calibration/{label}/{path.stem}", path, 0)
+            stress_ensemble = ensemble[stress_positions]
+            stress_truth = truth[stress_positions]
+            stress_persistence = persistence[stress_positions]
+            stress_mask = mask[stress_positions]
+            for path in _save_visuals(
+                output,
+                f"calibration_{label}_stress_raw",
+                stress_ensemble,
+                stress_truth,
+                stress_persistence,
+                stress_mask,
+            ):
+                tracker.report_image(
+                    "temperature/raw_stress_samples",
+                    f"calibration/{label}/{path.stem}",
+                    path,
+                    0,
+                )
             _atomic_json(output / "progress.json", result)
             if temperature == 1.05 and (
                 not entry["tail_gate"]["passed"] or not entry["stress_tail_gate"]["passed"]
@@ -475,11 +551,27 @@ def run(run_dir: Path, output: Path) -> dict[str, Any]:
 
             stress_prepared = [calibration[position] for position in stress_positions]
             stress65 = {}
+            stress65_paths = {}
             for temperature in (1.0, selected_temperature):
-                stress_ensemble, _, _, stress_mask, _ = sample_panel(
+                stress_ensemble, stress_truth, stress_persistence, stress_mask, stress_identities = sample_panel(
                     sampler, dataset, stress_prepared, members=8, temperature=temperature, steps=65
                 )
                 stress65[temperature] = tail_metrics(stress_ensemble, stress_mask)
+                label = f"tau_{temperature:.2f}"
+                stress65_paths[temperature] = _save_stress_samples(
+                    output,
+                    label,
+                    stress_ensemble,
+                    stress_truth,
+                    stress_persistence,
+                    stress_mask,
+                    stress_identities,
+                    list(range(len(stress_prepared))),
+                    temperature,
+                    prefix="stress_rk4_65",
+                    solver_steps=65,
+                )
+                tracker.upload_artifact(f"{label}_stress_rk4_65_raw", stress65_paths[temperature])
             stress65_gate = tail_gate(stress65[selected_temperature], stress65[1.0])
             calibration_entry = result["calibration"][selected_label]
             gate = confirmation_gate(
@@ -497,6 +589,8 @@ def run(run_dir: Path, output: Path) -> dict[str, Any]:
                 "baseline": stress65[1.0],
                 "candidate": stress65[selected_temperature],
                 "tail_gate": stress65_gate,
+                "baseline_raw_samples_path": str(stress65_paths[1.0]),
+                "candidate_raw_samples_path": str(stress65_paths[selected_temperature]),
             }
             result["acceptance_gate"] = gate
             result["status"] = "complete_candidate_accepted" if gate["passed"] else "complete_candidate_rejected"

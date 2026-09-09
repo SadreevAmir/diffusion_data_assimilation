@@ -18,6 +18,7 @@ from assim_lib.direct_dynamics_temperature_calibration import (
     CALIBRATION_INDICES,
     CONFIRMATION_INDICES,
     confirmation_gate,
+    score_cases_equal,
     scaled_initial_noise,
     tail_gate,
     validate_panel_indices,
@@ -196,6 +197,34 @@ class DirectDynamicsContractTests(unittest.TestCase):
         }
         self.assertTrue(confirmation_gate(comparison, 0.99, {"passed": True})["passed"])
         self.assertFalse(confirmation_gate(comparison, 1.0, {"passed": True})["passed"])
+
+    def test_case_equal_ssr_and_rank_tv_use_panel_aggregates(self):
+        truth = torch.zeros((2, DIRECT_OUTPUT_CHANNELS, 1, 2))
+        ensemble = torch.zeros((2, 3, DIRECT_OUTPUT_CHANNELS, 1, 2))
+        ensemble[0, 0] = -1.0
+        ensemble[0, 2] = 1.0
+        ensemble[1, 0] = 1.0
+        ensemble[1, 1] = 2.0
+        ensemble[1, 2] = 3.0
+        persistence = torch.ones_like(truth)
+        valid = torch.ones((2, 1, 1, 2))
+        scored = score_cases_equal(ensemble, truth, persistence, valid)
+        cases = [case["leads"]["d3"]["sic"] for case in scored["per_case"]]
+        aggregate = scored["aggregate"]["leads"]["d3"]["sic"]
+        expected_ssr = (
+            sum(case["spread"] ** 2 for case in cases)
+            / sum(case["ensemble_mean_rmse"] ** 2 for case in cases)
+        ) ** 0.5
+        self.assertAlmostEqual(aggregate["spread_skill_ratio"], expected_ssr)
+        probabilities = torch.tensor(aggregate["equal_case_rank_probabilities"])
+        expected_tv = 0.5 * (probabilities - 0.25).abs().sum().item()
+        self.assertAlmostEqual(aggregate["rank_tv_to_uniform"], expected_tv)
+        mean_case_tv = sum(case["rank_tv_to_uniform"] for case in cases) / len(cases)
+        self.assertNotAlmostEqual(aggregate["rank_tv_to_uniform"], mean_case_tv)
+        self.assertNotAlmostEqual(
+            aggregate["spread_skill_ratio"],
+            sum(case["spread_skill_ratio"] for case in cases) / len(cases),
+        )
 
 
 if __name__ == "__main__":
