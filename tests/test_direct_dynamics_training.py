@@ -168,6 +168,11 @@ class DirectDynamicsContractTests(unittest.TestCase):
         warm = scaled_initial_noise(4, 3, (2, 2), torch.device("cpu"), 1.1)
         self.assertTrue(torch.equal(warm, base * 1.1))
 
+    def test_temperature_launcher_caps_cpu_threads_to_server_quota(self):
+        launcher = open("scripts/run_direct_dynamics_temperature_calibration.sh").read()
+        for variable in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS"):
+            self.assertIn(f"export {variable}=6", launcher)
+
     def test_temperature_tail_and_confirmation_gates_fail_closed(self):
         def tails(value):
             return {

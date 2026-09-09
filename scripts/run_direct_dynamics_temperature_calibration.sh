@@ -39,6 +39,10 @@ finish() {
 trap finish EXIT
 
 export CLEARML_REQUIRE_ONLINE=1
+export OMP_NUM_THREADS=6
+export MKL_NUM_THREADS=6
+export OPENBLAS_NUM_THREADS=6
+export NUMEXPR_NUM_THREADS=6
 timeout --signal=TERM --kill-after=2m 14280s python -m assim_lib.direct_dynamics_temperature_calibration \
   --run-dir "$RESULT_ROOT/training/seed1701-night_20260909_v1" \
   --output "$OUTPUT"

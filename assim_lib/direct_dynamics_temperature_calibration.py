@@ -393,6 +393,11 @@ def run(run_dir: Path, output: Path) -> dict[str, Any]:
         raise RuntimeError("temperature calibration requires exactly one visible GPU")
     if os.environ.get("CLEARML_REQUIRE_ONLINE") != "1":
         raise RuntimeError("temperature calibration requires CLEARML_REQUIRE_ONLINE=1")
+    # The server exposes 256 logical CPUs through cpuset but enforces a six-core
+    # CFS quota.  PyTorch otherwise creates about 256 scoring threads, causing
+    # severe oversubscription in rank/CRPS reductions.
+    torch.set_num_threads(6)
+    torch.set_num_interop_threads(1)
     if output.exists():
         raise FileExistsError(f"refusing to reuse calibration output {output}")
     verified = {}
@@ -443,6 +448,7 @@ def run(run_dir: Path, output: Path) -> dict[str, Any]:
         "primary_scores_use_raw_unclipped_samples": True,
         "projection_role": "display_only",
         "inference_precision": "NN float32; ODE float32; TF32 disabled; RK4-33",
+        "cpu_thread_contract": {"intraop": 6, "interop": 1},
         "checkpoint": EMA6_CHECKPOINT,
         "checkpoint_sha256": verified[EMA6_CHECKPOINT],
         "verified_input_sha256": verified,
