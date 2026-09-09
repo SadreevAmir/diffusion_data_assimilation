@@ -14,6 +14,14 @@ from assim_lib.direct_dynamics_training import (
 )
 from assim_lib.direct_dynamics_evaluation import _score, _selected_indices
 from assim_lib.direct_dynamics_tail_diagnostic import _top_support_violations
+from assim_lib.direct_dynamics_temperature_calibration import (
+    CALIBRATION_INDICES,
+    CONFIRMATION_INDICES,
+    confirmation_gate,
+    scaled_initial_noise,
+    tail_gate,
+    validate_panel_indices,
+)
 from assim_lib.sampler import Sampler
 
 
@@ -145,6 +153,49 @@ class DirectDynamicsContractTests(unittest.TestCase):
         self.assertEqual(record["lead_day"], 9)
         self.assertEqual((record["row"], record["column"]), (3, 1))
         self.assertAlmostEqual(record["violation_magnitude"], 0.7)
+
+    def test_temperature_panels_are_date_disjoint_and_include_stress_cases(self):
+        contract = validate_panel_indices(8544)
+        self.assertEqual(len(CALIBRATION_INDICES), 12)
+        self.assertEqual(len(CONFIRMATION_INDICES), 12)
+        self.assertGreaterEqual(contract["minimum_anchor_separation_days"], 10)
+        self.assertEqual(set(CALIBRATION_INDICES).intersection(CONFIRMATION_INDICES), set())
+        self.assertEqual(contract["stress_dataset_indices"], [3883, 7766])
+
+    def test_temperature_scales_only_paired_base_noise(self):
+        base = scaled_initial_noise(4, 3, (2, 2), torch.device("cpu"), 1.0)
+        warm = scaled_initial_noise(4, 3, (2, 2), torch.device("cpu"), 1.1)
+        self.assertTrue(torch.equal(warm, base * 1.1))
+
+    def test_temperature_tail_and_confirmation_gates_fail_closed(self):
+        def tails(value):
+            return {
+                "leads": {
+                    lead: {
+                        field: {
+                            "mean_delta": value,
+                            "frequency_gt_0p01": value,
+                            "frequency_gt_0p10": value,
+                            "max_delta": value,
+                        }
+                        for field in ("sic", "sit")
+                    }
+                    for lead in ("d3", "d6", "d9")
+                }
+            }
+
+        self.assertTrue(tail_gate(tails(0.01), tails(0.01))["passed"])
+        self.assertFalse(tail_gate(tails(0.02), tails(0.01))["passed"])
+        comparison = {
+            "J_mean_fair_crps_ratio": 0.98,
+            "fair_crps_ratios": {"x": 1.0},
+            "rmse_ratios": {"x": 1.0},
+            "mean_abs_ssr_error_reduction": 0.02,
+            "mean_rank_tv_difference": -0.01,
+            "rank_tv_differences": {"x": 0.0},
+        }
+        self.assertTrue(confirmation_gate(comparison, 0.99, {"passed": True})["passed"])
+        self.assertFalse(confirmation_gate(comparison, 1.0, {"passed": True})["passed"])
 
 
 if __name__ == "__main__":
