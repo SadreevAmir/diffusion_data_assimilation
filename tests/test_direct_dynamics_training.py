@@ -13,6 +13,7 @@ from assim_lib.direct_dynamics_training import (
     DirectDynamicsTrainer,
 )
 from assim_lib.direct_dynamics_evaluation import _score, _selected_indices
+from assim_lib.direct_dynamics_tail_diagnostic import _top_support_violations
 from assim_lib.sampler import Sampler
 
 
@@ -127,6 +128,23 @@ class DirectDynamicsContractTests(unittest.TestCase):
         self.assertAlmostEqual(sum(metrics["leads"]["d3"]["sic"]["fractional_rank_counts"]), 24.0)
         self.assertEqual(metrics["support"]["sic"]["frequency"], 0.0)
         self.assertEqual(metrics["support"]["sit"]["frequency"], 0.0)
+
+    def test_tail_localization_preserves_case_member_lead_and_pixel(self):
+        ensemble = torch.zeros((2, 3, DIRECT_OUTPUT_CHANNELS, 4, 5))
+        ensemble[1, 2, 4, 3, 1] = 1.7
+        mask = torch.ones((2, 1, 4, 5))
+        identities = [
+            {"case_id": "a", "dataset_index": 10},
+            {"case_id": "b", "dataset_index": 20},
+        ]
+        record = _top_support_violations(
+            ensemble, mask, identities, field="sic", count=1
+        )[0]
+        self.assertEqual(record["case_order"], 1)
+        self.assertEqual(record["member"], 2)
+        self.assertEqual(record["lead_day"], 9)
+        self.assertEqual((record["row"], record["column"]), (3, 1))
+        self.assertAlmostEqual(record["violation_magnitude"], 0.7)
 
 
 if __name__ == "__main__":
