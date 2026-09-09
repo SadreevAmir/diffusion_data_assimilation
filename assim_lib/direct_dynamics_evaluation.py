@@ -10,6 +10,8 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
+import os
 from pathlib import Path
 from typing import Any
 
@@ -33,12 +35,31 @@ from .trainer import _atomic_json
 from .transforms import channel_denormalize
 
 
+EXPECTED_INPUT_SHA256 = {
+    "metadata.json": "73c530dc669b539237bc7b295a352ef6093f0936b970ecb9c96b321bc7745da0",
+    "config.json": "898b5414cb921569b33dbd6bab89df01b0952742ed41648ab948f4ff9a5b05a6",
+    "epoch_snapshots/epoch_0006/ema_last_model.pth": "9b8bb6954b7a19179aee2e58b0c6cdddfcb8b489b1e29d6f503086c704fa0b1b",
+    "epoch_snapshots/epoch_0008/ema_last_model.pth": "daeab3e0ba6590f44d05ca3114cf7c91df898d481d27404664ba0a3aff7fc28e",
+}
+
+
 def _sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as handle:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _require_finite_scalars(value: Any, path: str = "result") -> None:
+    if isinstance(value, dict):
+        for key, child in value.items():
+            _require_finite_scalars(child, f"{path}.{key}")
+    elif isinstance(value, (list, tuple)):
+        for index, child in enumerate(value):
+            _require_finite_scalars(child, f"{path}[{index}]")
+    elif isinstance(value, float) and not math.isfinite(value):
+        raise FloatingPointError(f"non-finite scalar metric at {path}: {value}")
 
 
 def _selected_indices(length: int, count: int) -> list[int]:
@@ -144,6 +165,11 @@ def _masked_rmse(values: torch.Tensor, truth: torch.Tensor, mask: torch.Tensor) 
     return float((values[valid] - truth[valid]).square().mean(dtype=torch.float64).sqrt().item())
 
 
+def _masked_mae(values: torch.Tensor, truth: torch.Tensor, mask: torch.Tensor) -> float:
+    valid = mask.expand_as(truth) > 0
+    return float((values[valid] - truth[valid]).abs().mean(dtype=torch.float64).item())
+
+
 def _roughness(values: torch.Tensor, mask: torch.Tensor) -> float:
     mask = mask[:, None].expand(values.shape[0], values.shape[1], values.shape[2], -1, -1)
     mask_y = (mask[..., 1:, :] > 0) & (mask[..., :-1, :] > 0)
@@ -194,6 +220,7 @@ def _score(ensemble: torch.Tensor, truth: torch.Tensor, persistence: torch.Tenso
                 "ensemble_mean_rmse": skill,
                 "persistence_rmse": _masked_rmse(baseline, target, mask),
                 "fair_crps": _fair_crps(members, target, mask),
+                "persistence_point_mass_crps": _masked_mae(baseline, target, mask),
                 "spread": float(torch.sqrt((spread.square() * mask).sum() / mask.sum().clamp(min=1)).item()),
                 "spread_skill_ratio": float(spread.square().mul(mask).sum().div(mask.sum().clamp(min=1)).sqrt().item() / max(skill, 1e-12)),
                 "fractional_rank_counts": [float(value) for value in rank],
@@ -236,6 +263,15 @@ def _save_visuals(output: Path, label: str, ensemble: torch.Tensor, truth: torch
 def run(run_dir: Path, output: Path, cases: int, members: int) -> dict[str, Any]:
     if torch.cuda.device_count() != 1:
         raise RuntimeError("paired direct evaluation requires exactly one visible GPU")
+    if os.environ.get("CLEARML_REQUIRE_ONLINE") != "1":
+        raise RuntimeError("paired direct evaluation requires CLEARML_REQUIRE_ONLINE=1")
+    verified_inputs = {}
+    for relative, expected in EXPECTED_INPUT_SHA256.items():
+        path = run_dir / relative
+        actual = _sha256(path)
+        if actual != expected:
+            raise ValueError(f"frozen input SHA-256 mismatch for {relative}: {actual}")
+        verified_inputs[relative] = actual
     if output.exists():
         raise FileExistsError(f"refusing to reuse evaluation output {output}")
     output.mkdir(parents=True)
@@ -260,8 +296,16 @@ def run(run_dir: Path, output: Path, cases: int, members: int) -> dict[str, Any]
         "schema_version": "direct_dynamics_paired_validation_v1",
         "split": "valid",
         "primary_scores_use_raw_unclipped_samples": True,
+        "inference_precision": {
+            "network_autocast": "bfloat16",
+            "ODE_state_and_time_grid": "float32",
+            "claim": "recovery evaluation; not strict-FP32 solver control",
+        },
         "cases": cases,
         "members": members,
+        "validation_case_indices": indices,
+        "member_noise_seed_rule": "314159 + 1000003*case_order + 1009*member_index",
+        "verified_input_sha256": verified_inputs,
         "dataset_sentinel": sentinel,
         "checkpoints": {},
     }
@@ -290,7 +334,7 @@ def run(run_dir: Path, output: Path, cases: int, members: int) -> dict[str, Any]
         }
         for lead, fields in metrics["leads"].items():
             for field, values in fields.items():
-                for name in ("ensemble_mean_rmse", "persistence_rmse", "fair_crps", "spread_skill_ratio", "rank_tv_to_uniform"):
+                for name in ("ensemble_mean_rmse", "persistence_rmse", "fair_crps", "persistence_point_mass_crps", "spread_skill_ratio", "rank_tv_to_uniform"):
                     tracker.report_scalar(f"paired/{name}", f"{label}/{lead}/{field}", values[name], 0)
         for path in visuals:
             tracker.report_image("individual_samples", f"{label}/{path.stem}", path, 0)
@@ -298,22 +342,31 @@ def run(run_dir: Path, output: Path, cases: int, members: int) -> dict[str, Any]
         torch.cuda.empty_cache()
 
     # A compact same-noise solver control; it is diagnostic, never a tuning loop.
-    solver = {}
-    for steps in (17, 33):
-        ensemble, truth, _, mask, _ = _sample_checkpoint(
-            run_dir, checkpoints["ema_epoch6"], training_config, dataset, indices[:2], members, steps, torch.device("cuda")
-        )
-        solver[str(steps)] = {"ensemble": ensemble, "truth": truth, "mask": mask}
-    diff = solver["33"]["ensemble"] - solver["17"]["ensemble"]
-    valid = solver["17"]["mask"][:, None].expand_as(diff) > 0
-    result["solver_sensitivity_epoch6_17_vs_33"] = {
-        "cases": 2,
-        "members": members,
-        "mean_absolute_difference": float(diff[valid].abs().to(torch.float64).mean().item()),
-        "root_mean_square_difference": float(diff[valid].square().to(torch.float64).mean().sqrt().item()),
-        "max_absolute_difference": float(diff[valid].abs().max().item()),
-    }
+    result["solver_sensitivity_17_vs_33"] = {}
+    for label, checkpoint in checkpoints.items():
+        solver = {}
+        for steps in (17, 33):
+            ensemble, truth, _, mask, _ = _sample_checkpoint(
+                run_dir, checkpoint, training_config, dataset, indices[:2], members, steps, torch.device("cuda")
+            )
+            solver[str(steps)] = {"ensemble": ensemble, "truth": truth, "mask": mask}
+        diff = solver["33"]["ensemble"] - solver["17"]["ensemble"]
+        checkpoint_result: dict[str, Any] = {"cases": 2, "members": members, "leads": {}}
+        for lead_index, lead in enumerate(DIRECT_LEADS):
+            checkpoint_result["leads"][f"d{lead}"] = {}
+            for field_offset, field in enumerate(("sic", "sit")):
+                channel = 2 * lead_index + field_offset
+                field_diff = diff[:, :, channel : channel + 1]
+                valid = solver["17"]["mask"][:, None].expand_as(field_diff) > 0
+                selected = field_diff[valid].to(torch.float64)
+                checkpoint_result["leads"][f"d{lead}"][field] = {
+                    "mean_absolute_difference": float(selected.abs().mean().item()),
+                    "root_mean_square_difference": float(selected.square().mean().sqrt().item()),
+                    "max_absolute_difference": float(selected.abs().max().item()),
+                }
+        result["solver_sensitivity_17_vs_33"][label] = checkpoint_result
     result["clearml_task_id"] = str(tracker.task.id)
+    _require_finite_scalars(result)
     _atomic_json(output / "paired_evaluation.json", result)
     tracker.upload_artifact("paired_evaluation", output / "paired_evaluation.json")
     tracker.close()
