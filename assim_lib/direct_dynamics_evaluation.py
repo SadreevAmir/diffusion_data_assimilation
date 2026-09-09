@@ -94,13 +94,22 @@ def _initial_noise(
     return torch.stack(values).to(device)
 
 
+def _case_identity(item: dict[str, Any], dataset_index: int) -> dict[str, Any]:
+    return {
+        "dataset_index": dataset_index,
+        "case_id": str(item["meta"]["case_id"]),
+        "archive_slice_index": int(item["meta"]["archive_slice_index"]),
+        "target_paths": list(item["meta"]["target_trajectory_paths"]),
+    }
+
+
 @torch.no_grad()
 def _sample_checkpoint(
     run_dir: Path,
     checkpoint: str,
     training_config: dict[str, Any],
     dataset,
-    indices: list[int],
+    prepared_cases: list[tuple[int, dict[str, Any]]],
     members: int,
     steps: int,
     device: torch.device,
@@ -110,8 +119,12 @@ def _sample_checkpoint(
     stds = _repeat_field_stats(dataset.stds)
     sampled, truths, persistence, masks, identities = [], [], [], [], []
     image_size = tuple(int(value) for value in training_config["image_size"])
-    for order, dataset_index in enumerate(indices):
-        item = dataset[dataset_index]
+    for order, (dataset_index, item) in enumerate(prepared_cases):
+        print(
+            f"[direct-eval] checkpoint={checkpoint} sampling "
+            f"case={order + 1}/{len(prepared_cases)} index={dataset_index}",
+            flush=True,
+        )
         batch = _tensor_batch(item, members, device)
         valid = batch["valid_mask"][:, :1]
         noise = _initial_noise(order, members, image_size, device)
@@ -141,14 +154,7 @@ def _sample_checkpoint(
         truths.append(item["structured_physical_truth"].float())
         persistence.append(item["structured_physical_background"].float())
         masks.append(item["valid_mask"][:1].float())
-        identities.append(
-            {
-                "dataset_index": dataset_index,
-                "case_id": str(item["meta"]["case_id"]),
-                "archive_slice_index": int(item["meta"]["archive_slice_index"]),
-                "target_paths": list(item["meta"]["target_trajectory_paths"]),
-            }
-        )
+        identities.append(_case_identity(item, dataset_index))
     del sampler
     torch.cuda.empty_cache()
     return (
@@ -279,7 +285,6 @@ def run(run_dir: Path, output: Path, cases: int, members: int) -> dict[str, Any]
     training_config = metadata["training_config"]
     data_config = metadata["data_config"]
     dataset = build_dataset(data_config, split="valid")
-    sentinel = validate_direct_dataset(dataset)
     indices = _selected_indices(len(dataset), cases)
     checkpoints = {
         "ema_epoch6": "epoch_snapshots/epoch_0006/ema_last_model.pth",
@@ -292,6 +297,17 @@ def run(run_dir: Path, output: Path, cases: int, members: int) -> dict[str, Any]
         env_path="/home/.env",
     )
     tracker.connect("evaluation", {"cases": cases, "members": members, "indices": indices, "checkpoints": checkpoints})
+    preload_indices = sorted(set(indices) | {0, 12, 23})
+    item_cache = {}
+    for order, dataset_index in enumerate(preload_indices):
+        print(
+            f"[direct-eval] preparing validation case "
+            f"{order + 1}/{len(preload_indices)} index={dataset_index}",
+            flush=True,
+        )
+        item_cache[dataset_index] = dataset[dataset_index]
+    sentinel = validate_direct_dataset(dataset, item_cache=item_cache)
+    prepared_cases = [(dataset_index, item_cache[dataset_index]) for dataset_index in indices]
     result: dict[str, Any] = {
         "schema_version": "direct_dynamics_paired_validation_v1",
         "split": "valid",
@@ -313,7 +329,7 @@ def run(run_dir: Path, output: Path, cases: int, members: int) -> dict[str, Any]
     for label, checkpoint in checkpoints.items():
         checkpoint_path = run_dir / checkpoint
         ensemble, truth, persistence, mask, identities = _sample_checkpoint(
-            run_dir, checkpoint, training_config, dataset, indices, members, 17, torch.device("cuda")
+            run_dir, checkpoint, training_config, dataset, prepared_cases, members, 17, torch.device("cuda")
         )
         if reference is None:
             reference = (truth, persistence, mask, identities)
@@ -347,7 +363,7 @@ def run(run_dir: Path, output: Path, cases: int, members: int) -> dict[str, Any]
         solver = {}
         for steps in (17, 33):
             ensemble, truth, _, mask, _ = _sample_checkpoint(
-                run_dir, checkpoint, training_config, dataset, indices[:2], members, steps, torch.device("cuda")
+                run_dir, checkpoint, training_config, dataset, prepared_cases[:2], members, steps, torch.device("cuda")
             )
             solver[str(steps)] = {"ensemble": ensemble, "truth": truth, "mask": mask}
         diff = solver["33"]["ensemble"] - solver["17"]["ensemble"]

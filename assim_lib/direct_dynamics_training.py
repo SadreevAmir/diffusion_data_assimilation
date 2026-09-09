@@ -13,6 +13,7 @@ import math
 import os
 import re
 from pathlib import Path
+from typing import Any
 
 import torch
 
@@ -39,7 +40,7 @@ def _repeat_field_stats(values: list[float] | tuple[float, ...]) -> tuple[float,
     return pair * len(DIRECT_LEADS)
 
 
-def validate_direct_dataset(dataset) -> dict:
+def validate_direct_dataset(dataset, item_cache: dict[int, dict[str, Any]] | None = None) -> dict:
     if dataset.hour_mode != "all" or dataset.hours_per_day != 24:
         raise ValueError("direct dynamics requires all 24 archive slices")
     if tuple(dataset.trajectory_lead_days) != DIRECT_LEADS:
@@ -51,7 +52,7 @@ def validate_direct_dataset(dataset) -> dict:
 
     checked = []
     for hour in (0, 12, 23):
-        item = dataset[hour]
+        item = item_cache[hour] if item_cache is not None else dataset[hour]
         if int(item["meta"]["archive_slice_index"]) != hour:
             raise ValueError("resolved archive slice is inconsistent")
         if tuple(item["truth"].shape) != (DIRECT_OUTPUT_CHANNELS, *dataset.image_size):
