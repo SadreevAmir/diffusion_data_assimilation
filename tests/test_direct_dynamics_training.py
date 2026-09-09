@@ -12,6 +12,7 @@ from assim_lib.direct_dynamics_training import (
     DIRECT_OUTPUT_CHANNELS,
     DirectDynamicsTrainer,
 )
+from assim_lib.direct_dynamics_evaluation import _score, _selected_indices
 from assim_lib.sampler import Sampler
 
 
@@ -108,6 +109,24 @@ class DirectDynamicsContractTests(unittest.TestCase):
         raw[0, 0, 0, 0, 0] = float("nan")
         with self.assertRaises(FloatingPointError):
             DirectDynamicsTrainer._raw_support_metrics(raw, valid)
+
+    def test_paired_evaluation_selection_and_raw_metrics(self):
+        self.assertEqual(_selected_indices(25, 3), [0, 12, 24])
+        truth = torch.zeros((2, DIRECT_OUTPUT_CHANNELS, 3, 4))
+        truth[:, 0::2] = 0.4
+        truth[:, 1::2] = 0.8
+        ensemble = truth[:, None].repeat(1, 3, 1, 1, 1)
+        ensemble[:, 0] -= 0.1
+        ensemble[:, 2] += 0.1
+        persistence = truth + 0.2
+        valid = torch.ones((2, 1, 3, 4))
+        metrics = _score(ensemble, truth, persistence, valid)
+        self.assertEqual(set(metrics["leads"]), {"d3", "d6", "d9"})
+        self.assertAlmostEqual(metrics["leads"]["d3"]["sic"]["ensemble_mean_rmse"], 0.0)
+        self.assertAlmostEqual(metrics["leads"]["d3"]["sic"]["persistence_rmse"], 0.2)
+        self.assertAlmostEqual(sum(metrics["leads"]["d3"]["sic"]["fractional_rank_counts"]), 24.0)
+        self.assertEqual(metrics["support"]["sic"]["frequency"], 0.0)
+        self.assertEqual(metrics["support"]["sit"]["frequency"], 0.0)
 
 
 if __name__ == "__main__":
