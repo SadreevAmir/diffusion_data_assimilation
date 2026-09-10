@@ -24,6 +24,11 @@ from .direct_dynamics_cascade_coarse import (
     coarse_model_input_for_test,
     ocean_fraction_weighted_mse,
 )
+from .direct_dynamics_cascade_coarse_residual import (
+    CoarsePersistenceResidualTrainer,
+    coarse_residual_flow_pair,
+    residual_model_input_for_test,
+)
 from .direct_dynamics_cascade_fine_training import (
     EXPECTED_SPLIT_LENGTHS,
     PREFETCH_FACTOR,
@@ -118,7 +123,13 @@ def _launch_status(status: str, **details) -> None:
     _atomic_json(path, {"status": status, **details})
 
 
-def _gpu_admission_smoke(model, raw: dict, config: TrainingConfig) -> dict:
+def _gpu_admission_smoke(
+    model,
+    raw: dict,
+    config: TrainingConfig,
+    *,
+    persistence_residual: bool = False,
+) -> dict:
     """Exercise the exact 56-to-6 coarse path with a real backward pass."""
     device = torch.device("cuda")
     torch.cuda.reset_peak_memory_stats(device)
@@ -133,8 +144,14 @@ def _gpu_admission_smoke(model, raw: dict, config: TrainingConfig) -> dict:
         device=device,
         dtype=torch.float32,
     )
-    state, target, _, fraction = coarse_flow_pair(truth, noise, valid, time)
-    model_input = coarse_model_input_for_test(state, condition, valid)
+    if persistence_residual:
+        state, target, _, _, fraction = coarse_residual_flow_pair(
+            truth, noise, condition, valid, time
+        )
+        model_input = residual_model_input_for_test(state, condition, valid)
+    else:
+        state, target, _, fraction = coarse_flow_pair(truth, noise, valid, time)
+        model_input = coarse_model_input_for_test(state, condition, valid)
     if tuple(model_input.shape[1:]) != (COARSE_INPUT_CHANNELS, coarse_height, coarse_width):
         raise ValueError("GPU smoke constructed the wrong coarse model input")
     with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
@@ -157,6 +174,7 @@ def _gpu_admission_smoke(model, raw: dict, config: TrainingConfig) -> dict:
         "gradient_accumulation_steps": config.gradient_accumulation_steps,
         "state_dtype": str(state.dtype),
         "loss_dtype": str(loss.dtype),
+        "state_coordinate": "persistence_residual" if persistence_residual else "absolute_coarse",
     }
     for parameter in model.parameters():
         parameter.grad = None
@@ -221,14 +239,18 @@ def _run_impl(config_path: Path, *, preflight_only: bool, lifecycle: _Lifecycle)
     train_case_count = int(pilot.get("train_case_count", -1))
     validation_case_count = int(pilot.get("validation_case_count", -1))
     pilot_kind = str(pilot.get("kind", "mechanics_512"))
-    expected_updates = {"mechanics_512": 512, "learning_curve_2048": 2048}.get(pilot_kind)
+    expected_updates = {
+        "mechanics_512": 512,
+        "learning_curve_2048": 2048,
+        "persistence_residual_2048": 2048,
+    }.get(pilot_kind)
     if expected_updates is None or (
         train_case_count,
         validation_case_count,
         int(pilot.get("optimizer_updates", -1)),
     ) != (4096, 48, expected_updates):
         raise ValueError(
-            "coarse pilot must declare mechanics_512 or learning_curve_2048 with exact audited sizes"
+            "coarse pilot must declare a supported exact bounded protocol"
         )
 
     output_root = Path(config.base_output_dir) / config.run_name
@@ -303,7 +325,13 @@ def _run_impl(config_path: Path, *, preflight_only: bool, lifecycle: _Lifecycle)
     model = build_unet(config)
     smoke_batch = _fine_collate([train_subset[index] for index in range(config.train_batch_size)])
     lifecycle.phase = "gpu_smoke"
-    smoke = _gpu_admission_smoke(model, smoke_batch, config)
+    persistence_residual = pilot_kind == "persistence_residual_2048"
+    smoke = _gpu_admission_smoke(
+        model,
+        smoke_batch,
+        config,
+        persistence_residual=persistence_residual,
+    )
     result = {
         "status": "preflight_passed" if preflight_only else "training_pending",
         "parameter_count": sum(parameter.numel() for parameter in model.parameters()),
@@ -322,9 +350,18 @@ def _run_impl(config_path: Path, *, preflight_only: bool, lifecycle: _Lifecycle)
         num_training_steps=planned_updates,
     )
     lifecycle.phase = "clearml_initialization"
-    trainer = CoarseCascadeDynamicsTrainer.__new__(CoarseCascadeDynamicsTrainer)
+    trainer_class = (
+        CoarsePersistenceResidualTrainer if persistence_residual else CoarseCascadeDynamicsTrainer
+    )
+    trainer = trainer_class.__new__(trainer_class)
     lifecycle.trainer = trainer
-    CoarseCascadeDynamicsTrainer.__init__(
+    trainer_kwargs = {}
+    if persistence_residual:
+        baseline = experiment.get("residual_baseline")
+        if not isinstance(baseline, dict):
+            raise ValueError("persistence-residual pilot requires residual_baseline")
+        trainer_kwargs["residual_baseline"] = baseline
+    trainer_class.__init__(
         trainer,
         config=config,
         model=model,
@@ -344,6 +381,7 @@ def _run_impl(config_path: Path, *, preflight_only: bool, lifecycle: _Lifecycle)
         dashboard_dataset=None,
         coarse_diagnostic_batch=diagnostic_batch,
         coarse_code_identity=code_identity,
+        **trainer_kwargs,
     )
     _atomic_json(output_root / "coarse_cascade_dataset_sentinel.json", sentinel)
     _atomic_json(output_root / "coarse_cascade_gpu_smoke.json", smoke)

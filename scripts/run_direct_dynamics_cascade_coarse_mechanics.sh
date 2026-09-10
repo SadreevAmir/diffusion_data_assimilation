@@ -12,7 +12,8 @@ fi
 CONFIG_PATH="${COARSE_CASCADE_CONFIG:-config/experiments/train_direct_dynamics_cascade_coarse_mechanics_v1.json}"
 case "$CONFIG_PATH" in
   config/experiments/train_direct_dynamics_cascade_coarse_mechanics_v1.json|\
-  config/experiments/train_direct_dynamics_cascade_coarse_learning_curve_v1.json) ;;
+  config/experiments/train_direct_dynamics_cascade_coarse_learning_curve_v1.json|\
+  config/experiments/train_direct_dynamics_cascade_coarse_residual_v1.json) ;;
   *)
     echo "unsafe COARSE_CASCADE_CONFIG" >&2
     exit 2
