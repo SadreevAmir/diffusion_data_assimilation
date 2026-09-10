@@ -928,6 +928,18 @@ class CoarseStandardizedPersistenceResidualTrainer(CoarsePersistenceResidualTrai
             "train_indices_sha256"
         ):
             raise ValueError("residual statistics and training subset differ")
+        if statistics.get("selected_case_ids") != current_provenance.get("train_case_ids"):
+            raise ValueError("residual statistics and training case identities differ")
+        dataset_provenance = kwargs.get("dataset_provenance", {})
+        current_calendar = dataset_provenance.get("train_calendar", {})
+        if statistics.get("ordered_inventory_sha256") != current_calendar.get(
+            "ordered_inventory_sha256"
+        ):
+            raise ValueError("residual statistics and ordered train inventory differ")
+        if statistics.get("static_valid_mask_sha256") != dataset_provenance.get(
+            "static_valid_mask_sha256"
+        ):
+            raise ValueError("residual statistics and static valid mask differ")
         current_data = kwargs.get("data_config")
         if not isinstance(current_data, dict) or statistics.get(
             "data_config_sha256"

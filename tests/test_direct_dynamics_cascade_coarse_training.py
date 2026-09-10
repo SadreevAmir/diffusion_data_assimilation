@@ -98,7 +98,36 @@ class CoarseCascadeRunnerTests(unittest.TestCase):
         self.assertIn("COARSE_CASCADE_LAUNCH_ID", launcher)
         self.assertIn("COARSE_CASCADE_CONFIG", launcher)
         self.assertIn("train_direct_dynamics_cascade_coarse_learning_curve_v1.json", launcher)
+        self.assertIn(
+            "train_direct_dynamics_cascade_coarse_standardized_residual_v1.json",
+            launcher,
+        )
         self.assertNotIn("FINE_CASCADE_LAUNCH_ID", launcher)
+
+    def test_standardized_residual_experiment_changes_only_coordinate_and_output(self):
+        base = json.loads(
+            Path(
+                "config/experiments/train_direct_dynamics_cascade_coarse_residual_v1.json"
+            ).read_text()
+        )
+        standardized = json.loads(
+            Path(
+                "config/experiments/"
+                "train_direct_dynamics_cascade_coarse_standardized_residual_v1.json"
+            ).read_text()
+        )
+        self.assertEqual(
+            standardized["pilot"],
+            {**base["pilot"], "kind": "standardized_persistence_residual_2048"},
+        )
+        self.assertEqual(standardized["data_config"], base["data_config"])
+        self.assertEqual(standardized["model_config"], base["model_config"])
+        self.assertEqual(standardized["data_overrides"], base["data_overrides"])
+        self.assertEqual(standardized["residual_baseline"], base["residual_baseline"])
+        self.assertEqual(
+            set(standardized["training"]), {"base_output_dir", "run_name"}
+        )
+        self.assertEqual(len(standardized["residual_statistics"]["sha256"]), 64)
 
     def test_free_to_occupied_then_malformed_final_never_reaches_python(self):
         source = Path("scripts/run_direct_dynamics_cascade_coarse_mechanics.sh").read_text(encoding="utf-8")

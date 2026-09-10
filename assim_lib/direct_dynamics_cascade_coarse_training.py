@@ -26,9 +26,12 @@ from .direct_dynamics_cascade_coarse import (
 )
 from .direct_dynamics_cascade_coarse_residual import (
     CoarsePersistenceResidualTrainer,
+    CoarseStandardizedPersistenceResidualTrainer,
     coarse_residual_flow_pair,
+    coarse_standardized_residual_flow_pair,
     residual_model_input_for_test,
 )
+from .direct_dynamics_cascade_residual_stats import _tensor_sha256
 from .direct_dynamics_cascade_fine_training import (
     EXPECTED_SPLIT_LENGTHS,
     PREFETCH_FACTOR,
@@ -129,6 +132,7 @@ def _gpu_admission_smoke(
     config: TrainingConfig,
     *,
     persistence_residual: bool = False,
+    residual_statistics: dict[str, Any] | None = None,
 ) -> dict:
     """Exercise the exact 56-to-6 coarse path with a real backward pass."""
     device = torch.device("cuda")
@@ -145,13 +149,21 @@ def _gpu_admission_smoke(
         dtype=torch.float32,
     )
     if persistence_residual:
-        state, target, _, _, fraction = coarse_residual_flow_pair(
-            truth, noise, condition, valid, time
-        )
+        if residual_statistics is None:
+            state, target, _, _, fraction = coarse_residual_flow_pair(
+                truth, noise, condition, valid, time
+            )
+            state_coordinate = "persistence_residual"
+        else:
+            state, target, _, _, fraction = coarse_standardized_residual_flow_pair(
+                truth, noise, condition, valid, time, residual_statistics
+            )
+            state_coordinate = "standardized_persistence_residual"
         model_input = residual_model_input_for_test(state, condition, valid)
     else:
         state, target, _, fraction = coarse_flow_pair(truth, noise, valid, time)
         model_input = coarse_model_input_for_test(state, condition, valid)
+        state_coordinate = "absolute_coarse"
     if tuple(model_input.shape[1:]) != (COARSE_INPUT_CHANNELS, coarse_height, coarse_width):
         raise ValueError("GPU smoke constructed the wrong coarse model input")
     with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
@@ -174,7 +186,7 @@ def _gpu_admission_smoke(
         "gradient_accumulation_steps": config.gradient_accumulation_steps,
         "state_dtype": str(state.dtype),
         "loss_dtype": str(loss.dtype),
-        "state_coordinate": "persistence_residual" if persistence_residual else "absolute_coarse",
+        "state_coordinate": state_coordinate,
     }
     for parameter in model.parameters():
         parameter.grad = None
@@ -243,6 +255,7 @@ def _run_impl(config_path: Path, *, preflight_only: bool, lifecycle: _Lifecycle)
         "mechanics_512": 512,
         "learning_curve_2048": 2048,
         "persistence_residual_2048": 2048,
+        "standardized_persistence_residual_2048": 2048,
     }.get(pilot_kind)
     if expected_updates is None or (
         train_case_count,
@@ -276,6 +289,7 @@ def _run_impl(config_path: Path, *, preflight_only: bool, lifecycle: _Lifecycle)
     validation_indices = _evenly_spaced_indices(len(validation_dataset), validation_case_count)
     train_subset = Subset(train_dataset, train_indices)
     validation_subset = Subset(validation_dataset, validation_indices)
+    train_static_valid_mask_sha256 = _tensor_sha256(train_subset[0]["valid_mask"][:1])
     diagnostic_batch, diagnostic_positions = _seasonal_diagnostic_batch(validation_subset)
     ipc = _ipc_preflight(train_subset, validation_subset, config)
     train_loader = build_dataloader(
@@ -325,12 +339,45 @@ def _run_impl(config_path: Path, *, preflight_only: bool, lifecycle: _Lifecycle)
     model = build_unet(config)
     smoke_batch = _fine_collate([train_subset[index] for index in range(config.train_batch_size)])
     lifecycle.phase = "gpu_smoke"
-    persistence_residual = pilot_kind == "persistence_residual_2048"
+    persistence_residual = pilot_kind in {
+        "persistence_residual_2048",
+        "standardized_persistence_residual_2048",
+    }
+    standardized_residual = pilot_kind == "standardized_persistence_residual_2048"
+    residual_statistics_binding = None
+    residual_statistics = None
+    if standardized_residual:
+        residual_statistics_binding = experiment.get("residual_statistics")
+        if not isinstance(residual_statistics_binding, dict):
+            raise ValueError("standardized residual pilot requires residual_statistics")
+        statistics_path = Path(str(residual_statistics_binding.get("path", "")))
+        statistics_sha256 = str(residual_statistics_binding.get("sha256", ""))
+        if not statistics_path.is_absolute() or statistics_path.name != "statistics.json":
+            raise ValueError("residual statistics path must be an absolute statistics.json")
+        if not statistics_path.is_file() or _sha256_file(statistics_path) != statistics_sha256:
+            raise ValueError("residual statistics artifact is missing or differs")
+        residual_statistics = json.loads(statistics_path.read_text(encoding="utf-8"))
+        expected_statistics_binding = {
+            "status": "complete",
+            "split": "train",
+            "train_case_count": train_case_count,
+            "train_indices_sha256": subset_provenance["train_indices_sha256"],
+            "selected_case_ids": subset_provenance["train_case_ids"],
+            "ordered_inventory_sha256": sentinel["train_calendar"][
+                "ordered_inventory_sha256"
+            ],
+            "static_valid_mask_sha256": train_static_valid_mask_sha256,
+            "data_config_sha256": _canonical_sha256(data_config),
+        }
+        for key, expected in expected_statistics_binding.items():
+            if residual_statistics.get(key) != expected:
+                raise ValueError(f"residual statistics binding differs for {key}")
     smoke = _gpu_admission_smoke(
         model,
         smoke_batch,
         config,
         persistence_residual=persistence_residual,
+        residual_statistics=residual_statistics,
     )
     result = {
         "status": "preflight_passed" if preflight_only else "training_pending",
@@ -350,9 +397,12 @@ def _run_impl(config_path: Path, *, preflight_only: bool, lifecycle: _Lifecycle)
         num_training_steps=planned_updates,
     )
     lifecycle.phase = "clearml_initialization"
-    trainer_class = (
-        CoarsePersistenceResidualTrainer if persistence_residual else CoarseCascadeDynamicsTrainer
-    )
+    if standardized_residual:
+        trainer_class = CoarseStandardizedPersistenceResidualTrainer
+    elif persistence_residual:
+        trainer_class = CoarsePersistenceResidualTrainer
+    else:
+        trainer_class = CoarseCascadeDynamicsTrainer
     trainer = trainer_class.__new__(trainer_class)
     lifecycle.trainer = trainer
     trainer_kwargs = {}
@@ -361,6 +411,8 @@ def _run_impl(config_path: Path, *, preflight_only: bool, lifecycle: _Lifecycle)
         if not isinstance(baseline, dict):
             raise ValueError("persistence-residual pilot requires residual_baseline")
         trainer_kwargs["residual_baseline"] = baseline
+    if standardized_residual:
+        trainer_kwargs["residual_statistics"] = residual_statistics_binding
     trainer_class.__init__(
         trainer,
         config=config,
@@ -376,6 +428,8 @@ def _run_impl(config_path: Path, *, preflight_only: bool, lifecycle: _Lifecycle)
         dataset_provenance={
             "train": train_dataset.provenance(),
             "valid": validation_dataset.provenance(),
+            "train_calendar": sentinel["train_calendar"],
+            "static_valid_mask_sha256": train_static_valid_mask_sha256,
             "pilot_subset": subset_provenance,
         },
         dashboard_dataset=None,

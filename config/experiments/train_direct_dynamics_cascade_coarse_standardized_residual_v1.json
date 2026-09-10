@@ -1,0 +1,58 @@
+{
+  "project_name": "sea_ice_two_stage",
+  "task_name": "direct_dynamics_cascade_coarse_standardized_persistence_residual_v1",
+  "data_config": "../data/m2m_2f_two_stage_dynamics_protocol.json",
+  "model_config": "../methods/direct_dynamics_cascade_coarse_residual_2f.json",
+  "training": {
+    "base_output_dir": "/home/autoresearch_results/direct_dynamics_cascade_v1/coarse_standardized_residual",
+    "run_name": "standardized_persistence_residual56_conv64_seed38119_u2048"
+  },
+  "data_overrides": {
+    "hour_mode": "all",
+    "dynamic_forcing_stats": {
+      "source_split": "train",
+      "estimator_scope": "slice23_train_reused_for_all_hour_recovery_ablation",
+      "indices": [6, 7, 13, 14],
+      "means": [0.00024072701720376523, -0.017859677007622955, -0.106700353199528, -0.18476749778477272],
+      "stds": [0.06025002092600086, 0.0655322642143171, 4.434678472175259, 4.7337812043401915],
+      "finite_value_count_per_field": [100059986, 100059986, 104958646, 104958646]
+    }
+  },
+  "pilot": {
+    "kind": "standardized_persistence_residual_2048",
+    "train_case_count": 4096,
+    "validation_case_count": 48,
+    "optimizer_updates": 2048
+  },
+  "residual_statistics": {
+    "path": "/home/autoresearch_results/direct_dynamics_cascade_v1/residual_statistics/whiten_stats_e6bbde7_20260910T0627Z/statistics.json",
+    "sha256": "4cd16e382de9506d0c4b975c174e33f2473cd158e9b1546afaab6b9187204e4c"
+  },
+  "residual_baseline": {
+    "path": "/home/autoresearch_results/direct_dynamics_cascade_v1/coarse_learning_curve/lossless56_conv64_seed38119_u2048-coarse_lc_ef12495_20260910T023106Z/coarse_diagnostics/update_2048_metrics.json",
+    "sha256": "ce542db427d152a579e982f2ab678e009721391370f1cbab8f5728a942d8d80a",
+    "samples_path": "/home/autoresearch_results/direct_dynamics_cascade_v1/coarse_learning_curve/lossless56_conv64_seed38119_u2048-coarse_lc_ef12495_20260910T023106Z/coarse_diagnostics/update_2048_samples.pt",
+    "samples_sha256": "2c6f36e85ba66d61f18f74e52e8b87c635134a30fbea4c4407689166d6c39272",
+    "metadata_path": "/home/autoresearch_results/direct_dynamics_cascade_v1/coarse_learning_curve/lossless56_conv64_seed38119_u2048-coarse_lc_ef12495_20260910T023106Z/metadata.json",
+    "metadata_sha256": "50b50891962da296b7d400b8ff3d56f5559ad369657e7bf7425ecbc99ae1d099",
+    "sentinel_path": "/home/autoresearch_results/direct_dynamics_cascade_v1/coarse_learning_curve/lossless56_conv64_seed38119_u2048-coarse_lc_ef12495_20260910T023106Z/coarse_cascade_dataset_sentinel.json",
+    "sentinel_sha256": "e526e8d134b675d0b3ffcc9e13aa09ed7ec27d3c0648ebe59ee0db51f430afd6"
+  },
+  "clearml": {
+    "enabled": true,
+    "env_path": "/home/.env",
+    "tags": [
+      "cascade-coarse-stage",
+      "persistence-centered-residual",
+      "train-only-diagonal-standardization",
+      "lossless-space-to-depth-conditioning",
+      "d3-d6-d9",
+      "sic-sit",
+      "wind-current",
+      "exact-2048-updates",
+      "one-gpu",
+      "no-clipping-no-smoothing"
+    ],
+    "upload_checkpoints": false
+  }
+}
