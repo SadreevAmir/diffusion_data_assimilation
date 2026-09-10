@@ -269,6 +269,9 @@ class CoarseCascadeDynamicsTrainer(DirectDynamicsTrainer):
     """Train p(C | full causal d0/forcing/calendar condition)."""
 
     diagnostic_steps = frozenset({63, 255, 511})
+    required_training_objective = "flow"
+    required_timestep_sampler = "stratified_uniform"
+    required_input_channels = COARSE_INPUT_CHANNELS
 
     def __init__(self, *args, **kwargs):
         self._coarse_diagnostic_batch_raw = kwargs.pop("coarse_diagnostic_batch", None)
@@ -276,18 +279,30 @@ class CoarseCascadeDynamicsTrainer(DirectDynamicsTrainer):
         config = kwargs.get("config", args[0] if args else None)
         if not isinstance(config, TrainingConfig):
             raise TypeError("coarse cascade trainer requires an explicit TrainingConfig")
-        if config.training_objective != "flow":
-            raise ValueError("coarse cascade requires training_objective='flow'")
-        if config.in_channels != COARSE_INPUT_CHANNELS or config.out_channels != DIRECT_OUTPUT_CHANNELS:
-            raise ValueError("coarse cascade requires an exact 56-to-6 model")
+        if config.training_objective != self.required_training_objective:
+            raise ValueError(
+                "coarse cascade requires "
+                f"training_objective={self.required_training_objective!r}"
+            )
+        if (
+            config.in_channels != self.required_input_channels
+            or config.out_channels != DIRECT_OUTPUT_CHANNELS
+        ):
+            raise ValueError(
+                "coarse cascade requires an exact "
+                f"{self.required_input_channels}-to-6 model"
+            )
         if tuple(config.image_size) != (160, 128):
             raise ValueError("coarse cascade model grid must be 160x128")
         if config.activation_checkpointing:
             raise ValueError("coarse cascade pilot forbids activation checkpointing")
         if config.gradient_accumulation_steps != 1:
             raise ValueError("coarse cascade pilot requires gradient_accumulation_steps=1")
-        if config.timestep_sampler != "stratified_uniform":
-            raise ValueError("coarse cascade pilot requires stratified_uniform flow times")
+        if config.timestep_sampler != self.required_timestep_sampler:
+            raise ValueError(
+                "coarse cascade pilot requires "
+                f"timestep_sampler={self.required_timestep_sampler!r}"
+            )
         if config.metric_every_n_epochs != 0 or config.sample_every_n_epochs != 0:
             raise ValueError("coarse cascade pilot forbids incompatible generic diagnostics")
         super().__init__(*args, **kwargs)

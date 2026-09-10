@@ -193,9 +193,15 @@ class TrainingConfig:
             "residual_flow",
             "bridge",
             "structured_joint_state_flow",
+            "deterministic_mean",
         }:
             raise ValueError(f"Unknown training_objective={self.training_objective!r}")
-        if self.timestep_sampler not in {"uniform", "beta", "stratified_uniform"}:
+        if self.timestep_sampler not in {
+            "uniform",
+            "beta",
+            "stratified_uniform",
+            "constant_zero",
+        }:
             raise ValueError(f"Unknown timestep_sampler={self.timestep_sampler!r}")
         if self.loss_domain not in {"full", "valid"}:
             raise ValueError(f"Unknown loss_domain={self.loss_domain!r}; expected 'full' or 'valid'")
@@ -203,6 +209,17 @@ class TrainingConfig:
             raise ValueError(f"Unknown sample_start_mode={self.sample_start_mode!r}")
         if self.training_objective == "residual_flow" and self.sample_start_mode == "bridge":
             raise ValueError("residual_flow is incompatible with sample_start_mode='bridge'")
+        if self.training_objective == "deterministic_mean":
+            if self.timestep_sampler != "constant_zero":
+                raise ValueError(
+                    "deterministic_mean requires timestep_sampler='constant_zero'"
+                )
+            if self.sample_every_n_epochs != 0 or self.metric_every_n_epochs != 0:
+                raise ValueError(
+                    "deterministic_mean requires dedicated diagnostics only"
+                )
+            if self.sample_use_ema:
+                raise ValueError("deterministic_mean validation must use raw weights")
         if not 0.0 <= self.background_dropout_probability <= 1.0:
             raise ValueError("background_dropout_probability must be within [0, 1]")
         if not 0.0 <= self.sample_end_time < 1.0:

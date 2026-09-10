@@ -364,6 +364,8 @@ class UNetTrainer:
             timesteps = (torch.arange(batch_size, device=device) + jitter) / float(batch_size)
             order = torch.randperm(batch_size, device=device, generator=generator)
             return timesteps[order]
+        if self.config.timestep_sampler == "constant_zero":
+            return torch.zeros(batch_size, device=device)
         return torch.rand(batch_size, device=device)
 
     def _make_sampler(self, model) -> Sampler:

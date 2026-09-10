@@ -4,6 +4,14 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
+PYTHON_MODE=()
+if [[ "$#" -eq 1 && "$1" == "--preflight-only" ]]; then
+  PYTHON_MODE=("--preflight-only")
+elif [[ "$#" -ne 0 ]]; then
+  echo "usage: $0 [--preflight-only]" >&2
+  exit 2
+fi
+
 RUN_ID="${COARSE_CASCADE_LAUNCH_ID:?COARSE_CASCADE_LAUNCH_ID is required}"
 if [[ ! "$RUN_ID" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$ ]]; then
   echo "unsafe COARSE_CASCADE_LAUNCH_ID" >&2
@@ -14,7 +22,8 @@ case "$CONFIG_PATH" in
   config/experiments/train_direct_dynamics_cascade_coarse_mechanics_v1.json|\
   config/experiments/train_direct_dynamics_cascade_coarse_learning_curve_v1.json|\
   config/experiments/train_direct_dynamics_cascade_coarse_residual_v1.json|\
-  config/experiments/train_direct_dynamics_cascade_coarse_standardized_residual_v1.json) ;;
+  config/experiments/train_direct_dynamics_cascade_coarse_standardized_residual_v1.json|\
+  config/experiments/train_direct_dynamics_cascade_coarse_mean_v1.json) ;;
   *)
     echo "unsafe COARSE_CASCADE_CONFIG" >&2
     exit 2
@@ -108,4 +117,4 @@ export MKL_NUM_THREADS=6
 export OPENBLAS_NUM_THREADS=6
 export NUMEXPR_NUM_THREADS=6
 timeout --signal=TERM --kill-after=2m 7080s python -m assim_lib.direct_dynamics_cascade_coarse_training \
-  --config "$CONFIG_PATH"
+  --config "$CONFIG_PATH" "${PYTHON_MODE[@]}"

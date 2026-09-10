@@ -97,9 +97,16 @@ class CoarseCascadeRunnerTests(unittest.TestCase):
         self.assertIn("--kill-after=2m 7080s", launcher)
         self.assertIn("COARSE_CASCADE_LAUNCH_ID", launcher)
         self.assertIn("COARSE_CASCADE_CONFIG", launcher)
+        self.assertIn('PYTHON_MODE=("--preflight-only")', launcher)
+        self.assertIn('"${PYTHON_MODE[@]}"', launcher)
+        self.assertIn("usage: $0 [--preflight-only]", launcher)
         self.assertIn("train_direct_dynamics_cascade_coarse_learning_curve_v1.json", launcher)
         self.assertIn(
             "train_direct_dynamics_cascade_coarse_standardized_residual_v1.json",
+            launcher,
+        )
+        self.assertIn(
+            "train_direct_dynamics_cascade_coarse_mean_v1.json",
             launcher,
         )
         self.assertNotIn("FINE_CASCADE_LAUNCH_ID", launcher)

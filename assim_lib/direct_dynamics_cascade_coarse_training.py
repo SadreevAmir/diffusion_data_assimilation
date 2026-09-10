@@ -22,6 +22,7 @@ from .direct_dynamics_cascade_coarse import (
     CoarseLearningCurveEarlyStop,
     coarse_flow_pair,
     coarse_model_input_for_test,
+    coarse_target,
     ocean_fraction_weighted_mse,
 )
 from .direct_dynamics_cascade_coarse_residual import (
@@ -30,6 +31,11 @@ from .direct_dynamics_cascade_coarse_residual import (
     coarse_residual_flow_pair,
     coarse_standardized_residual_flow_pair,
     residual_model_input_for_test,
+)
+from .direct_dynamics_cascade_coarse_mean import (
+    CoarseConditionalMeanTrainer,
+    coarse_mean_model_input,
+    coarse_mean_target,
 )
 from .direct_dynamics_cascade_residual_stats import _tensor_sha256
 from .direct_dynamics_cascade_fine_training import (
@@ -133,22 +139,37 @@ def _gpu_admission_smoke(
     *,
     persistence_residual: bool = False,
     residual_statistics: dict[str, Any] | None = None,
+    deterministic_mean: bool = False,
 ) -> dict:
-    """Exercise the exact 56-to-6 coarse path with a real backward pass."""
+    """Exercise the configured coarse path with a real CUDA backward pass."""
     device = torch.device("cuda")
     torch.cuda.reset_peak_memory_stats(device)
     model = model.to(device).train()
     truth = raw["truth"].to(device=device, dtype=torch.float32)
     valid = raw["valid_mask"][:, :1].to(device=device, dtype=torch.float32)
     condition = raw["structured_conditioning"].to(device=device, dtype=torch.float32)
-    time = torch.linspace(0.05, 0.95, truth.shape[0], device=device)
+    time = (
+        torch.zeros(truth.shape[0], device=device)
+        if deterministic_mean
+        else torch.linspace(0.05, 0.95, truth.shape[0], device=device)
+    )
     coarse_height, coarse_width = config.image_size
     noise = torch.randn(
         (truth.shape[0], 6, coarse_height, coarse_width),
         device=device,
         dtype=torch.float32,
     )
-    if persistence_residual:
+    if deterministic_mean:
+        target, persistence, _, fraction = coarse_mean_target(
+            truth, condition, valid
+        )
+        background, _, _ = coarse_target(raw["background"].to(device), valid)
+        if not torch.equal(persistence, background):
+            raise ValueError("mean smoke persistence differs from dataset baseline")
+        state = torch.zeros_like(target)
+        model_input, _, _ = coarse_mean_model_input(condition, valid)
+        state_coordinate = "deterministic_conditional_mean"
+    elif persistence_residual:
         if residual_statistics is None:
             state, target, _, _, fraction = coarse_residual_flow_pair(
                 truth, noise, condition, valid, time
@@ -164,7 +185,11 @@ def _gpu_admission_smoke(
         state, target, _, fraction = coarse_flow_pair(truth, noise, valid, time)
         model_input = coarse_model_input_for_test(state, condition, valid)
         state_coordinate = "absolute_coarse"
-    if tuple(model_input.shape[1:]) != (COARSE_INPUT_CHANNELS, coarse_height, coarse_width):
+    if tuple(model_input.shape[1:]) != (
+        config.in_channels,
+        coarse_height,
+        coarse_width,
+    ):
         raise ValueError("GPU smoke constructed the wrong coarse model input")
     with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
         prediction = model(model_input, time * 1000, return_dict=False)[0]
@@ -221,6 +246,9 @@ def _run_impl(config_path: Path, *, preflight_only: bool, lifecycle: _Lifecycle)
         "data": {"path": str(data_path.resolve()), "sha256": _sha256_file(data_path)},
         "method": {"path": str(model_path.resolve()), "sha256": _sha256_file(model_path)},
         "coarse_module": _sha256_file(Path(__file__).with_name("direct_dynamics_cascade_coarse.py")),
+        "mean_module": _sha256_file(
+            Path(__file__).with_name("direct_dynamics_cascade_coarse_mean.py")
+        ),
         "runner": _sha256_file(Path(__file__)),
     }
     data_config = merge_config_overrides(load_json(data_path), experiment.get("data_overrides"))
@@ -256,6 +284,7 @@ def _run_impl(config_path: Path, *, preflight_only: bool, lifecycle: _Lifecycle)
         "learning_curve_2048": 2048,
         "persistence_residual_2048": 2048,
         "standardized_persistence_residual_2048": 2048,
+        "deterministic_mean_2048": 2048,
     }.get(pilot_kind)
     if expected_updates is None or (
         train_case_count,
@@ -344,6 +373,7 @@ def _run_impl(config_path: Path, *, preflight_only: bool, lifecycle: _Lifecycle)
         "standardized_persistence_residual_2048",
     }
     standardized_residual = pilot_kind == "standardized_persistence_residual_2048"
+    deterministic_mean = pilot_kind == "deterministic_mean_2048"
     residual_statistics_binding = None
     residual_statistics = None
     if standardized_residual:
@@ -378,6 +408,7 @@ def _run_impl(config_path: Path, *, preflight_only: bool, lifecycle: _Lifecycle)
         config,
         persistence_residual=persistence_residual,
         residual_statistics=residual_statistics,
+        deterministic_mean=deterministic_mean,
     )
     result = {
         "status": "preflight_passed" if preflight_only else "training_pending",
@@ -397,7 +428,9 @@ def _run_impl(config_path: Path, *, preflight_only: bool, lifecycle: _Lifecycle)
         num_training_steps=planned_updates,
     )
     lifecycle.phase = "clearml_initialization"
-    if standardized_residual:
+    if deterministic_mean:
+        trainer_class = CoarseConditionalMeanTrainer
+    elif standardized_residual:
         trainer_class = CoarseStandardizedPersistenceResidualTrainer
     elif persistence_residual:
         trainer_class = CoarsePersistenceResidualTrainer
