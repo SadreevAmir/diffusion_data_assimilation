@@ -42,7 +42,7 @@ class CascadeCheckpointEvaluationTest(unittest.TestCase):
         result = _predicted_open_water_sit(sic, sit, fraction)
         self.assertAlmostEqual(result["case_equal_mean_positive_sit"], (0.02 + 0.0 + 0.03) / 3)
         self.assertAlmostEqual(result["case_equal_fraction_above_0p01m"], 2 / 3)
-        self.assertEqual(result["global_positive_sit_max"], 0.03)
+        self.assertAlmostEqual(result["global_positive_sit_max"], 0.03)
 
 
 if __name__ == "__main__":
