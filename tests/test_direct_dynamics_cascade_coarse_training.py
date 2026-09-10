@@ -90,8 +90,7 @@ class CoarseCascadeRunnerTests(unittest.TestCase):
         launcher = path.read_text(encoding="utf-8")
         self.assertTrue(os.access(path, os.X_OK))
         self.assertIn(".gpu_job.lock", launcher)
-        self.assertIn("exactly one", launcher)
-        self.assertIn("--query-gpu=uuid", launcher)
+        self.assertIn("scripts/require_single_gpu_uuid.sh", launcher)
         self.assertNotIn("--query-gpu=count", launcher)
         self.assertIn("{1..11}", launcher)
         self.assertIn("sleep 30", launcher)
@@ -116,6 +115,37 @@ class CoarseCascadeRunnerTests(unittest.TestCase):
             launcher,
         )
         self.assertNotIn("FINE_CASCADE_LAUNCH_ID", launcher)
+
+    def test_single_gpu_uuid_inventory_is_executable_and_fail_closed(self):
+        checker = Path("scripts/require_single_gpu_uuid.sh").resolve()
+        self.assertTrue(os.access(checker, os.X_OK))
+        valid = "GPU-01234567-89ab-cdef-0123-456789abcdef"
+        cases = (
+            (0, valid + "\n", 0),
+            (255, "", 5),
+            (0, "", 5),
+            (0, valid + "\n" + valid + "\n", 5),
+            (0, "not-a-gpu\n", 5),
+        )
+        for exit_code, output, expected in cases:
+            with self.subTest(exit_code=exit_code, output=output):
+                with TemporaryDirectory() as temporary:
+                    fake = Path(temporary) / "nvidia-smi"
+                    fake.write_text(
+                        "#!/bin/sh\n"
+                        + (f"printf '%b' {output!r}\n" if output else "")
+                        + f"exit {exit_code}\n",
+                        encoding="utf-8",
+                    )
+                    fake.chmod(0o700)
+                    result = subprocess.run(
+                        ["bash", str(checker)],
+                        env={**os.environ, "PATH": f"{temporary}:{os.environ['PATH']}"},
+                        capture_output=True,
+                        text=True,
+                        check=False,
+                    )
+                self.assertEqual(result.returncode, expected, result.stderr)
 
     def test_preflight_result_is_explicitly_zero_optimizer_and_terminal(self):
         source = Path(
@@ -169,9 +199,14 @@ class CoarseCascadeRunnerTests(unittest.TestCase):
                 'GPU_LOCK_ROOT="/home/autoresearch_results/direct_dynamics_all_hours_v1/launches"',
                 f'GPU_LOCK_ROOT="{shared_launches}"',
             )
-            launcher = root / "launcher.sh"
+            scripts = root / "scripts"
+            scripts.mkdir()
+            launcher = scripts / "launcher.sh"
             launcher.write_text(script, encoding="utf-8")
             launcher.chmod(0o700)
+            checker = scripts / "require_single_gpu_uuid.sh"
+            checker.write_bytes(Path("scripts/require_single_gpu_uuid.sh").read_bytes())
+            checker.chmod(0o700)
             state_path = root / "gpu_state"
             python_called = root / "python_called"
             commands = {
@@ -180,8 +215,8 @@ class CoarseCascadeRunnerTests(unittest.TestCase):
                 "sleep": "#!/usr/bin/env bash\nexit 0\n",
                 "timeout": f"#!/usr/bin/env bash\ntouch '{python_called}'\nexit 0\n",
                 "nvidia-smi": """#!/usr/bin/env bash
-if [[ "$*" == *"query-gpu=count"* ]]; then
-  echo 1
+if [[ "$*" == *"query-gpu=uuid"* ]]; then
+  echo 'GPU-01234567-89ab-cdef-0123-456789abcdef'
   exit 0
 fi
 count=0
