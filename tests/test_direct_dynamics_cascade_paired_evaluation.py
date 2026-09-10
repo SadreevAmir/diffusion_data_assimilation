@@ -30,7 +30,7 @@ class CoarsePairedEvaluationTests(unittest.TestCase):
         self.assertAlmostEqual(aggregate, math.sqrt(5.0))
 
     def test_spread_aggregate_is_root_of_case_equal_variance(self) -> None:
-        value = torch.tensor([[[[[1.0, 1.0]]]], [[[[3.0, 99.0]]]]])
+        value = torch.tensor([[[[1.0, 1.0]]], [[[3.0, 99.0]]]])
         fraction = torch.tensor([[[[1.0, 1.0]]], [[[1.0, 0.0]]]])
         aggregate, cases = _weighted_case_rms(value, fraction)
         self.assertEqual(cases, [1.0, 3.0])
