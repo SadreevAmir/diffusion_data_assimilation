@@ -12,6 +12,7 @@ fi
 CONFIG_PATH="config/experiments/train_direct_dynamics_cascade_coarse_residual_v1.json"
 RESULT_ROOT="/home/autoresearch_results/direct_dynamics_cascade_v1/residual_statistics"
 OUTPUT_DIR="$RESULT_ROOT/$RUN_ID"
+mkdir -p "$RESULT_ROOT"
 if ! mkdir -m 700 "$OUTPUT_DIR"; then
   echo "refusing to reuse residual-statistics output directory" >&2
   exit 3

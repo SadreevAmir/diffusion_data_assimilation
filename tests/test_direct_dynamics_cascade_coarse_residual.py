@@ -309,13 +309,22 @@ class CoarsePersistenceResidualTests(unittest.TestCase):
         self.assertTrue(torch.allclose(reconstructed, persistence + desired_residual, atol=1e-6))
 
     def test_production_standardized_sampler_recovers_correlated_moments(self) -> None:
-        class ZeroVelocity(nn.Module):
-            def forward(self, value, timestep, return_dict=False):
-                del timestep, return_dict
-                return (torch.zeros_like(value[:, :6]),)
+        class GaussianAffineVelocity(nn.Module):
+            def __init__(self, transform: torch.Tensor):
+                super().__init__()
+                self.register_buffer("transform", transform)
 
-        count = 5000
-        generator = torch.Generator().manual_seed(31)
+            def forward(self, value, timestep, return_dict=False):
+                del return_dict
+                state = value[:, :6].reshape(value.shape[0], 6)
+                time = timestep[0] / 1000.0
+                identity = torch.eye(6, dtype=state.dtype, device=state.device)
+                transform = self.transform.to(dtype=state.dtype)
+                interpolation = (1.0 - time) * transform + time * identity
+                source_noise = torch.linalg.solve(interpolation, state.T).T
+                velocity = source_noise @ (identity - transform).T
+                return (velocity.reshape(value.shape[0], 6, 1, 1),)
+
         mixing = torch.tensor(
             [
                 [1.0, 0.0, 0.0, 0.0, 0.0, 0.0],
@@ -326,29 +335,34 @@ class CoarsePersistenceResidualTests(unittest.TestCase):
                 [-0.1, 0.2, 0.0, 0.1, 0.3, 0.7],
             ]
         )
-        noise = (torch.randn((count, 6), generator=generator) @ mixing.T).reshape(
-            count, 6, 1, 1
-        )
+        count = 12
+        radius = torch.sqrt(torch.tensor((count - 1) / 2.0))
+        noise_matrix = torch.cat((radius * torch.eye(6), -radius * torch.eye(6)), dim=0)
+        noise = noise_matrix.reshape(count, 6, 1, 1)
         means = torch.tensor([0.2, -0.4, 0.1, 0.6, -0.2, 0.3])
         stds = torch.tensor([0.3, 0.7, 0.2, 1.1, 0.9, 0.4])
         statistics = {"means": means.tolist(), "stds": stds.tolist()}
         valid = torch.ones((count, 1, 2, 2))
         condition = _condition(torch.zeros((count, 2, 2, 2)), valid)
-        sampler = CoarseStandardizedPersistenceResidualSampler(ZeroVelocity(), statistics)
+        sampler = CoarseStandardizedPersistenceResidualSampler(
+            GaussianAffineVelocity(mixing), statistics
+        )
         sampler.sample_conditioned(
             structured_conditioning=condition,
             valid_mask=valid,
             initial_noise=noise,
-            num_timesteps=2,
+            num_timesteps=33,
             device=torch.device("cpu"),
-            method="euler",
+            method="rk4",
             end_time=0.0,
         )
         physical = sampler.last_residual.reshape(count, 6)
         expected_covariance = torch.diag(stds) @ (mixing @ mixing.T) @ torch.diag(stds)
-        self.assertTrue(torch.allclose(physical.mean(dim=0), means, atol=0.04, rtol=0.0))
+        self.assertTrue(torch.allclose(physical.mean(dim=0), means, atol=1e-5, rtol=0.0))
         self.assertTrue(
-            torch.allclose(torch.cov(physical.T), expected_covariance, atol=0.04, rtol=0.08)
+            torch.allclose(
+                torch.cov(physical.T), expected_covariance, atol=2e-5, rtol=2e-5
+            )
         )
 
     def test_case_equal_residual_moments_do_not_overweight_large_ocean_case(self) -> None:
@@ -389,6 +403,7 @@ class CoarsePersistenceResidualTests(unittest.TestCase):
         self.assertIn("export TORCH_NUM_INTEROP_THREADS=1", source)
         self.assertIn("--kill-after=30s 3600s", source)
         self.assertIn("COARSE_RESIDUAL_STATS_ID", source)
+        self.assertIn('mkdir -p "$RESULT_ROOT"', source)
 
 
 if __name__ == "__main__":
