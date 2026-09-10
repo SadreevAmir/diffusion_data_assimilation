@@ -94,7 +94,7 @@ class CoarseCascadeRunnerTests(unittest.TestCase):
         self.assertIn("{1..11}", launcher)
         self.assertIn("sleep 30", launcher)
         self.assertIn('"$observed_utilization" -ge 5', launcher)
-        self.assertIn("--kill-after=2m 7080s", launcher)
+        self.assertIn("timeout --foreground --signal=TERM --kill-after=2m 7080s", launcher)
         self.assertIn("COARSE_CASCADE_LAUNCH_ID", launcher)
         self.assertIn("COARSE_CASCADE_CONFIG", launcher)
         self.assertIn('PYTHON_MODE=("--preflight-only")', launcher)

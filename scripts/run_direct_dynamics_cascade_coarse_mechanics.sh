@@ -117,5 +117,5 @@ export OMP_NUM_THREADS=6
 export MKL_NUM_THREADS=6
 export OPENBLAS_NUM_THREADS=6
 export NUMEXPR_NUM_THREADS=6
-timeout --signal=TERM --kill-after=2m 7080s python -m assim_lib.direct_dynamics_cascade_coarse_training \
+timeout --foreground --signal=TERM --kill-after=2m 7080s python -m assim_lib.direct_dynamics_cascade_coarse_training \
   --config "$CONFIG_PATH" "${PYTHON_MODE[@]}"
