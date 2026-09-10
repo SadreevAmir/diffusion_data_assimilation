@@ -1,0 +1,87 @@
+{
+  "project_name": "sea_ice_two_stage",
+  "task_name": "direct_dynamics_cascade_frozen_paired8_v1",
+  "members": 8,
+  "rk4_steps": 33,
+  "sources": [
+    {
+      "label": "standardized_1024",
+      "kind": "standardized",
+      "run_dir": "/home/autoresearch_results/direct_dynamics_cascade_v1/coarse_standardized_residual/standardized_persistence_residual56_conv64_seed38119_u2048-standardized_residual_725bd4a_20260910T0636Z",
+      "code_commit": "725bd4a2fbc91d6e546f75a901b11550a7de4fde",
+      "checkpoint": "coarse_update_1024.pth",
+      "samples_artifact": "coarse_diagnostics/update_2048_samples.pt",
+      "sha256": {
+        "coarse_update_1024.pth": "9a48c174df6e96fa79e7c1aa3a3727f7dabf529eb24271d29512ac83c8a679db",
+        "config.json": "1ee18e2b6c109795561f0a7a116aff76672071e73c76fe6deb595be40ade7e7b",
+        "metadata.json": "f77977ac6e70d74068fa63fd4ffca3e953b0688ddc00221cfd7ef9f75fe6f913",
+        "coarse_cascade_manifest.json": "853201c3ea1f2b8ed581830393ffd9959acd2377a1b9b2ba08418897240bf9e6",
+        "coarse_cascade_dataset_sentinel.json": "4eecd87c3f19c41b7495e3d9f6b6d0e4ae21eeb44245f75bf229801420fcda76",
+        "coarse_diagnostics/update_2048_samples.pt": "b9d0c788894dd650c6f32037a873c8ce61301e709edd27dce26839a496e23a5e"
+      }
+    },
+    {
+      "label": "standardized_2048",
+      "kind": "standardized",
+      "run_dir": "/home/autoresearch_results/direct_dynamics_cascade_v1/coarse_standardized_residual/standardized_persistence_residual56_conv64_seed38119_u2048-standardized_residual_725bd4a_20260910T0636Z",
+      "code_commit": "725bd4a2fbc91d6e546f75a901b11550a7de4fde",
+      "checkpoint": "coarse_update_2048.pth",
+      "samples_artifact": "coarse_diagnostics/update_2048_samples.pt",
+      "sha256": {
+        "coarse_update_2048.pth": "707de8d42f17fec69f8164bc494e131c8ba030bc2ae8132038411ec36bcb424b",
+        "config.json": "1ee18e2b6c109795561f0a7a116aff76672071e73c76fe6deb595be40ade7e7b",
+        "metadata.json": "f77977ac6e70d74068fa63fd4ffca3e953b0688ddc00221cfd7ef9f75fe6f913",
+        "coarse_cascade_manifest.json": "853201c3ea1f2b8ed581830393ffd9959acd2377a1b9b2ba08418897240bf9e6",
+        "coarse_cascade_dataset_sentinel.json": "4eecd87c3f19c41b7495e3d9f6b6d0e4ae21eeb44245f75bf229801420fcda76",
+        "coarse_diagnostics/update_2048_samples.pt": "b9d0c788894dd650c6f32037a873c8ce61301e709edd27dce26839a496e23a5e"
+      }
+    },
+    {
+      "label": "unwhitened_2048",
+      "kind": "unwhitened",
+      "run_dir": "/home/autoresearch_results/direct_dynamics_cascade_v1/coarse_residual/persistence_residual56_conv64_seed38119_u2048-residual_a16744c_20260910",
+      "code_commit": "a16744cad4ba6c5207c9a704430acb7989a33ec9",
+      "checkpoint": "coarse_update_2048.pth",
+      "samples_artifact": "coarse_diagnostics/update_2048_samples.pt",
+      "sha256": {
+        "coarse_update_2048.pth": "3feb69d3527d457b6399a6e14889c5ccfd6f27e7e8ec818e0a708de321de54f7",
+        "config.json": "f12dbda51bd5c2ca0b3157ef56fae99b9c8375d4e72baf1935ffae91021ab9f1",
+        "metadata.json": "1cc0f8516fbf98ac08dba46f22aa39a6d39db637654db06628d12283de6a841b",
+        "coarse_cascade_manifest.json": "cc5ca12e8a7e38781f2b43984371edbad71ececf6a8e108981820698ec0833a6",
+        "coarse_cascade_dataset_sentinel.json": "f182741c9d4e17a0ec017527b169b726699646a9f6eb540c97e1aa9f306a5094",
+        "coarse_diagnostics/update_2048_samples.pt": "f8e69e7f8ee552073011b1ddf621172acc63d7295ad224e693631842fc3dd528"
+      }
+    },
+    {
+      "label": "absolute_2048",
+      "kind": "absolute",
+      "run_dir": "/home/autoresearch_results/direct_dynamics_cascade_v1/coarse_learning_curve/lossless56_conv64_seed38119_u2048-coarse_lc_ef12495_20260910T023106Z",
+      "code_commit": "ef12495a8daf6ed19a0aa6ceb3780e95ec57361a",
+      "checkpoint": "coarse_update_2048.pth",
+      "samples_artifact": "coarse_diagnostics/update_2048_samples.pt",
+      "sha256": {
+        "coarse_update_2048.pth": "23231db01faaebe6230885ba8703c7a767bbb04da9ee135b52d843592bcb6ed1",
+        "config.json": "7ad2b368ae2ec8e463d74bd8aab47e0d7322760474bd10b69aab3a2b667b97f0",
+        "metadata.json": "50b50891962da296b7d400b8ff3d56f5559ad369657e7bf7425ecbc99ae1d099",
+        "coarse_cascade_manifest.json": "c8dec24e55f1d046161bb6698b899c39878b8c94f5bde35ac2ec395125f0803b",
+        "coarse_cascade_dataset_sentinel.json": "e526e8d134b675d0b3ffcc9e13aa09ed7ec27d3c0648ebe59ee0db51f430afd6",
+        "coarse_diagnostics/update_2048_samples.pt": "2c6f36e85ba66d61f18f74e52e8b87c635134a30fbea4c4407689166d6c39272"
+      }
+    }
+  ],
+  "clearml": {
+    "env_path": "/home/.env",
+    "tags": [
+      "frozen-paired-evaluation",
+      "eight-members",
+      "rk4-33",
+      "fp32-tf32-off",
+      "raw-unclipped",
+      "rank-histogram",
+      "fair-crps",
+      "joint-energy-score",
+      "zero-optimizer-steps",
+      "one-gpu"
+    ]
+  }
+}
