@@ -91,6 +91,8 @@ class CoarseCascadeRunnerTests(unittest.TestCase):
         self.assertTrue(os.access(path, os.X_OK))
         self.assertIn(".gpu_job.lock", launcher)
         self.assertIn("scripts/require_single_gpu_uuid.sh", launcher)
+        self.assertIn("nvidia-smi --id=0 --query-gpu=memory.used,utilization.gpu", launcher)
+        self.assertNotIn("head -n 1", launcher)
         self.assertNotIn("--query-gpu=count", launcher)
         self.assertIn("{1..11}", launcher)
         self.assertIn("sleep 30", launcher)
@@ -215,7 +217,7 @@ class CoarseCascadeRunnerTests(unittest.TestCase):
                 "sleep": "#!/usr/bin/env bash\nexit 0\n",
                 "timeout": f"#!/usr/bin/env bash\ntouch '{python_called}'\nexit 0\n",
                 "nvidia-smi": """#!/usr/bin/env bash
-if [[ "$*" == *"query-gpu=uuid"* ]]; then
+if [[ "$*" == *"--id=0"* && "$*" == *"query-gpu=uuid"* ]]; then
   echo 'GPU-01234567-89ab-cdef-0123-456789abcdef'
   exit 0
 fi

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if ! inventory="$(nvidia-smi --query-gpu=uuid --format=csv,noheader)"; then
+if ! inventory="$(nvidia-smi --id=0 --query-gpu=uuid --format=csv,noheader)"; then
   echo "GPU admission failed: UUID inventory command failed" >&2
   exit 5
 fi

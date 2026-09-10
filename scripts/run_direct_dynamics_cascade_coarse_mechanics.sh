@@ -63,7 +63,7 @@ readonly GPU_UUID
 
 read_gpu_into() {
   local observation
-  if ! observation="$(nvidia-smi --query-gpu=memory.used,utilization.gpu --format=csv,noheader,nounits | head -n 1 | tr -d ' ')"; then
+  if ! observation="$(nvidia-smi --id=0 --query-gpu=memory.used,utilization.gpu --format=csv,noheader,nounits | tr -d ' ')"; then
     echo "GPU admission failed: nvidia-smi observation failed" >&2
     return 1
   fi
