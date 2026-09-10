@@ -50,6 +50,7 @@ class FineCascadeRunnerTests(unittest.TestCase):
         self.assertTrue(os.access(path, os.X_OK))
         self.assertIn("FINE_CASCADE_CONFIG", launcher)
         self.assertIn("train_direct_dynamics_cascade_fine_compact_v2.json", launcher)
+        self.assertIn("train_direct_dynamics_cascade_fine_compact_2048_v3.json", launcher)
         self.assertIn('PYTHON_MODE=("--preflight-only")', launcher)
         self.assertIn('"${PYTHON_MODE[@]}"', launcher)
         self.assertIn("usage: $0 [--preflight-only]", launcher)

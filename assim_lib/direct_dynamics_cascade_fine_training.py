@@ -371,12 +371,18 @@ def _run_impl(config_path: Path, *, preflight_only: bool, lifecycle: _Lifecycle)
         raise RuntimeError("fine cascade training requires exactly one visible GPU")
 
     pilot = experiment.get("pilot", {})
-    if pilot.get("kind") not in {None, "mechanics_512", "compact_architecture_screen_512"}:
+    if pilot.get("kind") not in {
+        None,
+        "mechanics_512",
+        "compact_architecture_screen_512",
+        "compact_undertraining_test_2048",
+    }:
         raise ValueError("fine cascade experiment declares an unsupported pilot kind")
     train_case_count = int(pilot.get("train_case_count", 4096))
     validation_case_count = int(pilot.get("validation_case_count", 48))
-    if int(pilot.get("optimizer_updates", -1)) != 512:
-        raise ValueError("fine cascade experiment must declare exactly 512 optimizer updates")
+    declared_updates = int(pilot.get("optimizer_updates", -1))
+    if declared_updates not in {512, 2048}:
+        raise ValueError("fine cascade experiment must declare 512 or 2048 optimizer updates")
     lifecycle.phase = "dataset_preflight"
     seed_everything(config.seed)
     train_dataset = build_dataset(data_config, split="train")
@@ -414,8 +420,10 @@ def _run_impl(config_path: Path, *, preflight_only: bool, lifecycle: _Lifecycle)
         prefetch_factor=PREFETCH_FACTOR,
     )
     planned_updates = len(train_loader) * config.num_epochs
-    if planned_updates != 512:
-        raise ValueError(f"fine cascade pilot must plan exactly 512 updates, got {planned_updates}")
+    if planned_updates != declared_updates:
+        raise ValueError(
+            f"fine cascade planned {planned_updates} updates but declared {declared_updates}"
+        )
     subset_provenance = {
         "selection": "deterministic_even_spacing_over_full_all-hour_split",
         "train_case_count": train_case_count,

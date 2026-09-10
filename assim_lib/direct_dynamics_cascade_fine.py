@@ -216,7 +216,7 @@ class FineCascadeSampler:
 class FineCascadeDynamicsTrainer(DirectDynamicsTrainer):
     """Train p(R | C, d0, forcing, calendar) with teacher coarse targets."""
 
-    diagnostic_steps = frozenset({63, 255, 511})
+    diagnostic_steps = frozenset({63, 255, 511, 1023, 2047})
 
     def __init__(self, *args, **kwargs):
         self._fine_code_identity = kwargs.pop("fine_code_identity", None)
@@ -242,8 +242,8 @@ class FineCascadeDynamicsTrainer(DirectDynamicsTrainer):
         model = kwargs["model"]
         kwargs["model"] = model if isinstance(model, ProjectedDetailModel) else ProjectedDetailModel(model)
         super().__init__(*args, **kwargs)
-        if self.config.num_epochs * len(self.train_dataloader) != 512:
-            raise ValueError("fine cascade mechanics pilot must contain exactly 512 optimizer updates")
+        if self.config.num_epochs * len(self.train_dataloader) not in {512, 2048}:
+            raise ValueError("fine cascade run must contain exactly 512 or 2048 optimizer updates")
         self._latest_fine_sampler: FineCascadeSampler | None = None
         self._fine_validation_case_ids: tuple[str, ...] = ()
         if self.accelerator.is_main_process:
