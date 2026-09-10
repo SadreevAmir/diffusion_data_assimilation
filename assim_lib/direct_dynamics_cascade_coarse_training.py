@@ -418,6 +418,16 @@ def _run_impl(config_path: Path, *, preflight_only: bool, lifecycle: _Lifecycle)
         "gpu_batch_smoke": smoke,
     }
     if preflight_only:
+        result["executed_optimizer_updates"] = 0
+        lifecycle.phase = "preflight_complete"
+        _launch_status(
+            "preflight_passed",
+            run_id=launch_id,
+            code_commit=code_identity["git_commit"],
+            candidate_optimizer_updates=planned_updates,
+            executed_optimizer_updates=0,
+            gpu_smoke_status=smoke["status"],
+        )
         return result
     optimizer = torch.optim.AdamW(model.parameters(), lr=config.learning_rate)
     from diffusers.optimization import get_cosine_schedule_with_warmup
@@ -512,6 +522,7 @@ def _run_impl(config_path: Path, *, preflight_only: bool, lifecycle: _Lifecycle)
             "output_dir": str(Path(output_dir).resolve()),
             "mechanics_gate": gate,
             "early_stop_reason": early_stop,
+            "executed_optimizer_updates": int(gate["optimizer_updates"]),
         }
     )
     _atomic_json(Path(output_dir) / "coarse_cascade_training_completion.json", result)

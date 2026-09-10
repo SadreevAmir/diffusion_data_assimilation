@@ -111,6 +111,17 @@ class CoarseCascadeRunnerTests(unittest.TestCase):
         )
         self.assertNotIn("FINE_CASCADE_LAUNCH_ID", launcher)
 
+    def test_preflight_result_is_explicitly_zero_optimizer_and_terminal(self):
+        source = Path(
+            "assim_lib/direct_dynamics_cascade_coarse_training.py"
+        ).read_text(encoding="utf-8")
+        self.assertIn('result["executed_optimizer_updates"] = 0', source)
+        self.assertIn(
+            '"executed_optimizer_updates": int(gate["optimizer_updates"])', source
+        )
+        self.assertIn('"preflight_passed",', source)
+        self.assertIn('lifecycle.phase = "preflight_complete"', source)
+
     def test_standardized_residual_experiment_changes_only_coordinate_and_output(self):
         base = json.loads(
             Path(
