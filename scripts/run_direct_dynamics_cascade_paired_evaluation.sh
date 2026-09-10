@@ -89,7 +89,7 @@ export OMP_NUM_THREADS=6
 export MKL_NUM_THREADS=6
 export OPENBLAS_NUM_THREADS=6
 export NUMEXPR_NUM_THREADS=6
-timeout --signal=TERM --kill-after=2m 3600s python -m \
+timeout --signal=TERM --kill-after=30s 3570s python -m \
   assim_lib.direct_dynamics_cascade_paired_evaluation \
   --config config/experiments/evaluate_direct_dynamics_cascade_paired_v1.json \
   --output "$OUTPUT"

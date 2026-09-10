@@ -44,6 +44,12 @@ SOURCE_LABELS = (
     "unwhitened_2048",
     "absolute_2048",
 )
+REQUIRED_SOURCE_ARTIFACTS = (
+    "config.json",
+    "metadata.json",
+    "coarse_cascade_manifest.json",
+    "coarse_cascade_dataset_sentinel.json",
+)
 
 
 def _sha256(path: Path) -> str:
@@ -59,13 +65,108 @@ def _member_seed(case_id: str, member: int) -> int:
     return int.from_bytes(hashlib.sha256(payload).digest()[:8], "big") & ((1 << 63) - 1)
 
 
-def _load_source_model(source: dict[str, Any], device: torch.device):
+def _verify_source_files(source: dict[str, Any]) -> None:
     root = Path(source["run_dir"])
-    required = source["sha256"]
-    for relative, expected in required.items():
+    required = {
+        *REQUIRED_SOURCE_ARTIFACTS,
+        source["checkpoint"],
+        source["samples_artifact"],
+    }
+    missing = required.difference(source["sha256"])
+    if missing:
+        raise ValueError(
+            f"source inventory is incomplete for {source['label']}: {sorted(missing)}"
+        )
+    for relative, expected in source["sha256"].items():
+        relative_path = Path(relative)
+        if relative_path.is_absolute() or ".." in relative_path.parts:
+            raise ValueError(f"unsafe source artifact path: {source['label']}:{relative}")
         path = root / relative
         if not path.is_file() or _sha256(path) != expected:
             raise ValueError(f"frozen source mismatch: {source['label']}:{relative}")
+
+
+def _verify_common_source_contract(sources: list[dict[str, Any]]) -> dict[str, Any]:
+    """Read only hash-verified metadata and prove a common causal data law."""
+    metadata = [load_json(Path(source["run_dir"]) / "metadata.json") for source in sources]
+    manifests = [
+        load_json(Path(source["run_dir"]) / "coarse_cascade_manifest.json")
+        for source in sources
+    ]
+    reference = metadata[0]
+    data_config = reference["data_config"]
+    data_hash = _canonical_sha256(data_config)
+    normalization = {
+        "means": reference["normalization_means"],
+        "stds": reference["normalization_stds"],
+    }
+    for source, candidate, manifest in zip(sources, metadata, manifests, strict=True):
+        if _canonical_sha256(candidate["data_config"]) != data_hash:
+            raise ValueError(f"source data law differs for {source['label']}")
+        candidate_normalization = {
+            "means": candidate["normalization_means"],
+            "stds": candidate["normalization_stds"],
+        }
+        if candidate_normalization != normalization:
+            raise ValueError(f"source normalization differs for {source['label']}")
+        if manifest.get("code_commit") != source["code_commit"]:
+            raise ValueError(f"source commit mismatch for {source['label']}")
+        expected_sampler = {
+            "standardized": "CoarseStandardizedPersistenceResidualSampler",
+            "unwhitened": "CoarsePersistenceResidualSampler",
+            "absolute": "CoarseCascadeSampler",
+        }[source["kind"]]
+        if manifest.get("sampler") != expected_sampler:
+            raise ValueError(f"source sampler mismatch for {source['label']}")
+        training_config = TrainingConfig.from_dict(
+            load_json(Path(source["run_dir"]) / "config.json")
+        )
+        if tuple(training_config.image_size) != (160, 128):
+            raise ValueError(f"source image size differs for {source['label']}")
+        if source["kind"] == "standardized":
+            statistics_path = Path(manifest["residual_statistics_path"])
+            expected = manifest["residual_statistics_sha256"]
+            if not statistics_path.is_file() or _sha256(statistics_path) != expected:
+                raise ValueError(
+                    f"standardized source statistics differ for {source['label']}"
+                )
+    if data_config.get("means") != normalization["means"] or data_config.get(
+        "stds"
+    ) != normalization["stds"]:
+        raise ValueError("metadata normalization differs from the common data law")
+    expected_causal_contract = {
+        "background_strategy": "none",
+        "conditioning_layout": "structured_sic_sit_dynamics_v1",
+        "trajectory_semantics": "state_only_forecast_snapshots_d_plus_3_6_9",
+        "trajectory_lead_days": list(DIRECT_LEADS),
+        "future_horizon_days": max(DIRECT_LEADS),
+        "resample_observation_masks_each_epoch": False,
+        "observation_mask": {"kind": "none"},
+        "dynamic_forcing_indices": [6, 7, 13, 14],
+    }
+    actual = {key: data_config.get(key) for key in expected_causal_contract}
+    if actual != expected_causal_contract:
+        raise ValueError(f"source causal data contract differs: {actual}")
+    return {
+        "metadata": reference,
+        "data_config_sha256": data_hash,
+        "normalization_sha256": _canonical_sha256(normalization),
+        "causal_contract": expected_causal_contract,
+    }
+
+
+def _atomic_torch_save(payload: Any, path: Path) -> None:
+    temporary = path.with_name(f".{path.name}.tmp-{os.getpid()}")
+    try:
+        torch.save(payload, temporary)
+        os.replace(temporary, path)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+def _load_source_model(source: dict[str, Any], device: torch.device):
+    _verify_source_files(source)
+    root = Path(source["run_dir"])
     manifest = load_json(root / "coarse_cascade_manifest.json")
     if manifest.get("code_commit") != source["code_commit"]:
         raise ValueError(f"source commit mismatch for {source['label']}")
@@ -101,8 +202,9 @@ def _weighted_case_rmse(
     weight = fraction.to(dtype=torch.float64)
     error = (estimate - truth).to(dtype=torch.float64)
     denominator = weight.sum(dim=(1, 2, 3))
-    values = torch.sqrt((error.square() * weight).sum(dim=(1, 2, 3)) / denominator)
-    return float(values.mean().item()), values.tolist()
+    case_mse = (error.square() * weight).sum(dim=(1, 2, 3)) / denominator
+    values = torch.sqrt(case_mse)
+    return float(torch.sqrt(case_mse.mean()).item()), values.tolist()
 
 
 def _weighted_case_fair_crps(
@@ -165,8 +267,9 @@ def _weighted_case_rms(value: torch.Tensor, fraction: torch.Tensor) -> tuple[flo
     value = value.to(dtype=torch.float64)
     weight = fraction.to(dtype=torch.float64)
     denominator = weight.sum(dim=(1, 2, 3))
-    result = torch.sqrt((value.square() * weight).sum(dim=(1, 2, 3)) / denominator)
-    return float(result.mean().item()), result.tolist()
+    case_variance = (value.square() * weight).sum(dim=(1, 2, 3)) / denominator
+    result = torch.sqrt(case_variance)
+    return float(torch.sqrt(case_variance.mean()).item()), result.tolist()
 
 
 def _roughness(value: torch.Tensor, active: torch.Tensor) -> float:
@@ -186,7 +289,7 @@ def _roughness(value: torch.Tensor, active: torch.Tensor) -> float:
     return float(torch.stack(results).mean().item())
 
 
-def _support_metrics(values: torch.Tensor, active: torch.Tensor, field: str) -> dict[str, float]:
+def _support_metrics(values: torch.Tensor, active: torch.Tensor, field: str) -> dict[str, Any]:
     per_case: dict[str, list[float]] = {
         "frequency": [],
         "mean_all": [],
@@ -205,14 +308,26 @@ def _support_metrics(values: torch.Tensor, active: torch.Tensor, field: str) -> 
         per_case["mean_all"].append(float(excess.mean().item()))
         per_case["p95_all"].append(float(torch.quantile(excess.flatten(), 0.95).item()))
         per_case["max"].append(float(excess.max().item()))
-    return {key: float(sum(values_) / len(values_)) for key, values_ in per_case.items()}
+    return {
+        "case_equal_mean_frequency": float(
+            sum(per_case["frequency"]) / len(per_case["frequency"])
+        ),
+        "case_equal_mean_excess": float(
+            sum(per_case["mean_all"]) / len(per_case["mean_all"])
+        ),
+        "case_equal_mean_p95_excess": float(
+            sum(per_case["p95_all"]) / len(per_case["p95_all"])
+        ),
+        "global_max_excess": max(per_case["max"]),
+        "case_values": per_case,
+    }
 
 
 def _low_ice_sit(
     sit_members: torch.Tensor,
     truth_sic: torch.Tensor,
     active: torch.Tensor,
-) -> dict[str, float]:
+) -> dict[str, Any]:
     rms, positive_p95, negative_p95 = [], [], []
     for case in range(sit_members.shape[0]):
         selector = (active[case, 0] > 0) & (truth_sic[case, 0] < 0.01)
@@ -225,9 +340,14 @@ def _low_ice_sit(
     if not rms:
         raise ValueError("paired evaluation has no low-ice cells")
     return {
-        "rms": sum(rms) / len(rms),
-        "positive_p95": sum(positive_p95) / len(positive_p95),
-        "negative_p95": sum(negative_p95) / len(negative_p95),
+        "case_equal_rms": math.sqrt(sum(value * value for value in rms) / len(rms)),
+        "case_equal_mean_positive_p95": sum(positive_p95) / len(positive_p95),
+        "case_equal_mean_negative_p95": sum(negative_p95) / len(negative_p95),
+        "case_values": {
+            "rms": rms,
+            "positive_p95": positive_p95,
+            "negative_p95": negative_p95,
+        },
     }
 
 
@@ -411,6 +531,9 @@ def _run_impl(
         raise ValueError("paired evaluation requires the four preregistered sources")
     if int(experiment["members"]) != ENSEMBLE_SIZE or int(experiment["rk4_steps"]) != SAMPLE_STEPS:
         raise ValueError("paired evaluation requires eight members and RK4-33")
+    for source in sources:
+        _verify_source_files(source)
+    source_contract = _verify_common_source_contract(sources)
     code_identity = _clean_code_identity(Path(__file__).resolve().parents[1])
     output.mkdir(parents=True, exist_ok=False)
     lifecycle["output"] = output
@@ -421,7 +544,7 @@ def _run_impl(
     device = torch.device("cuda:0")
 
     candidate_root = Path(sources[0]["run_dir"])
-    candidate_metadata = load_json(candidate_root / "metadata.json")
+    candidate_metadata = source_contract["metadata"]
     dataset = build_dataset(candidate_metadata["data_config"], split="valid")
     dataset_validation = validate_direct_dataset(dataset)
     calendar_inventory = _calendar_inventory(dataset, split="valid")
@@ -513,6 +636,9 @@ def _run_impl(
         "common_joint_energy_coordinate": "six normalized SIC/SIT channels",
         "member_noise_seeds": seeds,
         "sources": sources,
+        "source_contract": {
+            key: value for key, value in source_contract.items() if key != "metadata"
+        },
         "dataset_validation": dataset_validation,
         "calendar_inventory": calendar_inventory,
     }
@@ -524,9 +650,12 @@ def _run_impl(
         clearml_task_id=str(tracker.task.id),
     )
     _atomic_json(output / "contract.json", contract)
-    torch.save(
+    _atomic_torch_save(
         {
             "noise": noise,
+            "structured_conditioning": batch["structured_conditioning"].float(),
+            "fine_valid_mask": batch["valid_mask"].float(),
+            "sampler_valid_mask": valid,
             "truth_normalized": truth_normalized,
             "truth_physical": truth_physical,
             "persistence_normalized": persistence_normalized,
@@ -565,7 +694,7 @@ def _run_impl(
             normalized.flatten(0, 1), means, stds
         ).unflatten(0, (len(case_ids), ENSEMBLE_SIZE))
         ensembles[label] = {"normalized": normalized, "physical": physical}
-        torch.save(
+        _atomic_torch_save(
             {
                 "normalized": normalized,
                 "physical": physical,
@@ -662,19 +791,37 @@ def run(config_path: Path, output: Path) -> dict[str, Any]:
             "status": "failed",
             "error_type": type(error).__name__,
             "error": str(error),
+            "cleanup_errors": [],
         }
+        created = lifecycle.get("output")
+        if isinstance(created, Path) and created.is_dir():
+            try:
+                _atomic_json(created / "failure.json", failure)
+            except Exception as durability_error:
+                failure["cleanup_errors"].append(
+                    f"initial_failure_artifact: {durability_error}"
+                )
+        try:
+            _launch_status(**failure)
+        except Exception as durability_error:
+            failure["cleanup_errors"].append(f"launch_status: {durability_error}")
         tracker = lifecycle.get("tracker")
         if tracker is not None:
             try:
                 tracker.task.mark_failed(
                     status_reason=type(error).__name__, status_message=str(error)[:1000]
                 )
-            finally:
+            except Exception as cleanup_error:
+                failure["cleanup_errors"].append(f"clearml_mark_failed: {cleanup_error}")
+            try:
                 tracker.close()
-        created = lifecycle.get("output")
+            except Exception as cleanup_error:
+                failure["cleanup_errors"].append(f"clearml_close: {cleanup_error}")
         if isinstance(created, Path) and created.is_dir():
-            _atomic_json(created / "failure.json", failure)
-        _launch_status(**failure)
+            try:
+                _atomic_json(created / "failure.json", failure)
+            except Exception:
+                pass
         raise
 
 

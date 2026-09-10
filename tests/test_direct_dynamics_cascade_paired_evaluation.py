@@ -1,16 +1,22 @@
 import json
+import math
 import os
+import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 import torch
 
 from assim_lib.direct_dynamics_cascade_paired_evaluation import (
     SOURCE_LABELS,
     _joint_energy_score,
+    _support_metrics,
     _weighted_case_fair_crps,
     _weighted_case_rmse,
+    _weighted_case_rms,
     _weighted_fractional_rank,
+    run,
 )
 
 
@@ -21,7 +27,61 @@ class CoarsePairedEvaluationTests(unittest.TestCase):
         fraction = torch.tensor([[[[1.0, 1.0]]], [[[1.0, 0.0]]]])
         aggregate, cases = _weighted_case_rmse(estimate, truth, fraction)
         self.assertEqual(cases, [1.0, 3.0])
-        self.assertEqual(aggregate, 2.0)
+        self.assertAlmostEqual(aggregate, math.sqrt(5.0))
+
+    def test_spread_aggregate_is_root_of_case_equal_variance(self) -> None:
+        value = torch.tensor([[[[[1.0, 1.0]]]], [[[[3.0, 99.0]]]]])
+        fraction = torch.tensor([[[[1.0, 1.0]]], [[[1.0, 0.0]]]])
+        aggregate, cases = _weighted_case_rms(value, fraction)
+        self.assertEqual(cases, [1.0, 3.0])
+        self.assertAlmostEqual(aggregate, math.sqrt(5.0))
+
+    def test_support_keeps_case_table_and_true_global_maximum(self) -> None:
+        values = torch.tensor(
+            [
+                [[[[1.5]]], [[[1.0]]]],
+                [[[[3.0]]], [[[1.0]]]],
+            ]
+        )
+        result = _support_metrics(values, torch.ones((2, 1, 1, 1)), "sic")
+        self.assertEqual(result["global_max_excess"], 2.0)
+        self.assertEqual(result["case_values"]["max"], [0.5, 2.0])
+
+    def test_failure_artifact_survives_broken_tracker_cleanup(self) -> None:
+        class BrokenTask:
+            def mark_failed(self, **kwargs) -> None:
+                raise RuntimeError("mark cleanup")
+
+        class BrokenTracker:
+            task = BrokenTask()
+
+            def close(self) -> None:
+                raise RuntimeError("close cleanup")
+
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary) / "failure-output"
+
+            def fail(_config_path, target, lifecycle):
+                target.mkdir()
+                lifecycle["output"] = target
+                lifecycle["tracker"] = BrokenTracker()
+                raise ValueError("primary failure")
+
+            with mock.patch(
+                "assim_lib.direct_dynamics_cascade_paired_evaluation._run_impl",
+                side_effect=fail,
+            ):
+                with self.assertRaisesRegex(ValueError, "primary failure"):
+                    run(Path("unused.json"), output)
+            failure = json.loads((output / "failure.json").read_text())
+            self.assertEqual(failure["error"], "primary failure")
+            self.assertEqual(
+                failure["cleanup_errors"],
+                [
+                    "clearml_mark_failed: mark cleanup",
+                    "clearml_close: close cleanup",
+                ],
+            )
 
     def test_fair_crps_uses_unbiased_pair_correction(self) -> None:
         members = torch.tensor([-1.0, 1.0]).reshape(1, 2, 1, 1, 1)
@@ -73,7 +133,7 @@ class CoarsePairedEvaluationTests(unittest.TestCase):
         self.assertIn("{1..11}", source)
         self.assertIn("sleep 30", source)
         self.assertIn('"$GPU_UTILIZATION" -ge 5', source)
-        self.assertIn("--kill-after=2m 3600s", source)
+        self.assertIn("--kill-after=30s 3570s", source)
 
 
 if __name__ == "__main__":
