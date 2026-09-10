@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 import torch
-from torch.utils.data import Subset
+from torch.utils.data import DataLoader, Subset
 
 from .config import TrainingConfig, load_json, merge_config_overrides, resolve_path
 from .data import build_dataset
@@ -64,6 +64,85 @@ class _Lifecycle:
     output_root: Path | None = None
     output_writable: bool = False
     trainer: Any = None
+
+
+class CalendarWindowBatchSampler:
+    """Shuffle all cases once per epoch while retaining archive locality.
+
+    A source archive stores 24 hourly cases per day.  Global sample-level
+    shuffling repeatedly opens unrelated daily files and starves the GPU.
+    Here days are globally shuffled, then samples are shuffled within small
+    day windows.  Every index still appears exactly once per epoch.
+    """
+
+    def __init__(
+        self,
+        dataset_size: int,
+        batch_size: int,
+        *,
+        samples_per_day: int = 24,
+        days_per_window: int = 16,
+        seed: int,
+    ) -> None:
+        if min(dataset_size, batch_size, samples_per_day, days_per_window) <= 0:
+            raise ValueError("calendar-window sampler arguments must be positive")
+        if dataset_size % samples_per_day:
+            raise ValueError("dataset size must contain complete archive days")
+        if dataset_size % batch_size:
+            raise ValueError("calendar-window sampler requires complete batches")
+        if (days_per_window * samples_per_day) % batch_size:
+            raise ValueError("a complete calendar window must contain complete batches")
+        self.dataset_size = int(dataset_size)
+        self.batch_size = int(batch_size)
+        self.samples_per_day = int(samples_per_day)
+        self.days_per_window = int(days_per_window)
+        self.seed = int(seed)
+        self.epoch = 0
+
+    def __len__(self) -> int:
+        return self.dataset_size // self.batch_size
+
+    def set_epoch(self, epoch: int) -> None:
+        if epoch < 0:
+            raise ValueError("sampler epoch must be non-negative")
+        self.epoch = int(epoch)
+
+    def __iter__(self):
+        generator = torch.Generator().manual_seed(self.seed + self.epoch)
+        day_count = self.dataset_size // self.samples_per_day
+        day_order = torch.randperm(day_count, generator=generator).tolist()
+        for start in range(0, day_count, self.days_per_window):
+            days = day_order[start : start + self.days_per_window]
+            indices = [
+                day * self.samples_per_day + hour
+                for day in days
+                for hour in range(self.samples_per_day)
+            ]
+            order = torch.randperm(len(indices), generator=generator).tolist()
+            shuffled = [indices[position] for position in order]
+            for offset in range(0, len(shuffled), self.batch_size):
+                batch = shuffled[offset : offset + self.batch_size]
+                if len(batch) != self.batch_size:
+                    raise RuntimeError("calendar window produced an incomplete batch")
+                yield batch
+        self.epoch += 1
+
+
+def _calendar_window_dataloader(dataset, config: TrainingConfig) -> DataLoader:
+    batch_sampler = CalendarWindowBatchSampler(
+        len(dataset),
+        config.train_batch_size,
+        seed=config.seed,
+    )
+    return DataLoader(
+        dataset,
+        batch_sampler=batch_sampler,
+        num_workers=config.num_workers_train,
+        pin_memory=torch.cuda.is_available(),
+        persistent_workers=config.num_workers_train > 0,
+        collate_fn=_fine_collate,
+        prefetch_factor=PREFETCH_FACTOR if config.num_workers_train > 0 else None,
+    )
 
 
 def _record_failure(lifecycle: _Lifecycle, error: BaseException) -> None:
@@ -325,13 +404,17 @@ def _run_impl(config_path: Path, *, preflight_only: bool, lifecycle: _Lifecycle)
     train_static_valid_mask_sha256 = _tensor_sha256(train_subset[0]["valid_mask"][:1])
     diagnostic_batch, diagnostic_positions = _seasonal_diagnostic_batch(validation_subset)
     ipc = _ipc_preflight(train_subset, validation_subset, config)
-    train_loader = build_dataloader(
-        train_subset,
-        config.train_batch_size,
-        config.num_workers_train,
-        shuffle=True,
-        collate_fn=_fine_collate,
-        prefetch_factor=PREFETCH_FACTOR,
+    train_loader = (
+        _calendar_window_dataloader(train_subset, config)
+        if pilot_kind == "full_train_6_epochs"
+        else build_dataloader(
+            train_subset,
+            config.train_batch_size,
+            config.num_workers_train,
+            shuffle=True,
+            collate_fn=_fine_collate,
+            prefetch_factor=PREFETCH_FACTOR,
+        )
     )
     validation_loader = build_dataloader(
         validation_subset,
@@ -346,6 +429,11 @@ def _run_impl(config_path: Path, *, preflight_only: bool, lifecycle: _Lifecycle)
         raise ValueError(f"coarse pilot must plan {expected_updates} updates, got {planned_updates}")
     subset_provenance = {
         "selection": "deterministic_even_spacing_over_full_all-hour_split",
+        "train_order": (
+            "shuffle_days_then_shuffle_within_16_day_windows_without_replacement"
+            if pilot_kind == "full_train_6_epochs"
+            else "global_sample_shuffle"
+        ),
         "train_indices": train_indices,
         "train_indices_sha256": _indices_sha256(train_indices),
         "train_case_ids": [_case_id(train_dataset, index) for index in train_indices],

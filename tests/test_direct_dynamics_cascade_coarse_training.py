@@ -12,6 +12,7 @@ import torch
 from assim_lib.config import TrainingConfig
 from assim_lib.direct_dynamics_cascade_coarse import COARSE_INPUT_CHANNELS
 from assim_lib.direct_dynamics_cascade_coarse_training import (
+    CalendarWindowBatchSampler,
     _Lifecycle,
     _record_failure,
     _seasonal_diagnostic_batch,
@@ -39,6 +40,29 @@ def _sample(index: int) -> dict:
 
 
 class CoarseCascadeRunnerTests(unittest.TestCase):
+    def test_calendar_window_sampler_preserves_all_cases_and_locality(self):
+        sampler = CalendarWindowBatchSampler(
+            32 * 24,
+            16,
+            days_per_window=16,
+            seed=1701,
+        )
+        first = list(sampler)
+        flattened = [index for batch in first for index in batch]
+        self.assertEqual(len(first), 48)
+        self.assertEqual(sorted(flattened), list(range(32 * 24)))
+        for window_start in range(0, len(first), 24):
+            window_days = {
+                index // 24
+                for batch in first[window_start : window_start + 24]
+                for index in batch
+            }
+            self.assertEqual(len(window_days), 16)
+        second = list(sampler)
+        self.assertNotEqual(first, second)
+        sampler.set_epoch(0)
+        self.assertEqual(first, list(sampler))
+
     def test_seasonal_diagnostic_batch_has_four_stable_months(self):
         dataset = [_sample(index) for index in range(48)]
         batch, positions = _seasonal_diagnostic_batch(dataset)
