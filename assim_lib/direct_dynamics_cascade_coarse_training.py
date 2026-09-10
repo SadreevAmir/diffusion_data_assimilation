@@ -284,15 +284,17 @@ def _run_impl(config_path: Path, *, preflight_only: bool, lifecycle: _Lifecycle)
         "compact_architecture_screen_512": 512,
         "learning_curve_2048": 2048,
         "learning_curve_4096": 4096,
+        "full_train_6_epochs": 19422,
         "persistence_residual_2048": 2048,
         "standardized_persistence_residual_2048": 2048,
         "deterministic_mean_2048": 2048,
     }.get(pilot_kind)
+    expected_train_cases = 51_792 if pilot_kind == "full_train_6_epochs" else 4096
     if expected_updates is None or (
         train_case_count,
         validation_case_count,
         int(pilot.get("optimizer_updates", -1)),
-    ) != (4096, 48, expected_updates):
+    ) != (expected_train_cases, 48, expected_updates):
         raise ValueError(
             "coarse pilot must declare a supported exact bounded protocol"
         )

@@ -316,16 +316,21 @@ class CoarseCascadeDynamicsTrainer(DirectDynamicsTrainer):
         self._forecast_contract = forecast_contract_from_data_config(data_config)
         super().__init__(*args, **kwargs)
         planned_updates = self.config.num_epochs * len(self.train_dataloader)
-        if planned_updates not in {512, 2048, 4096}:
+        if planned_updates not in {512, 2048, 4096, 19422}:
             raise ValueError(
-                "coarse cascade pilot must contain exactly 512, 2048, or 4096 optimizer updates"
+                "coarse cascade run must contain exactly 512, 2048, 4096, or 19422 optimizer updates"
             )
         self._planned_updates = planned_updates
-        self.diagnostic_steps = (
-            frozenset({63, 255, 511})
-            if planned_updates == 512
-            else frozenset(range(511, planned_updates, 512))
-        )
+        if planned_updates == 512:
+            self.diagnostic_steps = frozenset({63, 255, 511})
+        elif planned_updates == 19422:
+            # Full-data training is inspected once per real epoch.  With the
+            # audited 51,792 cases and batch 16 this is every 3,237 updates.
+            self.diagnostic_steps = frozenset(
+                range(len(self.train_dataloader) - 1, planned_updates, len(self.train_dataloader))
+            )
+        else:
+            self.diagnostic_steps = frozenset(range(511, planned_updates, 512))
         self._coarse_diagnostic_batch = None
         self._coarse_diagnostic_case_ids: tuple[str, ...] = ()
         self._coarse_diagnostic_steps: set[int] = set()
@@ -400,12 +405,15 @@ class CoarseCascadeDynamicsTrainer(DirectDynamicsTrainer):
         if not self.accelerator.is_main_process:
             return
         planned_updates = getattr(self, "_planned_updates", global_step)
-        expected_steps = (
-            [64, 256, 512]
-            if planned_updates == 512
-            else list(range(512, planned_updates + 1, 512))
-        )
-        if planned_updates in {2048, 4096} and global_step in expected_steps:
+        if planned_updates == 512:
+            expected_steps = [64, 256, 512]
+        elif planned_updates == 19422:
+            expected_steps = list(
+                range(len(self.train_dataloader), planned_updates + 1, len(self.train_dataloader))
+            )
+        else:
+            expected_steps = list(range(512, planned_updates + 1, 512))
+        if planned_updates in {2048, 4096, 19422} and global_step in expected_steps:
             diagnostic_step = global_step - 1
             if diagnostic_step not in self._coarse_diagnostic_steps:
                 self._require_full_state_recovery(global_step)

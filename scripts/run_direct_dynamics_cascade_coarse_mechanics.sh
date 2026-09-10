@@ -22,6 +22,7 @@ case "$CONFIG_PATH" in
   config/experiments/train_direct_dynamics_cascade_coarse_mechanics_v1.json|\
   config/experiments/train_direct_dynamics_cascade_coarse_learning_curve_v1.json|\
   config/experiments/train_direct_dynamics_cascade_coarse_learning_curve_4096_v1.json|\
+  config/experiments/train_direct_dynamics_cascade_coarse_full_train_6e_v1.json|\
   config/experiments/train_direct_dynamics_cascade_coarse_residual_v1.json|\
   config/experiments/train_direct_dynamics_cascade_coarse_standardized_residual_v1.json|\
   config/experiments/train_direct_dynamics_cascade_coarse_mean_v1.json|\

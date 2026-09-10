@@ -107,6 +107,32 @@ class CoarseCascadeRunnerTests(unittest.TestCase):
         self.assertEqual(experiment["pilot"]["kind"], "learning_curve_4096")
         self.assertEqual(experiment["pilot"]["optimizer_updates"], 4096)
 
+    def test_full_training_uses_every_case_for_six_epochs(self):
+        config = TrainingConfig.from_dict(
+            json.loads(
+                Path(
+                    "config/methods/direct_dynamics_cascade_coarse_full_train_6e_2f.json"
+                ).read_text()
+            )
+        )
+        self.assertEqual(config.train_batch_size, 16)
+        self.assertEqual(config.num_epochs, 6)
+        self.assertFalse(config.activation_checkpointing)
+        experiment = json.loads(
+            Path(
+                "config/experiments/train_direct_dynamics_cascade_coarse_full_train_6e_v1.json"
+            ).read_text()
+        )
+        self.assertEqual(
+            experiment["pilot"],
+            {
+                "kind": "full_train_6_epochs",
+                "train_case_count": 51_792,
+                "validation_case_count": 48,
+                "optimizer_updates": 19_422,
+            },
+        )
+
     def test_launcher_is_executable_bounded_and_uses_shared_gpu_lock(self):
         path = Path("scripts/run_direct_dynamics_cascade_coarse_mechanics.sh")
         launcher = path.read_text(encoding="utf-8")
@@ -128,6 +154,9 @@ class CoarseCascadeRunnerTests(unittest.TestCase):
         self.assertIn("train_direct_dynamics_cascade_coarse_learning_curve_v1.json", launcher)
         self.assertIn(
             "train_direct_dynamics_cascade_coarse_learning_curve_4096_v1.json", launcher
+        )
+        self.assertIn(
+            "train_direct_dynamics_cascade_coarse_full_train_6e_v1.json", launcher
         )
         self.assertIn(
             "train_direct_dynamics_cascade_coarse_standardized_residual_v1.json",
