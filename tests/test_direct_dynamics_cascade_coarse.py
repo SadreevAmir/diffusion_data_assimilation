@@ -1,4 +1,5 @@
 import hashlib
+import json
 import unittest
 from contextlib import contextmanager
 from pathlib import Path
@@ -28,6 +29,7 @@ from assim_lib.direct_dynamics_cascade_coarse import (
 )
 from assim_lib.direct_dynamics_cascade_fine import FineCascadeSampler, generated_coarse_condition
 from assim_lib.model_io import build_unet
+from assim_lib.runtime import make_normalized_xy_grid
 
 
 class ConstantVelocityModel(nn.Module):
@@ -66,6 +68,8 @@ class DiagnosticHarness(CoarseCascadeDynamicsTrainer):
 
 
 class CoarseCascadeTests(unittest.TestCase):
+    CODE_COMMIT = "a" * 40
+
     def setUp(self):
         generator = torch.Generator().manual_seed(3901)
         self.condition = torch.randn(2, 15, 8, 10, generator=generator)
@@ -178,7 +182,12 @@ class CoarseCascadeTests(unittest.TestCase):
 
     def test_model_input_and_trainer_contract(self):
         state = torch.randn(2, 6, 4, 5)
-        model_input = coarse_model_input_for_test(state, self.condition, self.mask)
+        with patch(
+            "assim_lib.direct_dynamics_cascade_coarse.make_normalized_xy_grid",
+            wraps=make_normalized_xy_grid,
+        ) as grid_builder:
+            model_input = coarse_model_input_for_test(state, self.condition, self.mask)
+        self.assertEqual(grid_builder.call_args.kwargs["device"], state.device)
         self.assertEqual(tuple(model_input.shape), (2, COARSE_INPUT_CHANNELS, 4, 5))
         trainable = TrainableModel()
         prediction = trainable(model_input, torch.tensor([100.0, 900.0]))[0]
@@ -316,7 +325,7 @@ class CoarseCascadeTests(unittest.TestCase):
         model = build_unet(config).eval()
         with TemporaryDirectory() as directory:
             root = Path(directory)
-            write_coarse_manifest(root, config)
+            write_coarse_manifest(root, config, {"git_commit": self.CODE_COMMIT})
             with torch.no_grad():
                 for parameter in model.parameters():
                     parameter.fill_(0.25)
@@ -334,6 +343,7 @@ class CoarseCascadeTests(unittest.TestCase):
                     name,
                     dict(config.__dict__),
                     expected_sha,
+                    self.CODE_COMMIT,
                     device=torch.device("cpu"),
                 )
                 self.assertIsInstance(loaded, CoarseCascadeSampler)
@@ -349,6 +359,7 @@ class CoarseCascadeTests(unittest.TestCase):
                     "raw.pth",
                     changed,
                     raw_sha,
+                    self.CODE_COMMIT,
                     device=torch.device("cpu"),
                 )
             with self.assertRaisesRegex(ValueError, "SHA256 differs"):
@@ -357,6 +368,7 @@ class CoarseCascadeTests(unittest.TestCase):
                     "raw.pth",
                     dict(config.__dict__),
                     "0" * 64,
+                    self.CODE_COMMIT,
                     device=torch.device("cpu"),
                 )
 
@@ -407,6 +419,44 @@ class CoarseCascadeTests(unittest.TestCase):
             self.assertTrue(
                 all(torch.isfinite(torch.tensor(value)) for value in complete["metrics"].values())
             )
+
+    def test_terminal_gate_is_invariant_to_sic_sit_units(self):
+        outputs = ("d3_sic", "d3_sit", "d6_sic", "d6_sit", "d9_sic", "d9_sit")
+
+        def record(step: int, raw: float, *, sit_scale: float) -> dict[str, float]:
+            metrics = {
+                "step": float(step),
+                "joint_raw_support_violation_fraction": 0.1,
+            }
+            for name in outputs:
+                scale = sit_scale if name.endswith("sit") else 1.0
+                metrics[f"{name}_raw_mean_rmse"] = raw * scale
+                metrics[f"{name}_persistence_rmse"] = 1.5 * scale
+                metrics[f"{name}_member_roughness"] = 2.0 * scale
+                metrics[f"{name}_truth_roughness"] = 1.0 * scale
+            return metrics
+
+        summaries = []
+        for sit_scale in (1.0, 1000.0):
+            harness = DiagnosticHarness()
+            harness.accelerator = SimpleNamespace(is_main_process=True)
+            harness.clearml = None
+            harness.val_history = [{}]
+            harness._coarse_diagnostic_history = [
+                record(64, 2.0, sit_scale=sit_scale),
+                record(256, 1.2, sit_scale=sit_scale),
+                record(512, 1.0, sit_scale=sit_scale),
+            ]
+            with TemporaryDirectory() as directory:
+                harness.output_dir = directory
+                harness._after_training_epoch(0, 512)
+                gate = json.loads(
+                    (Path(directory) / "coarse_mechanics_gate.json").read_text(encoding="utf-8")
+                )
+            summaries.append(gate["summary"])
+        self.assertEqual(summaries[0], summaries[1])
+        self.assertAlmostEqual(summaries[0]["mean_dimensionless_rmse_improvement_from_update64"], 0.5)
+        self.assertAlmostEqual(summaries[0]["mean_dimensionless_rmse_skill_over_persistence"], 1.0 / 3.0)
 
 
 if __name__ == "__main__":

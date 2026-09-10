@@ -12,6 +12,7 @@ import hashlib
 import json
 import math
 import os
+import re
 from pathlib import Path
 from typing import Any
 
@@ -267,6 +268,7 @@ class CoarseCascadeDynamicsTrainer(DirectDynamicsTrainer):
 
     def __init__(self, *args, **kwargs):
         self._coarse_diagnostic_batch_raw = kwargs.pop("coarse_diagnostic_batch", None)
+        self._coarse_code_identity = kwargs.pop("coarse_code_identity", None)
         config = kwargs.get("config", args[0] if args else None)
         if not isinstance(config, TrainingConfig):
             raise TypeError("coarse cascade trainer requires an explicit TrainingConfig")
@@ -290,8 +292,9 @@ class CoarseCascadeDynamicsTrainer(DirectDynamicsTrainer):
         self._coarse_diagnostic_batch = None
         self._coarse_diagnostic_case_ids: tuple[str, ...] = ()
         self._coarse_diagnostic_steps: set[int] = set()
+        self._coarse_diagnostic_history: list[dict[str, float]] = []
         if self.accelerator.is_main_process:
-            write_coarse_manifest(self.output_dir, config)
+            write_coarse_manifest(self.output_dir, config, self._coarse_code_identity)
 
     def _make_training_pair(
         self,
@@ -347,7 +350,82 @@ class CoarseCascadeDynamicsTrainer(DirectDynamicsTrainer):
             self._coarse_diagnostic(step, f"update_{step + 1:04d}", checkpoint)
 
     def _after_training_epoch(self, epoch: int, global_step: int) -> None:
-        del epoch, global_step
+        if not self.accelerator.is_main_process:
+            return
+        expected_steps = [64, 256, 512]
+        actual_steps = [int(record["step"]) for record in self._coarse_diagnostic_history]
+        if actual_steps != expected_steps or global_step != 512:
+            raise RuntimeError(
+                f"coarse mechanics gate requires diagnostics {expected_steps} and step512, got {actual_steps}"
+            )
+        early = self._coarse_diagnostic_history[0]
+        final = self._coarse_diagnostic_history[-1]
+        rmse_keys = sorted(key for key in final if key.endswith("_raw_mean_rmse"))
+        persistence_keys = [key.replace("_raw_mean_rmse", "_persistence_rmse") for key in rmse_keys]
+        roughness_keys = sorted(key for key in final if key.endswith("_member_roughness"))
+        if any(early[key] <= 0 for key in rmse_keys) or any(final[key] <= 0 for key in persistence_keys):
+            raise ValueError("coarse mechanics ratio denominators must be strictly positive")
+        improvement_by_output = {
+            key.removesuffix("_raw_mean_rmse"): 1.0 - final[key] / early[key] for key in rmse_keys
+        }
+        skill_by_output = {
+            key.removesuffix("_persistence_rmse"): 1.0
+            - final[key.replace("_persistence_rmse", "_raw_mean_rmse")] / final[key]
+            for key in persistence_keys
+        }
+        roughness_ratios = [
+            final[key] / max(final[key.replace("_member_roughness", "_truth_roughness")], 1e-8)
+            for key in roughness_keys
+        ]
+        summary = {
+            "rmse_improvement_from_update64_by_output": improvement_by_output,
+            "rmse_skill_over_persistence_by_output": skill_by_output,
+            "mean_dimensionless_rmse_improvement_from_update64": sum(improvement_by_output.values())
+            / len(improvement_by_output),
+            "mean_dimensionless_rmse_skill_over_persistence": sum(skill_by_output.values())
+            / len(skill_by_output),
+            "max_member_to_truth_roughness_ratio": max(roughness_ratios),
+            "joint_raw_support_violation_fraction": final["joint_raw_support_violation_fraction"],
+        }
+        flattened_summary = [
+            *improvement_by_output.values(),
+            *skill_by_output.values(),
+            summary["mean_dimensionless_rmse_improvement_from_update64"],
+            summary["mean_dimensionless_rmse_skill_over_persistence"],
+            summary["max_member_to_truth_roughness_ratio"],
+            summary["joint_raw_support_violation_fraction"],
+        ]
+        if not all(math.isfinite(value) for value in flattened_summary):
+            raise FloatingPointError("coarse mechanics gate produced non-finite dimensionless ratios")
+        reasons = []
+        if summary["mean_dimensionless_rmse_improvement_from_update64"] < 0.20:
+            reasons.append("mean dimensionless RMSE ratio improved by less than 20% from update64")
+        if summary["mean_dimensionless_rmse_skill_over_persistence"] <= 0:
+            reasons.append("mean dimensionless coarse skill did not beat persistence")
+        if summary["max_member_to_truth_roughness_ratio"] >= 10:
+            reasons.append("raw coarse member roughness reached at least 10x truth")
+        if summary["joint_raw_support_violation_fraction"] >= 0.95:
+            reasons.append("at least 95% of raw coarse predictions violate physical support")
+        gate = {
+            "status": "failed" if reasons else "passed",
+            "decision": "reject_mechanics_candidate" if reasons else "eligible_for_paired_review",
+            "epoch": epoch + 1,
+            "optimizer_updates": global_step,
+            "criteria": {
+                "min_rmse_improvement_from_update64": 0.20,
+                "strictly_positive_rmse_skill_over_persistence": True,
+                "max_roughness_ratio_exclusive": 10.0,
+                "max_joint_support_violation_exclusive": 0.95,
+            },
+            "summary": summary,
+            "reasons": reasons,
+            "publication_ready": False,
+        }
+        _atomic_json(Path(self.output_dir) / "coarse_mechanics_gate.json", gate)
+        self.val_history[-1]["coarse_mechanics_gate"] = gate
+        _atomic_json(Path(self.output_dir) / "metrics.json", self.val_history)
+        if self.clearml is not None:
+            self.clearml.report_single_value("coarse_mechanics_gate_passed", float(not reasons))
 
     def save_model_custom(self, name: str = "last_model.pth"):
         """Atomically save raw and EMA weights used by coarse sampling."""
@@ -553,6 +631,7 @@ class CoarseCascadeDynamicsTrainer(DirectDynamicsTrainer):
             for key, value in metrics.items():
                 if key != "step" and math.isfinite(value):
                     self.clearml.report_scalar("coarse_dynamics/physical", key, value, step + 1)
+        self._coarse_diagnostic_history.append(dict(metrics))
         return metrics
 
 
@@ -562,7 +641,9 @@ def coarse_model_input_for_test(
     valid_mask: torch.Tensor,
 ) -> torch.Tensor:
     condition, _, _ = lossless_coarse_condition(structured_conditioning, valid_mask)
-    grid = make_normalized_xy_grid(*state.shape[-2:], dtype=state.dtype).expand(state.shape[0], -1, -1, -1)
+    grid = make_normalized_xy_grid(*state.shape[-2:], device=state.device, dtype=state.dtype).expand(
+        state.shape[0], -1, -1, -1
+    )
     return torch.cat((state, grid, condition), dim=1)
 
 
@@ -586,6 +667,7 @@ def load_coarse_cascade_sampler(
     checkpoint_name: str,
     model_config: dict[str, Any],
     expected_checkpoint_sha256: str,
+    expected_code_commit: str,
     device=None,
 ) -> CoarseCascadeSampler:
     root = Path(run_dir)
@@ -605,6 +687,11 @@ def load_coarse_cascade_sampler(
     }
     if any(manifest.get(key) != value for key, value in expected.items()):
         raise ValueError("coarse cascade sampler manifest is incompatible")
+    current_module_sha256 = CoarseCascadeDynamicsTrainer._sha256(Path(__file__))
+    if manifest.get("conditioning_module_sha256") != current_module_sha256:
+        raise ValueError("coarse conditioning implementation differs from the checkpoint manifest")
+    if manifest.get("code_commit") != expected_code_commit:
+        raise ValueError("coarse cascade code commit differs from the required identity")
     config = TrainingConfig.from_dict(model_config)
     if (
         config.in_channels != COARSE_INPUT_CHANNELS
@@ -638,7 +725,14 @@ def load_coarse_cascade_sampler(
     return CoarseCascadeSampler(model)
 
 
-def write_coarse_manifest(output_dir: str | Path, config: TrainingConfig) -> None:
+def write_coarse_manifest(
+    output_dir: str | Path,
+    config: TrainingConfig,
+    code_identity: dict[str, str] | None,
+) -> None:
+    commit = None if code_identity is None else code_identity.get("git_commit")
+    if commit is None or re.fullmatch(r"[0-9a-f]{40}", commit) is None:
+        raise ValueError("coarse manifest requires an exact immutable git commit")
     _atomic_json(
         Path(output_dir) / "coarse_cascade_manifest.json",
         {
@@ -653,5 +747,7 @@ def write_coarse_manifest(output_dir: str | Path, config: TrainingConfig) -> Non
             "coarse_factor": CASCADE_FACTOR,
             "image_size": [160, 128],
             "architecture": _architecture_signature(config),
+            "code_commit": commit,
+            "conditioning_module_sha256": CoarseCascadeDynamicsTrainer._sha256(Path(__file__)),
         },
     )
