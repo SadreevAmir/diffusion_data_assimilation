@@ -122,6 +122,7 @@ class TrainingConfig:
         "UpBlock2D",
     )
     norm_num_groups: int = 32
+    add_attention: bool = True
     structured_state_stats_path: str = ""
     structured_state_stats: dict[str, Any] | None = None
     structured_velocity_parameterization: str = "raw"
@@ -181,6 +182,8 @@ class TrainingConfig:
             raise ValueError(f"Training values must be positive: {invalid}")
         if self.num_workers_train < 0 or self.num_workers_val < 0:
             raise ValueError("DataLoader worker counts must be non-negative")
+        if not isinstance(self.add_attention, bool):
+            raise ValueError("add_attention must be boolean")
         if self.preserve_persistent_worker_rng and (self.num_workers_train != 0 or self.num_workers_val != 0):
             raise ValueError("preserve_persistent_worker_rng requires zero train and validation workers")
         if self.lr_scheduler_total_steps < 0:

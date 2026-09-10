@@ -6,6 +6,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 import torch
+from diffusers.models.attention_processor import Attention
 from diffusers.training_utils import EMAModel
 from torch import nn
 
@@ -291,9 +292,11 @@ class FineCascadeIntegrationTests(unittest.TestCase):
             down_block_types=("DownBlock2D",),
             up_block_types=("UpBlock2D",),
             norm_num_groups=4,
+            add_attention=False,
             clearml_enabled=False,
         )
         raw_model = build_unet(config).eval()
+        self.assertFalse(any(isinstance(module, Attention) for module in raw_model.modules()))
         condition, _, _ = teacher_coarse_condition(
             self.truth[:1, :, :8, :8],
             self.condition[:1, :, :8, :8],

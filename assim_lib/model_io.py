@@ -22,6 +22,7 @@ def build_unet(config: TrainingConfig) -> UNet2DModel:
         up_block_types=config.up_block_types,
         dropout=config.dropout,
         norm_num_groups=config.norm_num_groups,
+        add_attention=config.add_attention,
     )
 
 
@@ -51,18 +52,12 @@ def load_sampler(run_dir: str, checkpoint_name: str, model_config: dict, device=
     if config.training_objective == "structured_joint_state_flow":
         stored_config = metadata.get("training_config")
         if not isinstance(stored_config, dict):
-            raise ValueError(
-                "structured checkpoint metadata must record its training_config"
-            )
-        stored_parameterization = stored_config.get(
-            "structured_velocity_parameterization", "raw"
-        )
+            raise ValueError("structured checkpoint metadata must record its training_config")
+        stored_parameterization = stored_config.get("structured_velocity_parameterization", "raw")
         if stored_config.get("training_objective") != config.training_objective:
             raise ValueError("structured checkpoint objective differs from model config")
         if stored_parameterization != config.structured_velocity_parameterization:
-            raise ValueError(
-                "structured checkpoint velocity parameterization differs from model config"
-            )
+            raise ValueError("structured checkpoint velocity parameterization differs from model config")
     model = build_unet(config)
     checkpoint_path = os.path.join(run_dir, checkpoint_name)
     try:
@@ -82,7 +77,5 @@ def load_sampler(run_dir: str, checkpoint_name: str, model_config: dict, device=
     return Sampler(
         model,
         metadata=metadata,
-        structured_velocity_parameterization=(
-            config.structured_velocity_parameterization
-        ),
+        structured_velocity_parameterization=(config.structured_velocity_parameterization),
     )
