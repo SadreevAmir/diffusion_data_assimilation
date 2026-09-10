@@ -1,0 +1,25 @@
+{
+  "project_name": "sea_ice_two_stage",
+  "task_name": "coarse_full6e_raw_vs_ema_paired12_v1",
+  "source_run": "/home/autoresearch_results/direct_dynamics_cascade_v1/coarse_full_train_6e/lossless56_conv64_seed38119_full6e-coarse_full6e_final_bdafe1f",
+  "source_code_commit": "bdafe1f6407f747c4df5cd17c18b8099042b745b",
+  "cases": 12,
+  "members": 8,
+  "rk4_timepoints": 17,
+  "source_sha256": {
+    "config.json": "2615a0206bec10ea3851f04d490957bab83b76e54276cefaaa9c854412c0322b",
+    "metadata.json": "b918df3f32fa5809d816c2a9a53d92af5679acb72d646bfffe9a40a14216d92f",
+    "coarse_cascade_manifest.json": "f441382d73cbc4daf514d32b71ec6fd80f45b5d470170a2061c96f2a402ebe4a",
+    "coarse_cascade_dataset_sentinel.json": "192a6262fc1c42a4c38d7971d1bca606948c94f882a780ff6ec7ee4651be0d87"
+  },
+  "checkpoints": [
+    {"label": "raw_9711", "checkpoint": "coarse_update_9711.pth", "sha256": "0db4f95f634ee77054e3ced2271d009d0c991e9b38de79f07e6fd03a21e2b053"},
+    {"label": "ema_9711", "checkpoint": "ema_coarse_update_9711.pth", "sha256": "125f520c33cbea548a3de7d131220edbfc80900c120786202cdb34e8d0a4dcaa"},
+    {"label": "raw_19422", "checkpoint": "coarse_update_19422.pth", "sha256": "45ebf674505e8df405ef747cfee95ffd1ad9c19f5f4211b6472da6b7768f5f4f"},
+    {"label": "ema_19422", "checkpoint": "ema_coarse_update_19422.pth", "sha256": "b606189cf5be1ecffda7a78be14d8add5f6dcbf44cb46932d72adf9a41f3002a"}
+  ],
+  "clearml": {
+    "env_path": "/home/.env",
+    "tags": ["paired-validation", "raw-vs-ema", "twelve-cases", "eight-members", "rank-histogram", "fixed-scale", "raw-unclipped", "one-gpu", "zero-optimizer-steps"]
+  }
+}
