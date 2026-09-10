@@ -12,7 +12,8 @@ fi
 case "$CONFIG" in
   config/experiments/evaluate_direct_dynamics_cascade_e2e_v1.json|\
   config/experiments/evaluate_direct_dynamics_cascade_e2e_fine2048_v2.json|\
-  config/experiments/evaluate_direct_dynamics_cascade_e2e_fine6474_v3.json) ;;
+  config/experiments/evaluate_direct_dynamics_cascade_e2e_fine6474_v3.json|\
+  config/experiments/evaluate_direct_dynamics_cascade_e2e_fine4096_v4.json) ;;
   *)
     echo "unsupported CASCADE_E2E_CONFIG" >&2
     exit 2
