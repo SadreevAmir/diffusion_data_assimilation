@@ -362,6 +362,7 @@ def run(config_path: Path, *, preflight_only: bool = False) -> dict:
     )
     trainer = FineCascadeDynamicsTrainer(
         config=config,
+        fine_code_identity=code_identity,
         model=model,
         optimizer=optimizer,
         data_loader_train=train_loader,

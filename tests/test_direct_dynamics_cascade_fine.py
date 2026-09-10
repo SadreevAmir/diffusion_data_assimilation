@@ -1,3 +1,5 @@
+import hashlib
+import json
 import unittest
 from contextlib import contextmanager
 from pathlib import Path
@@ -12,6 +14,7 @@ from torch import nn
 
 from assim_lib.config import TrainingConfig
 from assim_lib.direct_dynamics_cascade import masked_block_average, project_detail
+from assim_lib.direct_dynamics_cascade_contract import forecast_contract_sha256
 from assim_lib.direct_dynamics_cascade_fine import (
     FINE_CONDITION_CHANNELS,
     FINE_INPUT_CHANNELS,
@@ -23,6 +26,7 @@ from assim_lib.direct_dynamics_cascade_fine import (
     load_fine_cascade_sampler,
     teacher_coarse_condition,
     validate_fine_condition,
+    write_fine_manifest,
 )
 from assim_lib.model_io import build_unet
 
@@ -285,7 +289,7 @@ class FineCascadeIntegrationTests(unittest.TestCase):
 
     def test_raw_and_ema_save_reload_keep_fine_sampler_semantics(self) -> None:
         config = TrainingConfig(
-            image_size=(8, 8),
+            image_size=(320, 256),
             in_channels=FINE_INPUT_CHANNELS,
             out_channels=6,
             block_out_channels=(8,),
@@ -323,22 +327,51 @@ class FineCascadeIntegrationTests(unittest.TestCase):
         expected = FineCascadeSampler(raw_model).sample_conditioned(**kwargs)
         with TemporaryDirectory() as directory:
             root = Path(directory)
-            (root / "fine_cascade_manifest.json").write_text(
-                '{"schema_version":1,"sampler":"FineCascadeSampler",'
-                '"condition_channels":21,"model_input_channels":29,'
-                '"model_output_channels":6,"coarse_factor":2}',
-                encoding="utf-8",
-            )
+            contract = {"unit_test_contract": "fine"}
+            contract_sha256 = forecast_contract_sha256(contract)
+            write_fine_manifest(root, config, {"git_commit": "a" * 40}, contract)
             torch.save(raw_model.state_dict(), root / "raw.pth")
             ema = EMAModel(raw_model.parameters())
             torch.save(ema.state_dict(), root / "ema.pth")
             model_config = dict(config.__dict__)
             for checkpoint in ("raw.pth", "ema.pth"):
+                checkpoint_sha256 = hashlib.sha256((root / checkpoint).read_bytes()).hexdigest()
                 loaded = load_fine_cascade_sampler(
-                    directory, checkpoint, model_config, device=torch.device("cpu")
+                    directory,
+                    checkpoint,
+                    model_config,
+                    checkpoint_sha256,
+                    "a" * 40,
+                    contract_sha256,
+                    device=torch.device("cpu"),
                 )
                 actual = loaded.sample_conditioned(**kwargs)
                 self.assertTrue(torch.allclose(actual, expected, atol=1e-6, rtol=0))
+            with self.assertRaisesRegex(ValueError, "SHA256"):
+                load_fine_cascade_sampler(
+                    directory,
+                    "raw.pth",
+                    model_config,
+                    "0" * 64,
+                    "a" * 40,
+                    contract_sha256,
+                    device=torch.device("cpu"),
+                )
+            manifest_path = root / "fine_cascade_manifest.json"
+            manifest = json.loads(manifest_path.read_text())
+            manifest["forecast_contract"]["tampered"] = True
+            manifest_path.write_text(json.dumps(manifest))
+            raw_sha256 = hashlib.sha256((root / "raw.pth").read_bytes()).hexdigest()
+            with self.assertRaisesRegex(ValueError, "forecast contract"):
+                load_fine_cascade_sampler(
+                    directory,
+                    "raw.pth",
+                    model_config,
+                    raw_sha256,
+                    "a" * 40,
+                    contract_sha256,
+                    device=torch.device("cpu"),
+                )
 
 
 if __name__ == "__main__":

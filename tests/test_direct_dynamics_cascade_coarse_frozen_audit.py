@@ -13,10 +13,12 @@ from assim_lib.direct_dynamics_cascade_coarse_frozen_audit import (
     _phase_contrast,
     _phase_rms,
     _region_masks,
+    _replayable_forecast_contract_sha256,
     _require_finite_scalars,
     _shift_audit,
     _Lifecycle,
 )
+from assim_lib.direct_dynamics_cascade_contract import forecast_contract_sha256
 
 
 class CoarseFrozenAuditTests(unittest.TestCase):
@@ -108,6 +110,22 @@ class CoarseFrozenAuditTests(unittest.TestCase):
     def test_recursive_finite_guard_rejects_nan(self) -> None:
         with self.assertRaises(FloatingPointError):
             _require_finite_scalars({"nested": [0.0, float("nan")]})
+
+    def test_legacy_manifest_is_rejected_without_relabeling(self) -> None:
+        with self.assertRaisesRegex(ValueError, "exact source commit"):
+            _replayable_forecast_contract_sha256({"schema_version": 1})
+        contract = {"unit_test_contract": "coarse"}
+        expected = forecast_contract_sha256(contract)
+        self.assertEqual(
+            _replayable_forecast_contract_sha256(
+                {
+                    "schema_version": 2,
+                    "forecast_contract": contract,
+                    "forecast_contract_sha256": expected,
+                }
+            ),
+            expected,
+        )
 
     def test_probe_masking_contract_keeps_land_at_zero(self) -> None:
         active = torch.tensor([[[[1.0, 0.0]]]])

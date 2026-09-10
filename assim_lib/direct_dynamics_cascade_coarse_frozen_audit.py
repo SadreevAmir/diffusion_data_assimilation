@@ -30,6 +30,7 @@ from .direct_dynamics_cascade_coarse import (
     coarse_target,
     load_coarse_cascade_sampler,
 )
+from .direct_dynamics_cascade_contract import forecast_contract_sha256
 from .direct_dynamics_cascade_fine_training import _clean_code_identity, _fine_collate, _sha256_file
 from .direct_dynamics_training import DIRECT_LEADS, _repeat_field_stats, validate_direct_dataset
 from .structured_trajectory_evaluation import make_structured_trajectory_figure
@@ -134,6 +135,22 @@ def _require_finite_scalars(value: Any, path: str = "root") -> None:
             _require_finite_scalars(child, f"{path}[{index}]")
     elif isinstance(value, float) and not math.isfinite(value):
         raise FloatingPointError(f"{path} is NaN/Inf")
+
+
+def _replayable_forecast_contract_sha256(manifest: dict[str, Any]) -> str:
+    """Fail closed instead of assigning the new contract to a legacy checkpoint."""
+    if manifest.get("schema_version") != 2:
+        raise ValueError(
+            "legacy coarse manifest must be replayed from its exact source commit; "
+            "it cannot be relabeled with the schema-2 forecast contract"
+        )
+    contract = manifest.get("forecast_contract")
+    if not isinstance(contract, dict):
+        raise ValueError("schema-2 coarse manifest lacks its forecast contract body")
+    actual = forecast_contract_sha256(contract)
+    if manifest.get("forecast_contract_sha256") != actual:
+        raise ValueError("coarse manifest forecast contract body/hash mismatch")
+    return actual
 
 
 def _model_output(value: Any) -> torch.Tensor:
@@ -504,6 +521,7 @@ def _run_impl(config_path: Path, output_dir: Path, lifecycle: _Lifecycle) -> dic
     metadata = load_json(required["metadata"])
     if manifest.get("code_commit") != experiment["source_code_commit"]:
         raise ValueError("source code commit differs from audit contract")
+    source_contract_sha256 = _replayable_forecast_contract_sha256(manifest)
     if gate.get("decision") != "reject_mechanics_candidate":
         raise ValueError("source mechanics gate is not the expected rejection")
 
@@ -620,6 +638,7 @@ def _run_impl(config_path: Path, output_dir: Path, lifecycle: _Lifecycle) -> dic
         load_json(required["model_config"]),
         expected_sha["checkpoint"],
         experiment["source_code_commit"],
+        source_contract_sha256,
         device=device,
     )
     model = sampler.sampler.model.to(dtype=torch.float32).eval()

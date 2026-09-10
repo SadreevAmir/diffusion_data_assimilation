@@ -20,8 +20,13 @@ import torch
 import torch.nn.functional as F
 from diffusers.training_utils import EMAModel
 
+from . import direct_dynamics_cascade as cascade_core
 from .config import TrainingConfig
 from .direct_dynamics_cascade import masked_block_average
+from .direct_dynamics_cascade_contract import (
+    forecast_contract_from_data_config,
+    forecast_contract_sha256,
+)
 from .direct_dynamics_training import (
     DIRECT_CONDITION_CHANNELS,
     DIRECT_OUTPUT_CHANNELS,
@@ -276,6 +281,7 @@ class CoarseCascadeDynamicsTrainer(DirectDynamicsTrainer):
     def __init__(self, *args, **kwargs):
         self._coarse_diagnostic_batch_raw = kwargs.pop("coarse_diagnostic_batch", None)
         self._coarse_code_identity = kwargs.pop("coarse_code_identity", None)
+        data_config = kwargs.get("data_config")
         config = kwargs.get("config", args[0] if args else None)
         if not isinstance(config, TrainingConfig):
             raise TypeError("coarse cascade trainer requires an explicit TrainingConfig")
@@ -305,6 +311,9 @@ class CoarseCascadeDynamicsTrainer(DirectDynamicsTrainer):
             )
         if config.metric_every_n_epochs != 0 or config.sample_every_n_epochs != 0:
             raise ValueError("coarse cascade pilot forbids incompatible generic diagnostics")
+        if not isinstance(data_config, dict):
+            raise TypeError("coarse cascade trainer requires an explicit data_config")
+        self._forecast_contract = forecast_contract_from_data_config(data_config)
         super().__init__(*args, **kwargs)
         planned_updates = self.config.num_epochs * len(self.train_dataloader)
         if planned_updates not in {512, 2048}:
@@ -318,7 +327,12 @@ class CoarseCascadeDynamicsTrainer(DirectDynamicsTrainer):
         self._coarse_diagnostic_steps: set[int] = set()
         self._coarse_diagnostic_history: list[dict[str, float]] = []
         if self.accelerator.is_main_process:
-            write_coarse_manifest(self.output_dir, config, self._coarse_code_identity)
+            write_coarse_manifest(
+                self.output_dir,
+                config,
+                self._coarse_code_identity,
+                self._forecast_contract,
+            )
 
     def _full_state_recovery_enabled(self) -> bool:
         """Persist model, optimizer, scheduler, scaler and RNG at every epoch boundary."""
@@ -818,6 +832,7 @@ def load_coarse_cascade_sampler(
     model_config: dict[str, Any],
     expected_checkpoint_sha256: str,
     expected_code_commit: str,
+    expected_forecast_contract_sha256: str,
     device=None,
 ) -> CoarseCascadeSampler:
     root = Path(run_dir)
@@ -826,7 +841,7 @@ def load_coarse_cascade_sampler(
         raise ValueError("coarse cascade checkpoint is missing its sampler manifest")
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     expected = {
-        "schema_version": 1,
+        "schema_version": 2,
         "sampler": "CoarseCascadeSampler",
         "condition_encoding": "lossless_2x2_space_to_depth_v1",
         "condition_channels": COARSE_CONDITION_CHANNELS,
@@ -842,6 +857,19 @@ def load_coarse_cascade_sampler(
         raise ValueError("coarse conditioning implementation differs from the checkpoint manifest")
     if manifest.get("code_commit") != expected_code_commit:
         raise ValueError("coarse cascade code commit differs from the required identity")
+    stored_contract = manifest.get("forecast_contract")
+    if not isinstance(stored_contract, dict):
+        raise ValueError("coarse cascade manifest lacks its forecast contract body")
+    stored_contract_sha256 = forecast_contract_sha256(stored_contract)
+    if (
+        manifest.get("forecast_contract_sha256") != stored_contract_sha256
+        or stored_contract_sha256 != expected_forecast_contract_sha256
+    ):
+        raise ValueError("coarse cascade forecast contract differs from the required identity")
+    if manifest.get("cascade_core_sha256") != CoarseCascadeDynamicsTrainer._sha256(
+        Path(cascade_core.__file__)
+    ):
+        raise ValueError("coarse D/U implementation differs from the checkpoint manifest")
     config = TrainingConfig.from_dict(model_config)
     if (
         config.in_channels != COARSE_INPUT_CHANNELS
@@ -879,6 +907,7 @@ def write_coarse_manifest(
     output_dir: str | Path,
     config: TrainingConfig,
     code_identity: dict[str, str] | None,
+    forecast_contract: dict[str, Any],
 ) -> None:
     commit = None if code_identity is None else code_identity.get("git_commit")
     if commit is None or re.fullmatch(r"[0-9a-f]{40}", commit) is None:
@@ -886,7 +915,7 @@ def write_coarse_manifest(
     _atomic_json(
         Path(output_dir) / "coarse_cascade_manifest.json",
         {
-            "schema_version": 1,
+            "schema_version": 2,
             "sampler": "CoarseCascadeSampler",
             "target": "C=D(Y)",
             "conditional_law": "p(C|c_full) via lossless fixed encoding of c_full",
@@ -899,5 +928,8 @@ def write_coarse_manifest(
             "architecture": _architecture_signature(config),
             "code_commit": commit,
             "conditioning_module_sha256": CoarseCascadeDynamicsTrainer._sha256(Path(__file__)),
+            "cascade_core_sha256": CoarseCascadeDynamicsTrainer._sha256(Path(cascade_core.__file__)),
+            "forecast_contract": forecast_contract,
+            "forecast_contract_sha256": forecast_contract_sha256(forecast_contract),
         },
     )

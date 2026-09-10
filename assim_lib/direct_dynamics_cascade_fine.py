@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import os
+import re
 from pathlib import Path
 from typing import Any
 
@@ -11,6 +13,7 @@ import torch
 from diffusers.training_utils import EMAModel
 from torch import nn
 
+from . import direct_dynamics_cascade as cascade_core
 from .config import TrainingConfig
 from .direct_dynamics_cascade import (
     decompose,
@@ -18,6 +21,10 @@ from .direct_dynamics_cascade import (
     project_detail,
     residual_flow_pair,
     smooth_right_inverse,
+)
+from .direct_dynamics_cascade_contract import (
+    forecast_contract_from_data_config,
+    forecast_contract_sha256,
 )
 from .direct_dynamics_training import (
     DIRECT_CONDITION_CHANNELS,
@@ -212,6 +219,8 @@ class FineCascadeDynamicsTrainer(DirectDynamicsTrainer):
     diagnostic_steps = frozenset({63, 255, 511})
 
     def __init__(self, *args, **kwargs):
+        self._fine_code_identity = kwargs.pop("fine_code_identity", None)
+        data_config = kwargs.get("data_config")
         if "model" not in kwargs:
             raise TypeError("fine cascade trainer requires model as a keyword argument")
         config = kwargs.get("config", args[0] if args else None)
@@ -227,6 +236,9 @@ class FineCascadeDynamicsTrainer(DirectDynamicsTrainer):
             raise ValueError("fine cascade update accounting requires gradient_accumulation_steps=1")
         if config.metric_every_n_epochs != 0 or config.sample_every_n_epochs != 0:
             raise ValueError("fine cascade uses only audited oracle diagnostics during the pilot")
+        if not isinstance(data_config, dict):
+            raise TypeError("fine cascade trainer requires an explicit data_config")
+        self._forecast_contract = forecast_contract_from_data_config(data_config)
         model = kwargs["model"]
         kwargs["model"] = model if isinstance(model, ProjectedDetailModel) else ProjectedDetailModel(model)
         super().__init__(*args, **kwargs)
@@ -235,18 +247,11 @@ class FineCascadeDynamicsTrainer(DirectDynamicsTrainer):
         self._latest_fine_sampler: FineCascadeSampler | None = None
         self._fine_validation_case_ids: tuple[str, ...] = ()
         if self.accelerator.is_main_process:
-            _atomic_json(
-                Path(self.output_dir) / "fine_cascade_manifest.json",
-                {
-                    "schema_version": 1,
-                    "sampler": "FineCascadeSampler",
-                    "representation": "Y=U(C)+R; D(U(C))=C; D(R)=0",
-                    "condition_channels": FINE_CONDITION_CHANNELS,
-                    "model_input_channels": FINE_INPUT_CHANNELS,
-                    "model_output_channels": DIRECT_OUTPUT_CHANNELS,
-                    "coarse_factor": CASCADE_FACTOR,
-                    "diagnostic_semantics": "oracle_true_coarse_mechanics_only",
-                },
+            write_fine_manifest(
+                self.output_dir,
+                config,
+                self._fine_code_identity,
+                self._forecast_contract,
             )
 
     def _make_training_pair(
@@ -437,36 +442,126 @@ def fine_model_input_for_test(
     return torch.cat((state, grid, condition), dim=1)
 
 
+def _architecture_signature(config: TrainingConfig) -> dict[str, Any]:
+    return {
+        "image_size": list(config.image_size),
+        "in_channels": config.in_channels,
+        "out_channels": config.out_channels,
+        "block_out_channels": list(config.block_out_channels),
+        "layers_per_block": config.layers_per_block,
+        "down_block_types": list(config.down_block_types),
+        "up_block_types": list(config.up_block_types),
+        "norm_num_groups": config.norm_num_groups,
+        "dropout": config.dropout,
+        "add_attention": config.add_attention,
+    }
+
+
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def write_fine_manifest(
+    output_dir: str | Path,
+    config: TrainingConfig,
+    code_identity: dict[str, str] | None,
+    forecast_contract: dict[str, Any],
+) -> None:
+    commit = None if code_identity is None else code_identity.get("git_commit")
+    if commit is None or re.fullmatch(r"[0-9a-f]{40}", commit) is None:
+        raise ValueError("fine manifest requires an exact immutable git commit")
+    _atomic_json(
+        Path(output_dir) / "fine_cascade_manifest.json",
+        {
+            "schema_version": 2,
+            "sampler": "FineCascadeSampler",
+            "representation": "Y=U(C)+R; D(U(C))=C; D(R)=0",
+            "conditional_law": "p(R|C_generated,c_causal)",
+            "condition_channels": FINE_CONDITION_CHANNELS,
+            "model_input_channels": FINE_INPUT_CHANNELS,
+            "model_output_channels": DIRECT_OUTPUT_CHANNELS,
+            "coarse_factor": CASCADE_FACTOR,
+            "image_size": list(config.image_size),
+            "architecture": _architecture_signature(config),
+            "code_commit": commit,
+            "conditioning_module_sha256": _sha256(Path(__file__)),
+            "cascade_core_sha256": _sha256(Path(cascade_core.__file__)),
+            "training_condition": "teacher_coarse",
+            "forecast_condition": "generated_coarse_only",
+            "training_diagnostics": "oracle_true_coarse_mechanics_only",
+            "forecast_contract": forecast_contract,
+            "forecast_contract_sha256": forecast_contract_sha256(forecast_contract),
+        },
+    )
+
+
 def load_fine_cascade_sampler(
-    run_dir: str, checkpoint_name: str, model_config: dict, device=None
+    run_dir: str,
+    checkpoint_name: str,
+    model_config: dict,
+    expected_checkpoint_sha256: str,
+    expected_code_commit: str,
+    expected_forecast_contract_sha256: str,
+    device=None,
 ) -> FineCascadeSampler:
     """Reload a fine-stage checkpoint without silently falling back to plain sampling."""
     root = Path(run_dir)
     manifest_path = root / "fine_cascade_manifest.json"
     if not manifest_path.is_file():
         raise ValueError("fine cascade checkpoint is missing its sampler manifest")
-    import json
-
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     expected = {
-        "schema_version": 1,
+        "schema_version": 2,
         "sampler": "FineCascadeSampler",
+        "conditional_law": "p(R|C_generated,c_causal)",
         "condition_channels": FINE_CONDITION_CHANNELS,
         "model_input_channels": FINE_INPUT_CHANNELS,
         "model_output_channels": DIRECT_OUTPUT_CHANNELS,
         "coarse_factor": CASCADE_FACTOR,
+        "image_size": [320, 256],
+        "forecast_condition": "generated_coarse_only",
     }
     if any(manifest.get(key) != value for key, value in expected.items()):
         raise ValueError("fine cascade sampler manifest is incompatible")
+    if manifest.get("conditioning_module_sha256") != _sha256(Path(__file__)):
+        raise ValueError("fine conditioning implementation differs from the checkpoint manifest")
+    if manifest.get("code_commit") != expected_code_commit:
+        raise ValueError("fine cascade code commit differs from the required identity")
+    stored_contract = manifest.get("forecast_contract")
+    if not isinstance(stored_contract, dict):
+        raise ValueError("fine cascade manifest lacks its forecast contract body")
+    stored_contract_sha256 = forecast_contract_sha256(stored_contract)
+    if (
+        manifest.get("forecast_contract_sha256") != stored_contract_sha256
+        or stored_contract_sha256 != expected_forecast_contract_sha256
+    ):
+        raise ValueError("fine cascade forecast contract differs from the required identity")
+    if manifest.get("cascade_core_sha256") != _sha256(Path(cascade_core.__file__)):
+        raise ValueError("fine D/U implementation differs from the checkpoint manifest")
     config = TrainingConfig.from_dict(model_config)
-    if config.in_channels != FINE_INPUT_CHANNELS or config.out_channels != DIRECT_OUTPUT_CHANNELS:
-        raise ValueError("fine cascade checkpoint requires an exact 29-to-6 UNet")
+    if (
+        config.in_channels != FINE_INPUT_CHANNELS
+        or config.out_channels != DIRECT_OUTPUT_CHANNELS
+        or tuple(config.image_size) != (320, 256)
+    ):
+        raise ValueError("fine cascade checkpoint requires an exact 320x256 29-to-6 UNet")
+    if manifest.get("architecture") != _architecture_signature(config):
+        raise ValueError("fine cascade architecture differs from its sampler manifest")
+    if checkpoint_name == "auto":
+        raise ValueError("fine cascade production reload requires an explicit checkpoint")
     resolved_name = resolve_checkpoint_name(run_dir, checkpoint_name)
+    checkpoint_path = root / resolved_name
+    if _sha256(checkpoint_path) != expected_checkpoint_sha256:
+        raise ValueError("fine cascade checkpoint SHA256 differs from the required identity")
     model = build_unet(config)
     try:
-        state = torch.load(root / resolved_name, map_location="cpu", weights_only=True)
+        state = torch.load(checkpoint_path, map_location="cpu", weights_only=True)
     except TypeError:
-        state = torch.load(root / resolved_name, map_location="cpu")
+        state = torch.load(checkpoint_path, map_location="cpu")
     if isinstance(state, dict) and "shadow_params" in state:
         ema_model = EMAModel(model.parameters())
         ema_model.load_state_dict(state)

@@ -13,6 +13,7 @@ from torch import nn
 
 from assim_lib.config import TrainingConfig
 from assim_lib.direct_dynamics_cascade import masked_block_average, project_detail, smooth_right_inverse
+from assim_lib.direct_dynamics_cascade_contract import forecast_contract_sha256
 from assim_lib.direct_dynamics_cascade_coarse import (
     COARSE_CONDITION_CHANNELS,
     COARSE_INPUT_CHANNELS,
@@ -334,7 +335,9 @@ class CoarseCascadeTests(unittest.TestCase):
         model = build_unet(config).eval()
         with TemporaryDirectory() as directory:
             root = Path(directory)
-            write_coarse_manifest(root, config, {"git_commit": self.CODE_COMMIT})
+            contract = {"unit_test_contract": "coarse"}
+            contract_sha256 = forecast_contract_sha256(contract)
+            write_coarse_manifest(root, config, {"git_commit": self.CODE_COMMIT}, contract)
             with torch.no_grad():
                 for parameter in model.parameters():
                     parameter.fill_(0.25)
@@ -353,6 +356,7 @@ class CoarseCascadeTests(unittest.TestCase):
                     dict(config.__dict__),
                     expected_sha,
                     self.CODE_COMMIT,
+                    contract_sha256,
                     device=torch.device("cpu"),
                 )
                 self.assertIsInstance(loaded, CoarseCascadeSampler)
@@ -369,6 +373,7 @@ class CoarseCascadeTests(unittest.TestCase):
                     changed,
                     raw_sha,
                     self.CODE_COMMIT,
+                    contract_sha256,
                     device=torch.device("cpu"),
                 )
             with self.assertRaisesRegex(ValueError, "SHA256 differs"):
@@ -378,6 +383,21 @@ class CoarseCascadeTests(unittest.TestCase):
                     dict(config.__dict__),
                     "0" * 64,
                     self.CODE_COMMIT,
+                    contract_sha256,
+                    device=torch.device("cpu"),
+                )
+            manifest_path = root / "coarse_cascade_manifest.json"
+            manifest = json.loads(manifest_path.read_text())
+            manifest["forecast_contract"]["tampered"] = True
+            manifest_path.write_text(json.dumps(manifest))
+            with self.assertRaisesRegex(ValueError, "forecast contract"):
+                load_coarse_cascade_sampler(
+                    directory,
+                    "raw.pth",
+                    dict(config.__dict__),
+                    raw_sha,
+                    self.CODE_COMMIT,
+                    contract_sha256,
                     device=torch.device("cpu"),
                 )
 
