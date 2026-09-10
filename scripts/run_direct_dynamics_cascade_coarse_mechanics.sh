@@ -58,7 +58,7 @@ if ! flock -n 9; then
   echo "another project launch owns the GPU lock" >&2
   exit 4
 fi
-GPU_COUNT="$(nvidia-smi --query-gpu=count --format=csv,noheader | wc -l | tr -d ' ')"
+GPU_COUNT="$(nvidia-smi --query-gpu=uuid --format=csv,noheader,nounits | sed '/^[[:space:]]*$/d' | wc -l | tr -d ' ')"
 if [[ ! "$GPU_COUNT" =~ ^[0-9]+$ || "$GPU_COUNT" != "1" ]]; then
   echo "GPU admission failed: visible=$GPU_COUNT, expected exactly one" >&2
   exit 5

@@ -91,6 +91,8 @@ class CoarseCascadeRunnerTests(unittest.TestCase):
         self.assertTrue(os.access(path, os.X_OK))
         self.assertIn(".gpu_job.lock", launcher)
         self.assertIn("exactly one", launcher)
+        self.assertIn("--query-gpu=uuid", launcher)
+        self.assertNotIn("--query-gpu=count", launcher)
         self.assertIn("{1..11}", launcher)
         self.assertIn("sleep 30", launcher)
         self.assertIn('"$observed_utilization" -ge 5', launcher)
