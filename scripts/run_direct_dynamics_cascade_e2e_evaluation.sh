@@ -4,10 +4,19 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 RUN_ID="${CASCADE_E2E_RUN_ID:?CASCADE_E2E_RUN_ID is required}"
+CONFIG="${CASCADE_E2E_CONFIG:-config/experiments/evaluate_direct_dynamics_cascade_e2e_v1.json}"
 if [[ ! "$RUN_ID" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$ ]]; then
   echo "unsafe CASCADE_E2E_RUN_ID" >&2
   exit 2
 fi
+case "$CONFIG" in
+  config/experiments/evaluate_direct_dynamics_cascade_e2e_v1.json|\
+  config/experiments/evaluate_direct_dynamics_cascade_e2e_fine2048_v2.json) ;;
+  *)
+    echo "unsupported CASCADE_E2E_CONFIG" >&2
+    exit 2
+    ;;
+esac
 RESULT_ROOT="/home/autoresearch_results/direct_dynamics_cascade_v2"
 STATUS_DIR="$RESULT_ROOT/launches/$RUN_ID"
 mkdir -p "$RESULT_ROOT/launches"
@@ -56,5 +65,5 @@ export OPENBLAS_NUM_THREADS=6
 export NUMEXPR_NUM_THREADS=6
 timeout --signal=TERM --kill-after=2m 14280s python -m \
   assim_lib.direct_dynamics_cascade_e2e_evaluation \
-  --config config/experiments/evaluate_direct_dynamics_cascade_e2e_v1.json \
+  --config "$CONFIG" \
   --output "$OUTPUT"
