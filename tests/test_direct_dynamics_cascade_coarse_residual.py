@@ -8,12 +8,17 @@ from torch import nn
 from assim_lib.direct_dynamics_cascade_coarse_residual import (
     CoarsePersistenceResidualSampler,
     CoarsePersistenceResidualTrainer,
+    CoarseStandardizedPersistenceResidualSampler,
     coarse_persistence_from_condition,
     coarse_residual_flow_pair,
+    coarse_standardized_residual_flow_pair,
     publish_residual_mechanics_gate,
     residual_mechanics_gate,
     residual_model_input_for_test,
+    standardize_coarse_residual,
+    unstandardize_coarse_residual,
 )
+from assim_lib.direct_dynamics_cascade_residual_stats import CaseEqualResidualMoments
 
 
 def _condition(d0: torch.Tensor, valid: torch.Tensor) -> torch.Tensor:
@@ -170,6 +175,125 @@ class CoarsePersistenceResidualTests(unittest.TestCase):
             tracker.calls,
             [("coarse_residual_mechanics_gate_passed", 1.0)],
         )
+
+    def test_standardized_residual_round_trip_and_flow_sign(self) -> None:
+        valid = torch.ones((1, 1, 4, 4))
+        d0 = torch.stack((torch.full((4, 4), 0.4), torch.full((4, 4), 0.8)))[None]
+        condition = _condition(d0, valid)
+        truth = d0.repeat(1, 3, 1, 1) + 0.25
+        statistics = {
+            "means": [0.05, -0.10, 0.05, -0.10, 0.05, -0.10],
+            "stds": [0.10, 0.20, 0.10, 0.20, 0.10, 0.20],
+        }
+        noise = torch.full((1, 6, 2, 2), -0.5)
+        state, velocity, residual, persistence, fraction = (
+            coarse_standardized_residual_flow_pair(
+                truth,
+                noise,
+                condition,
+                valid,
+                torch.tensor([0.25]),
+                statistics,
+            )
+        )
+        active = (fraction > 0).float()
+        whitened = standardize_coarse_residual(residual, active, statistics)
+        self.assertTrue(torch.allclose(state, 0.75 * whitened + 0.25 * noise))
+        self.assertTrue(torch.allclose(velocity, noise - whitened))
+        recovered = unstandardize_coarse_residual(whitened, active, statistics)
+        self.assertTrue(torch.allclose(persistence + recovered, torch.nn.functional.avg_pool2d(truth, 2)))
+
+    def test_standardized_residual_is_invariant_to_channel_units(self) -> None:
+        generator = torch.Generator().manual_seed(7)
+        residual = torch.randn((2, 6, 3, 2), generator=generator)
+        active = torch.ones((2, 1, 3, 2))
+        means = torch.tensor([0.2, -0.4, 0.1, 0.6, -0.2, 0.3])
+        stds = torch.tensor([0.3, 0.7, 0.2, 1.1, 0.9, 0.4])
+        scales = torch.tensor([2.0, 1000.0, 0.5, 10.0, 4.0, 0.25]).reshape(1, 6, 1, 1)
+        base = standardize_coarse_residual(
+            residual, active, {"means": means.tolist(), "stds": stds.tolist()}
+        )
+        changed = standardize_coarse_residual(
+            residual * scales,
+            active,
+            {"means": (means * scales.flatten()).tolist(), "stds": (stds * scales.flatten()).tolist()},
+        )
+        self.assertTrue(torch.allclose(base, changed, atol=1e-6))
+
+    def test_affine_inverse_preserves_correlated_gaussian_moments(self) -> None:
+        generator = torch.Generator().manual_seed(19)
+        mixing = torch.tensor(
+            [
+                [1.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.4, 0.8, 0.0, 0.0, 0.0, 0.0],
+                [0.2, -0.1, 0.9, 0.0, 0.0, 0.0],
+                [0.0, 0.3, 0.1, 0.7, 0.0, 0.0],
+                [0.1, 0.0, 0.2, -0.2, 0.8, 0.0],
+                [-0.1, 0.2, 0.0, 0.1, 0.3, 0.7],
+            ]
+        )
+        standardized = (torch.randn((50000, 6), generator=generator) @ mixing.T).reshape(
+            50000, 6, 1, 1
+        )
+        means = torch.tensor([0.2, -0.4, 0.1, 0.6, -0.2, 0.3])
+        stds = torch.tensor([0.3, 0.7, 0.2, 1.1, 0.9, 0.4])
+        physical = unstandardize_coarse_residual(
+            standardized,
+            torch.ones((50000, 1, 1, 1)),
+            {"means": means.tolist(), "stds": stds.tolist()},
+        ).reshape(50000, 6)
+        empirical_mean = physical.mean(dim=0)
+        empirical_covariance = torch.cov(physical.T)
+        expected_covariance = torch.diag(stds) @ (mixing @ mixing.T) @ torch.diag(stds)
+        self.assertTrue(torch.allclose(empirical_mean, means, atol=0.015, rtol=0.0))
+        self.assertTrue(torch.allclose(empirical_covariance, expected_covariance, atol=0.015, rtol=0.04))
+
+    def test_standardized_sampler_oracle_inverts_nonzero_affine_map(self) -> None:
+        class ConstantVelocity(nn.Module):
+            def __init__(self, velocity):
+                super().__init__()
+                self.register_buffer("velocity", velocity)
+
+            def forward(self, value, timestep, return_dict=False):
+                del timestep, return_dict
+                return (self.velocity.expand(value.shape[0], -1, -1, -1),)
+
+        valid = torch.ones((1, 1, 4, 4))
+        d0 = torch.stack((torch.full((4, 4), 0.2), torch.full((4, 4), 0.7)))[None]
+        condition = _condition(d0, valid)
+        noise = torch.full((1, 6, 2, 2), 0.9)
+        desired_whitened = torch.full_like(noise, -0.1)
+        statistics = {
+            "means": [0.05, -0.10, 0.05, -0.10, 0.05, -0.10],
+            "stds": [0.10, 0.20, 0.10, 0.20, 0.10, 0.20],
+        }
+        sampler = CoarseStandardizedPersistenceResidualSampler(
+            ConstantVelocity(noise - desired_whitened), statistics
+        )
+        reconstructed = sampler.sample_conditioned(
+            structured_conditioning=condition,
+            valid_mask=valid,
+            initial_noise=noise,
+            num_timesteps=17,
+            device=torch.device("cpu"),
+            method="rk4",
+            end_time=0.0,
+        )
+        persistence, active, _ = coarse_persistence_from_condition(condition, valid)
+        desired_residual = unstandardize_coarse_residual(
+            desired_whitened, active, statistics
+        )
+        self.assertTrue(torch.allclose(sampler.last_residual, desired_residual, atol=1e-6))
+        self.assertTrue(torch.allclose(reconstructed, persistence + desired_residual, atol=1e-6))
+
+    def test_case_equal_residual_moments_do_not_overweight_large_ocean_case(self) -> None:
+        accumulator = CaseEqualResidualMoments(channels=1)
+        residual = torch.tensor([[[[0.0, 2.0]]], [[[10.0, 99.0]]]])
+        fraction = torch.tensor([[[[1.0, 1.0]]], [[[1.0, 0.0]]]])
+        accumulator.update(residual, fraction)
+        result = accumulator.finalize()
+        self.assertAlmostEqual(result["means"][0], 5.5)
+        self.assertAlmostEqual(result["variances"][0], 20.75)
 
 
 if __name__ == "__main__":

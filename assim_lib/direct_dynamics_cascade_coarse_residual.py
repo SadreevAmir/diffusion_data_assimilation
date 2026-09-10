@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 import math
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 
 import matplotlib.pyplot as plt
 import torch
@@ -72,6 +72,75 @@ def coarse_residual_flow_pair(
     velocity = canonical_noise - residual
     if not torch.isfinite(state[support]).all() or not torch.isfinite(velocity[support]).all():
         raise FloatingPointError("residual flow pair produced NaN/Inf on active ocean")
+    return state, velocity, residual, persistence, fraction
+
+
+def _residual_affine_tensors(
+    statistics: Mapping[str, Any], reference: torch.Tensor
+) -> tuple[torch.Tensor, torch.Tensor]:
+    means = torch.as_tensor(statistics.get("means"), dtype=reference.dtype, device=reference.device)
+    stds = torch.as_tensor(statistics.get("stds"), dtype=reference.dtype, device=reference.device)
+    if means.shape != (DIRECT_OUTPUT_CHANNELS,) or stds.shape != (DIRECT_OUTPUT_CHANNELS,):
+        raise ValueError("residual statistics require exactly six means and standard deviations")
+    if not torch.isfinite(means).all() or not torch.isfinite(stds).all() or torch.any(stds <= 0):
+        raise ValueError("residual statistics must be finite with strictly positive deviations")
+    shape = (1, DIRECT_OUTPUT_CHANNELS, 1, 1)
+    return means.reshape(shape), stds.reshape(shape)
+
+
+def standardize_coarse_residual(
+    residual: torch.Tensor,
+    active: torch.Tensor,
+    statistics: Mapping[str, Any],
+) -> torch.Tensor:
+    """Apply the fixed invertible train-only diagonal residual transform."""
+    means, stds = _residual_affine_tensors(statistics, residual)
+    support = active.expand_as(residual) > 0
+    standardized = (residual - means) / stds
+    if not torch.isfinite(standardized[support]).all():
+        raise FloatingPointError("standardized residual contains NaN/Inf on active ocean")
+    return torch.where(support, standardized, torch.zeros_like(standardized))
+
+
+def unstandardize_coarse_residual(
+    standardized: torch.Tensor,
+    active: torch.Tensor,
+    statistics: Mapping[str, Any],
+) -> torch.Tensor:
+    """Invert the fixed diagonal transform without clipping or smoothing."""
+    means, stds = _residual_affine_tensors(statistics, standardized)
+    support = active.expand_as(standardized) > 0
+    residual = means + stds * standardized
+    if not torch.isfinite(residual[support]).all():
+        raise FloatingPointError("unstandardized residual contains NaN/Inf on active ocean")
+    return torch.where(support, residual, torch.zeros_like(residual))
+
+
+def coarse_standardized_residual_flow_pair(
+    truth: torch.Tensor,
+    noise: torch.Tensor,
+    structured_conditioning: torch.Tensor,
+    valid_mask: torch.Tensor,
+    time: torch.Tensor,
+    statistics: Mapping[str, Any],
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    """Return w_t, epsilon-W, raw R, persistence P and ocean fraction."""
+    _, _, residual, persistence, fraction = coarse_residual_flow_pair(
+        truth,
+        torch.zeros_like(noise),
+        structured_conditioning,
+        valid_mask,
+        torch.zeros_like(time),
+    )
+    active = (fraction > 0).to(dtype=residual.dtype)
+    whitened = standardize_coarse_residual(residual, active, statistics)
+    support = active.expand_as(whitened) > 0
+    canonical_noise = torch.where(support, noise.float(), torch.zeros_like(whitened))
+    if not torch.isfinite(canonical_noise[support]).all():
+        raise FloatingPointError("whitened residual noise contains NaN/Inf on active ocean")
+    view = time.to(device=whitened.device, dtype=whitened.dtype).reshape(-1, 1, 1, 1)
+    state = (1.0 - view) * whitened + view * canonical_noise
+    velocity = canonical_noise - whitened
     return state, velocity, residual, persistence, fraction
 
 
@@ -153,6 +222,77 @@ class CoarsePersistenceResidualSampler:
         )
         if not torch.isfinite(reconstructed[support]).all():
             raise FloatingPointError("coarse residual reconstruction produced NaN/Inf")
+        self.last_residual = residual
+        return reconstructed
+
+
+class CoarseStandardizedPersistenceResidualSampler:
+    """Sample standardized residuals and exactly invert the train-only transform."""
+
+    def __init__(self, model, statistics: Mapping[str, Any]):
+        self.sampler = Sampler(model)
+        self.statistics = dict(statistics)
+        self.last_residual: torch.Tensor | None = None
+
+    @torch.no_grad()
+    def sample_conditioned(
+        self,
+        *,
+        structured_conditioning: torch.Tensor,
+        valid_mask: torch.Tensor,
+        initial_noise: torch.Tensor,
+        num_timesteps: int,
+        device=None,
+        method: str = "rk4",
+        rtol: float = 1e-5,
+        atol: float = 1e-6,
+        end_time: float = 0.0,
+    ) -> torch.Tensor:
+        condition, active, _ = lossless_coarse_condition(structured_conditioning, valid_mask)
+        persistence, persistence_active, _ = coarse_persistence_from_condition(
+            structured_conditioning, valid_mask
+        )
+        if not torch.equal(active, persistence_active):
+            raise ValueError("encoded condition and persistence supports differ")
+        expected = (condition.shape[0], DIRECT_OUTPUT_CHANNELS, *condition.shape[-2:])
+        if tuple(initial_noise.shape) != expected:
+            raise ValueError(f"standardized residual noise must have shape {expected}")
+        support = active.expand_as(initial_noise) > 0
+        raw_noise = initial_noise.to(device=active.device, dtype=torch.float32)
+        if not torch.isfinite(raw_noise[support]).all():
+            raise FloatingPointError("standardized residual noise contains NaN/Inf")
+        noise = torch.where(support, raw_noise, torch.zeros_like(raw_noise))
+        zeros = torch.zeros(expected, dtype=torch.float32, device=condition.device)
+        empty_obs = torch.zeros((expected[0], 2, *expected[-2:]), dtype=torch.float32, device=zeros.device)
+        whitened = self.sampler.sample_conditioned(
+            background=zeros,
+            background_mask=torch.ones_like(zeros),
+            obs_values=empty_obs,
+            obs_mask=empty_obs,
+            water_mask=active,
+            size=expected[-2:],
+            num_timesteps=num_timesteps,
+            device=device,
+            method=method,
+            rtol=rtol,
+            atol=atol,
+            start_mode="noise",
+            initial_noise=noise,
+            sample_target="state",
+            model_conditioning=condition.float(),
+            state_channels=DIRECT_OUTPUT_CHANNELS,
+            end_time=end_time,
+            valid_mask=active,
+            state_mask=active.expand(-1, DIRECT_OUTPUT_CHANNELS, -1, -1),
+        )
+        residual = unstandardize_coarse_residual(whitened.float(), active, self.statistics)
+        reconstructed = torch.where(
+            support,
+            persistence.to(device=residual.device, dtype=torch.float32) + residual,
+            torch.zeros_like(residual),
+        )
+        if not torch.isfinite(reconstructed[support]).all():
+            raise FloatingPointError("standardized residual reconstruction produced NaN/Inf")
         self.last_residual = residual
         return reconstructed
 
@@ -455,7 +595,7 @@ class CoarsePersistenceResidualTrainer(CoarseCascadeDynamicsTrainer):
         was_training = self.model.training
         with self._sampling_model() as sample_model:
             sample_model.eval()
-            sampler = CoarsePersistenceResidualSampler(sample_model)
+            sampler = self._make_sampler(sample_model)
             for member in range(2):
                 noises = []
                 member_seeds = []
@@ -757,3 +897,99 @@ class CoarsePersistenceResidualTrainer(CoarseCascadeDynamicsTrainer):
             clearml=self.clearml,
             gate=gate,
         )
+
+
+class CoarseStandardizedPersistenceResidualTrainer(CoarsePersistenceResidualTrainer):
+    """Train W=(C-P-mu)/s using immutable train-only diagonal statistics."""
+
+    def __init__(self, *args, **kwargs):
+        binding = kwargs.pop("residual_statistics", None)
+        if not isinstance(binding, dict):
+            raise ValueError("standardized residual trainer requires a statistics binding")
+        path = Path(str(binding.get("path", "")))
+        sha256 = str(binding.get("sha256", ""))
+        if not path.is_file() or self._sha256(path) != sha256:
+            raise ValueError("residual statistics artifact is missing or differs")
+        statistics = json.loads(path.read_text(encoding="utf-8"))
+        if statistics.get("status") != "complete" or statistics.get("split") != "train":
+            raise ValueError("residual statistics must be a completed train-only artifact")
+        if int(statistics.get("train_case_count", -1)) != 4096:
+            raise ValueError("residual statistics must contain the exact 4096-case pilot subset")
+        current_provenance = kwargs.get("dataset_provenance", {}).get("pilot_subset", {})
+        if statistics.get("train_indices_sha256") != current_provenance.get(
+            "train_indices_sha256"
+        ):
+            raise ValueError("residual statistics and training subset differ")
+        current_data = kwargs.get("data_config")
+        if not isinstance(current_data, dict) or statistics.get(
+            "data_config_sha256"
+        ) != self._canonical_hash(current_data):
+            raise ValueError("residual statistics and effective data configuration differ")
+        reference = torch.empty((1, DIRECT_OUTPUT_CHANNELS, 1, 1))
+        _residual_affine_tensors(statistics, reference)
+        self._residual_statistics_path = path
+        self._residual_statistics_sha256 = sha256
+        self._residual_statistics = statistics
+        super().__init__(*args, **kwargs)
+
+    @staticmethod
+    def _canonical_hash(payload: Mapping[str, Any]) -> str:
+        import hashlib
+
+        encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+        return hashlib.sha256(encoded).hexdigest()
+
+    def _write_residual_manifest(self) -> None:
+        super()._write_residual_manifest()
+        path = Path(self.output_dir) / "coarse_cascade_manifest.json"
+        manifest = json.loads(path.read_text(encoding="utf-8"))
+        manifest.update(
+            {
+                "target": "W=(C-P-mu)/s",
+                "reconstruction": "C=P+mu+s*W",
+                "conditional_law": "p(C|c_full) via fixed invertible train-only diagonal affine map",
+                "residual_standardization": "six-channel train-only case-equal diagonal",
+                "residual_statistics_path": str(self._residual_statistics_path),
+                "residual_statistics_sha256": self._residual_statistics_sha256,
+                "residual_statistics": {
+                    "means": self._residual_statistics["means"],
+                    "stds": self._residual_statistics["stds"],
+                    "train_indices_sha256": self._residual_statistics[
+                        "train_indices_sha256"
+                    ],
+                },
+            }
+        )
+        _atomic_json(path, manifest)
+
+    def _make_training_pair(
+        self,
+        truth: torch.Tensor,
+        batch: dict[str, torch.Tensor],
+        timesteps: torch.Tensor,
+        residual_background: torch.Tensor | None = None,
+        generator: torch.Generator | None = None,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        del residual_background
+        shape = (
+            truth.shape[0],
+            DIRECT_OUTPUT_CHANNELS,
+            truth.shape[-2] // 2,
+            truth.shape[-1] // 2,
+        )
+        noise = torch.randn(shape, dtype=truth.dtype, device=truth.device, generator=generator)
+        state, velocity, _, persistence, _ = coarse_standardized_residual_flow_pair(
+            truth,
+            noise,
+            batch["structured_conditioning"],
+            batch["valid_mask"][:, :1],
+            timesteps,
+            self._residual_statistics,
+        )
+        background, _, _ = coarse_target(batch["background"], batch["valid_mask"][:, :1])
+        if not torch.equal(persistence, background):
+            raise ValueError("causal d0 persistence differs from dataset persistence baseline")
+        return state, velocity
+
+    def _make_sampler(self, model) -> CoarseStandardizedPersistenceResidualSampler:
+        return CoarseStandardizedPersistenceResidualSampler(model, self._residual_statistics)
