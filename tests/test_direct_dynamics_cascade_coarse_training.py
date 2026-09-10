@@ -85,6 +85,28 @@ class CoarseCascadeRunnerTests(unittest.TestCase):
         self.assertEqual(experiment["pilot"]["kind"], "learning_curve_2048")
         self.assertEqual(experiment["pilot"]["optimizer_updates"], 2048)
 
+    def test_extended_learning_curve_changes_only_budget_and_output_identity(self):
+        short = json.loads(
+            Path("config/methods/direct_dynamics_cascade_coarse_learning_curve_2f.json").read_text()
+        )
+        extended = json.loads(
+            Path(
+                "config/methods/direct_dynamics_cascade_coarse_learning_curve_4096_2f.json"
+            ).read_text()
+        )
+        differences = {
+            key for key in set(short) | set(extended) if short.get(key) != extended.get(key)
+        }
+        self.assertEqual(differences, {"num_epochs", "base_output_dir", "run_name"})
+        self.assertEqual(extended["num_epochs"], 8)
+        experiment = json.loads(
+            Path(
+                "config/experiments/train_direct_dynamics_cascade_coarse_learning_curve_4096_v1.json"
+            ).read_text()
+        )
+        self.assertEqual(experiment["pilot"]["kind"], "learning_curve_4096")
+        self.assertEqual(experiment["pilot"]["optimizer_updates"], 4096)
+
     def test_launcher_is_executable_bounded_and_uses_shared_gpu_lock(self):
         path = Path("scripts/run_direct_dynamics_cascade_coarse_mechanics.sh")
         launcher = path.read_text(encoding="utf-8")
@@ -104,6 +126,9 @@ class CoarseCascadeRunnerTests(unittest.TestCase):
         self.assertIn('"${PYTHON_MODE[@]}"', launcher)
         self.assertIn("usage: $0 [--preflight-only]", launcher)
         self.assertIn("train_direct_dynamics_cascade_coarse_learning_curve_v1.json", launcher)
+        self.assertIn(
+            "train_direct_dynamics_cascade_coarse_learning_curve_4096_v1.json", launcher
+        )
         self.assertIn(
             "train_direct_dynamics_cascade_coarse_standardized_residual_v1.json",
             launcher,

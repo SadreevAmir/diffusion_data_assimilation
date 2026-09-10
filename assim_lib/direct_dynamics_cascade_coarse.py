@@ -316,11 +316,15 @@ class CoarseCascadeDynamicsTrainer(DirectDynamicsTrainer):
         self._forecast_contract = forecast_contract_from_data_config(data_config)
         super().__init__(*args, **kwargs)
         planned_updates = self.config.num_epochs * len(self.train_dataloader)
-        if planned_updates not in {512, 2048}:
-            raise ValueError("coarse cascade pilot must contain exactly 512 or 2048 optimizer updates")
+        if planned_updates not in {512, 2048, 4096}:
+            raise ValueError(
+                "coarse cascade pilot must contain exactly 512, 2048, or 4096 optimizer updates"
+            )
         self._planned_updates = planned_updates
         self.diagnostic_steps = (
-            frozenset({63, 255, 511}) if planned_updates == 512 else frozenset({511, 1023, 1535, 2047})
+            frozenset({63, 255, 511})
+            if planned_updates == 512
+            else frozenset(range(511, planned_updates, 512))
         )
         self._coarse_diagnostic_batch = None
         self._coarse_diagnostic_case_ids: tuple[str, ...] = ()
@@ -396,8 +400,12 @@ class CoarseCascadeDynamicsTrainer(DirectDynamicsTrainer):
         if not self.accelerator.is_main_process:
             return
         planned_updates = getattr(self, "_planned_updates", global_step)
-        expected_steps = [64, 256, 512] if planned_updates == 512 else [512, 1024, 1536, 2048]
-        if planned_updates == 2048 and global_step in expected_steps:
+        expected_steps = (
+            [64, 256, 512]
+            if planned_updates == 512
+            else list(range(512, planned_updates + 1, 512))
+        )
+        if planned_updates in {2048, 4096} and global_step in expected_steps:
             diagnostic_step = global_step - 1
             if diagnostic_step not in self._coarse_diagnostic_steps:
                 self._require_full_state_recovery(global_step)
@@ -415,7 +423,7 @@ class CoarseCascadeDynamicsTrainer(DirectDynamicsTrainer):
             raise RuntimeError(
                 f"coarse mechanics gate requires diagnostics {expected_so_far}, got {actual_steps}"
             )
-        if planned_updates == 2048 and global_step < planned_updates:
+        if planned_updates in {2048, 4096} and global_step < planned_updates:
             progress = self._learning_curve_progress(epoch, global_step)
             _atomic_json(Path(self.output_dir) / "coarse_learning_curve_progress.json", progress)
             if progress["decision"] == "stop_no_learning_with_persistent_speckle":

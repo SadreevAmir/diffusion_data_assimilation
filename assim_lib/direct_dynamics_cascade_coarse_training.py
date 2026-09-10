@@ -283,6 +283,7 @@ def _run_impl(config_path: Path, *, preflight_only: bool, lifecycle: _Lifecycle)
         "mechanics_512": 512,
         "compact_architecture_screen_512": 512,
         "learning_curve_2048": 2048,
+        "learning_curve_4096": 4096,
         "persistence_residual_2048": 2048,
         "standardized_persistence_residual_2048": 2048,
         "deterministic_mean_2048": 2048,
