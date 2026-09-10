@@ -89,14 +89,10 @@ def configure_activation_checkpointing(model, enabled: bool) -> tuple[str, ...]:
             f"got {diffusers_version}"
         )
     enable = getattr(model, "enable_gradient_checkpointing", None)
-    if not callable(enable) or not bool(
-        getattr(model, "_supports_gradient_checkpointing", False)
-    ):
+    if not callable(enable) or not bool(getattr(model, "_supports_gradient_checkpointing", False)):
         raise RuntimeError("model does not support native diffusers activation checkpointing")
     expected_modules = tuple(
-        name
-        for name, module in model.named_modules()
-        if hasattr(module, "gradient_checkpointing")
+        name for name, module in model.named_modules() if hasattr(module, "gradient_checkpointing")
     )
     if not expected_modules:
         raise RuntimeError("model exposes no native checkpointable modules")
@@ -106,10 +102,7 @@ def configure_activation_checkpointing(model, enabled: bool) -> tuple[str, ...]:
         for name, module in model.named_modules()
         if bool(getattr(module, "gradient_checkpointing", False))
     )
-    if (
-        not bool(getattr(model, "is_gradient_checkpointing", False))
-        or modules != expected_modules
-    ):
+    if not bool(getattr(model, "is_gradient_checkpointing", False)) or modules != expected_modules:
         raise RuntimeError(
             "activation checkpointing was requested but did not activate on every "
             f"native block: expected={expected_modules}, active={modules}"
@@ -165,9 +158,7 @@ def _require_finite_gradients(model, provenance: str) -> None:
             if len(bad) >= 8:
                 break
     if bad:
-        raise FloatingPointError(
-            f"non-finite gradients before optimizer step in {bad}; {provenance}"
-        )
+        raise FloatingPointError(f"non-finite gradients before optimizer step in {bad}; {provenance}")
 
 
 def _validate_existing_structured_run_files(
@@ -271,9 +262,7 @@ class UNetTrainer:
             "data_config": jsonable(self.data_config),
             "dataset_provenance": jsonable(dataset_provenance or {}),
             "training_config": config_payload,
-            "activation_checkpointed_modules": list(
-                self.activation_checkpointed_modules
-            ),
+            "activation_checkpointed_modules": list(self.activation_checkpointed_modules),
             "experiment_config": jsonable(experiment_config) if experiment_config is not None else None,
             "model_config": jsonable(model_config) if model_config is not None else None,
             "resume_contract_sha256": self._resume_contract_sha256,
@@ -283,7 +272,7 @@ class UNetTrainer:
             ),
         }
         existing_structured_run = False
-        if config.training_objective == "structured_joint_state_flow":
+        if self._full_state_recovery_enabled():
             existing_structured_run = _validate_existing_structured_run_files(
                 Path(self.output_dir), config_payload, self._resume_contract_sha256
             )
@@ -305,7 +294,7 @@ class UNetTrainer:
             if not existing_structured_run:
                 _atomic_json(Path(self.output_dir) / "config.json", config_payload)
                 _atomic_json(Path(self.output_dir) / "metadata.json", run_metadata)
-            elif config.training_objective != "structured_joint_state_flow":
+            elif not self._full_state_recovery_enabled():
                 raise RuntimeError("unreachable legacy run provenance branch")
             if config.clearml_enabled:
                 _debug("initializing ClearML on main process")
@@ -380,14 +369,10 @@ class UNetTrainer:
     def _make_sampler(self, model) -> Sampler:
         return Sampler(
             model,
-            structured_velocity_parameterization=(
-                self.config.structured_velocity_parameterization
-            ),
+            structured_velocity_parameterization=(self.config.structured_velocity_parameterization),
         )
 
-    def _structured_model_state(
-        self, state: torch.Tensor, timesteps: torch.Tensor
-    ) -> torch.Tensor:
+    def _structured_model_state(self, state: torch.Tensor, timesteps: torch.Tensor) -> torch.Tensor:
         if self.config.training_objective != "structured_joint_state_flow":
             return state
         return velocity_model_state(
@@ -441,9 +426,7 @@ class UNetTrainer:
         if device.type == "cuda":
             cuda_devices = [device.index if device.index is not None else torch.cuda.current_device()]
         with torch.random.fork_rng(devices=cuda_devices, enabled=True):
-            seed = self._structured_diagnostic_seed(
-                epoch, stream_index=stream_index
-            )
+            seed = self._structured_diagnostic_seed(epoch, stream_index=stream_index)
             torch.manual_seed(seed)
             if cuda_devices:
                 with torch.cuda.device(cuda_devices[0]):
@@ -452,7 +435,7 @@ class UNetTrainer:
 
     def _training_loop_start(self) -> tuple[int, int]:
         """Restore the structured run from its last atomic epoch boundary."""
-        if self.config.training_objective != "structured_joint_state_flow":
+        if not self._full_state_recovery_enabled():
             return 0, 0
         if self.accelerator.num_processes != 1:
             raise ValueError("structured recovery currently requires exactly one process/GPU")
@@ -497,9 +480,7 @@ class UNetTrainer:
             or state.get("steps_per_epoch") != len(self.train_dataloader)
         ):
             raise ValueError("structured recovery state violates the run contract")
-        if state.get("payload_manifest_sha256") != _canonical_sha256(
-            _checkpoint_payload_manifest(state_dir)
-        ):
+        if state.get("payload_manifest_sha256") != _canonical_sha256(_checkpoint_payload_manifest(state_dir)):
             raise ValueError("structured recovery payload content is corrupted or incomplete")
         history = state.get("validation_history")
         if (
@@ -521,7 +502,7 @@ class UNetTrainer:
         return next_epoch, global_step
 
     def _save_structured_recovery(self, next_epoch: int, global_step: int) -> None:
-        if self.config.training_objective != "structured_joint_state_flow":
+        if not self._full_state_recovery_enabled():
             return
         if not self.accelerator.is_main_process or self.accelerator.num_processes != 1:
             return
@@ -573,6 +554,10 @@ class UNetTrainer:
             if temporary.exists():
                 shutil.rmtree(temporary)
         return 0, 0
+
+    def _full_state_recovery_enabled(self) -> bool:
+        """Whether this trainer commits complete optimizer/scheduler/RNG state per epoch."""
+        return self.config.training_objective == "structured_joint_state_flow"
 
     def _after_training_epoch(self, epoch: int, global_step: int) -> None:
         """Extension point called after all ordinary epoch artifacts are durable."""
@@ -676,9 +661,7 @@ class UNetTrainer:
         if self.config.training_objective == "structured_joint_state_flow":
             condition = batch.get("structured_conditioning")
             if condition is None:
-                raise KeyError(
-                    "structured_joint_state_flow requires batch['structured_conditioning']"
-                )
+                raise KeyError("structured_joint_state_flow requires batch['structured_conditioning']")
             model_input = torch.cat((noisy_truth, grid, condition), dim=1)
             if model_input.shape[1] != self.config.in_channels:
                 raise ValueError(
@@ -728,9 +711,7 @@ class UNetTrainer:
         if self.config.training_objective == "structured_joint_state_flow":
             physical_truth = batch.get("structured_physical_truth")
             if physical_truth is None:
-                raise KeyError(
-                    "structured_joint_state_flow requires batch['structured_physical_truth']"
-                )
+                raise KeyError("structured_joint_state_flow requires batch['structured_physical_truth']")
             clean = encode_structured_joint_trajectory(
                 physical_truth,
                 batch["valid_mask"][:, :1],
@@ -901,9 +882,7 @@ class UNetTrainer:
         if self.config.training_objective == "structured_joint_state_flow":
             for key, value in metrics.items():
                 if isinstance(value, (int, float)) and math.isfinite(float(value)):
-                    self.clearml.report_scalar(
-                        "structured_trajectory/metric", key, float(value), step
-                    )
+                    self.clearml.report_scalar("structured_trajectory/metric", key, float(value), step)
             return
 
         def _report(title: str, series: str, key: str):
@@ -1028,12 +1007,8 @@ class UNetTrainer:
                     obs_values=obs_values,
                     obs_mask=obs_mask,
                 )
-                model_output = self.model(
-                    model_input, timesteps * 1000, return_dict=False
-                )[0]
-                v_pred = self._reconstruct_model_velocity(
-                    model_output, model_state, timesteps
-                )
+                model_output = self.model(model_input, timesteps * 1000, return_dict=False)[0]
+                v_pred = self._reconstruct_model_velocity(model_output, model_state, timesteps)
                 loss_full = self._flow_matching_loss(v_pred, v_real, batch)
 
                 total_full += self.accelerator.gather_for_metrics(loss_full).mean().item()
@@ -1391,18 +1366,20 @@ class UNetTrainer:
                         generator=generator,
                     )
                     try:
-                        members.append(sample_structured_batch(
-                            sampler,
-                            batch,
-                            stats=self.config.structured_state_stats,
-                            size=self.config.image_size,
-                            num_timesteps=self.config.metric_num_timesteps,
-                            device=self.accelerator.device,
-                            method=self.config.sample_method,
-                            rtol=self.config.sample_rtol,
-                            atol=self.config.sample_atol,
-                            initial_noise=initial_noise,
-                        ))
+                        members.append(
+                            sample_structured_batch(
+                                sampler,
+                                batch,
+                                stats=self.config.structured_state_stats,
+                                size=self.config.image_size,
+                                num_timesteps=self.config.metric_num_timesteps,
+                                device=self.accelerator.device,
+                                method=self.config.sample_method,
+                                rtol=self.config.sample_rtol,
+                                atol=self.config.sample_atol,
+                                initial_noise=initial_noise,
+                            )
+                        )
                     except StructuredDecodeSaturationError as error:
                         raise StructuredDecodeSaturationError(
                             f"validation case={case_index} member={member_index}: {error}",
@@ -1429,8 +1406,7 @@ class UNetTrainer:
             lag0_mask=torch.cat(lag0_masks, dim=0),
             sic_cap=float(self.config.structured_state_stats["sic_cap"]),
             exclude_lag0_from_day0_scores=(
-                bool(self.config.trajectory_lead_days)
-                and self.config.trajectory_lead_days[0] == 0
+                bool(self.config.trajectory_lead_days) and self.config.trajectory_lead_days[0] == 0
             ),
         )
         metrics.update(
@@ -1986,9 +1962,7 @@ class UNetTrainer:
             return
         batch = self._batch_to_device(raw_batch)
         one = {key: value[:1] for key, value in batch.items()}
-        sample_seed = self._structured_diagnostic_seed(
-            epoch, case_index=0, member_index=0, stream_index=23
-        )
+        sample_seed = self._structured_diagnostic_seed(epoch, case_index=0, member_index=0, stream_index=23)
         generator = torch.Generator(device=self.accelerator.device)
         generator.manual_seed(sample_seed)
         initial_noise = torch.randn(
@@ -2096,12 +2070,8 @@ class UNetTrainer:
                         obs_values=obs_values,
                         obs_mask=obs_mask,
                     )
-                    model_output = self.model(
-                        model_input, timesteps * 1000, return_dict=False
-                    )[0]
-                    v_pred = self._reconstruct_model_velocity(
-                        model_output, model_state, timesteps
-                    )
+                    model_output = self.model(model_input, timesteps * 1000, return_dict=False)[0]
+                    v_pred = self._reconstruct_model_velocity(model_output, model_state, timesteps)
                     loss_full = self._flow_matching_loss(v_pred, v_real, batch)
                     loss_obs = torch.zeros_like(loss_full)
                     loss_smooth = torch.zeros_like(loss_full)
@@ -2213,26 +2183,19 @@ class UNetTrainer:
                         )
                     except StopIteration:
                         pass
-                    if (
-                        structured_sampling_due
-                        and global_step < self.config.diagnostic_min_optimizer_steps
-                    ):
+                    if structured_sampling_due and global_step < self.config.diagnostic_min_optimizer_steps:
                         history_entry["structured_sampling_diagnostic"] = {
                             "status": "skipped_warmup",
                             "epoch": int(epoch),
                             "global_step": int(global_step),
-                            "minimum_step": int(
-                                self.config.diagnostic_min_optimizer_steps
-                            ),
+                            "minimum_step": int(self.config.diagnostic_min_optimizer_steps),
                             "partial_metrics_permitted": False,
                         }
                         _atomic_json(Path(self.output_dir) / "metrics.json", self.val_history)
                     else:
                         try:
                             if metric_due:
-                                sample_metrics = self.compute_sample_validation_metrics(
-                                    epoch=epoch
-                                )
+                                sample_metrics = self.compute_sample_validation_metrics(epoch=epoch)
                             self.report_unconditional_dashboard_sample(epoch)
                             self.report_dashboard_samples(epoch)
                         except StructuredDecodeSaturationError as error:
@@ -2249,13 +2212,9 @@ class UNetTrainer:
                                 "optimization_continues": True,
                                 "publication_ready": False,
                             }
-                            _atomic_json(
-                                Path(self.output_dir) / "metrics.json", self.val_history
-                            )
+                            _atomic_json(Path(self.output_dir) / "metrics.json", self.val_history)
                             if self.clearml is not None:
-                                self.clearml.report_single_value(
-                                    "structured_sampling_diagnostic_valid", 0.0
-                                )
+                                self.clearml.report_single_value("structured_sampling_diagnostic_valid", 0.0)
                             _debug(
                                 "structured sampling diagnostic failed nonfatally "
                                 f"at epoch={epoch} step={global_step}: {error}"
@@ -2263,9 +2222,7 @@ class UNetTrainer:
                         else:
                             if metric_due:
                                 history_entry.update(sample_metrics)
-                                self._report_sample_validation_metrics(
-                                    sample_metrics, global_step
-                                )
+                                self._report_sample_validation_metrics(sample_metrics, global_step)
                             if structured_sampling_due:
                                 history_entry["structured_sampling_diagnostic"] = {
                                     "status": "passed",
@@ -2291,9 +2248,7 @@ class UNetTrainer:
                     for entry in self.val_history
                     if "structured_sampling_diagnostic" in entry
                 ]
-                physical_sampling_validated = _latest_structured_sampling_valid(
-                    diagnostic_records
-                )
+                physical_sampling_validated = _latest_structured_sampling_valid(diagnostic_records)
                 completion = {
                     "optimization_complete": True,
                     "completed_optimizer_steps": int(global_step),

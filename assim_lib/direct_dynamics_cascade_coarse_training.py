@@ -19,6 +19,7 @@ from .data import build_dataset
 from .direct_dynamics_cascade_coarse import (
     COARSE_INPUT_CHANNELS,
     CoarseCascadeDynamicsTrainer,
+    CoarseLearningCurveEarlyStop,
     coarse_flow_pair,
     coarse_model_input_for_test,
     ocean_fraction_weighted_mse,
@@ -219,12 +220,16 @@ def _run_impl(config_path: Path, *, preflight_only: bool, lifecycle: _Lifecycle)
     pilot = experiment.get("pilot", {})
     train_case_count = int(pilot.get("train_case_count", -1))
     validation_case_count = int(pilot.get("validation_case_count", -1))
-    if (train_case_count, validation_case_count, int(pilot.get("optimizer_updates", -1))) != (
-        4096,
-        48,
-        512,
-    ):
-        raise ValueError("coarse mechanics pilot requires exactly 4096 train, 48 validation, 512 updates")
+    pilot_kind = str(pilot.get("kind", "mechanics_512"))
+    expected_updates = {"mechanics_512": 512, "learning_curve_2048": 2048}.get(pilot_kind)
+    if expected_updates is None or (
+        train_case_count,
+        validation_case_count,
+        int(pilot.get("optimizer_updates", -1)),
+    ) != (4096, 48, expected_updates):
+        raise ValueError(
+            "coarse pilot must declare mechanics_512 or learning_curve_2048 with exact audited sizes"
+        )
 
     output_root = Path(config.base_output_dir) / config.run_name
     lifecycle.output_root = output_root
@@ -268,8 +273,8 @@ def _run_impl(config_path: Path, *, preflight_only: bool, lifecycle: _Lifecycle)
         prefetch_factor=PREFETCH_FACTOR,
     )
     planned_updates = len(train_loader) * config.num_epochs
-    if planned_updates != 512:
-        raise ValueError(f"coarse mechanics pilot must plan 512 updates, got {planned_updates}")
+    if planned_updates != expected_updates:
+        raise ValueError(f"coarse pilot must plan {expected_updates} updates, got {planned_updates}")
     subset_provenance = {
         "selection": "deterministic_even_spacing_over_full_all-hour_split",
         "train_indices": train_indices,
@@ -308,8 +313,6 @@ def _run_impl(config_path: Path, *, preflight_only: bool, lifecycle: _Lifecycle)
     }
     if preflight_only:
         return result
-    _atomic_json(output_root / "coarse_cascade_dataset_sentinel.json", sentinel)
-    _atomic_json(output_root / "coarse_cascade_gpu_smoke.json", smoke)
     optimizer = torch.optim.AdamW(model.parameters(), lr=config.learning_rate)
     from diffusers.optimization import get_cosine_schedule_with_warmup
 
@@ -342,6 +345,8 @@ def _run_impl(config_path: Path, *, preflight_only: bool, lifecycle: _Lifecycle)
         coarse_diagnostic_batch=diagnostic_batch,
         coarse_code_identity=code_identity,
     )
+    _atomic_json(output_root / "coarse_cascade_dataset_sentinel.json", sentinel)
+    _atomic_json(output_root / "coarse_cascade_gpu_smoke.json", smoke)
     _launch_status(
         "clearml_online",
         run_id=launch_id,
@@ -356,22 +361,37 @@ def _run_impl(config_path: Path, *, preflight_only: bool, lifecycle: _Lifecycle)
         output_dir=str(output_root),
         planned_optimizer_updates=planned_updates,
     )
-    output_dir = trainer.train_loop()
+    early_stop = None
+    try:
+        output_dir = trainer.train_loop()
+    except CoarseLearningCurveEarlyStop as error:
+        early_stop = str(error)
+        output_dir = trainer.output_dir
+        if trainer.clearml is not None:
+            trainer.clearml.report_single_value("coarse_learning_curve_early_stop", 1.0)
+            trainer.clearml.close()
+        trainer.accelerator.end_training()
     lifecycle.phase = "terminal_finalization"
     gate_path = Path(output_dir) / "coarse_mechanics_gate.json"
     if not gate_path.is_file():
         raise FileNotFoundError("coarse mechanics completion lacks its terminal gate")
     gate = json.loads(gate_path.read_text(encoding="utf-8"))
+    completion_status = (
+        "stopped_pending_independent_review"
+        if early_stop is not None
+        else "complete_pending_independent_review"
+    )
     result.update(
         {
-            "status": "complete_pending_independent_review",
+            "status": completion_status,
             "output_dir": str(Path(output_dir).resolve()),
             "mechanics_gate": gate,
+            "early_stop_reason": early_stop,
         }
     )
     _atomic_json(Path(output_dir) / "coarse_cascade_training_completion.json", result)
     _launch_status(
-        "complete_pending_independent_review",
+        completion_status,
         run_id=launch_id,
         code_commit=code_identity["git_commit"],
         output_dir=str(Path(output_dir).resolve()),

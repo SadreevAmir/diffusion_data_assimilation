@@ -60,6 +60,31 @@ class CoarseCascadeRunnerTests(unittest.TestCase):
         self.assertEqual(config.metric_every_n_epochs, 0)
         self.assertEqual(config.sample_every_n_epochs, 0)
 
+    def test_learning_curve_changes_only_budget_schedule_and_recovery(self):
+        short = json.loads(
+            Path("config/methods/direct_dynamics_cascade_coarse_mechanics_2f.json").read_text()
+        )
+        long = json.loads(
+            Path("config/methods/direct_dynamics_cascade_coarse_learning_curve_2f.json").read_text()
+        )
+        differences = {key for key in set(short) | set(long) if short.get(key) != long.get(key)}
+        self.assertEqual(
+            differences,
+            {
+                "num_epochs",
+                "base_output_dir",
+                "run_name",
+                "recovery_checkpoint_name",
+            },
+        )
+        self.assertEqual(long["num_epochs"], 4)
+        self.assertEqual(long.get("resume_from_checkpoint", ""), "")
+        experiment = json.loads(
+            Path("config/experiments/train_direct_dynamics_cascade_coarse_learning_curve_v1.json").read_text()
+        )
+        self.assertEqual(experiment["pilot"]["kind"], "learning_curve_2048")
+        self.assertEqual(experiment["pilot"]["optimizer_updates"], 2048)
+
     def test_launcher_is_executable_bounded_and_uses_shared_gpu_lock(self):
         path = Path("scripts/run_direct_dynamics_cascade_coarse_mechanics.sh")
         launcher = path.read_text(encoding="utf-8")
@@ -71,6 +96,8 @@ class CoarseCascadeRunnerTests(unittest.TestCase):
         self.assertIn('"$observed_utilization" -ge 5', launcher)
         self.assertIn("--kill-after=2m 7080s", launcher)
         self.assertIn("COARSE_CASCADE_LAUNCH_ID", launcher)
+        self.assertIn("COARSE_CASCADE_CONFIG", launcher)
+        self.assertIn("train_direct_dynamics_cascade_coarse_learning_curve_v1.json", launcher)
         self.assertNotIn("FINE_CASCADE_LAUNCH_ID", launcher)
 
     def test_free_to_occupied_then_malformed_final_never_reaches_python(self):

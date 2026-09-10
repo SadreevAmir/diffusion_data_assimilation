@@ -18,6 +18,7 @@ from assim_lib.direct_dynamics_cascade_coarse import (
     COARSE_INPUT_CHANNELS,
     CoarseCascadeDynamicsTrainer,
     CoarseCascadeSampler,
+    CoarseLearningCurveEarlyStop,
     coarse_flow_pair,
     coarse_model_input_for_test,
     coarse_target,
@@ -65,6 +66,14 @@ class DiagnosticHarness(CoarseCascadeDynamicsTrainer):
 
     def _sampling_weight_label(self):
         return "raw"
+
+
+class _LenOnly:
+    def __init__(self, length: int):
+        self.length = length
+
+    def __len__(self):
+        return self.length
 
 
 class CoarseCascadeTests(unittest.TestCase):
@@ -457,6 +466,74 @@ class CoarseCascadeTests(unittest.TestCase):
         self.assertEqual(summaries[0], summaries[1])
         self.assertAlmostEqual(summaries[0]["mean_dimensionless_rmse_improvement_from_update64"], 0.5)
         self.assertAlmostEqual(summaries[0]["mean_dimensionless_rmse_skill_over_persistence"], 1.0 / 3.0)
+
+    def test_learning_curve_stops_only_after_two_flat_intervals_with_speckle(self):
+        def record(step: int, ratio: float, roughness: float) -> dict[str, float]:
+            metrics = {"step": float(step), "joint_raw_support_violation_fraction": 0.2}
+            for name in ("d3_sic", "d3_sit", "d6_sic", "d6_sit", "d9_sic", "d9_sit"):
+                metrics[f"{name}_raw_mean_rmse"] = ratio
+                metrics[f"{name}_persistence_rmse"] = 1.0
+                metrics[f"{name}_member_roughness"] = roughness
+                metrics[f"{name}_truth_roughness"] = 1.0
+            return metrics
+
+        harness = DiagnosticHarness()
+        harness.accelerator = SimpleNamespace(is_main_process=True)
+        harness.clearml = None
+        harness.val_history = [{}, {}, {}]
+        harness._planned_updates = 2048
+        harness._coarse_diagnostic_steps = {511, 1023, 1535}
+        harness._coarse_diagnostic_history = [
+            record(512, 1.1, 4.0),
+            record(1024, 1.1, 4.0),
+            record(1536, 1.2, 4.0),
+        ]
+        with TemporaryDirectory() as directory:
+            harness.output_dir = directory
+            with self.assertRaisesRegex(CoarseLearningCurveEarlyStop, "did not improve"):
+                harness._after_training_epoch(2, 1536)
+            gate = json.loads((Path(directory) / "coarse_mechanics_gate.json").read_text())
+        self.assertEqual(gate["decision"], "stop_no_learning_with_persistent_speckle")
+
+    def test_learning_curve_diagnostic_requires_durable_epoch_state_first(self):
+        harness = DiagnosticHarness()
+        harness.accelerator = SimpleNamespace(is_main_process=True)
+        harness.clearml = None
+        harness._planned_updates = 2048
+        harness._coarse_diagnostic_steps = set()
+        harness._coarse_diagnostic_history = []
+        harness.train_dataloader = _LenOnly(512)
+        harness.config = SimpleNamespace(recovery_checkpoint_name="coarse_full_state_recovery")
+        with TemporaryDirectory() as directory:
+            harness.output_dir = directory
+            state_dir = Path(directory) / "coarse_full_state_recovery" / "epoch_0001"
+            (state_dir / "accelerator").mkdir(parents=True)
+            torch.save({"ema": True}, state_dir / "ema_state.pth")
+            (state_dir / "resume.json").write_text('{"complete":true}', encoding="utf-8")
+            pointer = {
+                "state_dir": state_dir.name,
+                "resume_sha256": harness._sha256(state_dir / "resume.json"),
+            }
+            (state_dir.parent / "latest.json").write_text(json.dumps(pointer), encoding="utf-8")
+            with (
+                patch.object(harness, "save_model_custom"),
+                patch.object(harness, "_coarse_diagnostic", side_effect=RuntimeError("plot failed")),
+                self.assertRaisesRegex(RuntimeError, "plot failed"),
+            ):
+                harness._after_training_epoch(0, 512)
+            self.assertTrue((state_dir / "accelerator").is_dir())
+            self.assertTrue((state_dir / "ema_state.pth").is_file())
+            self.assertTrue((state_dir / "resume.json").is_file())
+
+    def test_raw_support_magnitude_reports_size_not_only_fraction(self):
+        raw = torch.tensor([[[[[-0.2, 1.3]], [[-0.4, 0.2]]]]]).reshape(1, 1, 2, 1, 2)
+        # SIC channel: -0.2, 1.3. SIT channel: -0.4, 0.2.
+        valid = torch.ones(1, 1, 1, 2)
+        metrics = CoarseCascadeDynamicsTrainer._raw_support_magnitude_metrics(raw, valid)
+        self.assertAlmostEqual(metrics["sic_raw_support_excess_mean_all"], 0.25, places=6)
+        self.assertAlmostEqual(metrics["sit_raw_support_excess_mean_all"], 0.2, places=6)
+        self.assertAlmostEqual(metrics["sic_raw_support_excess_max"], 0.3, places=6)
+        self.assertAlmostEqual(metrics["sit_raw_support_excess_max"], 0.4, places=6)
 
 
 if __name__ == "__main__":

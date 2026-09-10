@@ -261,6 +261,10 @@ class CoarseCascadeSampler:
         return torch.where(support, coarse.float(), torch.zeros_like(coarse.float()))
 
 
+class CoarseLearningCurveEarlyStop(RuntimeError):
+    """Expected scientific stop after a bounded, non-improving learning curve."""
+
+
 class CoarseCascadeDynamicsTrainer(DirectDynamicsTrainer):
     """Train p(C | full causal d0/forcing/calendar condition)."""
 
@@ -287,14 +291,23 @@ class CoarseCascadeDynamicsTrainer(DirectDynamicsTrainer):
         if config.metric_every_n_epochs != 0 or config.sample_every_n_epochs != 0:
             raise ValueError("coarse cascade pilot forbids incompatible generic diagnostics")
         super().__init__(*args, **kwargs)
-        if self.config.num_epochs * len(self.train_dataloader) != 512:
-            raise ValueError("coarse cascade mechanics pilot must contain exactly 512 optimizer updates")
+        planned_updates = self.config.num_epochs * len(self.train_dataloader)
+        if planned_updates not in {512, 2048}:
+            raise ValueError("coarse cascade pilot must contain exactly 512 or 2048 optimizer updates")
+        self._planned_updates = planned_updates
+        self.diagnostic_steps = (
+            frozenset({63, 255, 511}) if planned_updates == 512 else frozenset({511, 1023, 1535, 2047})
+        )
         self._coarse_diagnostic_batch = None
         self._coarse_diagnostic_case_ids: tuple[str, ...] = ()
         self._coarse_diagnostic_steps: set[int] = set()
         self._coarse_diagnostic_history: list[dict[str, float]] = []
         if self.accelerator.is_main_process:
             write_coarse_manifest(self.output_dir, config, self._coarse_code_identity)
+
+    def _full_state_recovery_enabled(self) -> bool:
+        """Persist model, optimizer, scheduler, scaler and RNG at every epoch boundary."""
+        return True
 
     def _make_training_pair(
         self,
@@ -341,6 +354,7 @@ class CoarseCascadeDynamicsTrainer(DirectDynamicsTrainer):
         UNetTrainer._report_train_metrics(self, loss, loss_full, loss_obs, loss_smooth, step)
         if (
             self.accelerator.is_main_process
+            and self._planned_updates == 512
             and step in self.diagnostic_steps
             and step not in self._coarse_diagnostic_steps
         ):
@@ -352,14 +366,42 @@ class CoarseCascadeDynamicsTrainer(DirectDynamicsTrainer):
     def _after_training_epoch(self, epoch: int, global_step: int) -> None:
         if not self.accelerator.is_main_process:
             return
-        expected_steps = [64, 256, 512]
+        planned_updates = getattr(self, "_planned_updates", global_step)
+        expected_steps = [64, 256, 512] if planned_updates == 512 else [512, 1024, 1536, 2048]
+        if planned_updates == 2048 and global_step in expected_steps:
+            diagnostic_step = global_step - 1
+            if diagnostic_step not in self._coarse_diagnostic_steps:
+                self._require_full_state_recovery(global_step)
+                self._coarse_diagnostic_steps.add(diagnostic_step)
+                checkpoint = f"coarse_update_{global_step:04d}.pth"
+                self.save_model_custom(checkpoint)
+                self._coarse_diagnostic(
+                    diagnostic_step,
+                    f"update_{global_step:04d}",
+                    checkpoint,
+                )
         actual_steps = [int(record["step"]) for record in self._coarse_diagnostic_history]
-        if actual_steps != expected_steps or global_step != 512:
+        expected_so_far = [step for step in expected_steps if step <= global_step]
+        if actual_steps != expected_so_far:
             raise RuntimeError(
-                f"coarse mechanics gate requires diagnostics {expected_steps} and step512, got {actual_steps}"
+                f"coarse mechanics gate requires diagnostics {expected_so_far}, got {actual_steps}"
+            )
+        if planned_updates == 2048 and global_step < planned_updates:
+            progress = self._learning_curve_progress(epoch, global_step)
+            _atomic_json(Path(self.output_dir) / "coarse_learning_curve_progress.json", progress)
+            if progress["decision"] == "stop_no_learning_with_persistent_speckle":
+                _atomic_json(Path(self.output_dir) / "coarse_mechanics_gate.json", progress)
+                raise CoarseLearningCurveEarlyStop(progress["reason"])
+            return
+        if global_step != planned_updates:
+            raise RuntimeError(
+                f"coarse mechanics terminal gate expected step {planned_updates}, got {global_step}"
             )
         early = self._coarse_diagnostic_history[0]
         final = self._coarse_diagnostic_history[-1]
+        baseline_step = int(early["step"])
+        improvement_key = f"rmse_improvement_from_update{baseline_step}_by_output"
+        mean_improvement_key = f"mean_dimensionless_rmse_improvement_from_update{baseline_step}"
         rmse_keys = sorted(key for key in final if key.endswith("_raw_mean_rmse"))
         persistence_keys = [key.replace("_raw_mean_rmse", "_persistence_rmse") for key in rmse_keys]
         roughness_keys = sorted(key for key in final if key.endswith("_member_roughness"))
@@ -378,10 +420,10 @@ class CoarseCascadeDynamicsTrainer(DirectDynamicsTrainer):
             for key in roughness_keys
         ]
         summary = {
-            "rmse_improvement_from_update64_by_output": improvement_by_output,
+            "rmse_improvement_reference_step": baseline_step,
+            improvement_key: improvement_by_output,
             "rmse_skill_over_persistence_by_output": skill_by_output,
-            "mean_dimensionless_rmse_improvement_from_update64": sum(improvement_by_output.values())
-            / len(improvement_by_output),
+            mean_improvement_key: sum(improvement_by_output.values()) / len(improvement_by_output),
             "mean_dimensionless_rmse_skill_over_persistence": sum(skill_by_output.values())
             / len(skill_by_output),
             "max_member_to_truth_roughness_ratio": max(roughness_ratios),
@@ -390,7 +432,7 @@ class CoarseCascadeDynamicsTrainer(DirectDynamicsTrainer):
         flattened_summary = [
             *improvement_by_output.values(),
             *skill_by_output.values(),
-            summary["mean_dimensionless_rmse_improvement_from_update64"],
+            summary[mean_improvement_key],
             summary["mean_dimensionless_rmse_skill_over_persistence"],
             summary["max_member_to_truth_roughness_ratio"],
             summary["joint_raw_support_violation_fraction"],
@@ -398,8 +440,10 @@ class CoarseCascadeDynamicsTrainer(DirectDynamicsTrainer):
         if not all(math.isfinite(value) for value in flattened_summary):
             raise FloatingPointError("coarse mechanics gate produced non-finite dimensionless ratios")
         reasons = []
-        if summary["mean_dimensionless_rmse_improvement_from_update64"] < 0.20:
-            reasons.append("mean dimensionless RMSE ratio improved by less than 20% from update64")
+        if summary[mean_improvement_key] < 0.20:
+            reasons.append(
+                f"mean dimensionless RMSE ratio improved by less than 20% from update{baseline_step}"
+            )
         if summary["mean_dimensionless_rmse_skill_over_persistence"] <= 0:
             reasons.append("mean dimensionless coarse skill did not beat persistence")
         if summary["max_member_to_truth_roughness_ratio"] >= 10:
@@ -412,7 +456,8 @@ class CoarseCascadeDynamicsTrainer(DirectDynamicsTrainer):
             "epoch": epoch + 1,
             "optimizer_updates": global_step,
             "criteria": {
-                "min_rmse_improvement_from_update64": 0.20,
+                "rmse_improvement_reference_step": baseline_step,
+                f"min_rmse_improvement_from_update{baseline_step}": 0.20,
                 "strictly_positive_rmse_skill_over_persistence": True,
                 "max_roughness_ratio_exclusive": 10.0,
                 "max_joint_support_violation_exclusive": 0.95,
@@ -426,6 +471,95 @@ class CoarseCascadeDynamicsTrainer(DirectDynamicsTrainer):
         _atomic_json(Path(self.output_dir) / "metrics.json", self.val_history)
         if self.clearml is not None:
             self.clearml.report_single_value("coarse_mechanics_gate_passed", float(not reasons))
+
+    def _require_full_state_recovery(self, global_step: int) -> None:
+        """Fail closed unless the epoch state was committed before diagnostics."""
+        if global_step % len(self.train_dataloader):
+            raise ValueError("coarse diagnostics require an exact epoch boundary")
+        epoch = global_step // len(self.train_dataloader)
+        root = Path(self.output_dir) / self.config.recovery_checkpoint_name
+        latest_path = root / "latest.json"
+        if latest_path.is_symlink() or not latest_path.is_file():
+            raise RuntimeError("coarse diagnostic requires a committed full-state recovery pointer")
+        latest = json.loads(latest_path.read_text(encoding="utf-8"))
+        state_dir = root / f"epoch_{epoch:04d}"
+        state_path = state_dir / "resume.json"
+        if (
+            latest.get("state_dir") != state_dir.name
+            or latest.get("resume_sha256") != self._sha256(state_path)
+            or not (state_dir / "ema_state.pth").is_file()
+            or not (state_dir / "accelerator").is_dir()
+        ):
+            raise RuntimeError("coarse diagnostic full-state recovery is incomplete or stale")
+
+    @staticmethod
+    def _mean_rmse_ratio(record: dict[str, float]) -> float:
+        rmse_keys = sorted(key for key in record if key.endswith("_raw_mean_rmse"))
+        ratios = []
+        for key in rmse_keys:
+            denominator = record[key.replace("_raw_mean_rmse", "_persistence_rmse")]
+            if denominator <= 0:
+                raise ValueError("persistence RMSE must be positive for learning-curve ratios")
+            ratios.append(record[key] / denominator)
+        if not ratios or not all(math.isfinite(value) for value in ratios):
+            raise FloatingPointError("learning-curve RMSE ratios are empty or non-finite")
+        return sum(ratios) / len(ratios)
+
+    def _learning_curve_progress(self, epoch: int, global_step: int) -> dict[str, Any]:
+        ratios = [self._mean_rmse_ratio(record) for record in self._coarse_diagnostic_history]
+        latest = self._coarse_diagnostic_history[-1]
+        roughness = max(
+            latest[key] / max(latest[key.replace("_member_roughness", "_truth_roughness")], 1e-8)
+            for key in latest
+            if key.endswith("_member_roughness")
+        )
+        two_flat_intervals = len(ratios) >= 3 and ratios[-1] >= ratios[-2] and ratios[-2] >= ratios[-3]
+        persistent_speckle = roughness >= 3.0
+        stop = two_flat_intervals and persistent_speckle
+        return {
+            "status": "stopped" if stop else "continue",
+            "decision": ("stop_no_learning_with_persistent_speckle" if stop else "continue_learning_curve"),
+            "epoch": epoch + 1,
+            "optimizer_updates": global_step,
+            "mean_dimensionless_rmse_ratio_history": ratios,
+            "latest_max_member_to_truth_roughness_ratio": roughness,
+            "criteria": {
+                "two_consecutive_nonimproving_rmse_ratio_intervals": True,
+                "persistent_speckle_proxy_roughness_ratio_at_least": 3.0,
+            },
+            "reason": (
+                "two consecutive diagnostics did not improve forecast RMSE while roughness remained high"
+                if stop
+                else "learning curve remains eligible to continue"
+            ),
+            "publication_ready": False,
+        }
+
+    @classmethod
+    def _raw_support_magnitude_metrics(
+        cls, raw_ensemble: torch.Tensor, valid: torch.Tensor
+    ) -> dict[str, float]:
+        expanded_valid = valid[:, None].expand_as(raw_ensemble)
+        cls._require_finite_on_valid(raw_ensemble, expanded_valid, label="raw coarse ensemble")
+        support = valid[:, None].expand_as(raw_ensemble[:, :, 0::2]) > 0
+        sic = raw_ensemble[:, :, 0::2]
+        sit = raw_ensemble[:, :, 1::2]
+        sic_excess = torch.relu(-sic) + torch.relu(sic - 1.0)
+        sit_excess = torch.relu(-sit)
+
+        def summarize(prefix: str, excess: torch.Tensor) -> dict[str, float]:
+            values = excess[support]
+            positive = values[values > 0]
+            return {
+                f"{prefix}_raw_support_excess_mean_all": float(values.mean().item()),
+                f"{prefix}_raw_support_excess_mean_violating": (
+                    float(positive.mean().item()) if positive.numel() else 0.0
+                ),
+                f"{prefix}_raw_support_excess_p95_all": float(torch.quantile(values, 0.95).item()),
+                f"{prefix}_raw_support_excess_max": float(values.max().item()),
+            }
+
+        return {**summarize("sic", sic_excess), **summarize("sit", sit_excess)}
 
     def save_model_custom(self, name: str = "last_model.pth"):
         """Atomically save raw and EMA weights used by coarse sampling."""
@@ -579,6 +713,7 @@ class CoarseCascadeDynamicsTrainer(DirectDynamicsTrainer):
             "step": float(step + 1),
             "diagnostic_case_count": float(case_count),
             **self._raw_support_metrics(physical_ensemble, active),
+            **self._raw_support_magnitude_metrics(physical_ensemble, active),
         }
         mean = physical_ensemble.mean(dim=1)
         for lead_index, lead in enumerate((3, 6, 9)):

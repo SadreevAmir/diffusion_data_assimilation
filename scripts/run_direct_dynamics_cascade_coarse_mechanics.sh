@@ -9,6 +9,15 @@ if [[ ! "$RUN_ID" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$ ]]; then
   echo "unsafe COARSE_CASCADE_LAUNCH_ID" >&2
   exit 2
 fi
+CONFIG_PATH="${COARSE_CASCADE_CONFIG:-config/experiments/train_direct_dynamics_cascade_coarse_mechanics_v1.json}"
+case "$CONFIG_PATH" in
+  config/experiments/train_direct_dynamics_cascade_coarse_mechanics_v1.json|\
+  config/experiments/train_direct_dynamics_cascade_coarse_learning_curve_v1.json) ;;
+  *)
+    echo "unsafe COARSE_CASCADE_CONFIG" >&2
+    exit 2
+    ;;
+esac
 
 RESULT_ROOT="/home/autoresearch_results/direct_dynamics_cascade_v1"
 STATUS_ROOT="$RESULT_ROOT/launches"
@@ -97,4 +106,4 @@ export MKL_NUM_THREADS=6
 export OPENBLAS_NUM_THREADS=6
 export NUMEXPR_NUM_THREADS=6
 timeout --signal=TERM --kill-after=2m 7080s python -m assim_lib.direct_dynamics_cascade_coarse_training \
-  --config config/experiments/train_direct_dynamics_cascade_coarse_mechanics_v1.json
+  --config "$CONFIG_PATH"
