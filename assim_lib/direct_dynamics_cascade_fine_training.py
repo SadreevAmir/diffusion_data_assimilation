@@ -376,13 +376,14 @@ def _run_impl(config_path: Path, *, preflight_only: bool, lifecycle: _Lifecycle)
         "mechanics_512",
         "compact_architecture_screen_512",
         "compact_undertraining_test_2048",
+        "compact_full_data_one_epoch_6474",
     }:
         raise ValueError("fine cascade experiment declares an unsupported pilot kind")
     train_case_count = int(pilot.get("train_case_count", 4096))
     validation_case_count = int(pilot.get("validation_case_count", 48))
     declared_updates = int(pilot.get("optimizer_updates", -1))
-    if declared_updates not in {512, 2048}:
-        raise ValueError("fine cascade experiment must declare 512 or 2048 optimizer updates")
+    if declared_updates not in {512, 2048, 6474}:
+        raise ValueError("fine cascade experiment must declare 512, 2048, or 6474 optimizer updates")
     lifecycle.phase = "dataset_preflight"
     seed_everything(config.seed)
     train_dataset = build_dataset(data_config, split="train")

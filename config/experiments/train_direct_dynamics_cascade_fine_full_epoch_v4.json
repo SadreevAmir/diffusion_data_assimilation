@@ -1,0 +1,39 @@
+{
+  "project_name": "sea_ice_two_stage",
+  "task_name": "direct_dynamics_cascade_fine_full_epoch_v4",
+  "data_config": "../data/m2m_2f_two_stage_dynamics_protocol.json",
+  "model_config": "../methods/direct_dynamics_cascade_fine_compact_2f.json",
+  "data_overrides": {
+    "hour_mode": "all",
+    "dynamic_forcing_stats": {
+      "source_split": "train",
+      "estimator_scope": "slice23_train_reused_for_all_hour_recovery_ablation",
+      "indices": [6, 7, 13, 14],
+      "means": [0.00024072701720376523, -0.017859677007622955, -0.106700353199528, -0.18476749778477272],
+      "stds": [0.06025002092600086, 0.0655322642143171, 4.434678472175259, 4.7337812043401915],
+      "finite_value_count_per_field": [100059986, 100059986, 104958646, 104958646]
+    }
+  },
+  "pilot": {
+    "kind": "compact_full_data_one_epoch_6474",
+    "train_case_count": 51792,
+    "validation_case_count": 48,
+    "optimizer_updates": 6474
+  },
+  "clearml": {
+    "enabled": true,
+    "env_path": "/home/.env",
+    "tags": [
+      "cascade-fine-stage",
+      "compact-conv32",
+      "full-training-archive",
+      "teacher-coarse-training-only",
+      "generated-coarse-deployment-contract",
+      "exact-6474-updates",
+      "one-full-data-epoch",
+      "one-gpu",
+      "no-activation-checkpointing"
+    ],
+    "upload_checkpoints": false
+  }
+}

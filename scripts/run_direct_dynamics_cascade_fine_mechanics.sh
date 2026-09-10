@@ -21,7 +21,8 @@ CONFIG_PATH="${FINE_CASCADE_CONFIG:-config/experiments/train_direct_dynamics_cas
 case "$CONFIG_PATH" in
   config/experiments/train_direct_dynamics_cascade_fine_mechanics_v1.json|\
   config/experiments/train_direct_dynamics_cascade_fine_compact_v2.json|\
-  config/experiments/train_direct_dynamics_cascade_fine_compact_2048_v3.json) ;;
+  config/experiments/train_direct_dynamics_cascade_fine_compact_2048_v3.json|\
+  config/experiments/train_direct_dynamics_cascade_fine_full_epoch_v4.json) ;;
   *)
     echo "unsafe FINE_CASCADE_CONFIG" >&2
     exit 2
