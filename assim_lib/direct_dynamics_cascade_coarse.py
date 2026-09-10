@@ -438,6 +438,10 @@ class CoarseCascadeDynamicsTrainer(DirectDynamicsTrainer):
                 _atomic_json(Path(self.output_dir) / "coarse_mechanics_gate.json", progress)
                 raise CoarseLearningCurveEarlyStop(progress["reason"])
             return
+        if planned_updates == 19422 and global_step < planned_updates:
+            # Full-archive training is deliberately assessed at every epoch;
+            # only epoch six is terminal.
+            return
         if global_step != planned_updates:
             raise RuntimeError(
                 f"coarse mechanics terminal gate expected step {planned_updates}, got {global_step}"

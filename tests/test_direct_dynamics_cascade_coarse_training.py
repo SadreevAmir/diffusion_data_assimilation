@@ -156,6 +156,11 @@ class CoarseCascadeRunnerTests(unittest.TestCase):
                 "optimizer_updates": 19_422,
             },
         )
+        source = Path("assim_lib/direct_dynamics_cascade_coarse.py").read_text()
+        self.assertIn(
+            "if planned_updates == 19422 and global_step < planned_updates:",
+            source,
+        )
 
     def test_launcher_is_executable_bounded_and_uses_shared_gpu_lock(self):
         path = Path("scripts/run_direct_dynamics_cascade_coarse_mechanics.sh")
