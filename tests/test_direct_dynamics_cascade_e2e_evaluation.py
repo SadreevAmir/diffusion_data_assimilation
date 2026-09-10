@@ -27,6 +27,15 @@ class CascadeE2EEvaluationTests(unittest.TestCase):
         coarse, fine = _validate_experiment(experiment)
         self.assertEqual(coarse["checkpoint"], "ema_coarse_update_9711.pth")
         self.assertEqual([row["label"] for row in fine], ["raw_fine_512", "ema_fine_512"])
+        experiment["fine_checkpoints"] = [
+            {"label": "raw_fine_2048", "checkpoint": "raw.pth", "sha256": "a" * 64},
+            {"label": "ema_fine_2048", "checkpoint": "ema.pth", "sha256": "b" * 64},
+        ]
+        _, fine = _validate_experiment(experiment)
+        self.assertEqual([row["label"] for row in fine], ["raw_fine_2048", "ema_fine_2048"])
+        experiment["fine_checkpoints"][1]["label"] = "ema_fine_512"
+        with self.assertRaisesRegex(ValueError, "same update"):
+            _validate_experiment(experiment)
         experiment["members"] = 7
         with self.assertRaisesRegex(ValueError, "12 cases and 8 members"):
             _validate_experiment(experiment)

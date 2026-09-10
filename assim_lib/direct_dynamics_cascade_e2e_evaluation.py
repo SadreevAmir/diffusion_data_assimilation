@@ -7,6 +7,7 @@ import hashlib
 import json
 import math
 import os
+import re
 from pathlib import Path
 from typing import Any
 
@@ -32,7 +33,7 @@ from .trainer import _atomic_json
 from .transforms import channel_denormalize
 
 
-EXPECTED_FINE_LABELS = ("raw_fine_512", "ema_fine_512")
+FINE_LABEL_PATTERN = re.compile(r"^(raw|ema)_fine_([1-9][0-9]*)$")
 
 
 def _sha256(path: Path) -> str:
@@ -77,8 +78,17 @@ def _validate_experiment(experiment: dict[str, Any]) -> tuple[dict[str, Any], li
     if not isinstance(coarse, dict) or coarse.get("checkpoint") != "ema_coarse_update_9711.pth":
         raise ValueError("cascade evaluation requires the frozen EMA9711 coarse source")
     fine = experiment.get("fine_checkpoints")
-    if not isinstance(fine, list) or [row.get("label") for row in fine] != list(EXPECTED_FINE_LABELS):
-        raise ValueError(f"fine checkpoints must be ordered as {EXPECTED_FINE_LABELS}")
+    labels = tuple(str(row.get("label", "")) for row in fine) if isinstance(fine, list) else ()
+    matches = tuple(FINE_LABEL_PATTERN.fullmatch(label) for label in labels)
+    if (
+        len(labels) != 2
+        or matches[0] is None
+        or matches[1] is None
+        or matches[0].group(1) != "raw"
+        or matches[1].group(1) != "ema"
+        or matches[0].group(2) != matches[1].group(2)
+    ):
+        raise ValueError("fine checkpoints must be an ordered raw/EMA pair at the same update")
     for row in fine:
         if not isinstance(row.get("checkpoint"), str) or len(str(row.get("sha256", ""))) != 64:
             raise ValueError("each fine checkpoint requires a path and SHA256")
