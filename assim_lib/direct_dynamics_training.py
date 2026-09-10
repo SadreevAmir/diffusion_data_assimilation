@@ -21,11 +21,9 @@ from .config import TrainingConfig, load_json, merge_config_overrides, resolve_p
 from .data import build_dataset
 from .main import _debug
 from .model_io import build_unet
-from .runtime import add_noise, build_dataloader, seed_everything
-from .runtime import make_normalized_xy_grid
+from .runtime import add_noise, build_dataloader, make_normalized_xy_grid, seed_everything
 from .trainer import UNetTrainer, _atomic_json
 from .transforms import channel_denormalize
-
 
 DIRECT_LEADS = (3, 6, 9)
 DIRECT_OUTPUT_CHANNELS = 2 * len(DIRECT_LEADS)
@@ -130,8 +128,7 @@ class DirectDynamicsTrainer(UNetTrainer):
         model_input = torch.cat((noisy_truth, grid, condition), dim=1)
         if model_input.shape[1] != DIRECT_INPUT_CHANNELS:
             raise ValueError(
-                f"direct model input has {model_input.shape[1]} channels, "
-                f"expected {DIRECT_INPUT_CHANNELS}"
+                f"direct model input has {model_input.shape[1]} channels, expected {DIRECT_INPUT_CHANNELS}"
             )
         return model_input
 
@@ -169,27 +166,19 @@ class DirectDynamicsTrainer(UNetTrainer):
         return float((numerator / denominator.clamp(min=1)).item())
 
     @staticmethod
-    def _require_finite_on_valid(
-        value: torch.Tensor, valid: torch.Tensor, *, label: str
-    ) -> None:
+    def _require_finite_on_valid(value: torch.Tensor, valid: torch.Tensor, *, label: str) -> None:
         mask = valid.expand_as(value) > 0
         if not torch.any(mask):
             raise ValueError(f"{label} has no valid ocean points")
         invalid = ~torch.isfinite(value)
         count = int((invalid & mask).sum().item())
         if count:
-            raise FloatingPointError(
-                f"{label} contains {count} NaN/Inf values on valid ocean points"
-            )
+            raise FloatingPointError(f"{label} contains {count} NaN/Inf values on valid ocean points")
 
     @classmethod
-    def _raw_support_metrics(
-        cls, raw_ensemble: torch.Tensor, valid: torch.Tensor
-    ) -> dict[str, float]:
+    def _raw_support_metrics(cls, raw_ensemble: torch.Tensor, valid: torch.Tensor) -> dict[str, float]:
         expanded_valid = valid[:, None].expand_as(raw_ensemble)
-        cls._require_finite_on_valid(
-            raw_ensemble, expanded_valid, label="raw direct-dynamics ensemble"
-        )
+        cls._require_finite_on_valid(raw_ensemble, expanded_valid, label="raw direct-dynamics ensemble")
         sic = raw_ensemble[:, :, 0::2]
         sit = raw_ensemble[:, :, 1::2]
         support = valid[:, None].expand_as(sic) > 0
@@ -199,9 +188,7 @@ class DirectDynamicsTrainer(UNetTrainer):
         return {
             "sic_raw_support_violation_fraction": float(sic_bad.sum().item() / denominator),
             "sit_raw_support_violation_fraction": float(sit_bad.sum().item() / denominator),
-            "joint_raw_support_violation_fraction": float(
-                (sic_bad | sit_bad).sum().item() / denominator
-            ),
+            "joint_raw_support_violation_fraction": float((sic_bad | sit_bad).sum().item() / denominator),
         }
 
     def _fixed_validation_batch(self) -> dict[str, torch.Tensor]:
@@ -209,16 +196,12 @@ class DirectDynamicsTrainer(UNetTrainer):
             raw = next(iter(self.val_dataloader))
             batch = self._batch_to_device(raw)
             self._direct_validation_batch = {
-                key: value[: min(3, value.shape[0])]
-                for key, value in batch.items()
-                if torch.is_tensor(value)
+                key: value[: min(3, value.shape[0])] for key, value in batch.items() if torch.is_tensor(value)
             }
         return self._direct_validation_batch
 
     @torch.no_grad()
-    def _direct_diagnostic(
-        self, step: int, label: str, *, case_count: int = 1
-    ) -> dict[str, float]:
+    def _direct_diagnostic(self, step: int, label: str, *, case_count: int = 1) -> dict[str, float]:
         from .structured_trajectory_evaluation import make_structured_trajectory_figure
 
         batch = self._fixed_validation_batch()
@@ -266,16 +249,33 @@ class DirectDynamicsTrainer(UNetTrainer):
             self.model.train()
 
         raw_ensemble = torch.stack(members, dim=1)
+        truth = batch["structured_physical_truth"]
+        persistence = batch["structured_physical_background"]
+        samples_dir = Path(self.output_dir) / "direct_diagnostics"
+        samples_dir.mkdir(parents=True, exist_ok=True)
+        payload_path = samples_dir / f"{label}_samples.pt"
+        payload = self._augment_direct_diagnostic_payload(
+            {
+                "diagnostic_status": "raw_samples_saved_metrics_pending",
+                "raw_samples": raw_ensemble.detach().cpu(),
+                "truth": truth.detach().cpu(),
+                "persistence": persistence.detach().cpu(),
+                "valid_mask": valid.detach().cpu(),
+                "metrics": {},
+                "lead_days": DIRECT_LEADS,
+            },
+            step=step,
+            label=label,
+        )
+        self._atomic_save_direct_payload(payload, payload_path)
+
         metrics: dict[str, float] = {
+            **payload["metrics"],
             "step": float(step),
             "diagnostic_case_count": float(case_count),
             **self._raw_support_metrics(raw_ensemble, valid),
         }
-        ensemble = self._project_for_display(raw_ensemble.flatten(0, 1)).unflatten(
-            0, (case_count, 2)
-        )
-        truth = batch["structured_physical_truth"]
-        persistence = batch["structured_physical_background"]
+        ensemble = self._project_for_display(raw_ensemble.flatten(0, 1)).unflatten(0, (case_count, 2))
         raw_mean = raw_ensemble.mean(dim=1)
         display_mean = ensemble.mean(dim=1)
         self._require_finite_on_valid(truth, valid, label="direct diagnostic truth")
@@ -298,25 +298,16 @@ class DirectDynamicsTrainer(UNetTrainer):
                 metrics[f"{key}_member_roughness"] = self._roughness(
                     raw_ensemble[:, 0, channel : channel + 1], valid
                 )
-                metrics[f"{key}_truth_roughness"] = self._roughness(
-                    truth[0, channel : channel + 1], valid[0]
-                )
+                metrics[f"{key}_truth_roughness"] = self._roughness(truth[0, channel : channel + 1], valid[0])
 
-        samples_dir = Path(self.output_dir) / "direct_diagnostics"
-        samples_dir.mkdir(parents=True, exist_ok=True)
-        payload_path = samples_dir / f"{label}_samples.pt"
-        torch.save(
+        payload.update(
             {
-                "raw_samples": raw_ensemble.detach().cpu(),
+                "diagnostic_status": "complete_before_plot",
                 "display_samples": ensemble.detach().cpu(),
-                "truth": truth.detach().cpu(),
-                "persistence": persistence.detach().cpu(),
-                "valid_mask": valid.detach().cpu(),
                 "metrics": metrics,
-                "lead_days": DIRECT_LEADS,
-            },
-            payload_path,
+            }
         )
+        self._atomic_save_direct_payload(payload, payload_path)
         figure_series = (
             ("raw_member0", raw_ensemble[0, 0]),
             ("projected_member0_display_only", ensemble[0, 0]),
@@ -347,6 +338,19 @@ class DirectDynamicsTrainer(UNetTrainer):
                     self.clearml.report_scalar("direct_dynamics/physical", key, value, step)
         return metrics
 
+    def _augment_direct_diagnostic_payload(
+        self, payload: dict[str, Any], *, step: int, label: str
+    ) -> dict[str, Any]:
+        """Hook for atomic, pre-plot diagnostic provenance."""
+        del step, label
+        return payload
+
+    @staticmethod
+    def _atomic_save_direct_payload(payload: dict[str, Any], path: Path) -> None:
+        temporary = path.with_name(f".{path.name}.{os.getpid()}.incomplete")
+        torch.save(payload, temporary)
+        os.replace(temporary, path)
+
     def _report_train_metrics(self, loss, loss_full, loss_obs, loss_smooth, step: int):
         super()._report_train_metrics(loss, loss_full, loss_obs, loss_smooth, step)
         if (
@@ -359,9 +363,7 @@ class DirectDynamicsTrainer(UNetTrainer):
 
     def _after_training_epoch(self, epoch: int, global_step: int) -> None:
         if self.accelerator.is_main_process:
-            metrics = self._direct_diagnostic(
-                global_step, f"epoch_{epoch + 1:04d}", case_count=3
-            )
+            metrics = self._direct_diagnostic(global_step, f"epoch_{epoch + 1:04d}", case_count=3)
             self.val_history[-1]["direct_physical_diagnostic"] = metrics
             if epoch == 0:
                 gate_reasons = []
@@ -414,9 +416,7 @@ def _gpu_batch_smoke(model, train_loader, config: TrainingConfig) -> dict:
     time = torch.linspace(0.05, 0.95, truth.shape[0], device=device)
     state = (1.0 - time[:, None, None, None]) * clean + time[:, None, None, None] * noise
     target = noise - clean
-    grid = make_normalized_xy_grid(*config.image_size, device=device).expand(
-        truth.shape[0], -1, -1, -1
-    )
+    grid = make_normalized_xy_grid(*config.image_size, device=device).expand(truth.shape[0], -1, -1, -1)
     model_input = torch.cat((state, grid, condition), dim=1)
     if model_input.shape[1] != DIRECT_INPUT_CHANNELS:
         raise ValueError("GPU smoke constructed the wrong direct model input")
@@ -476,7 +476,10 @@ def run(config_path: Path, *, preflight_only: bool = False) -> dict:
     train_config = TrainingConfig.from_dict(model_config)
     if train_config.training_objective != "flow":
         raise ValueError("direct dynamics recovery intentionally uses the accepted state-flow objective")
-    if train_config.in_channels != DIRECT_INPUT_CHANNELS or train_config.out_channels != DIRECT_OUTPUT_CHANNELS:
+    if (
+        train_config.in_channels != DIRECT_INPUT_CHANNELS
+        or train_config.out_channels != DIRECT_OUTPUT_CHANNELS
+    ):
         raise ValueError("direct dynamics model must use 23 inputs and 6 outputs")
     if torch.cuda.device_count() != 1:
         raise RuntimeError("direct dynamics training requires exactly one visible GPU")
