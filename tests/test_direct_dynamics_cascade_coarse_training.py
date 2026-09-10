@@ -109,6 +109,10 @@ class CoarseCascadeRunnerTests(unittest.TestCase):
             "train_direct_dynamics_cascade_coarse_mean_v1.json",
             launcher,
         )
+        self.assertIn(
+            "train_direct_dynamics_cascade_coarse_compact_v2.json",
+            launcher,
+        )
         self.assertNotIn("FINE_CASCADE_LAUNCH_ID", launcher)
 
     def test_preflight_result_is_explicitly_zero_optimizer_and_terminal(self):

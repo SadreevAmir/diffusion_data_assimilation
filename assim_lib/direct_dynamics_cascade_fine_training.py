@@ -7,7 +7,9 @@ import hashlib
 import json
 import os
 import re
+import signal
 import subprocess
+from dataclasses import dataclass
 from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
@@ -47,6 +49,102 @@ FINE_BATCH_KEYS = (
 )
 PREFETCH_FACTOR = 4
 SHM_SAFETY_FRACTION = 0.70
+
+
+@dataclass
+class _Lifecycle:
+    run_id: str = "unknown"
+    code_commit: str = "unknown"
+    phase: str = "configuration"
+    output_root: Path | None = None
+    output_writable: bool = False
+    trainer: Any = None
+
+
+def _launch_status(status: str, **details: Any) -> None:
+    raw_path = os.environ.get("FINE_CASCADE_STATUS_PATH", "").strip()
+    if not raw_path:
+        return
+    path = Path(raw_path)
+    if not path.is_absolute() or path.name != "status.json":
+        raise ValueError("FINE_CASCADE_STATUS_PATH must be an absolute status.json path")
+    _atomic_json(path, {"status": status, **details})
+
+
+def _write_preflight_evidence(payload: dict[str, Any]) -> Path | None:
+    """Persist full preflight evidence in the unique controller launch directory."""
+    raw_path = os.environ.get("FINE_CASCADE_STATUS_PATH", "").strip()
+    if not raw_path:
+        return None
+    status_path = Path(raw_path)
+    if not status_path.is_absolute() or status_path.name != "status.json":
+        raise ValueError("FINE_CASCADE_STATUS_PATH must be an absolute status.json path")
+    path = status_path.parent / "preflight.json"
+    if path.exists() or path.is_symlink():
+        raise FileExistsError(f"refusing to replace fine cascade preflight evidence: {path}")
+    _atomic_json(path, payload)
+    return path
+
+
+def _record_failure(lifecycle: _Lifecycle, error: BaseException) -> None:
+    """Persist the primary failure while cleanup remains strictly best-effort."""
+    failure = {
+        "status": "failed",
+        "phase": lifecycle.phase,
+        "error_type": type(error).__name__,
+        "error": str(error),
+        "code_commit": lifecycle.code_commit,
+        "run_id": lifecycle.run_id,
+        "output_dir": None if lifecycle.output_root is None else str(lifecycle.output_root),
+        "cleanup_errors": [],
+    }
+    cleanup_errors = failure["cleanup_errors"]
+    if lifecycle.output_writable and lifecycle.output_root is not None:
+        try:
+            _atomic_json(lifecycle.output_root / "fine_cascade_failure.json", failure)
+        except Exception as cleanup_error:  # noqa: BLE001 - preserve primary failure
+            cleanup_errors.append(f"initial_failure_artifact: {cleanup_error}")
+    try:
+        _launch_status(**failure)
+    except Exception as cleanup_error:  # noqa: BLE001 - preserve primary failure
+        cleanup_errors.append(f"initial_failure_status: {cleanup_error}")
+    trainer = lifecycle.trainer
+    tracker = getattr(trainer, "clearml", None)
+    if tracker is not None:
+        try:
+            tracker.task.mark_failed(
+                status_reason=type(error).__name__, status_message=str(error)[:1000]
+            )
+        except Exception as cleanup_error:  # noqa: BLE001 - preserve primary failure
+            cleanup_errors.append(f"clearml_mark_failed: {cleanup_error}")
+        try:
+            tracker.close()
+        except Exception as cleanup_error:  # noqa: BLE001 - preserve primary failure
+            cleanup_errors.append(f"clearml_close: {cleanup_error}")
+    accelerator = getattr(trainer, "accelerator", None)
+    if accelerator is not None:
+        try:
+            accelerator.end_training()
+        except Exception as cleanup_error:  # noqa: BLE001 - preserve primary failure
+            cleanup_errors.append(f"accelerator_end_training: {cleanup_error}")
+    if lifecycle.output_writable and lifecycle.output_root is not None:
+        try:
+            _atomic_json(lifecycle.output_root / "fine_cascade_failure.json", failure)
+        except Exception as cleanup_error:  # noqa: BLE001 - preserve primary failure
+            cleanup_errors.append(f"failure_artifact: {cleanup_error}")
+    try:
+        _launch_status(**failure)
+    except Exception as cleanup_error:  # noqa: BLE001 - preserve primary failure
+        cleanup_errors.append(f"failure_status: {cleanup_error}")
+
+
+def _initialize_trainer(lifecycle: _Lifecycle, **kwargs: Any) -> FineCascadeDynamicsTrainer:
+    """Expose a partially initialized trainer to failure cleanup immediately."""
+    trainer_class = FineCascadeDynamicsTrainer
+    trainer = trainer_class.__new__(trainer_class)
+    lifecycle.trainer = trainer
+    trainer_class.__init__(trainer, **kwargs)
+    return trainer
 
 
 def _sha256_file(path: Path) -> str:
@@ -233,13 +331,14 @@ def _gpu_admission_smoke(model, raw: dict, config: TrainingConfig) -> dict:
     return result
 
 
-def run(config_path: Path, *, preflight_only: bool = False) -> dict:
+def _run_impl(config_path: Path, *, preflight_only: bool, lifecycle: _Lifecycle) -> dict:
     experiment = load_json(config_path)
     config_dir = config_path.resolve().parent
     data_path = resolve_path(experiment["data_config"], config_dir)
     model_path = resolve_path(experiment["model_config"], config_dir)
     repo_root = Path(__file__).resolve().parents[1]
     code_identity = _clean_code_identity(repo_root)
+    lifecycle.code_commit = code_identity["git_commit"]
     source_config_identity = {
         "experiment": {"path": str(config_path.resolve()), "sha256": _sha256_file(config_path)},
         "data": {"path": str(data_path.resolve()), "sha256": _sha256_file(data_path)},
@@ -250,6 +349,8 @@ def run(config_path: Path, *, preflight_only: bool = False) -> dict:
     launch_id = os.environ.get("FINE_CASCADE_LAUNCH_ID", "").strip()
     if not launch_id or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,63}", launch_id) is None:
         raise ValueError("FINE_CASCADE_LAUNCH_ID must be a safe non-empty identifier")
+    lifecycle.run_id = launch_id
+    _launch_status("python_preflight", run_id=launch_id, code_commit=code_identity["git_commit"])
     base_run_name = str(model_config.get("run_name") or "fine-cascade")
     model_config["run_name"] = f"{base_run_name}-{launch_id}"
     clearml = experiment.get("clearml", {})
@@ -264,14 +365,19 @@ def run(config_path: Path, *, preflight_only: bool = False) -> dict:
         }
     )
     config = TrainingConfig.from_dict(model_config)
+    if not config.clearml_enabled:
+        raise ValueError("bounded fine pilot requires online ClearML")
     if torch.cuda.device_count() != 1:
         raise RuntimeError("fine cascade training requires exactly one visible GPU")
 
     pilot = experiment.get("pilot", {})
+    if pilot.get("kind") not in {None, "mechanics_512", "compact_architecture_screen_512"}:
+        raise ValueError("fine cascade experiment declares an unsupported pilot kind")
     train_case_count = int(pilot.get("train_case_count", 4096))
     validation_case_count = int(pilot.get("validation_case_count", 48))
     if int(pilot.get("optimizer_updates", -1)) != 512:
         raise ValueError("fine cascade experiment must declare exactly 512 optimizer updates")
+    lifecycle.phase = "dataset_preflight"
     seed_everything(config.seed)
     train_dataset = build_dataset(data_config, split="train")
     validation_dataset = build_dataset(data_config, split="valid")
@@ -332,12 +438,15 @@ def run(config_path: Path, *, preflight_only: bool = False) -> dict:
     }
     sentinel["code_identity"] = code_identity
     output_root = Path(config.base_output_dir) / config.run_name
+    lifecycle.output_root = output_root
     if output_root.exists() or output_root.is_symlink():
         raise FileExistsError(f"refusing to reuse fine cascade output: {output_root}")
+    lifecycle.output_writable = True
 
     model = build_unet(config)
     parameter_count = sum(parameter.numel() for parameter in model.parameters())
     smoke_batch = _fine_collate([train_subset[index] for index in range(config.train_batch_size)])
+    lifecycle.phase = "gpu_smoke"
     smoke = _gpu_admission_smoke(model, smoke_batch, config)
     result = {
         "status": "preflight_passed" if preflight_only else "training_pending",
@@ -348,6 +457,26 @@ def run(config_path: Path, *, preflight_only: bool = False) -> dict:
         "gpu_batch_smoke": smoke,
     }
     if preflight_only:
+        result["executed_optimizer_updates"] = 0
+        preflight_evidence = {
+            **result,
+            "status": "preflight_passed",
+            "run_id": launch_id,
+            "code_identity": code_identity,
+            "source_config_identity": source_config_identity,
+            "effective_config_sha256": sentinel["effective_config_sha256"],
+        }
+        preflight_path = _write_preflight_evidence(preflight_evidence)
+        lifecycle.phase = "preflight_complete"
+        _launch_status(
+            "preflight_passed",
+            run_id=launch_id,
+            code_commit=code_identity["git_commit"],
+            candidate_optimizer_updates=planned_updates,
+            executed_optimizer_updates=0,
+            gpu_smoke_status=smoke["status"],
+            preflight_evidence=None if preflight_path is None else str(preflight_path),
+        )
         return result
 
     _atomic_json(output_root / "fine_cascade_dataset_sentinel.json", sentinel)
@@ -360,7 +489,9 @@ def run(config_path: Path, *, preflight_only: bool = False) -> dict:
         num_warmup_steps=config.lr_warmup_steps,
         num_training_steps=planned_updates,
     )
-    trainer = FineCascadeDynamicsTrainer(
+    lifecycle.phase = "clearml_initialization"
+    trainer = _initialize_trainer(
+        lifecycle,
         config=config,
         fine_code_identity=code_identity,
         model=model,
@@ -379,13 +510,48 @@ def run(config_path: Path, *, preflight_only: bool = False) -> dict:
         },
         dashboard_dataset=None,
     )
+    _launch_status(
+        "training",
+        run_id=launch_id,
+        code_commit=code_identity["git_commit"],
+        output_dir=str(output_root),
+        planned_optimizer_updates=planned_updates,
+    )
+    lifecycle.phase = "training_or_diagnostics"
     output_dir = trainer.train_loop()
-    result.update({"status": "completed", "output_dir": str(Path(output_dir).resolve())})
+    lifecycle.phase = "terminal_finalization"
+    result.update(
+        {
+            "status": "complete_pending_generated_coarse_e2e_and_independent_review",
+            "output_dir": str(Path(output_dir).resolve()),
+            "executed_optimizer_updates": planned_updates,
+        }
+    )
     _atomic_json(Path(output_dir) / "fine_cascade_training_completion.json", result)
+    _launch_status(
+        result["status"],
+        run_id=launch_id,
+        code_commit=code_identity["git_commit"],
+        output_dir=str(Path(output_dir).resolve()),
+        executed_optimizer_updates=planned_updates,
+    )
     return result
 
 
+def run(config_path: Path, *, preflight_only: bool = False) -> dict:
+    lifecycle = _Lifecycle()
+    try:
+        return _run_impl(config_path, preflight_only=preflight_only, lifecycle=lifecycle)
+    except BaseException as error:
+        _record_failure(lifecycle, error)
+        raise
+
+
 def main() -> None:
+    def _terminate(signum, _frame):
+        raise TimeoutError(f"fine cascade received termination signal {signum}")
+
+    signal.signal(signal.SIGTERM, _terminate)
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", required=True, type=Path)
     parser.add_argument("--preflight-only", action="store_true")

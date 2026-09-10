@@ -4,11 +4,28 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
+PYTHON_MODE=()
+if [[ "$#" -eq 1 && "$1" == "--preflight-only" ]]; then
+  PYTHON_MODE=("--preflight-only")
+elif [[ "$#" -ne 0 ]]; then
+  echo "usage: $0 [--preflight-only]" >&2
+  exit 2
+fi
+
 RUN_ID="${FINE_CASCADE_LAUNCH_ID:?FINE_CASCADE_LAUNCH_ID is required}"
 if [[ ! "$RUN_ID" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$ ]]; then
   echo "unsafe FINE_CASCADE_LAUNCH_ID" >&2
   exit 2
 fi
+CONFIG_PATH="${FINE_CASCADE_CONFIG:-config/experiments/train_direct_dynamics_cascade_fine_mechanics_v1.json}"
+case "$CONFIG_PATH" in
+  config/experiments/train_direct_dynamics_cascade_fine_mechanics_v1.json|\
+  config/experiments/train_direct_dynamics_cascade_fine_compact_v2.json) ;;
+  *)
+    echo "unsafe FINE_CASCADE_CONFIG" >&2
+    exit 2
+    ;;
+esac
 
 RESULT_ROOT="/home/autoresearch_results/direct_dynamics_cascade_v1"
 STATUS_ROOT="$RESULT_ROOT/launches"
@@ -24,8 +41,8 @@ printf '{"status":"admission_check","run_id":"%s","started_at":"%s","code_commit
 finish() {
   code=$?
   finished="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-  printf '{"status":"finished","run_id":"%s","exit_code":%d,"finished_at":"%s","code_commit":"%s"}\n' \
-    "$RUN_ID" "$code" "$finished" "$(git rev-parse HEAD)" > "$STATUS_DIR/status.json"
+  printf '{"run_id":"%s","controller_exit_code":%d,"finished_at":"%s","code_commit":"%s"}\n' \
+    "$RUN_ID" "$code" "$finished" "$(git rev-parse HEAD)" > "$STATUS_DIR/exit.json"
   exit "$code"
 }
 trap finish EXIT
@@ -90,10 +107,11 @@ fi
 printf '{"status":"running","run_id":"%s","started_at":"%s","code_commit":"%s"}\n' \
   "$RUN_ID" "$started" "$(git rev-parse HEAD)" > "$STATUS_DIR/status.json"
 
+export FINE_CASCADE_STATUS_PATH="$STATUS_DIR/status.json"
 export CLEARML_REQUIRE_ONLINE=1
 export OMP_NUM_THREADS=6
 export MKL_NUM_THREADS=6
 export OPENBLAS_NUM_THREADS=6
 export NUMEXPR_NUM_THREADS=6
 timeout --signal=TERM --kill-after=2m 14280s python -m assim_lib.direct_dynamics_cascade_fine_training \
-  --config config/experiments/train_direct_dynamics_cascade_fine_mechanics_v1.json
+  --config "$CONFIG_PATH" "${PYTHON_MODE[@]}"

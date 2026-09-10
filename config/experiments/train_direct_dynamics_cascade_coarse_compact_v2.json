@@ -15,6 +15,7 @@
     }
   },
   "pilot": {
+    "kind": "compact_architecture_screen_512",
     "train_case_count": 4096,
     "validation_case_count": 48,
     "optimizer_updates": 512
