@@ -1,6 +1,8 @@
+import os
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 import torch
 from torch import nn
@@ -18,7 +20,10 @@ from assim_lib.direct_dynamics_cascade_coarse_residual import (
     standardize_coarse_residual,
     unstandardize_coarse_residual,
 )
-from assim_lib.direct_dynamics_cascade_residual_stats import CaseEqualResidualMoments
+from assim_lib.direct_dynamics_cascade_residual_stats import (
+    CaseEqualResidualMoments,
+    _make_stats_loader,
+)
 
 
 def _condition(d0: torch.Tensor, valid: torch.Tensor) -> torch.Tensor:
@@ -201,7 +206,24 @@ class CoarsePersistenceResidualTests(unittest.TestCase):
         self.assertTrue(torch.allclose(state, 0.75 * whitened + 0.25 * noise))
         self.assertTrue(torch.allclose(velocity, noise - whitened))
         recovered = unstandardize_coarse_residual(whitened, active, statistics)
-        self.assertTrue(torch.allclose(persistence + recovered, torch.nn.functional.avg_pool2d(truth, 2)))
+        self.assertTrue(
+            torch.allclose(
+                persistence + recovered, torch.nn.functional.avg_pool2d(truth, 2)
+            )
+        )
+
+    def test_standardized_flow_rejects_nonfinite_and_out_of_range_real_time(self) -> None:
+        valid = torch.ones((1, 1, 4, 4))
+        d0 = torch.zeros((1, 2, 4, 4))
+        condition = _condition(d0, valid)
+        truth = d0.repeat(1, 3, 1, 1)
+        noise = torch.zeros((1, 6, 2, 2))
+        statistics = {"means": [0.0] * 6, "stds": [1.0] * 6}
+        for invalid_time in (torch.tensor([float("nan")]), torch.tensor([1.01])):
+            with self.assertRaises(ValueError):
+                coarse_standardized_residual_flow_pair(
+                    truth, noise, condition, valid, invalid_time, statistics
+                )
 
     def test_standardized_residual_is_invariant_to_channel_units(self) -> None:
         generator = torch.Generator().manual_seed(7)
@@ -286,6 +308,49 @@ class CoarsePersistenceResidualTests(unittest.TestCase):
         self.assertTrue(torch.allclose(sampler.last_residual, desired_residual, atol=1e-6))
         self.assertTrue(torch.allclose(reconstructed, persistence + desired_residual, atol=1e-6))
 
+    def test_production_standardized_sampler_recovers_correlated_moments(self) -> None:
+        class ZeroVelocity(nn.Module):
+            def forward(self, value, timestep, return_dict=False):
+                del timestep, return_dict
+                return (torch.zeros_like(value[:, :6]),)
+
+        count = 5000
+        generator = torch.Generator().manual_seed(31)
+        mixing = torch.tensor(
+            [
+                [1.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.4, 0.8, 0.0, 0.0, 0.0, 0.0],
+                [0.2, -0.1, 0.9, 0.0, 0.0, 0.0],
+                [0.0, 0.3, 0.1, 0.7, 0.0, 0.0],
+                [0.1, 0.0, 0.2, -0.2, 0.8, 0.0],
+                [-0.1, 0.2, 0.0, 0.1, 0.3, 0.7],
+            ]
+        )
+        noise = (torch.randn((count, 6), generator=generator) @ mixing.T).reshape(
+            count, 6, 1, 1
+        )
+        means = torch.tensor([0.2, -0.4, 0.1, 0.6, -0.2, 0.3])
+        stds = torch.tensor([0.3, 0.7, 0.2, 1.1, 0.9, 0.4])
+        statistics = {"means": means.tolist(), "stds": stds.tolist()}
+        valid = torch.ones((count, 1, 2, 2))
+        condition = _condition(torch.zeros((count, 2, 2, 2)), valid)
+        sampler = CoarseStandardizedPersistenceResidualSampler(ZeroVelocity(), statistics)
+        sampler.sample_conditioned(
+            structured_conditioning=condition,
+            valid_mask=valid,
+            initial_noise=noise,
+            num_timesteps=2,
+            device=torch.device("cpu"),
+            method="euler",
+            end_time=0.0,
+        )
+        physical = sampler.last_residual.reshape(count, 6)
+        expected_covariance = torch.diag(stds) @ (mixing @ mixing.T) @ torch.diag(stds)
+        self.assertTrue(torch.allclose(physical.mean(dim=0), means, atol=0.04, rtol=0.0))
+        self.assertTrue(
+            torch.allclose(torch.cov(physical.T), expected_covariance, atol=0.04, rtol=0.08)
+        )
+
     def test_case_equal_residual_moments_do_not_overweight_large_ocean_case(self) -> None:
         accumulator = CaseEqualResidualMoments(channels=1)
         residual = torch.tensor([[[[0.0, 2.0]]], [[[10.0, 99.0]]]])
@@ -294,6 +359,36 @@ class CoarsePersistenceResidualTests(unittest.TestCase):
         result = accumulator.finalize()
         self.assertAlmostEqual(result["means"][0], 5.5)
         self.assertAlmostEqual(result["variances"][0], 20.75)
+
+    def test_stats_loader_refuses_insufficient_shm_before_worker_construction(self) -> None:
+        sample = {
+            "truth": torch.zeros(6, 8, 8),
+            "background": torch.zeros(6, 8, 8),
+            "obs_values": torch.zeros(2, 8, 8),
+            "obs_mask": torch.zeros(2, 8, 8),
+            "valid_mask": torch.ones(1, 8, 8),
+            "water_mask": torch.ones(5, 8, 8),
+            "structured_conditioning": torch.zeros(15, 8, 8),
+            "structured_physical_truth": torch.zeros(6, 8, 8),
+            "structured_physical_background": torch.zeros(6, 8, 8),
+            "meta": {"case_id": "2016-01-01_slice00"},
+        }
+        with patch(
+            "assim_lib.direct_dynamics_cascade_residual_stats.build_dataloader"
+        ) as build:
+            with self.assertRaisesRegex(RuntimeError, "shared-memory safety budget"):
+                _make_stats_loader([sample], available_bytes=1)
+        build.assert_not_called()
+
+    def test_stats_launcher_is_cpu_only_bounded_and_thread_limited(self) -> None:
+        path = Path("scripts/run_direct_dynamics_cascade_residual_stats.sh")
+        source = path.read_text(encoding="utf-8")
+        self.assertTrue(os.access(path, os.X_OK))
+        self.assertIn("export CUDA_VISIBLE_DEVICES=''", source)
+        self.assertIn("export OMP_NUM_THREADS=6", source)
+        self.assertIn("export TORCH_NUM_INTEROP_THREADS=1", source)
+        self.assertIn("--kill-after=30s 3600s", source)
+        self.assertIn("COARSE_RESIDUAL_STATS_ID", source)
 
 
 if __name__ == "__main__":

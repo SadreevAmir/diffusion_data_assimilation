@@ -70,7 +70,9 @@ def coarse_residual_flow_pair(
     view = time.to(device=clean.device, dtype=clean.dtype).reshape(-1, 1, 1, 1)
     state = (1.0 - view) * residual + view * canonical_noise
     velocity = canonical_noise - residual
-    if not torch.isfinite(state[support]).all() or not torch.isfinite(velocity[support]).all():
+    if not torch.isfinite(state[support]).all() or not torch.isfinite(
+        velocity[support]
+    ).all():
         raise FloatingPointError("residual flow pair produced NaN/Inf on active ocean")
     return state, velocity, residual, persistence, fraction
 
@@ -125,12 +127,16 @@ def coarse_standardized_residual_flow_pair(
     statistics: Mapping[str, Any],
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
     """Return w_t, epsilon-W, raw R, persistence P and ocean fraction."""
+    if time.ndim != 1 or time.shape[0] != truth.shape[0]:
+        raise ValueError("time must contain one scalar per case")
+    if not torch.isfinite(time).all() or torch.any((time < 0) | (time > 1)):
+        raise ValueError("flow time must lie in [0,1]")
     _, _, residual, persistence, fraction = coarse_residual_flow_pair(
         truth,
         torch.zeros_like(noise),
         structured_conditioning,
         valid_mask,
-        torch.zeros_like(time),
+        time,
     )
     active = (fraction > 0).to(dtype=residual.dtype)
     whitened = standardize_coarse_residual(residual, active, statistics)
@@ -141,6 +147,8 @@ def coarse_standardized_residual_flow_pair(
     view = time.to(device=whitened.device, dtype=whitened.dtype).reshape(-1, 1, 1, 1)
     state = (1.0 - view) * whitened + view * canonical_noise
     velocity = canonical_noise - whitened
+    if not torch.isfinite(state[support]).all() or not torch.isfinite(velocity[support]).all():
+        raise FloatingPointError("standardized residual flow pair produced NaN/Inf on active ocean")
     return state, velocity, residual, persistence, fraction
 
 
@@ -945,9 +953,11 @@ class CoarseStandardizedPersistenceResidualTrainer(CoarsePersistenceResidualTrai
         manifest = json.loads(path.read_text(encoding="utf-8"))
         manifest.update(
             {
+                "sampler": "CoarseStandardizedPersistenceResidualSampler",
                 "target": "W=(C-P-mu)/s",
                 "reconstruction": "C=P+mu+s*W",
                 "conditional_law": "p(C|c_full) via fixed invertible train-only diagonal affine map",
+                "base_noise_coordinate": "epsilon~N(0,I) in W-space",
                 "residual_standardization": "six-channel train-only case-equal diagonal",
                 "residual_statistics_path": str(self._residual_statistics_path),
                 "residual_statistics_sha256": self._residual_statistics_sha256,

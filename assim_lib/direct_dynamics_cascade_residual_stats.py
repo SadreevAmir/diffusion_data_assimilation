@@ -3,9 +3,13 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
+import os
 from pathlib import Path
+from typing import Any
+
 import torch
 from torch.utils.data import Subset
 
@@ -16,6 +20,9 @@ from .direct_dynamics_cascade_coarse_residual import coarse_persistence_from_con
 from .direct_dynamics_cascade_fine_training import (
     EXPECTED_SPLIT_LENGTHS,
     PREFETCH_FACTOR,
+    SHM_SAFETY_FRACTION,
+    _batch_tensor_bytes,
+    _calendar_inventory,
     _canonical_sha256,
     _clean_code_identity,
     _evenly_spaced_indices,
@@ -23,6 +30,7 @@ from .direct_dynamics_cascade_fine_training import (
     _indices_sha256,
     _sha256_file,
 )
+from .direct_dynamics_training import validate_direct_dataset
 from .runtime import build_dataloader
 from .trainer import _atomic_json
 
@@ -84,6 +92,80 @@ class CaseEqualResidualMoments:
         }
 
 
+def _case_id(dataset, index: int) -> str:
+    day_index, archive_slice = divmod(index, 24)
+    target = dataset.calendar_pairs[day_index][1]
+    return f"{target.date.isoformat()}_slice{archive_slice:02d}"
+
+
+def _tensor_sha256(value: torch.Tensor) -> str:
+    canonical = value.detach().cpu().contiguous()
+    digest = hashlib.sha256()
+    digest.update(str(tuple(canonical.shape)).encode())
+    digest.update(str(canonical.dtype).encode())
+    digest.update(canonical.numpy().tobytes())
+    return digest.hexdigest()
+
+
+def residual_stats_ipc_preflight(
+    subset,
+    *,
+    batch_size: int,
+    num_workers: int,
+    prefetch_factor: int,
+    available_bytes: int | None = None,
+) -> dict[str, int | float]:
+    """Bound full-collate DataLoader IPC before any worker is constructed."""
+    if batch_size <= 0 or num_workers < 0 or prefetch_factor <= 0:
+        raise ValueError("residual statistics loader dimensions must be positive")
+    single_sample_bytes = _batch_tensor_bytes(_fine_collate([subset[0]]))
+    retained_batches = 1 + num_workers * prefetch_factor
+    estimated = single_sample_bytes * batch_size * retained_batches
+    if available_bytes is None:
+        stats = os.statvfs("/dev/shm")
+        available_bytes = int(stats.f_bavail * stats.f_frsize)
+    budget = int(SHM_SAFETY_FRACTION * available_bytes)
+    if estimated > budget:
+        raise RuntimeError(
+            "residual statistics DataLoader IPC estimate exceeds shared-memory safety budget: "
+            f"estimated={estimated}, budget={budget}, available={available_bytes}"
+        )
+    return {
+        "single_sample_bytes": single_sample_bytes,
+        "retained_batches": retained_batches,
+        "estimated_peak_ipc_bytes": estimated,
+        "shared_memory_available_bytes": available_bytes,
+        "safety_fraction": SHM_SAFETY_FRACTION,
+        "prefetch_factor": prefetch_factor,
+    }
+
+
+def _make_stats_loader(
+    subset,
+    *,
+    batch_size: int = 8,
+    num_workers: int = 4,
+    prefetch_factor: int = PREFETCH_FACTOR,
+    available_bytes: int | None = None,
+) -> tuple[Any, dict[str, int | float]]:
+    ipc = residual_stats_ipc_preflight(
+        subset,
+        batch_size=batch_size,
+        num_workers=num_workers,
+        prefetch_factor=prefetch_factor,
+        available_bytes=available_bytes,
+    )
+    loader = build_dataloader(
+        subset,
+        batch_size=batch_size,
+        num_workers=num_workers,
+        shuffle=False,
+        collate_fn=_fine_collate,
+        prefetch_factor=prefetch_factor,
+    )
+    return loader, ipc
+
+
 def build_statistics(config_path: Path, output_path: Path) -> dict:
     if not config_path.is_file():
         raise FileNotFoundError(config_path)
@@ -102,19 +184,22 @@ def build_statistics(config_path: Path, output_path: Path) -> dict:
     dataset = build_dataset(data_config, split="train")
     if len(dataset) != EXPECTED_SPLIT_LENGTHS["train"]:
         raise ValueError("train archive length differs from its audited inventory")
+    dataset_validation = validate_direct_dataset(dataset)
+    calendar_inventory = _calendar_inventory(dataset, split="train")
     indices = _evenly_spaced_indices(len(dataset), train_case_count)
+    selected_case_ids = [_case_id(dataset, index) for index in indices]
     subset = Subset(dataset, indices)
-    loader = build_dataloader(
-        subset,
-        batch_size=8,
-        num_workers=4,
-        shuffle=False,
-        collate_fn=_fine_collate,
-        prefetch_factor=PREFETCH_FACTOR,
-    )
+    reference_valid_mask = subset[0]["valid_mask"][:1].contiguous()
+    if not torch.isfinite(reference_valid_mask).all():
+        raise ValueError("static valid mask contains NaN/Inf")
+    static_valid_mask_sha256 = _tensor_sha256(reference_valid_mask)
+    loader, ipc = _make_stats_loader(subset)
     moments = CaseEqualResidualMoments()
     for raw in loader:
         valid = raw["valid_mask"][:, :1].float()
+        expected_valid = reference_valid_mask.to(dtype=valid.dtype).expand_as(valid)
+        if not torch.equal(valid, expected_valid):
+            raise ValueError("selected training cases do not share one static valid mask")
         clean, active, fraction = coarse_target(raw["truth"], valid)
         persistence, persistence_active, persistence_fraction = coarse_persistence_from_condition(
             raw["structured_conditioning"], valid
@@ -135,7 +220,14 @@ def build_statistics(config_path: Path, output_path: Path) -> dict:
         "coordinate": "normalized coarse R=C-P for d3/d6/d9 SIC/SIT",
         "channel_order": ["d3_sic", "d3_sit", "d6_sic", "d6_sit", "d9_sic", "d9_sit"],
         "train_case_count": train_case_count,
+        "selected_case_ids": selected_case_ids,
+        "selected_case_ids_sha256": _canonical_sha256(selected_case_ids),
         "train_indices_sha256": _indices_sha256(indices),
+        "ordered_inventory_sha256": calendar_inventory["ordered_inventory_sha256"],
+        "static_valid_mask_sha256": static_valid_mask_sha256,
+        "dataset_validation": dataset_validation,
+        "calendar_inventory": calendar_inventory,
+        "ipc_preflight": ipc,
         "data_config_sha256": _canonical_sha256(data_config),
         "data_config_path": str(data_path.resolve()),
         "data_config_file_sha256": _sha256_file(data_path),
@@ -155,6 +247,8 @@ def main() -> None:
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     arguments = parser.parse_args()
+    torch.set_num_threads(6)
+    torch.set_num_interop_threads(1)
     print(json.dumps(build_statistics(arguments.config.resolve(), arguments.output.resolve()), indent=2))
 
 
