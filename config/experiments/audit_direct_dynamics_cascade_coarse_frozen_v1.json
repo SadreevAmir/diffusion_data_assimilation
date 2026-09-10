@@ -1,0 +1,30 @@
+{
+  "project_name": "sea_ice_two_stage",
+  "task_name": "direct_dynamics_cascade_coarse_frozen_audit_v1",
+  "source_run": "/home/autoresearch_results/direct_dynamics_cascade_v1/coarse_learning_curve/lossless56_conv64_seed38119_u2048-coarse_lc_ef12495_20260910T023106Z",
+  "source_task_id": "f957e8ec0425420988f4fbbbaf8d4055",
+  "source_code_commit": "ef12495a8daf6ed19a0aa6ceb3780e95ec57361a",
+  "source_sha256": {
+    "checkpoint": "23231db01faaebe6230885ba8703c7a767bbb04da9ee135b52d843592bcb6ed1",
+    "samples": "2c6f36e85ba66d61f18f74e52e8b87c635134a30fbea4c4407689166d6c39272",
+    "manifest": "c8dec24e55f1d046161bb6698b899c39878b8c94f5bde35ac2ec395125f0803b",
+    "sentinel": "e526e8d134b675d0b3ffcc9e13aa09ed7ec27d3c0648ebe59ee0db51f430afd6",
+    "metadata": "50b50891962da296b7d400b8ff3d56f5559ad369657e7bf7425ecbc99ae1d099",
+    "model_config": "7ad2b368ae2ec8e463d74bd8aab47e0d7322760474bd10b69aab3a2b667b97f0",
+    "gate": "4954b20d2af1de7a8170bc0191c083ca3578ffa322a9343739a54f031672b2f7"
+  },
+  "clearml": {
+    "env_path": "/home/.env",
+    "tags": [
+      "cascade-coarse-stage",
+      "frozen-checkpoint",
+      "raw-update-2048",
+      "strict-fp32",
+      "rk4-17-33-65",
+      "shift-phase-audit",
+      "activation-audit",
+      "zero-optimizer-steps",
+      "one-gpu"
+    ]
+  }
+}
