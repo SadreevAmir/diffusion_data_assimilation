@@ -1,0 +1,30 @@
+{
+  "task_name": "direct_dynamics_cascade_residual_law_audit_v1",
+  "project_name": "sea_ice_two_stage",
+  "data_config": "../data/m2m_2f_two_stage_dynamics_protocol.json",
+  "data_overrides": {
+    "hour_mode": "all",
+    "dynamic_forcing_stats": {
+      "source_split": "train",
+      "estimator_scope": "slice23_train_reused_for_all_hour_recovery_ablation",
+      "indices": [6, 7, 13, 14],
+      "means": [0.00024072701720376523, -0.017859677007622955, -0.106700353199528, -0.18476749778477272],
+      "stds": [0.06025002092600086, 0.0655322642143171, 4.434678472175259, 4.7337812043401915],
+      "finite_value_count_per_field": [100059986, 100059986, 104958646, 104958646]
+    }
+  },
+  "batch_size": 4,
+  "num_workers": 4,
+  "noise_seed": 82471,
+  "clearml": {
+    "enabled": true,
+    "env_path": "/home/.env",
+    "tags": [
+      "cascade-fine-stage",
+      "train-only-audit",
+      "residual-base-law",
+      "zero-optimizer-steps",
+      "cpu-only"
+    ]
+  }
+}
