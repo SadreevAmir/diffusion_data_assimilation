@@ -1,0 +1,37 @@
+{
+  "project_name": "sea_ice_two_stage",
+  "task_name": "direct_dynamics_coarse_mean_vs_ensemble_gate_v1",
+  "artifacts": {
+    "mean_predictions": {
+      "path": "/home/autoresearch_results/direct_dynamics_cascade_v1/coarse_mean_frozen_audit/mean512_01ed925/frozen48_raw_predictions.pt",
+      "sha256": "e2a88e7d72df7a2b9f9d02143b5d9ff057a756c2d6d8cb7dfd76cfb2b20e94aa"
+    },
+    "mean_inputs": {
+      "path": "/home/autoresearch_results/direct_dynamics_cascade_v1/coarse_mean_frozen_audit/mean512_01ed925/frozen48_inputs.pt",
+      "sha256": "4284b7b4c2056834d8b5fcb8ea4a9635d78c7f69236b46a061d2daebbce2061d"
+    },
+    "mean_audit": {
+      "path": "/home/autoresearch_results/direct_dynamics_cascade_v1/coarse_mean_frozen_audit/mean512_01ed925/frozen_mean_audit.json",
+      "sha256": "395072ac6ce51556033c4e251e6cbc875300b12cd06d840d9a35f57a72bad2f6"
+    },
+    "coarse_ensemble": {
+      "path": "/home/autoresearch_results/direct_dynamics_cascade_v2/spatial_calibration/components/baseline2048.pt",
+      "sha256": "57df51edfe918ef581b7b7decd0f21725aa780dbc733cd225404041d80069a25"
+    }
+  },
+  "protocol": {
+    "case_count": 12,
+    "member_count": 8,
+    "checkpoint": "raw deterministic update512",
+    "ensemble": "coarse EMA9711",
+    "mc_correction": "unbiased member variance divided by 8; never clipped",
+    "regions": ["ocean", "coast"],
+    "spectral_band": "native coarse fully-ocean patch low band",
+    "bootstrap_unit": "date",
+    "optimizer_steps": 0
+  },
+  "clearml": {
+    "env_path": "/home/.env",
+    "tags": ["cpu-only", "frozen12", "deterministic-mean", "coarse-ema9711", "mc-corrected", "paired-date", "no-training"]
+  }
+}
