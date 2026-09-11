@@ -16,8 +16,9 @@ import math
 import os
 import re
 import signal
+import time
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import torch
 from torch.utils.data import Subset
@@ -267,33 +268,67 @@ def _repeat_for_members(value: torch.Tensor, members: int) -> torch.Tensor:
     return value[:, None].expand(-1, members, *value.shape[1:]).flatten(0, 1)
 
 
+REVIEWED_PROTOCOL = {
+    "prefix_intervals": 15,
+    "trainable_intervals": 1,
+    "rk4_intervals": 16,
+    "members": 4,
+    "updates": 64,
+    "batch_size": 1,
+    "learning_rate": 1e-5,
+    "crps_weight": 0.75,
+    "joint_energy_weight": 0.25,
+    "network_precision": "bf16",
+    "state_precision": "fp32",
+    "score_precision": "fp32",
+    "seed": 69173,
+    "training_split": "train-2016-2021",
+    "evaluation_generator": "same frozen-prefix plus trainable-terminal hybrid",
+    "rank_objective": False,
+    "clipping": False,
+    "activation_checkpointing": False,
+    "additional_ema": False,
+    "max_gpu_minutes": 30,
+}
+
+
+def _validate_reviewed_protocol(protocol: dict[str, Any]) -> None:
+    if any(protocol.get(key) != value for key, value in REVIEWED_PROTOCOL.items()):
+        raise ValueError("proper-refinement protocol differs from the reviewed bounded contract")
+
+
+def _atomic_torch_save(payload: Any, path: Path) -> str:
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    try:
+        torch.save(payload, temporary)
+        os.replace(temporary, path)
+    finally:
+        temporary.unlink(missing_ok=True)
+    return _sha256(path)
+
+
+def _persist_training_update_then_report(
+    output_dir: Path,
+    progress: dict[str, Any],
+    report: Callable[[], None],
+    *,
+    final_checkpoint: dict[str, Any] | None = None,
+) -> str | None:
+    """Make local progress durable before any fallible ClearML reporting."""
+    _atomic_json(output_dir / "progress.json", progress)
+    checkpoint_sha256 = None
+    if final_checkpoint is not None:
+        checkpoint_sha256 = _atomic_torch_save(
+            final_checkpoint, output_dir / "terminal_model_update_64.pth"
+        )
+    report()
+    return checkpoint_sha256
+
+
 def run_admission(config_path: Path, output_dir: Path) -> dict[str, Any]:
     experiment = load_json(config_path)
     protocol = experiment["protocol"]
-    required = {
-        "prefix_intervals": 15,
-        "trainable_intervals": 1,
-        "rk4_intervals": 16,
-        "members": 4,
-        "updates": 64,
-        "batch_size": 1,
-        "learning_rate": 1e-5,
-        "crps_weight": 0.75,
-        "joint_energy_weight": 0.25,
-        "network_precision": "bf16",
-        "state_precision": "fp32",
-        "score_precision": "fp32",
-        "seed": 69173,
-        "training_split": "train-2016-2021",
-        "evaluation_generator": "same frozen-prefix plus trainable-terminal hybrid",
-        "rank_objective": False,
-        "clipping": False,
-        "activation_checkpointing": False,
-        "additional_ema": False,
-        "max_gpu_minutes": 30,
-    }
-    if any(protocol.get(key) != value for key, value in required.items()):
-        raise ValueError("proper-refinement protocol differs from the reviewed bounded contract")
+    _validate_reviewed_protocol(protocol)
     if torch.cuda.device_count() != 1:
         raise RuntimeError("proper refinement requires exactly one visible GPU")
     if output_dir.exists() or output_dir.is_symlink():
@@ -483,6 +518,254 @@ def run_admission(config_path: Path, output_dir: Path) -> dict[str, Any]:
                 pass
 
 
+def run_training(config_path: Path, output_dir: Path) -> dict[str, Any]:
+    """Run the single Astra-approved 64-update train-only refinement."""
+    experiment = load_json(config_path)
+    protocol = experiment["protocol"]
+    _validate_reviewed_protocol(protocol)
+    if torch.cuda.device_count() != 1:
+        raise RuntimeError("proper refinement requires exactly one visible GPU")
+    if output_dir.exists() or output_dir.is_symlink():
+        raise FileExistsError(f"refusing to reuse output directory {output_dir}")
+    output_dir.mkdir(parents=True)
+    status_path = output_dir / "status.json"
+    _atomic_json(status_path, {"status": "initializing"})
+    tracker = None
+    history: list[dict[str, Any]] = []
+    attempted_update = 0
+    checkpoint_sha256 = None
+    try:
+        started = time.monotonic()
+        repo_root = Path(__file__).resolve().parents[1]
+        code_identity = _clean_code_identity(repo_root)
+        config_dir = config_path.resolve().parent
+        data_path = resolve_path(experiment["data_config"], config_dir)
+        model_path = resolve_path(experiment["model_config"], config_dir)
+        data_config = merge_config_overrides(
+            load_json(data_path), experiment.get("data_overrides")
+        )
+        model_config = load_json(model_path)
+        source = experiment["source"]
+        effective_contract = forecast_contract_from_data_config(data_config)
+        effective_contract_sha256 = forecast_contract_sha256(effective_contract)
+        if effective_contract_sha256 != source["forecast_contract_sha256"]:
+            raise ValueError("effective data/conditioning contract differs from EMA9711")
+
+        seed_everything(int(protocol["seed"]))
+        dataset = build_dataset(data_config, split="train")
+        if len(dataset) != EXPECTED_SPLIT_LENGTHS["train"]:
+            raise ValueError("train archive length differs from audited inventory")
+        sentinel = {
+            "dataset": validate_direct_dataset(dataset),
+            "calendar": _calendar_inventory(dataset, split="train"),
+            "data_config_sha256": _canonical_sha256(data_config),
+        }
+        indices = _evenly_spaced_indices(len(dataset), int(protocol["updates"]))
+        if len(indices) != int(protocol["updates"]) or len(set(indices)) != len(indices):
+            raise RuntimeError("reviewed training schedule must contain 64 unique cases")
+
+        device = torch.device("cuda:0")
+        tracker = ClearMLTracker(
+            experiment["project_name"],
+            f"direct_dynamics_cascade_coarse_proper_refinement_train_v1-{output_dir.name}",
+            tags=[*experiment["clearml"]["tags"], "train-64-updates"],
+            env_path=experiment["clearml"]["env_path"],
+        )
+        tracker.connect("proper_refinement_protocol", protocol)
+        _atomic_json(
+            status_path,
+            {"status": "training", "clearml_task_id": str(tracker.task.id), "update": 0},
+        )
+
+        loaded = load_coarse_cascade_sampler(
+            source["run_dir"],
+            source["checkpoint"],
+            model_config,
+            source["checkpoint_sha256"],
+            source["code_commit"],
+            source["forecast_contract_sha256"],
+            device=device,
+        )
+        frozen_model = loaded.sampler.model.eval()
+        for parameter in frozen_model.parameters():
+            parameter.requires_grad_(False)
+        trainable_model = copy.deepcopy(frozen_model).train()
+        for parameter in trainable_model.parameters():
+            parameter.requires_grad_(True)
+        optimizer = torch.optim.AdamW(
+            trainable_model.parameters(),
+            lr=float(protocol["learning_rate"]),
+            weight_decay=0.0,
+        )
+        generator = torch.Generator(device=device).manual_seed(int(protocol["seed"]) + 1)
+        grid = None
+        torch.cuda.reset_peak_memory_stats(device)
+
+        for update, index in enumerate(indices, start=1):
+            attempted_update = update
+            raw = dataset[index]
+            truth = raw["truth"].unsqueeze(0).to(device=device, dtype=torch.float32)
+            valid = raw["valid_mask"].unsqueeze(0)[:, :1].to(
+                device=device, dtype=torch.float32
+            )
+            condition = raw["structured_conditioning"].unsqueeze(0).to(
+                device=device, dtype=torch.float32
+            )
+            coarse_truth, active, ocean_fraction = coarse_target(truth, valid)
+            encoded, encoded_active, encoded_fraction = lossless_coarse_condition(
+                condition, valid
+            )
+            if not torch.equal(active, encoded_active) or not torch.equal(
+                ocean_fraction, encoded_fraction
+            ):
+                raise RuntimeError("coarse truth and condition support differ")
+            if grid is None:
+                grid = make_normalized_xy_grid(
+                    *coarse_truth.shape[-2:], device=device, dtype=torch.float32
+                )
+
+            members = int(protocol["members"])
+            noise = torch.randn(
+                (members, DIRECT_OUTPUT_CHANNELS, *coarse_truth.shape[-2:]),
+                generator=generator,
+                device=device,
+            )
+            encoded_members = _repeat_for_members(encoded, members)
+            active_members = _repeat_for_members(active, members)
+            prefix = frozen_prefix(
+                frozen_model, noise, encoded_members, active_members, grid
+            )
+            candidate = hybrid_terminal_sample(
+                trainable_model, prefix, encoded_members, active_members, grid
+            ).unflatten(0, (1, members))
+            objective, crps, energy = proper_objective(
+                candidate, coarse_truth, ocean_fraction
+            )
+            optimizer.zero_grad(set_to_none=True)
+            objective.backward()
+            gradients = [
+                parameter.grad.detach()
+                for parameter in trainable_model.parameters()
+                if parameter.grad is not None
+            ]
+            if not gradients or not all(torch.isfinite(value).all() for value in gradients):
+                raise FloatingPointError(f"invalid gradients at update {update}")
+            gradient_norm = torch.sqrt(
+                sum(value.float().square().sum() for value in gradients)
+            )
+            if not torch.isfinite(gradient_norm) or gradient_norm <= 0:
+                raise FloatingPointError(f"dead gradient at update {update}")
+            optimizer.step()
+            if not all(
+                torch.isfinite(parameter).all() for parameter in trainable_model.parameters()
+            ):
+                raise FloatingPointError(f"non-finite model at update {update}")
+
+            record = {
+                "update": update,
+                "train_index": int(index),
+                "objective": float(objective.detach().cpu()),
+                "fair_crps": float(crps.detach().cpu()),
+                "joint_energy": float(energy.detach().cpu()),
+                "gradient_norm": float(gradient_norm.detach().cpu()),
+                "elapsed_seconds": time.monotonic() - started,
+            }
+            history.append(record)
+            progress = {
+                "status": "training",
+                "clearml_task_id": str(tracker.task.id),
+                "attempted_update": attempted_update,
+                "completed_updates": len(history),
+                "history": history,
+            }
+            final_checkpoint = None
+            if update == int(protocol["updates"]):
+                final_checkpoint = {
+                    "model": trainable_model.state_dict(),
+                    "optimizer": optimizer.state_dict(),
+                    "source": source,
+                    "protocol": protocol,
+                    "train_indices": indices,
+                    "code_identity": code_identity,
+                    "effective_forecast_contract_sha256": effective_contract_sha256,
+                    "completed_updates": len(history),
+                }
+
+            def report_update() -> None:
+                for name in ("objective", "fair_crps", "joint_energy", "gradient_norm"):
+                    tracker.report_scalar(
+                        "proper_refinement_train", name, record[name], update
+                    )
+
+            saved_sha256 = _persist_training_update_then_report(
+                output_dir,
+                progress,
+                report_update,
+                final_checkpoint=final_checkpoint,
+            )
+            if saved_sha256 is not None:
+                checkpoint_sha256 = saved_sha256
+            _atomic_json(status_path, {**progress, **record})
+
+        checkpoint_path = output_dir / "terminal_model_update_64.pth"
+        if checkpoint_sha256 is None or not checkpoint_path.is_file():
+            raise RuntimeError("final checkpoint was not durably saved at update 64")
+        result = {
+            "status": "training_complete_pending_paired_gate",
+            "source": source,
+            "code_identity": code_identity,
+            "source_identity": {
+                "experiment_sha256": _sha256(config_path),
+                "data_sha256": _sha256_file(data_path),
+                "model_sha256": _sha256_file(model_path),
+            },
+            "protocol": protocol,
+            "train_indices": indices,
+            "dataset_sentinel": sentinel,
+            "effective_forecast_contract_sha256": effective_contract_sha256,
+            "history": history,
+            "checkpoint": checkpoint_path.name,
+            "checkpoint_sha256": checkpoint_sha256,
+            "peak_gpu_memory_mib": float(torch.cuda.max_memory_allocated(device) / 2**20),
+            "elapsed_seconds": time.monotonic() - started,
+            "clearml_task_id": str(tracker.task.id),
+        }
+        _atomic_json(output_dir / "training.json", result)
+        tracker.upload_artifact("terminal_model_update_64", checkpoint_path)
+        tracker.upload_artifact("proper_refinement_training", output_dir / "training.json")
+        tracker.close()
+        tracker = None
+        _atomic_json(
+            status_path,
+            {"status": result["status"], "clearml_task_id": result["clearml_task_id"]},
+        )
+        return result
+    except BaseException as error:
+        failure = {
+            "status": "failed",
+            "error_type": type(error).__name__,
+            "error": str(error),
+            "attempted_update": attempted_update,
+            "completed_updates": len(history),
+            "history": history,
+            "checkpoint": "terminal_model_update_64.pth"
+            if (output_dir / "terminal_model_update_64.pth").is_file()
+            else None,
+        }
+        try:
+            _atomic_json(output_dir / "failure.json", failure)
+            _atomic_json(status_path, failure)
+        except Exception:
+            pass
+        raise
+    finally:
+        if tracker is not None:
+            try:
+                tracker.close()
+            except Exception:
+                pass
+
+
 def main() -> None:
     def _terminate(signum, _frame):
         raise TimeoutError(f"proper refinement received termination signal {signum}")
@@ -492,11 +775,12 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--mode", choices=("admission",), default="admission")
+    parser.add_argument("--mode", choices=("admission", "train"), default="admission")
     args = parser.parse_args()
     if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,79}", args.output.name) is None:
         raise ValueError("output directory name is unsafe")
-    print(json.dumps(run_admission(args.config.resolve(), args.output.resolve()), indent=2))
+    runner = run_admission if args.mode == "admission" else run_training
+    print(json.dumps(runner(args.config.resolve(), args.output.resolve()), indent=2))
 
 
 if __name__ == "__main__":

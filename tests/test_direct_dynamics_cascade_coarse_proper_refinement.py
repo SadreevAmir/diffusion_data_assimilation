@@ -1,4 +1,7 @@
 import contextlib
+import json
+import tempfile
+from pathlib import Path
 
 import torch
 from torchdiffeq import odeint
@@ -6,11 +9,37 @@ from torchdiffeq import odeint
 from assim_lib.direct_dynamics_cascade_coarse_proper_refinement import (
     frozen_prefix,
     hybrid_terminal_sample,
+    _persist_training_update_then_report,
     proper_objective,
     rk4_interval,
     standardized_fair_crps,
     standardized_joint_energy,
 )
+
+
+def test_final_checkpoint_precedes_reporting_failure():
+    class ReportingFailure(RuntimeError):
+        pass
+
+    with tempfile.TemporaryDirectory() as directory:
+        output = Path(directory)
+
+        def fail_reporting():
+            raise ReportingFailure("network failed on update 64")
+
+        try:
+            _persist_training_update_then_report(
+                output,
+                {"completed_updates": 64, "history": [{"update": 64}]},
+                fail_reporting,
+                final_checkpoint={"model": {"weight": torch.ones(1)}, "completed_updates": 64},
+            )
+        except ReportingFailure as error:
+            assert str(error) == "network failed on update 64"
+        else:
+            raise AssertionError("reporting failure was not preserved")
+        assert (output / "terminal_model_update_64.pth").is_file()
+        assert json.loads((output / "progress.json").read_text())["completed_updates"] == 64
 
 
 def test_fair_crps_two_member_closed_form():

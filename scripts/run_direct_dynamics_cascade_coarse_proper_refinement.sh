@@ -5,8 +5,13 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 RUN_ID="${PROPER_REFINEMENT_RUN_ID:?PROPER_REFINEMENT_RUN_ID is required}"
+MODE="${PROPER_REFINEMENT_MODE:-admission}"
 if [[ ! "$RUN_ID" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$ ]]; then
   echo "unsafe PROPER_REFINEMENT_RUN_ID" >&2
+  exit 2
+fi
+if [[ "$MODE" != "admission" && "$MODE" != "train" ]]; then
+  echo "PROPER_REFINEMENT_MODE must be admission or train" >&2
   exit 2
 fi
 CONFIG="config/experiments/train_direct_dynamics_cascade_coarse_proper_refinement_v1.json"
@@ -17,8 +22,8 @@ if ! mkdir -m 700 "$STATUS_ROOT/$RUN_ID"; then
   echo "refusing to reuse proper-refinement launch" >&2
   exit 3
 fi
-printf '{"status":"gpu_admission","run_id":"%s","code_commit":"%s"}\n' \
-  "$RUN_ID" "$(git rev-parse HEAD)" > "$STATUS_ROOT/$RUN_ID/status.json"
+printf '{"status":"%s_gpu_admission","run_id":"%s","code_commit":"%s"}\n' \
+  "$MODE" "$RUN_ID" "$(git rev-parse HEAD)" > "$STATUS_ROOT/$RUN_ID/status.json"
 finish() {
   code=$?
   trap - EXIT
@@ -26,8 +31,8 @@ finish() {
     "$RUN_ID" "$code" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$(git rev-parse HEAD)" \
     > "$STATUS_ROOT/$RUN_ID/exit.json"
   if [[ "$code" -eq 0 ]]; then
-    printf '{"status":"admission_complete","run_id":"%s","code_commit":"%s"}\n' \
-      "$RUN_ID" "$(git rev-parse HEAD)" > "$STATUS_ROOT/$RUN_ID/status.json"
+    printf '{"status":"%s_complete","run_id":"%s","code_commit":"%s"}\n' \
+      "$MODE" "$RUN_ID" "$(git rev-parse HEAD)" > "$STATUS_ROOT/$RUN_ID/status.json"
   else
     printf '{"status":"failed","run_id":"%s","exit_code":%d,"code_commit":"%s"}\n' \
       "$RUN_ID" "$code" "$(git rev-parse HEAD)" > "$STATUS_ROOT/$RUN_ID/status.json"
@@ -90,4 +95,4 @@ export OPENBLAS_NUM_THREADS=6
 export NUMEXPR_NUM_THREADS=6
 timeout --foreground --signal=TERM --kill-after=60s 1740s \
   python -m assim_lib.direct_dynamics_cascade_coarse_proper_refinement \
-  --config "$CONFIG" --output "$OUTPUT" --mode admission
+  --config "$CONFIG" --output "$OUTPUT" --mode "$MODE"
