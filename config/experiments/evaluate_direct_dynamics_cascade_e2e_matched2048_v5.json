@@ -1,0 +1,43 @@
+{
+  "project_name": "sea_ice_two_stage",
+  "task_name": "direct_dynamics_cascade_e2e_matched_scale_2048_v5",
+  "cases": 12,
+  "members": 8,
+  "coarse_rk4_timepoints": 17,
+  "fine_rk4_timepoints": 17,
+  "forecast_contract_sha256": "24ee4b6c2e543d5bba866d06a5eafb170de39360de6c71256d7c53bfcd89b146",
+  "case_indices": [0, 727, 1636, 2363, 3090, 3817, 4726, 5453, 6180, 6907, 7816, 8543],
+  "case_ids": [
+    "2022-01-01_slice00", "2022-01-31_slice07", "2022-03-10_slice04",
+    "2022-04-09_slice11", "2022-05-09_slice18", "2022-06-09_slice01",
+    "2022-07-16_slice22", "2022-08-16_slice05", "2022-09-15_slice12",
+    "2022-10-15_slice19", "2022-11-22_slice16", "2022-12-22_slice23"
+  ],
+  "coarse": {
+    "run_dir": "/home/autoresearch_results/direct_dynamics_cascade_v1/coarse_full_train_6e/lossless56_conv64_seed38119_full6e-coarse_full6e_final_bdafe1f",
+    "checkpoint": "ema_coarse_update_9711.pth",
+    "code_commit": "bdafe1f6407f747c4df5cd17c18b8099042b745b",
+    "sha256": {
+      "ema_coarse_update_9711.pth": "125f520c33cbea548a3de7d131220edbfc80900c120786202cdb34e8d0a4dcaa",
+      "config.json": "2615a0206bec10ea3851f04d490957bab83b76e54276cefaaa9c854412c0322b",
+      "metadata.json": "b918df3f32fa5809d816c2a9a53d92af5679acb72d646bfffe9a40a14216d92f",
+      "coarse_cascade_manifest.json": "f441382d73cbc4daf514d32b71ec6fd80f45b5d470170a2061c96f2a402ebe4a"
+    }
+  },
+  "fine_run_dir": "/home/autoresearch_results/direct_dynamics_cascade_v2/fine_compact_mechanics/conv32_seed27181-fine_matched_scale_2048_78679f2",
+  "fine_code_commit": "78679f2c081032bcea96555aa6d805ed8b06b755",
+  "fine_sha256": {
+    "config.json": "cd7f3846432fe776cd9e6e454f6c5f2710d6bd37adcf14f2bb3225425bc08111",
+    "metadata.json": "4a07a392c9ff9ceeb0068e5a9a5557e8c8a0f3bfbbb21b88187483b75de887a1",
+    "fine_cascade_manifest.json": "91c49a455631188a1bc88115ba19835d0da61a77eef2410e2016a1fd0669c294",
+    "fine_cascade_matched_base_manifest.json": "856e550c7706325d98fc9814a2e29cffafcb3b43774993e02275b4ac9f9c2caf"
+  },
+  "fine_checkpoints": [
+    {"label": "raw_fine_2048", "checkpoint": "mechanics_update_2048.pth", "sha256": "60be1fce1dc42193aa5601165083214c290ba2f47a674b06ebbc2b9db8510509"},
+    {"label": "ema_fine_2048", "checkpoint": "ema_mechanics_update_2048.pth", "sha256": "0ddce7f88a51260eb167239190703ca8d0de94e26b67f843d3b5d2f0113e9759"}
+  ],
+  "clearml": {
+    "env_path": "/home/.env",
+    "tags": ["generated-coarse-e2e", "ema9711", "matched-scale-fine2048", "equal-budget-control", "paired-raw-ema", "twelve-cases", "eight-members", "rank-histogram", "fixed-scale", "raw-unclipped", "one-gpu", "zero-optimizer-steps"]
+  }
+}
