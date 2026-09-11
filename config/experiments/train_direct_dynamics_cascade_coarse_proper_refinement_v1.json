@@ -1,0 +1,52 @@
+{
+  "project_name": "sea_ice_two_stage",
+  "task_name": "direct_dynamics_cascade_coarse_proper_refinement_admission_v1",
+  "data_config": "../data/m2m_2f_two_stage_dynamics_protocol.json",
+  "model_config": "../methods/direct_dynamics_cascade_coarse_full_train_6e_2f.json",
+  "data_overrides": {
+    "hour_mode": "all",
+    "dynamic_forcing_stats": {
+      "source_split": "train",
+      "estimator_scope": "slice23_train_reused_for_all_hour_recovery_ablation",
+      "indices": [6, 7, 13, 14],
+      "means": [0.00024072701720376523, -0.017859677007622955, -0.106700353199528, -0.18476749778477272],
+      "stds": [0.06025002092600086, 0.0655322642143171, 4.434678472175259, 4.7337812043401915],
+      "finite_value_count_per_field": [100059986, 100059986, 104958646, 104958646]
+    }
+  },
+  "source": {
+    "run_dir": "/home/autoresearch_results/direct_dynamics_cascade_v1/coarse_full_train_6e/lossless56_conv64_seed38119_full6e-coarse_full6e_final_bdafe1f",
+    "checkpoint": "ema_coarse_update_9711.pth",
+    "checkpoint_sha256": "125f520c33cbea548a3de7d131220edbfc80900c120786202cdb34e8d0a4dcaa",
+    "code_commit": "bdafe1f6407f747c4df5cd17c18b8099042b745b",
+    "forecast_contract_sha256": "24ee4b6c2e543d5bba866d06a5eafb170de39360de6c71256d7c53bfcd89b146",
+    "fine_checkpoint": "ema_mechanics_update_4096.pth",
+    "fine_checkpoint_sha256": "5700d1ad12950af748b22a395743df2afea6aaff1502481aa6d065cf76eb35bf"
+  },
+  "protocol": {
+    "prefix_intervals": 15,
+    "trainable_intervals": 1,
+    "rk4_intervals": 16,
+    "members": 4,
+    "updates": 64,
+    "batch_size": 1,
+    "learning_rate": 0.00001,
+    "crps_weight": 0.75,
+    "joint_energy_weight": 0.25,
+    "seed": 69173,
+    "training_split": "train-2016-2021",
+    "evaluation_generator": "same frozen-prefix plus trainable-terminal hybrid",
+    "rank_objective": false,
+    "clipping": false,
+    "activation_checkpointing": false,
+    "additional_ema": false,
+    "network_precision": "bf16",
+    "state_precision": "fp32",
+    "score_precision": "fp32",
+    "max_gpu_minutes": 30
+  },
+  "clearml": {
+    "env_path": "/home/.env",
+    "tags": ["coarse-ema9711", "proper-score", "frozen-prefix", "trainable-terminal-rk4", "admission", "one-gpu", "no-checkpointing", "train-only"]
+  }
+}
