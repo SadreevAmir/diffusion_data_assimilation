@@ -1,0 +1,57 @@
+{
+  "project_name": "sea_ice_two_stage",
+  "task_name": "direct_dynamics_cascade_memberwise_affine_oof_v1",
+  "source": {
+    "path": "/home/autoresearch_results/direct_dynamics_cascade_v2/spatial_calibration/components/champion4096.pt",
+    "sha256": "af55cd7d5cbda26ea57bef98c8ecebf6158f7a17b4698d4b3fb608e226cb28ff",
+    "candidate": "champion4096",
+    "coarse_checkpoint": "ema_coarse_update_9711.pth",
+    "coarse_checkpoint_sha256": "125f520c33cbea548a3de7d131220edbfc80900c120786202cdb34e8d0a4dcaa",
+    "fine_checkpoint": "ema_mechanics_update_4096.pth",
+    "fine_checkpoint_sha256": "5700d1ad12950af748b22a395743df2afea6aaff1502481aa6d065cf76eb35bf",
+    "schema_version": "frozen_cascade_components_v1",
+    "replay_commit": "134dff96375f33ac72c38b7ede045014ba603685",
+    "fine_training_commit": "48622bcf99c541d3a30449b3264c38047f21f78b",
+    "solver": {"method": "rk4", "coarse_num_timesteps": 17, "fine_num_timesteps": 17, "rtol": 0.00001, "atol": 0.000001, "end_time": 0.0}
+  },
+  "normalization": {
+    "source_path": "config/data/m2m_2f_structured_joint_train_stats.json",
+    "source_sha256": "42551e8888c51b79f4e94ee441d9ec7e2bc373afaaa7e96750896a5c8fa82c14",
+    "means": [0.19301218262209952, 0.18969311571248842],
+    "stds": [0.36890927421384667, 0.4359687842884708]
+  },
+  "folds": [[0, 3, 6, 9], [1, 4, 7, 10], [2, 5, 8, 11]],
+  "case_ids": [
+    "2022-01-01_slice00", "2022-01-31_slice07", "2022-03-10_slice04",
+    "2022-04-09_slice11", "2022-05-09_slice18", "2022-06-09_slice01",
+    "2022-07-16_slice22", "2022-08-16_slice05", "2022-09-15_slice12",
+    "2022-10-15_slice19", "2022-11-22_slice16", "2022-12-22_slice23"
+  ],
+  "fit": {
+    "scale_bounds": [0.5, 2.0],
+    "offset_bounds_standardized": [-0.25, 0.25],
+    "coarse_scale_step": 0.1,
+    "coarse_offset_step": 0.05,
+    "coarse_pixel_stride": 16,
+    "powell_maxfev": 240,
+    "powell_xtol": 0.0005,
+    "powell_ftol": 0.00001
+  },
+  "gate": {
+    "minimum_crps_improvement": 0.01,
+    "per_output_score_tolerance": 0.01,
+    "minimum_ssr_error_reduction": 0.05,
+    "per_output_rank_tv_tolerance": 0.01,
+    "roughness_tolerance": 0.02,
+    "haze_mean_tolerance_m": 0.001,
+    "haze_p95_tolerance_m": 0.001,
+    "haze_fraction_tolerance": 0.005,
+    "exact_zero_fraction_tolerance": 0.005,
+    "bootstrap_draws": 10000,
+    "bootstrap_seed": 93117
+  },
+  "clearml": {
+    "env_path": "/home/.env",
+    "tags": ["cpu-only", "champion4096", "memberwise", "censored-affine", "oof", "zero-training"]
+  }
+}
