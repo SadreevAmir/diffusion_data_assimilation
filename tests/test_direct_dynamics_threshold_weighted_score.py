@@ -68,6 +68,30 @@ def test_threshold_evaluation_is_explicitly_development_only_and_valid():
     assert "evaluate_direct_dynamics_cascade_threshold_weighted_refinement_v1.json" in launcher
 
 
+def test_threshold_evaluation_launcher_executes_terminal_module_dispatch():
+    environment = {
+        "PATH": "/usr/bin:/bin",
+        "CASCADE_E2E_RUN_ID": "resolve_threshold_module",
+        "CASCADE_E2E_CONFIG": (
+            "config/experiments/"
+            "evaluate_direct_dynamics_cascade_threshold_weighted_refinement_v1.json"
+        ),
+        "CASCADE_E2E_RESOLVE_ONLY": "1",
+    }
+    result = subprocess.run(
+        ["bash", "scripts/run_direct_dynamics_cascade_e2e_evaluation.sh"],
+        cwd=Path.cwd(),
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == (
+        "assim_lib.direct_dynamics_cascade_proper_refinement_evaluation"
+    )
+
+
 def test_launcher_rejects_unreviewed_config_before_gpu_admission():
     environment = {
         "PATH": "/usr/bin:/bin",
