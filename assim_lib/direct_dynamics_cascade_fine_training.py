@@ -141,10 +141,11 @@ def _record_failure(lifecycle: _Lifecycle, error: BaseException) -> None:
 def _initialize_trainer(
     lifecycle: _Lifecycle,
     *,
-    trainer_class=FineCascadeDynamicsTrainer,
+    trainer_class=None,
     **kwargs: Any,
 ) -> FineCascadeDynamicsTrainer:
     """Expose a partially initialized trainer to failure cleanup immediately."""
+    trainer_class = FineCascadeDynamicsTrainer if trainer_class is None else trainer_class
     trainer = trainer_class.__new__(trainer_class)
     lifecycle.trainer = trainer
     trainer_class.__init__(trainer, **kwargs)
