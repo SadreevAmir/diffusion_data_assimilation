@@ -15,7 +15,7 @@ from .clearml_tracking import ClearMLTracker
 from .config import load_json, merge_config_overrides, resolve_path
 from .data import build_dataset
 from .direct_dynamics_cascade_coarse import coarse_target
-from .direct_dynamics_cascade_coarse_correlated_reference import (
+from .direct_dynamics_coarse_correlated_reference import (
     ActiveCoarseLayout,
     fit_weighted_second_moment_basis,
     identity_reference,
