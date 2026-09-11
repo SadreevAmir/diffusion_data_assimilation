@@ -117,7 +117,8 @@ def run(config_path: Path, output: Path) -> dict[str, Any]:
             raise ValueError("target and persistence supports differ")
         if layout is None:
             layout = ActiveCoarseLayout.build(active[:1], fraction[:1])
-            if tensor_sha256(valid[:1].contiguous()) != statistics["static_valid_mask_sha256"]:
+            # Statistics bind the sample mask as [1,H,W], without a batch axis.
+            if tensor_sha256(valid[0].contiguous()) != statistics["static_valid_mask_sha256"]:
                 raise ValueError("current dataset static mask differs from residual statistics")
         expected_active = active[:1].expand_as(active)
         expected_fraction = fraction[:1].expand_as(fraction)
