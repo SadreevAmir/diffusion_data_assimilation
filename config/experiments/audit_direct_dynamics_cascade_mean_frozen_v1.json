@@ -1,0 +1,63 @@
+{
+  "schema_version": "coarse_mean_frozen_audit_contract_v1",
+  "project_name": "sea_ice_two_stage",
+  "task_name": "direct_dynamics_cascade_mean_frozen_audit_v1",
+  "source_commit": "ea428e68114d016be003de530df36d8a708c7cf3",
+  "source_run_dir": "/home/autoresearch_results/direct_dynamics_cascade_v1/coarse_mean/deterministic_mean50_conv64_seed38119_u2048-mean2048_ea428e6_20260910T0927Z",
+  "validation_indices_sha256": "922b5fe753aeacc4034d8c328d6cbe487bf933c2f22c52ad4fa0b639dfde2600",
+  "source_artifacts_sha256": {
+    "best_model.pth": "6e4ad495eea741cade0d307b4be5e40ff287169ead69c00cb93fd6459e048fab",
+    "coarse_update_0512.pth": "451ed1e7763703706cbab748043fd3bdc685aaa2ed154af7fcae9c8eb4338bc5",
+    "metadata.json": "a735c96fd3708be0d3871650c1939cee5a0f44eecec0d8b19211396890e0c356",
+    "coarse_cascade_manifest.json": "6e032a2d2439d1781aa872657ad31a1cbe2b2463dfaab614fc65939fb6baf41c",
+    "coarse_cascade_dataset_sentinel.json": "2a732c7b08e5a0a2e28dab8a0cf4df982dc28370a08fb8ed5a7aee012d282335",
+    "metrics.json": "4fe652921142a2de8366f2b81d4406edbcdfa03331d6d12fa8a6178b28f43107",
+    "coarse_mechanics_gate.json": "4b4608cb0232bbae1343b8b0381bfcb84d4c933d609400fdb28ee89e25818f5d",
+    "coarse_cascade_training_completion.json": "4b2f67f6ca31edb3d28a0dcda06c88700156996fec3a3d8c8b65bb50dba7788e",
+    "coarse_mean_diagnostics/update_0512_mean.pt": "ac8be1594b044b4683a40e9cadfb0f0d72d2cc416c9e02a63a66e04e28ee1619",
+    "coarse_mean_diagnostics/update_0512_metrics.json": "d57af7b9fed2ae0ee0739237fa1b1ea874849b053d92d506aea6276e10df84d0",
+    "coarse_mean_diagnostics/update_1024_mean.pt": "366888467320d073f802490d3d0723fa67ff09fc42322c727cd7a8b61088b35f",
+    "coarse_mean_diagnostics/update_1024_metrics.json": "164995771da33b552475b31d7fde4a11b2c7ab9628ea6fbf992ccba3887a5e33",
+    "coarse_mean_diagnostics/update_1536_mean.pt": "f79351ace29adb8167f5180679f5148a7fb434bd0099c140ed28e1574af93cac",
+    "coarse_mean_diagnostics/update_1536_metrics.json": "de325c5714b314d4ff14c402823c62909b0bb6293e808eb06f5731b670578093",
+    "coarse_mean_diagnostics/update_2048_mean.pt": "8f583826f98884bccdfbf3699e909319d9c88ec5b0bf9b3c6ae12f28cdac670c",
+    "coarse_mean_diagnostics/update_2048_metrics.json": "d9a5c1c26eeb259cf113f41f113deeed9ea8df00abd9ce8b4e7629fb4444087e"
+  },
+  "source_files_sha256": {
+    "config/experiments/train_direct_dynamics_cascade_coarse_mean_v1.json": "577499449e7370854fc2631bf22cff47c1ab7bc6e9a0a1ade0cdba3e44ef8b8f",
+    "config/data/m2m_2f_two_stage_dynamics_protocol.json": "6fb71cc079f17fc0888dd4b4c0d7f06dd57c217b0729403ee3916ac3f82903de",
+    "config/methods/direct_dynamics_cascade_coarse_mean_2f.json": "10bda7c5661f72168d1d5eedb907a75b633d1e00815b06fd682f2495dfa71cbd",
+    "assim_lib/direct_dynamics_cascade_coarse_mean.py": "315129869f0fc9aa035a0fa19f7748ce18a1f97f5edd6f682b9a5490b680c7b4",
+    "assim_lib/direct_dynamics_cascade_coarse.py": "761d67efe6035db87361a62d0deb884bcf00e013331757cdd03c8cda1178f8e8",
+    "assim_lib/direct_dynamics_cascade.py": "217397bda804a1683a83d82c5909cdddc00b9ec1109485e12f859c58596674a3",
+    "assim_lib/direct_dynamics_cascade_coarse_residual.py": "de99bad7c221e59e12b67928dec1d40f80984c5285fbc1aa0289babcb645d7ac",
+    "assim_lib/direct_dynamics_cascade_fine_training.py": "ed46c4a1412a28d090f2676eb30b89a7fa91a8f5cc68d65be9d2a96bb051ad0b",
+    "assim_lib/direct_dynamics_training.py": "26da32b40200eb5b45d13181945cfb9b38e3685d30d2eaa7ac21cd42489410fa",
+    "assim_lib/data.py": "3bb2a6bef47caa5183d15e6182652be0f180428c66c11fd2291110397cd0e63e",
+    "assim_lib/model_io.py": "b6779524be7a7685f4f28ba6d5feff5f025bd77b424940233e47eaa2323a573c",
+    "assim_lib/transforms.py": "fd0ec8fc8d4c7d62d8a9f949238cf995802784baecb55cedeac3b391160f577c",
+    "assim_lib/runtime.py": "2a5da67a1262f2e82264432f0a34d5627108aab14bd84b27ff0ac684ac4de0dc",
+    "assim_lib/config.py": "76d10683a0e5d3d4e9c2c0396e49968f9c286e028223efccdf81329dbabbbe2c"
+  },
+  "protocol": {
+    "split": "valid",
+    "case_count": 48,
+    "batch_size": 4,
+    "workers": 0,
+    "inference_dtype": "float32",
+    "scoring_dtype": "float64",
+    "checkpoint": "coarse_update_0512.pth",
+    "matched_updates": [512, 1024, 1536, 2048],
+    "matched_subset_positions": [4, 16, 28, 40],
+    "physical_tolerance": 1e-6,
+    "historical_metric_atol": 1e-6,
+    "historical_metric_rtol": 1e-5,
+    "optimizer_steps": 0,
+    "new_dates": false
+  },
+  "clearml": {
+    "enabled": true,
+    "env_path": "/home/.env",
+    "tags": ["cpu-only", "frozen-48", "raw-checkpoint-512", "point-control", "no-training", "no-new-dates", "astra-reviewed-protocol"]
+  }
+}
