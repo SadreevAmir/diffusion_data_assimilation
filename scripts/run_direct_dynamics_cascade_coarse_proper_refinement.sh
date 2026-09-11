@@ -16,10 +16,14 @@ if [[ "$MODE" != "admission" && "$MODE" != "train" ]]; then
 fi
 CONFIG="${PROPER_REFINEMENT_CONFIG:-config/experiments/train_direct_dynamics_cascade_coarse_proper_refinement_v1.json}"
 OUTPUT_GROUP="${PROPER_REFINEMENT_OUTPUT_GROUP:-proper_refinement}"
-if [[ ! "$OUTPUT_GROUP" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$ ]]; then
-  echo "unsafe PROPER_REFINEMENT_OUTPUT_GROUP" >&2
-  exit 2
-fi
+case "$CONFIG|$OUTPUT_GROUP" in
+  "config/experiments/train_direct_dynamics_cascade_coarse_proper_refinement_v1.json|proper_refinement"|\
+  "config/experiments/train_direct_dynamics_cascade_threshold_weighted_refinement_v1.json|threshold_weighted_refinement") ;;
+  *)
+    echo "unreviewed proper-refinement config/output pair" >&2
+    exit 2
+    ;;
+esac
 if [[ ! -f "$CONFIG" ]]; then
   echo "proper-refinement config does not exist: $CONFIG" >&2
   exit 2

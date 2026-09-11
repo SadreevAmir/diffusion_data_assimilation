@@ -1,4 +1,6 @@
 import json
+import subprocess
+import tempfile
 from copy import deepcopy
 from pathlib import Path
 
@@ -11,6 +13,7 @@ from assim_lib.direct_dynamics_threshold_weighted_score import (
 )
 from assim_lib.direct_dynamics_cascade_coarse_proper_refinement import (
     _configured_proper_objective,
+    _persist_step0_evidence_then_assess,
     _validate_reviewed_protocol,
     standardized_fair_crps,
 )
@@ -43,6 +46,53 @@ def test_threshold_weighted_protocol_is_exact_and_frozen():
         pass
     else:
         raise AssertionError("unreviewed threshold weight was accepted")
+
+
+def test_launcher_rejects_unreviewed_config_before_gpu_admission():
+    environment = {
+        "PATH": "/usr/bin:/bin",
+        "PROPER_REFINEMENT_RUN_ID": "reject_unreviewed",
+        "PROPER_REFINEMENT_CONFIG": "config/experiments/not_reviewed.json",
+        "PROPER_REFINEMENT_OUTPUT_GROUP": "proper_refinement",
+    }
+    result = subprocess.run(
+        ["bash", "scripts/run_direct_dynamics_cascade_coarse_proper_refinement.sh"],
+        cwd=Path.cwd(),
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 2
+    assert "unreviewed proper-refinement config/output pair" in result.stderr
+    assert "nvidia-smi" not in result.stderr
+
+
+def test_step0_evidence_survives_assessment_failure_with_original_exception():
+    class InjectedScoreFailure(RuntimeError):
+        pass
+
+    with tempfile.TemporaryDirectory() as directory:
+        output = Path(directory)
+
+        def fail():
+            raise InjectedScoreFailure("injected threshold scorer failure")
+
+        try:
+            _persist_step0_evidence_then_assess(
+                output,
+                {"candidate": torch.ones(1), "marginal_score_contract": {"kind": "test"}},
+                fail,
+            )
+        except InjectedScoreFailure as error:
+            assert str(error) == "injected threshold scorer failure"
+        else:
+            raise AssertionError("assessment failure was not preserved")
+        assert (output / "step0_samples.pth").is_file()
+        status = json.loads((output / "status.json").read_text())
+        assert status["status"] == "failed"
+        assert status["error_type"] == "InjectedScoreFailure"
+        assert len(status["step0_samples_sha256"]) == 64
 
 
 def test_configured_objective_reaches_threshold_weighted_production_score():

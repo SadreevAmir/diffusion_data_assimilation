@@ -405,6 +405,29 @@ def _atomic_torch_save(payload: Any, path: Path) -> str:
     return _sha256(path)
 
 
+def _persist_step0_evidence_then_assess(
+    output_dir: Path,
+    payload: dict[str, Any],
+    assess: Callable[[], Any],
+) -> tuple[str, Any]:
+    """Persist replay evidence before any check, score, or backward can fail."""
+    evidence_path = output_dir / "step0_samples.pth"
+    evidence_sha256 = _atomic_torch_save(payload, evidence_path)
+    try:
+        return evidence_sha256, assess()
+    except BaseException as error:
+        _atomic_json(
+            output_dir / "status.json",
+            {
+                "status": "failed",
+                "error_type": type(error).__name__,
+                "error": str(error),
+                "step0_samples_sha256": evidence_sha256,
+            },
+        )
+        raise
+
+
 def _persist_training_update_then_report(
     output_dir: Path,
     progress: dict[str, Any],
@@ -540,15 +563,38 @@ def run_admission(config_path: Path, output_dir: Path) -> dict[str, Any]:
                     atol=1e-6,
                     end_time=0.0,
                 ).unflatten(0, (1, members))
-        candidate_control_max_abs = float((candidate.detach() - control).abs().max().cpu())
-        production_replay_max_abs = float((control - production).abs().max().cpu())
-        if candidate_control_max_abs > 1e-6:
-            raise RuntimeError("step-zero trainable terminal differs from frozen terminal")
-        if production_replay_max_abs > 2e-5:
-            raise RuntimeError("custom hybrid does not replay the production RK4 sampler")
-        objective, crps, energy = _configured_proper_objective(
-            candidate, coarse_truth, ocean_fraction, protocol, data_config
+        admission_samples = {
+            "candidate": candidate.detach().cpu(),
+            "control": control.detach().cpu(),
+            "production": production.detach().cpu(),
+            "truth": coarse_truth.detach().cpu(),
+            "ocean_fraction": ocean_fraction.detach().cpu(),
+            "train_index": int(indices[0]),
+            "noise_seed": int(protocol["seed"]) + 1,
+            "source": source,
+            "code_identity": code_identity,
+            "config_sha256": _sha256(config_path),
+            "effective_forecast_contract_sha256": effective_contract_sha256,
+            "marginal_score_contract": _score_contract(protocol),
+        }
+
+        def assess_step0():
+            candidate_control = float((candidate.detach() - control).abs().max().cpu())
+            production_replay = float((control - production).abs().max().cpu())
+            if candidate_control > 1e-6:
+                raise RuntimeError("step-zero trainable terminal differs from frozen terminal")
+            if production_replay > 2e-5:
+                raise RuntimeError("custom hybrid does not replay the production RK4 sampler")
+            scores = _configured_proper_objective(
+                candidate, coarse_truth, ocean_fraction, protocol, data_config
+            )
+            return candidate_control, production_replay, scores
+
+        admission_samples_sha256, assessment = _persist_step0_evidence_then_assess(
+            output_dir, admission_samples, assess_step0
         )
+        candidate_control_max_abs, production_replay_max_abs, scores = assessment
+        objective, crps, energy = scores
         objective.backward()
         gradients = [
             parameter.grad.detach()
@@ -562,19 +608,7 @@ def run_admission(config_path: Path, output_dir: Path) -> dict[str, Any]:
         )
         if not math.isfinite(gradient_norm) or gradient_norm <= 0:
             raise FloatingPointError("proper-refinement gradient is dead")
-        admission_samples = {
-            "candidate": candidate.detach().cpu(),
-            "control": control.detach().cpu(),
-            "production": production.detach().cpu(),
-            "truth": coarse_truth.detach().cpu(),
-            "ocean_fraction": ocean_fraction.detach().cpu(),
-            "train_index": int(indices[0]),
-            "noise_seed": int(protocol["seed"]) + 1,
-        }
         admission_samples_path = output_dir / "step0_samples.pth"
-        admission_samples_sha256 = _atomic_torch_save(
-            admission_samples, admission_samples_path
-        )
         result = {
             "status": "admission_passed_pending_astra_review",
             "training_performed": False,
@@ -622,6 +656,9 @@ def run_admission(config_path: Path, output_dir: Path) -> dict[str, Any]:
             "error_type": type(error).__name__,
             "error": str(error),
         }
+        evidence_path = output_dir / "step0_samples.pth"
+        if evidence_path.is_file():
+            failure["step0_samples_sha256"] = _sha256(evidence_path)
         _atomic_json(status_path, failure)
         raise
     finally:
