@@ -8,6 +8,7 @@ import hashlib
 import json
 import os
 import signal
+from datetime import date
 from pathlib import Path
 from typing import Any, Callable
 
@@ -21,6 +22,7 @@ from .direct_dynamics_cascade_checkpoint_evaluation import _save_rank_histograms
 from .direct_dynamics_cascade_coarse_proper_refinement import (
     REVIEWED_PROTOCOL,
     TerminalRefinedCoarseSampler,
+    standardized_fair_crps,
 )
 from .direct_dynamics_cascade_e2e_evaluation import _add_joint_consistency, _summary
 from .direct_dynamics_cascade_end_to_end import CascadePredictor, load_cascade_predictor
@@ -36,6 +38,97 @@ from .transforms import channel_denormalize
 
 
 _ACTIVE_TRACKER: ClearMLTracker | None = None
+
+
+def _case_anchor(case_id: str) -> date:
+    if len(case_id) != 18 or case_id[10:16] != "_slice" or not case_id[16:].isdigit():
+        raise ValueError(f"invalid frozen case id: {case_id}")
+    slice_index = int(case_id[16:])
+    if not 0 <= slice_index < 24:
+        raise ValueError(f"invalid archive slice in frozen case id: {case_id}")
+    return date.fromisoformat(case_id[:10])
+
+
+def _validate_confirmation_panel(experiment: dict[str, Any]) -> None:
+    panel = experiment.get("panel")
+    if not isinstance(panel, dict) or panel.get("role") != "frozen_confirmation":
+        return
+    if panel.get("forecast_window_days") != 10 or panel.get(
+        "minimum_anchor_separation_days"
+    ) != 10:
+        raise ValueError("confirmation requires disjoint d0..d9 forecast windows")
+    development = panel.get("development_case_ids")
+    if not isinstance(development, list) or len(development) != 12:
+        raise ValueError("confirmation requires the frozen 12-case development panel")
+    confirmation = experiment["case_ids"]
+    anchors = [
+        ("development", case_id, _case_anchor(case_id)) for case_id in development
+    ] + [("confirmation", case_id, _case_anchor(case_id)) for case_id in confirmation]
+    for left in range(len(anchors)):
+        for right in range(left + 1, len(anchors)):
+            separation = abs((anchors[left][2] - anchors[right][2]).days)
+            if separation < 10:
+                raise ValueError(
+                    "confirmation/development forecast windows overlap: "
+                    f"{anchors[left][1]} vs {anchors[right][1]}"
+                )
+    gate = experiment.get("decision_gate")
+    if not isinstance(gate, dict) or gate.get("bootstrap_draws") != 100000:
+        raise ValueError("confirmation decision gate must be frozen before sampling")
+    if gate.get("primary") != (
+        "case_equal_six_channel_train_standardized_fair_crps"
+    ):
+        raise ValueError("confirmation primary score differs from reviewed protocol")
+
+
+def _primary_standardized_fair_crps(
+    ensemble: torch.Tensor, truth: torch.Tensor, valid: torch.Tensor
+) -> dict[str, Any]:
+    case_values = [
+        float(
+            standardized_fair_crps(
+                ensemble[index : index + 1].double(),
+                truth[index : index + 1].double(),
+                valid[index : index + 1].double(),
+            ).item()
+        )
+        for index in range(ensemble.shape[0])
+    ]
+    return {
+        "case_equal_mean": float(sum(case_values) / len(case_values)),
+        "case_values": case_values,
+    }
+
+
+def _paired_primary_confirmation(
+    raw: dict[str, Any], candidate: dict[str, Any], gate: dict[str, Any]
+) -> dict[str, Any]:
+    raw_values = torch.tensor(raw["case_values"], dtype=torch.float64)
+    candidate_values = torch.tensor(candidate["case_values"], dtype=torch.float64)
+    if raw_values.shape != (12,) or candidate_values.shape != (12,):
+        raise ValueError("confirmation primary requires exactly twelve paired dates")
+    delta = candidate_values - raw_values
+    generator = torch.Generator().manual_seed(int(gate["bootstrap_seed"]))
+    indices = torch.randint(
+        12,
+        (int(gate["bootstrap_draws"]), 12),
+        generator=generator,
+    )
+    bootstrap = delta[indices].mean(dim=1)
+    estimate = float(delta.mean().item())
+    ci_low = float(torch.quantile(bootstrap, 0.025).item())
+    ci_high = float(torch.quantile(bootstrap, 0.975).item())
+    return {
+        "delta_refined_minus_raw": estimate,
+        "relative_change_of_aggregate": float(
+            candidate["case_equal_mean"] / raw["case_equal_mean"] - 1.0
+        ),
+        "paired_date_bootstrap_95_ci_low": ci_low,
+        "paired_date_bootstrap_95_ci_high": ci_high,
+        "bootstrap_draws": int(gate["bootstrap_draws"]),
+        "bootstrap_seed": int(gate["bootstrap_seed"]),
+        "primary_passed": estimate < 0.0 and ci_high < 0.0,
+    }
 
 
 def _sha256(path: Path) -> str:
@@ -106,6 +199,7 @@ def _validate(experiment: dict[str, Any]) -> None:
         raise ValueError("paired gate must keep EMA4096 fine fixed")
     if experiment["refinement"]["completed_updates"] != 64:
         raise ValueError("paired gate requires the approved 64-update candidate")
+    _validate_confirmation_panel(experiment)
 
 
 @torch.no_grad()
@@ -186,6 +280,9 @@ def _run_impl(config_path: Path, output: Path) -> dict[str, Any]:
         },
         "raw_unclipped_scoring": True,
         "display_only_projection": True,
+        "optimizer_steps": 0,
+        "panel": experiment.get("panel"),
+        "decision_gate": experiment.get("decision_gate"),
         "coarse": coarse,
         "fine": fine,
         "refinement": refinement,
@@ -383,6 +480,9 @@ def _run_impl(config_path: Path, output: Path) -> dict[str, Any]:
         )
         _add_joint_consistency(metrics, physical, valid)
         metrics["exact_coarse_2x2_mean_error_max"] = exact_error
+        metrics["primary_standardized_fair_crps"] = _primary_standardized_fair_crps(
+            normalized, truth_normalized, valid
+        )
         metrics["summary"] = _summary(metrics)
         _require_finite_scalars(metrics)
         result["candidates"][label] = {
@@ -451,6 +551,17 @@ def _run_impl(config_path: Path, output: Path) -> dict[str, Any]:
             strict=True,
         )
     ]
+    if experiment.get("panel", {}).get("role") == "frozen_confirmation":
+        result["frozen_confirmation"] = _paired_primary_confirmation(
+            raw_metrics["primary_standardized_fair_crps"],
+            refined_metrics["primary_standardized_fair_crps"],
+            experiment["decision_gate"],
+        )
+        result["frozen_confirmation"]["numerical_decision"] = (
+            "GO_PENDING_SECONDARY_AND_VISUAL_REVIEW"
+            if result["frozen_confirmation"]["primary_passed"]
+            else "HOLD"
+        )
     _require_finite_scalars(result)
     _atomic_json(output / "proper_refinement_e2e_evaluation.json", result)
     for title, series, path in local_images:

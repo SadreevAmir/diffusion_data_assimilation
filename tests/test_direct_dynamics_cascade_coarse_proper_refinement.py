@@ -1,6 +1,8 @@
 import contextlib
 import json
 import tempfile
+import unittest
+from copy import deepcopy
 from pathlib import Path
 
 import torch
@@ -16,6 +18,34 @@ from assim_lib.direct_dynamics_cascade_coarse_proper_refinement import (
     standardized_fair_crps,
     standardized_joint_energy,
 )
+
+
+def _confirmation_experiment():
+    return json.loads(
+        Path(
+            "config/experiments/evaluate_direct_dynamics_cascade_proper_refinement_confirmation_v1.json"
+        ).read_text()
+    )
+
+
+def test_frozen_confirmation_panel_is_disjoint_and_valid():
+    experiment = _confirmation_experiment()
+    evaluation._validate(experiment)
+    broken = deepcopy(experiment)
+    broken["case_ids"][0] = "2022-01-05_slice12"
+    with unittest.TestCase().assertRaisesRegex(ValueError, "overlap"):
+        evaluation._validate(broken)
+
+
+def test_confirmation_primary_is_case_equal_and_bootstrapped():
+    raw = {"case_equal_mean": 1.0, "case_values": [1.0] * 12}
+    candidate = {"case_equal_mean": 0.9, "case_values": [0.9] * 12}
+    result = evaluation._paired_primary_confirmation(
+        raw, candidate, _confirmation_experiment()["decision_gate"]
+    )
+    assert result["primary_passed"]
+    assert result["paired_date_bootstrap_95_ci_high"] < 0
+    assert abs(result["relative_change_of_aggregate"] + 0.1) < 1e-12
 
 
 def test_paired_evaluation_uses_reviewed_precision(monkeypatch):
@@ -257,5 +287,6 @@ def test_launcher_pins_gpu_and_closes_lifecycle():
     ).read()
     assert "require_single_gpu_uuid.sh" in evaluation_source
     assert 'export CUDA_VISIBLE_DEVICES="$GPU_UUID"' in evaluation_source
+    assert "evaluate_direct_dynamics_cascade_proper_refinement_confirmation_v1.json" in evaluation_source
     assert "GPU became busy" in evaluation_source
     assert "2640s" in evaluation_source and "--kill-after=60s" in evaluation_source

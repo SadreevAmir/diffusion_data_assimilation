@@ -15,7 +15,8 @@ case "$CONFIG" in
   config/experiments/evaluate_direct_dynamics_cascade_e2e_fine6474_v3.json|\
   config/experiments/evaluate_direct_dynamics_cascade_e2e_matched2048_v5.json|\
   config/experiments/evaluate_direct_dynamics_cascade_e2e_fine4096_v4.json|\
-  config/experiments/evaluate_direct_dynamics_cascade_proper_refinement_v1.json) ;;
+  config/experiments/evaluate_direct_dynamics_cascade_proper_refinement_v1.json|\
+  config/experiments/evaluate_direct_dynamics_cascade_proper_refinement_confirmation_v1.json) ;;
   *)
     echo "unsupported CASCADE_E2E_CONFIG" >&2
     exit 2
@@ -97,7 +98,7 @@ export MKL_NUM_THREADS=6
 export OPENBLAS_NUM_THREADS=6
 export NUMEXPR_NUM_THREADS=6
 MODULE="assim_lib.direct_dynamics_cascade_e2e_evaluation"
-if [[ "$CONFIG" == "config/experiments/evaluate_direct_dynamics_cascade_proper_refinement_v1.json" ]]; then
+if [[ "$CONFIG" == config/experiments/evaluate_direct_dynamics_cascade_proper_refinement* ]]; then
   MODULE="assim_lib.direct_dynamics_cascade_proper_refinement_evaluation"
 fi
 timeout --foreground --signal=TERM --kill-after=60s 2640s python -m "$MODULE" \
