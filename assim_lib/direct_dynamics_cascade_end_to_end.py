@@ -163,7 +163,10 @@ class CascadePredictor:
             device=device,
             dtype=torch.float32,
         )
-        projected_noise = project_detail(fine_noise, mask, CASCADE_FACTOR)
+        if hasattr(self.fine_sampler, "project_initial_noise"):
+            projected_noise = self.fine_sampler.project_initial_noise(fine_noise, mask)
+        else:
+            projected_noise = project_detail(fine_noise, mask, CASCADE_FACTOR)
         zeros = torch.zeros((batch, DIRECT_OUTPUT_CHANNELS, height, width), device=device)
         empty_obs = torch.zeros((batch, 2, height, width), device=device)
         forecast = self.fine_sampler.sample_conditioned(
@@ -294,15 +297,31 @@ def load_cascade_predictor(
         expected_forecast_contract_sha256,
         device=device,
     )
-    fine = load_fine_cascade_sampler(
-        fine_run_dir,
-        fine_checkpoint_name,
-        fine_model_config,
-        fine_checkpoint_sha256,
-        expected_fine_code_commit,
-        expected_forecast_contract_sha256,
-        device=device,
-    )
+    matched_manifest = Path(fine_run_dir) / "fine_cascade_matched_base_manifest.json"
+    if matched_manifest.is_file():
+        from .direct_dynamics_cascade_fine_matched_scale import (
+            load_matched_scale_fine_cascade_sampler,
+        )
+
+        fine = load_matched_scale_fine_cascade_sampler(
+            fine_run_dir,
+            fine_checkpoint_name,
+            fine_model_config,
+            fine_checkpoint_sha256,
+            expected_fine_code_commit,
+            expected_forecast_contract_sha256,
+            device=device,
+        )
+    else:
+        fine = load_fine_cascade_sampler(
+            fine_run_dir,
+            fine_checkpoint_name,
+            fine_model_config,
+            fine_checkpoint_sha256,
+            expected_fine_code_commit,
+            expected_forecast_contract_sha256,
+            device=device,
+        )
     replay_identity = {
         "coarse_checkpoint_sha256": coarse_checkpoint_sha256,
         "fine_checkpoint_sha256": fine_checkpoint_sha256,
@@ -316,4 +335,6 @@ def load_cascade_predictor(
         "coarse_loader_sha256": _sha256(Path(coarse_implementation.__file__)),
         "fine_loader_sha256": _sha256(Path(fine_implementation.__file__)),
     }
+    if matched_manifest.is_file():
+        replay_identity["fine_matched_base_manifest_sha256"] = _sha256(matched_manifest)
     return CascadePredictor(coarse, fine, replay_identity=replay_identity)

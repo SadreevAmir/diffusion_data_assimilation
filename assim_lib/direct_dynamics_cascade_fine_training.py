@@ -138,9 +138,13 @@ def _record_failure(lifecycle: _Lifecycle, error: BaseException) -> None:
         cleanup_errors.append(f"failure_status: {cleanup_error}")
 
 
-def _initialize_trainer(lifecycle: _Lifecycle, **kwargs: Any) -> FineCascadeDynamicsTrainer:
+def _initialize_trainer(
+    lifecycle: _Lifecycle,
+    *,
+    trainer_class=FineCascadeDynamicsTrainer,
+    **kwargs: Any,
+) -> FineCascadeDynamicsTrainer:
     """Expose a partially initialized trainer to failure cleanup immediately."""
-    trainer_class = FineCascadeDynamicsTrainer
     trainer = trainer_class.__new__(trainer_class)
     lifecycle.trainer = trainer
     trainer_class.__init__(trainer, **kwargs)
@@ -280,7 +284,12 @@ def _indices_sha256(indices: list[int]) -> str:
     return hashlib.sha256(",".join(str(value) for value in indices).encode()).hexdigest()
 
 
-def _gpu_admission_smoke(model, raw: dict, config: TrainingConfig) -> dict:
+def _gpu_admission_smoke(
+    model,
+    raw: dict,
+    config: TrainingConfig,
+    base_noise_channel_scales: tuple[float, ...] | None = None,
+) -> dict:
     """Run the exact 29→6 projected training path without an optimizer step."""
     device = torch.device("cuda")
     torch.cuda.reset_peak_memory_stats(device)
@@ -291,7 +300,14 @@ def _gpu_admission_smoke(model, raw: dict, config: TrainingConfig) -> dict:
     batch_size = truth.shape[0]
     time = torch.linspace(0.05, 0.95, batch_size, device=device)
     noise = torch.randn_like(truth)
-    state, target, _, _ = residual_flow_pair(truth, noise, valid_mask, time)
+    if base_noise_channel_scales is None:
+        state, target, _, _ = residual_flow_pair(truth, noise, valid_mask, time)
+    else:
+        from .direct_dynamics_cascade_fine_matched_scale import matched_residual_flow_pair
+
+        state, target, _, _ = matched_residual_flow_pair(
+            truth, noise, valid_mask, time, base_noise_channel_scales
+        )
     condition, _, _ = teacher_coarse_condition(truth, causal, valid_mask)
     grid = make_normalized_xy_grid(*config.image_size, device=device).expand(batch_size, -1, -1, -1)
     model_input = torch.cat((state, grid, condition), dim=1)
@@ -322,6 +338,9 @@ def _gpu_admission_smoke(model, raw: dict, config: TrainingConfig) -> dict:
         "peak_gpu_memory_mib": float(torch.cuda.max_memory_allocated(device) / 2**20),
         "activation_checkpointing": config.activation_checkpointing,
         "gradient_accumulation_steps": config.gradient_accumulation_steps,
+        "base_noise_channel_scales": (
+            None if base_noise_channel_scales is None else list(base_noise_channel_scales)
+        ),
     }
     for parameter in projected_model.parameters():
         parameter.grad = None
@@ -377,6 +396,7 @@ def _run_impl(config_path: Path, *, preflight_only: bool, lifecycle: _Lifecycle)
         "compact_architecture_screen_512",
         "compact_undertraining_test_2048",
         "compact_full_data_one_epoch_6474",
+        "compact_matched_base_scale_2048",
     }:
         raise ValueError("fine cascade experiment declares an unsupported pilot kind")
     train_case_count = int(pilot.get("train_case_count", 4096))
@@ -456,7 +476,22 @@ def _run_impl(config_path: Path, *, preflight_only: bool, lifecycle: _Lifecycle)
     parameter_count = sum(parameter.numel() for parameter in model.parameters())
     smoke_batch = _fine_collate([train_subset[index] for index in range(config.train_batch_size)])
     lifecycle.phase = "gpu_smoke"
-    smoke = _gpu_admission_smoke(model, smoke_batch, config)
+    trainer_class = FineCascadeDynamicsTrainer
+    base_noise_channel_scales = None
+    if pilot.get("kind") == "compact_matched_base_scale_2048":
+        from .direct_dynamics_cascade_fine_matched_scale import (
+            MatchedScaleFineCascadeDynamicsTrainer,
+            validate_channel_scales,
+        )
+
+        law = experiment.get("fine_base_law")
+        if not isinstance(law, dict):
+            raise ValueError("matched-scale pilot requires fine_base_law")
+        base_noise_channel_scales = validate_channel_scales(law.get("channel_scales"))
+        trainer_class = MatchedScaleFineCascadeDynamicsTrainer
+    smoke = _gpu_admission_smoke(
+        model, smoke_batch, config, base_noise_channel_scales=base_noise_channel_scales
+    )
     result = {
         "status": "preflight_passed" if preflight_only else "training_pending",
         "parameter_count": parameter_count,
@@ -501,6 +536,7 @@ def _run_impl(config_path: Path, *, preflight_only: bool, lifecycle: _Lifecycle)
     lifecycle.phase = "clearml_initialization"
     trainer = _initialize_trainer(
         lifecycle,
+        trainer_class=trainer_class,
         config=config,
         fine_code_identity=code_identity,
         model=model,
