@@ -37,6 +37,8 @@ from .trainer import _atomic_json
 
 KINDS = ("absolute_target", "persistence_increment", "actual_absolute_base")
 REGIONS = ("ocean", "interior", "coast")
+TRAIN_DATE_BLOCKS = 24
+SLICES_PER_DATE = 24
 
 
 def _sha256(path: Path) -> str:
@@ -68,6 +70,37 @@ def _case_channel_second_cross(value: torch.Tensor, weight: torch.Tensor) -> tor
     denominator = support.sum(dim=(-2, -1)).squeeze(1)
     weighted = value.double() * torch.sqrt(support)
     return torch.einsum("bihw,bjhw->bij", weighted, weighted) / denominator[:, None, None]
+
+
+def _date_blocks(value: torch.Tensor) -> torch.Tensor:
+    if value.shape[0] != TRAIN_DATE_BLOCKS * SLICES_PER_DATE:
+        raise ValueError("train statistic does not contain 24 dates x 24 slices")
+    return value.reshape(TRAIN_DATE_BLOCKS, SLICES_PER_DATE, *value.shape[1:]).mean(dim=1)
+
+
+def _bootstrap_mean_ci(value: torch.Tensor, seed: int, *, draws: int = 10000) -> dict[str, Any]:
+    if value.shape[0] != TRAIN_DATE_BLOCKS:
+        raise ValueError("bootstrap unit must be the 24 frozen train dates")
+    generator = torch.Generator().manual_seed(seed)
+    indices = torch.randint(TRAIN_DATE_BLOCKS, (draws, TRAIN_DATE_BLOCKS), generator=generator)
+    sampled = value[indices].mean(dim=1)
+    return {
+        "estimate": value.mean(dim=0).tolist(),
+        "date_block_bootstrap_95_ci_low": torch.quantile(sampled, 0.025, dim=0).tolist(),
+        "date_block_bootstrap_95_ci_high": torch.quantile(sampled, 0.975, dim=0).tolist(),
+        "bootstrap_draws": draws,
+    }
+
+
+def _leave_one_year_out(value: torch.Tensor) -> list[dict[str, Any]]:
+    if value.shape[0] != 24:
+        raise ValueError("leave-one-year audit requires 24 date blocks")
+    rows = []
+    for year_index, year in enumerate(range(2016, 2022)):
+        keep = torch.ones(24, dtype=torch.bool)
+        keep[4 * year_index : 4 * (year_index + 1)] = False
+        rows.append({"excluded_year": year, "mean": value[keep].mean(dim=0).tolist()})
+    return rows
 
 
 class _TrainAccumulator:
@@ -104,11 +137,19 @@ class _TrainAccumulator:
         result: dict[str, Any] = {"case_count": self.count, "measures": {}}
         for kind in KINDS:
             dc = torch.cat(self.dc[kind])
+            dc_blocks = _date_blocks(dc)
             row: dict[str, Any] = {
                 "case_channel_dc": dc.tolist(),
                 "mean_dc_by_channel": dc.mean(dim=0).tolist(),
                 "std_case_dc_by_channel": dc.std(dim=0, unbiased=True).tolist(),
                 "regions": {},
+                "date_blocked": {
+                    "unit": "calendar_date_with_all_24_slices",
+                    "date_count": TRAIN_DATE_BLOCKS,
+                    "dc": _bootstrap_mean_ci(dc_blocks, 84001),
+                    "dc_leave_one_year_out": _leave_one_year_out(dc_blocks),
+                    "regions": {},
+                },
             }
             for region in REGIONS:
                 second = torch.cat(self.second[kind][region])
@@ -119,10 +160,27 @@ class _TrainAccumulator:
                     "mean_spatial_covariance_6x6": covariance.mean(dim=0).tolist(),
                     "mean_raw_second_cross_moment_6x6": raw_cross.mean(dim=0).tolist(),
                 }
+                second_blocks = _date_blocks(second)
+                covariance_blocks = _date_blocks(covariance)
+                raw_cross_blocks = _date_blocks(raw_cross)
+                row["date_blocked"]["regions"][region] = {
+                    "second_moment": _bootstrap_mean_ci(second_blocks, 84101),
+                    "spatial_covariance": _bootstrap_mean_ci(covariance_blocks, 84201),
+                    "raw_second_cross_moment": _bootstrap_mean_ci(raw_cross_blocks, 84301),
+                    "second_moment_leave_one_year_out": _leave_one_year_out(second_blocks),
+                    "spatial_covariance_leave_one_year_out": _leave_one_year_out(covariance_blocks),
+                }
             spectrum = torch.cat(self.spectrum[kind])
             if not torch.isfinite(spectrum).all():
                 raise FloatingPointError("train panel lacks a fully-ocean coarse spectral patch")
             row["fully_ocean_patch_power_low_mid_high"] = spectrum.mean(dim=0).tolist()
+            spectrum_blocks = _date_blocks(spectrum)
+            row["date_blocked"]["fully_ocean_patch_power_low_mid_high"] = _bootstrap_mean_ci(
+                spectrum_blocks, 84401
+            )
+            row["date_blocked"]["spectrum_leave_one_year_out"] = _leave_one_year_out(
+                spectrum_blocks
+            )
             result["measures"][kind] = row
         return result
 
@@ -150,13 +208,32 @@ def _validation_coarse_diagnostic(payload: dict[str, Any], dataset, indices: lis
     masks = _weighted_region_masks(active, fraction)
     regions = {}
     for region, mask in masks.items():
+        bias = _case_mean(error, mask)
+        ensemble_variance = _case_mean(variance, mask)
+        mean_error = _case_mean(error.square(), mask)
+        persistence_mse = _case_mean(persistence_error.square(), mask)
+        generator = torch.Generator().manual_seed(85001)
+        bootstrap_indices = torch.randint(12, (10000, 12), generator=generator)
+        sampled_bias = bias[bootstrap_indices].mean(dim=1)
+        factor = 1.0 + 1.0 / 8.0
+        sampled_ssr = torch.sqrt(
+            factor * ensemble_variance[bootstrap_indices].mean(dim=(1, 2))
+            / mean_error[bootstrap_indices].mean(dim=(1, 2)).clamp_min(torch.finfo(torch.float64).tiny)
+        )
         regions[region] = {
-            "case_channel_signed_bias": _case_mean(error, mask).tolist(),
-            "case_channel_ensemble_variance": _case_mean(variance, mask).tolist(),
-            "case_channel_squared_mean_error": _case_mean(error.square(), mask).tolist(),
-            "case_channel_persistence_squared_error": _case_mean(
-                persistence_error.square(), mask
-            ).tolist(),
+            "case_channel_signed_bias": bias.tolist(),
+            "case_channel_ensemble_variance": ensemble_variance.tolist(),
+            "case_channel_squared_mean_error": mean_error.tolist(),
+            "case_channel_persistence_squared_error": persistence_mse.tolist(),
+            "date_block_bootstrap": {
+                "mean_signed_bias_by_channel": bias.mean(dim=0).tolist(),
+                "mean_signed_bias_95_ci_low": torch.quantile(sampled_bias, 0.025, dim=0).tolist(),
+                "mean_signed_bias_95_ci_high": torch.quantile(sampled_bias, 0.975, dim=0).tolist(),
+                "pooled_adjusted_ssr": float(torch.sqrt(factor * ensemble_variance.mean() / mean_error.mean())),
+                "pooled_adjusted_ssr_95_ci_low": float(torch.quantile(sampled_ssr, 0.025)),
+                "pooled_adjusted_ssr_95_ci_high": float(torch.quantile(sampled_ssr, 0.975)),
+                "bootstrap_draws": 10000,
+            },
         }
     spectra = {
         "ensemble_anomaly": _case_ocean_patch_power(anomaly, active).tolist(),
@@ -217,11 +294,14 @@ def run(config_path: Path, output: Path) -> dict[str, Any]:
     protocol = {
         "split": "train_for_reference_law_and_valid_for_frozen_diagnostic",
         "train_case_count": 576,
+        "train_independent_block_count": 24,
+        "slices_per_train_date_block": 24,
         "train_case_ids_sha256": _canonical_sha256(train_ids),
         "validation_case_count": 12,
         "noise_seed": int(experiment["noise_seed"]),
         "actual_base_measure": "masked iid N(0,1) in absolute normalized coarse state",
         "conditional_variance_claimed": False,
+        "seasonal_coverage_caveat": "four fixed seasonal dates/year are not full annual coverage",
         "optimizer_steps": 0,
         "gpu_required": False,
         "code_identity": identity,

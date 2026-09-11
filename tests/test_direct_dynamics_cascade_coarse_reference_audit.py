@@ -2,6 +2,7 @@ import torch
 
 from assim_lib.direct_dynamics_cascade_coarse_reference_audit import (
     _case_channel_covariance,
+    _date_blocks,
     _weighted_region_masks,
 )
 
@@ -23,3 +24,10 @@ def test_weighted_regions_partition_active_support():
     fraction = torch.full_like(active, 0.75)
     regions = _weighted_region_masks(active, fraction)
     assert torch.equal(regions["interior"] + regions["coast"], regions["ocean"])
+
+
+def test_date_blocks_average_moments_after_slice_measurement():
+    value = torch.arange(24 * 24 * 2, dtype=torch.float64).reshape(24 * 24, 2)
+    blocked = _date_blocks(value)
+    assert blocked.shape == (24, 2)
+    assert torch.equal(blocked[0], value[:24].mean(dim=0))
