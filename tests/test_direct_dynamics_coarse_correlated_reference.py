@@ -3,8 +3,10 @@ import torch
 from assim_lib.direct_dynamics_coarse_correlated_reference import (
     ActiveCoarseLayout,
     fit_reference,
+    fit_weighted_second_moment_basis_exact,
     identity_reference,
 )
+from assim_lib.direct_dynamics_coarse_covariance_gate import _synthetic_selection_controls
 
 
 def test_active_layout_round_trip_and_padding_invariance():
@@ -64,3 +66,21 @@ def test_woodbury_score_matches_dense_score():
         + torch.linalg.slogdet(covariance).logabsdet
     ) / (2 * 32)
     assert torch.allclose(reference.gaussian_score(probe), dense, atol=1e-10)
+
+
+def test_exact_gram_basis_matches_dense_svd_subspace():
+    x = torch.randn(40, 29, generator=torch.Generator().manual_seed(15), dtype=torch.float64)
+    fraction = torch.linspace(0.2, 1.0, 29, dtype=torch.float64)
+    basis = fit_weighted_second_moment_basis_exact(x, fraction, max_rank=7)
+    weighted = x * torch.sqrt(fraction)[None]
+    _, singular, vh = torch.linalg.svd(weighted, full_matrices=False)
+    expected = vh[:7].T * (singular[:7] / x.shape[0] ** 0.5)[None]
+    expected = expected / torch.sqrt(fraction)[:, None]
+    assert torch.allclose(basis @ basis.T, expected @ expected.T, atol=1e-10)
+
+
+def test_production_selection_controls_distinguish_white_and_correlated_laws():
+    result = _synthetic_selection_controls()
+    assert result["passed"]
+    assert result["white_selected"]["rank"] == 0
+    assert result["correlated_selected"]["rank"] > 0

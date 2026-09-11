@@ -17,7 +17,7 @@ from .data import build_dataset
 from .direct_dynamics_cascade_coarse import coarse_target
 from .direct_dynamics_coarse_correlated_reference import (
     ActiveCoarseLayout,
-    fit_weighted_second_moment_basis,
+    fit_weighted_second_moment_basis_exact,
     identity_reference,
     reference_from_basis,
     select_reference_leave_one_year_out,
@@ -51,9 +51,14 @@ def _load_bound_statistics(spec: dict[str, Any]) -> dict[str, Any]:
     return statistics
 
 
-def _covariance_oracle(reference, *, seed: int, draws: int = 40000) -> dict[str, float]:
+def _covariance_oracle(reference, *, seed: int, draws: int = 40000) -> dict[str, Any]:
     if reference.is_identity:
-        return {"draws": draws, "max_diagonal_error": 0.0, "mean_covariance_error": 0.0}
+        return {
+            "method": "analytic_identity_check",
+            "draws": 0,
+            "max_diagonal_error": 0.0,
+            "mean_covariance_error": 0.0,
+        }
     # Test a deterministic 64-coordinate marginal; constructing dense d x d K is forbidden.
     count = min(64, reference.dimension)
     indices = torch.linspace(0, reference.dimension - 1, count).round().long().unique()
@@ -72,6 +77,7 @@ def _covariance_oracle(reference, *, seed: int, draws: int = 40000) -> dict[str,
         1.0 - reference.alpha
     ) * (h[:, None] * basis) @ (h[:, None] * basis).T
     return {
+        "method": "empirical_fixed_marginal",
         "draws": draws,
         "max_diagonal_error": float((torch.diag(empirical) - 1).abs().max()),
         "mean_covariance_error": float((empirical - expected).abs().mean()),
@@ -79,6 +85,36 @@ def _covariance_oracle(reference, *, seed: int, draws: int = 40000) -> dict[str,
         "maximum_expected_offdiagonal": float(
             (expected - torch.diag(torch.diag(expected))).abs().max()
         ),
+    }
+
+
+def _synthetic_selection_controls() -> dict[str, Any]:
+    """Prove that production selection admits stable correlation and white laws."""
+    dates, slices, dimension = 24, 24, 24
+    white_generator = torch.Generator().manual_seed(771)
+    white = torch.randn((dates, slices, dimension), generator=white_generator, dtype=torch.float64)
+    correlated_generator = torch.Generator().manual_seed(772)
+    latent = torch.randn((dates, slices, 1), generator=correlated_generator, dtype=torch.float64)
+    independent = torch.randn(
+        (dates, slices, dimension), generator=correlated_generator, dtype=torch.float64
+    )
+    correlated = (0.10**0.5) * independent + (0.90**0.5) * latent
+    kwargs = {
+        "coordinate_fraction": torch.ones(dimension, dtype=torch.float64),
+        "ranks": (1, 2, 4, 8),
+        "alphas": (0.10, 0.25, 0.50, 0.75),
+        "basis_method": "exact_fp64_gram",
+    }
+    white_result = select_reference_leave_one_year_out(white, **kwargs)
+    correlated_result = select_reference_leave_one_year_out(correlated, **kwargs)
+    passed = (
+        white_result["selected"]["rank"] == 0
+        and correlated_result["selected"]["rank"] > 0
+    )
+    return {
+        "passed": passed,
+        "white_selected": white_result["selected"],
+        "correlated_selected": correlated_result["selected"],
     }
 
 
@@ -105,6 +141,8 @@ def run(config_path: Path, output: Path) -> dict[str, Any]:
         collate_fn=_fine_collate, prefetch_factor=2,
     )
     layout = None
+    reference_active = None
+    reference_fraction = None
     vectors = []
     round_trip_max_error = 0.0
     for raw in loader:
@@ -117,11 +155,13 @@ def run(config_path: Path, output: Path) -> dict[str, Any]:
             raise ValueError("target and persistence supports differ")
         if layout is None:
             layout = ActiveCoarseLayout.build(active[:1], fraction[:1])
+            reference_active = active[:1].clone()
+            reference_fraction = fraction[:1].clone()
             # Statistics bind the sample mask as [1,H,W], without a batch axis.
             if tensor_sha256(valid[0].contiguous()) != statistics["static_valid_mask_sha256"]:
                 raise ValueError("current dataset static mask differs from residual statistics")
-        expected_active = active[:1].expand_as(active)
-        expected_fraction = fraction[:1].expand_as(fraction)
+        expected_active = reference_active.expand_as(active)
+        expected_fraction = reference_fraction.expand_as(fraction)
         if not torch.equal(active, expected_active) or not torch.equal(fraction, expected_fraction):
             raise ValueError("coarse active mask/fraction is not static")
         residual = torch.where(active.expand_as(clean) > 0, clean - persistence, 0.0)
@@ -139,16 +179,16 @@ def run(config_path: Path, output: Path) -> dict[str, Any]:
     selection = select_reference_leave_one_year_out(
         values, layout.coordinate_fraction,
         ranks=tuple(experiment["ranks"]), alphas=tuple(experiment["alphas"]),
-        seed=int(experiment["fit_seed"]),
+        seed=int(experiment["fit_seed"]), basis_method="exact_fp64_gram",
     )
     chosen = selection["selected"]
     if chosen["rank"] == 0:
         reference = identity_reference(layout.dimension)
         candidate_permitted = False
     else:
-        maximum_basis = fit_weighted_second_moment_basis(
+        maximum_basis = fit_weighted_second_moment_basis_exact(
             values.reshape(-1, layout.dimension), layout.coordinate_fraction,
-            max_rank=max(experiment["ranks"]), seed=int(experiment["fit_seed"]),
+            max_rank=max(experiment["ranks"]),
         )
         reference = reference_from_basis(
             maximum_basis, rank=int(chosen["rank"]), alpha=float(chosen["alpha"])
@@ -168,8 +208,10 @@ def run(config_path: Path, output: Path) -> dict[str, Any]:
         "channel_order": ["d3_sic", "d3_sit", "d6_sic", "d6_sit", "d9_sic", "d9_sit"],
     }, artifact_path)
     oracle = _covariance_oracle(reference, seed=int(experiment["oracle_seed"]))
+    synthetic_controls = _synthetic_selection_controls()
     gate_passed = (
         round_trip_max_error <= 2e-6
+        and synthetic_controls["passed"]
         and oracle["max_diagonal_error"] <= 0.03
         and oracle["mean_covariance_error"] <= 0.015
         and oracle.get("minimum_expected_eigenvalue", 1.0) > 0
@@ -178,6 +220,7 @@ def run(config_path: Path, output: Path) -> dict[str, Any]:
     protocol = {
         "coordinate": "W=S^-1(C-P-mu)",
         "moment": "full second moment E[WW^T], without per-sample centering",
+        "basis_method": "exact FP64 sample-space Gram eigendecomposition",
         "blocking": "leave-one-year-out; four dates/year; all 24 slices/date together",
         "train_case_count": 576,
         "train_date_count": 24,
@@ -202,6 +245,7 @@ def run(config_path: Path, output: Path) -> dict[str, Any]:
         "selection": selection,
         "round_trip_max_error": round_trip_max_error,
         "covariance_oracle": oracle,
+        "synthetic_selection_controls": synthetic_controls,
         "reference_artifact": str(artifact_path),
         "reference_artifact_sha256": _sha256_file(artifact_path),
         "protocol": protocol,
