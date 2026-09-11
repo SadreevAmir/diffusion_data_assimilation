@@ -1,0 +1,31 @@
+{
+  "task_name": "direct_dynamics_coarse_covariance_gate_v1",
+  "project_name": "sea_ice_two_stage",
+  "data_config": "../data/m2m_2f_two_stage_dynamics_protocol.json",
+  "data_overrides": {
+    "hour_mode": "all",
+    "dynamic_forcing_stats": {
+      "source_split": "train",
+      "estimator_scope": "slice23_train_reused_for_all_hour_recovery_ablation",
+      "indices": [6, 7, 13, 14],
+      "means": [0.00024072701720376523, -0.017859677007622955, -0.106700353199528, -0.18476749778477272],
+      "stds": [0.06025002092600086, 0.0655322642143171, 4.434678472175259, 4.7337812043401915],
+      "finite_value_count_per_field": [100059986, 100059986, 104958646, 104958646]
+    }
+  },
+  "residual_statistics": {
+    "path": "/home/autoresearch_results/direct_dynamics_cascade_v1/residual_statistics/whiten_stats_e6bbde7_20260910T0627Z/statistics.json",
+    "sha256": "4cd16e382de9506d0c4b975c174e33f2473cd158e9b1546afaab6b9187204e4c",
+    "static_valid_mask_sha256": "8cb9b0334bfc88d579422a5a150e4e4fc2602a0ad86b18930fbb9ee5a39bf73e"
+  },
+  "ranks": [8, 16, 32, 64],
+  "alphas": [0.10, 0.25, 0.50, 0.75],
+  "fit_seed": 97311,
+  "oracle_seed": 97391,
+  "batch_size": 4,
+  "num_workers": 4,
+  "clearml": {
+    "env_path": "/home/.env",
+    "tags": ["cpu-only", "train-only", "coarse", "standardized-residual", "correlated-reference", "unit-diagonal", "loyo", "covariance-gate"]
+  }
+}
