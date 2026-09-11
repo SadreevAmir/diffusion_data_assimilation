@@ -1,9 +1,18 @@
+import json
+from copy import deepcopy
+from pathlib import Path
+
 import torch
 
 from assim_lib.direct_dynamics_threshold_weighted_score import (
     boundary_emphasis_transform,
     threshold_weighted_fair_crps,
     threshold_weighted_proper_objective,
+)
+from assim_lib.direct_dynamics_cascade_coarse_proper_refinement import (
+    _configured_proper_objective,
+    _validate_reviewed_protocol,
+    standardized_fair_crps,
 )
 
 
@@ -13,6 +22,53 @@ STDS = torch.tensor([0.25, 0.5] * 3)
 
 def _normalize(physical: torch.Tensor) -> torch.Tensor:
     return (physical - MEANS.reshape(6, 1, 1)) / STDS.reshape(6, 1, 1)
+
+
+def _experiment() -> dict:
+    return json.loads(
+        Path(
+            "config/experiments/train_direct_dynamics_cascade_threshold_weighted_refinement_v1.json"
+        ).read_text()
+    )
+
+
+def test_threshold_weighted_protocol_is_exact_and_frozen():
+    experiment = _experiment()
+    _validate_reviewed_protocol(experiment["protocol"])
+    changed = deepcopy(experiment["protocol"])
+    changed["marginal_score"]["boundary_weight_multiplier"] = 3.0
+    try:
+        _validate_reviewed_protocol(changed)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("unreviewed threshold weight was accepted")
+
+
+def test_configured_objective_reaches_threshold_weighted_production_score():
+    experiment = _experiment()
+    physical_members = torch.tensor([-0.01, 0.01]).reshape(1, 2, 1, 1, 1).expand(
+        -1, -1, 6, -1, -1
+    )
+    physical_truth = torch.full((1, 6, 1, 1), 0.03)
+    data_config = {
+        "fields": ["siconc", "sithic"],
+        "means": MEANS[:2].tolist(),
+        "stds": STDS[:2].tolist(),
+    }
+    members = (physical_members - MEANS.reshape(1, 1, 6, 1, 1)) / STDS.reshape(
+        1, 1, 6, 1, 1
+    )
+    truth = (physical_truth - MEANS.reshape(1, 6, 1, 1)) / STDS.reshape(1, 6, 1, 1)
+    objective, marginal, energy = _configured_proper_objective(
+        members,
+        truth,
+        torch.ones((1, 1, 1, 1)),
+        experiment["protocol"],
+        data_config,
+    )
+    assert torch.allclose(marginal, torch.tensor(0.09), atol=1e-7)
+    assert torch.allclose(objective, 0.75 * marginal + 0.25 * energy)
 
 
 def test_transform_is_identity_plus_exact_frozen_boundary_arc_length():
@@ -55,6 +111,22 @@ def test_unbiased_two_member_estimator_keeps_closed_form():
     assert abs(float(score)) < 1e-7
 
 
+def test_production_weighted_score_has_independent_nonzero_reference():
+    physical_members = torch.tensor([-0.01, 0.01]).reshape(1, 2, 1, 1, 1).expand(
+        -1, -1, 6, -1, -1
+    )
+    physical_truth = torch.full((1, 6, 1, 1), 0.03)
+    members = (physical_members - MEANS.reshape(1, 1, 6, 1, 1)) / STDS.reshape(
+        1, 1, 6, 1, 1
+    )
+    truth = (physical_truth - MEANS.reshape(1, 6, 1, 1)) / STDS.reshape(1, 6, 1, 1)
+    fraction = torch.ones((1, 1, 1, 1))
+    weighted = threshold_weighted_fair_crps(members, truth, fraction, MEANS, STDS)
+    ordinary = standardized_fair_crps(members, truth, fraction)
+    assert torch.allclose(weighted, torch.tensor(0.09), atol=1e-7)
+    assert torch.allclose(ordinary, torch.tensor(0.06), atol=1e-7)
+
+
 def test_mixed_law_oracle_prefers_the_true_distribution():
     # Exact expected transformed-kernel score on a law with boundary atoms and
     # an interior component.  No Monte Carlo noise is involved.
@@ -80,3 +152,38 @@ def test_mixed_law_oracle_prefers_the_true_distribution():
         torch.tensor([0.20, 0.10, 0.40, 0.10, 0.20], dtype=torch.float64),
     )
     assert all(expected_score(candidate) > oracle for candidate in alternatives)
+
+
+def test_production_estimator_matches_exact_mixed_law_population_score():
+    support_physical = torch.tensor([0.0, 0.01, 0.5, 0.99, 1.0])
+    probability = torch.tensor([0.30, 0.10, 0.20, 0.10, 0.30], dtype=torch.float64)
+    channel_support = (
+        support_physical.reshape(1, -1) - MEANS.reshape(-1, 1)
+    ) / STDS.reshape(-1, 1)
+    embedded = channel_support.reshape(1, 6, 1, 5)
+    transformed = boundary_emphasis_transform(embedded, MEANS, STDS)[0, :, 0].double()
+    distance = (transformed[:, :, None] - transformed[:, None, :]).abs()
+    population = (
+        probability[None, :, None] * probability[None, None, :] * distance
+    ).sum(dim=(1, 2))
+    expected_population_score = 0.5 * population.mean()
+
+    production_expectation = torch.zeros((), dtype=torch.float64)
+    fraction = torch.ones((1, 1, 1, 1))
+    for left in range(5):
+        for right in range(5):
+            members = torch.stack(
+                (channel_support[:, left], channel_support[:, right]), dim=0
+            ).reshape(1, 2, 6, 1, 1)
+            for observation in range(5):
+                truth = channel_support[:, observation].reshape(1, 6, 1, 1)
+                score = threshold_weighted_fair_crps(
+                    members, truth, fraction, MEANS, STDS
+                ).double()
+                production_expectation = production_expectation + (
+                    probability[left]
+                    * probability[right]
+                    * probability[observation]
+                    * score
+                )
+    assert torch.allclose(production_expectation, expected_population_score, atol=1e-7)

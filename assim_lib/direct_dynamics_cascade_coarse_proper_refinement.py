@@ -334,10 +334,65 @@ REVIEWED_PROTOCOL = {
     "max_gpu_minutes": 30,
 }
 
+THRESHOLD_WEIGHTED_SCORE_CONTRACT = {
+    "kind": "threshold_weighted_transformed_kernel_fair_crps_v1",
+    "boundary_weight_multiplier": 2.0,
+    "sic_physical_bands": [[0.0, 0.02], [0.98, 1.0]],
+    "sit_physical_bands_metres": [[0.0, 0.02]],
+}
+
 
 def _validate_reviewed_protocol(protocol: dict[str, Any]) -> None:
-    if any(protocol.get(key) != value for key, value in REVIEWED_PROTOCOL.items()):
+    core = {key: value for key, value in protocol.items() if key != "marginal_score"}
+    if core != REVIEWED_PROTOCOL:
         raise ValueError("proper-refinement protocol differs from the reviewed bounded contract")
+    score = protocol.get("marginal_score")
+    if score is not None and score != THRESHOLD_WEIGHTED_SCORE_CONTRACT:
+        raise ValueError("proper-refinement marginal score differs from a reviewed contract")
+
+
+def _score_contract(protocol: dict[str, Any]) -> dict[str, Any]:
+    return protocol.get(
+        "marginal_score",
+        {"kind": "standardized_fair_crps_v1"},
+    )
+
+
+def _configured_proper_objective(
+    members: torch.Tensor,
+    truth: torch.Tensor,
+    ocean_fraction: torch.Tensor,
+    protocol: dict[str, Any],
+    data_config: dict[str, Any],
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    score = _score_contract(protocol)
+    if score["kind"] == "standardized_fair_crps_v1":
+        return proper_objective(members, truth, ocean_fraction)
+    if score != THRESHOLD_WEIGHTED_SCORE_CONTRACT:
+        raise ValueError("unknown proper-refinement marginal score")
+    if data_config.get("fields") != ["siconc", "sithic"]:
+        raise ValueError("threshold-weighted score requires SIC/SIT channel order")
+    means = tuple(float(value) for value in data_config.get("means", ()))
+    stds = tuple(float(value) for value in data_config.get("stds", ()))
+    if len(means) != 2 or len(stds) != 2:
+        raise ValueError("threshold-weighted score requires two physical normalization statistics")
+    channel_means = torch.as_tensor(
+        means * 3, device=members.device, dtype=members.dtype
+    )
+    channel_stds = torch.as_tensor(
+        stds * 3, device=members.device, dtype=members.dtype
+    )
+    from .direct_dynamics_threshold_weighted_score import (
+        threshold_weighted_proper_objective,
+    )
+
+    return threshold_weighted_proper_objective(
+        members,
+        truth,
+        ocean_fraction,
+        channel_means,
+        channel_stds,
+    )
 
 
 def _atomic_torch_save(payload: Any, path: Path) -> str:
@@ -491,8 +546,8 @@ def run_admission(config_path: Path, output_dir: Path) -> dict[str, Any]:
             raise RuntimeError("step-zero trainable terminal differs from frozen terminal")
         if production_replay_max_abs > 2e-5:
             raise RuntimeError("custom hybrid does not replay the production RK4 sampler")
-        objective, crps, energy = proper_objective(
-            candidate, coarse_truth, ocean_fraction
+        objective, crps, energy = _configured_proper_objective(
+            candidate, coarse_truth, ocean_fraction, protocol, data_config
         )
         objective.backward()
         gradients = [
@@ -507,6 +562,19 @@ def run_admission(config_path: Path, output_dir: Path) -> dict[str, Any]:
         )
         if not math.isfinite(gradient_norm) or gradient_norm <= 0:
             raise FloatingPointError("proper-refinement gradient is dead")
+        admission_samples = {
+            "candidate": candidate.detach().cpu(),
+            "control": control.detach().cpu(),
+            "production": production.detach().cpu(),
+            "truth": coarse_truth.detach().cpu(),
+            "ocean_fraction": ocean_fraction.detach().cpu(),
+            "train_index": int(indices[0]),
+            "noise_seed": int(protocol["seed"]) + 1,
+        }
+        admission_samples_path = output_dir / "step0_samples.pth"
+        admission_samples_sha256 = _atomic_torch_save(
+            admission_samples, admission_samples_path
+        )
         result = {
             "status": "admission_passed_pending_astra_review",
             "training_performed": False,
@@ -518,6 +586,7 @@ def run_admission(config_path: Path, output_dir: Path) -> dict[str, Any]:
                 "model_sha256": _sha256_file(model_path),
             },
             "protocol": protocol,
+            "marginal_score_contract": _score_contract(protocol),
             "train_indices": indices,
             "dataset_sentinel": sentinel,
             "effective_forecast_contract": effective_contract,
@@ -533,10 +602,12 @@ def run_admission(config_path: Path, output_dir: Path) -> dict[str, Any]:
                     torch.cuda.max_memory_allocated(device) / 2**20
                 ),
                 "candidate_shape": list(candidate.shape),
+                "samples_sha256": admission_samples_sha256,
             },
         }
         result["clearml_task_id"] = str(tracker.task.id)
         _atomic_json(output_dir / "admission.json", result)
+        tracker.upload_artifact("proper_refinement_step0_samples", admission_samples_path)
         tracker.connect("proper_refinement_admission", result)
         for key, value in result["step0"].items():
             if isinstance(value, (int, float)):
@@ -610,7 +681,7 @@ def run_training(config_path: Path, output_dir: Path) -> dict[str, Any]:
         device = torch.device("cuda:0")
         tracker = ClearMLTracker(
             experiment["project_name"],
-            f"direct_dynamics_cascade_coarse_proper_refinement_train_v1-{output_dir.name}",
+            f"{experiment['task_name']}-{output_dir.name}",
             tags=[*experiment["clearml"]["tags"], "train-64-updates"],
             env_path=experiment["clearml"]["env_path"],
         )
@@ -681,8 +752,8 @@ def run_training(config_path: Path, output_dir: Path) -> dict[str, Any]:
             candidate = hybrid_terminal_sample(
                 trainable_model, prefix, encoded_members, active_members, grid
             ).unflatten(0, (1, members))
-            objective, crps, energy = proper_objective(
-                candidate, coarse_truth, ocean_fraction
+            objective, crps, energy = _configured_proper_objective(
+                candidate, coarse_truth, ocean_fraction, protocol, data_config
             )
             optimizer.zero_grad(set_to_none=True)
             objective.backward()
@@ -763,6 +834,7 @@ def run_training(config_path: Path, output_dir: Path) -> dict[str, Any]:
                 "model_sha256": _sha256_file(model_path),
             },
             "protocol": protocol,
+            "marginal_score_contract": _score_contract(protocol),
             "train_indices": indices,
             "dataset_sentinel": sentinel,
             "effective_forecast_contract_sha256": effective_contract_sha256,

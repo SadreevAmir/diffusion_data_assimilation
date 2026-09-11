@@ -14,9 +14,18 @@ if [[ "$MODE" != "admission" && "$MODE" != "train" ]]; then
   echo "PROPER_REFINEMENT_MODE must be admission or train" >&2
   exit 2
 fi
-CONFIG="config/experiments/train_direct_dynamics_cascade_coarse_proper_refinement_v1.json"
-OUTPUT="/home/autoresearch_results/direct_dynamics_cascade_v2/proper_refinement/$RUN_ID"
-STATUS_ROOT="/home/autoresearch_results/direct_dynamics_cascade_v2/proper_refinement_launches"
+CONFIG="${PROPER_REFINEMENT_CONFIG:-config/experiments/train_direct_dynamics_cascade_coarse_proper_refinement_v1.json}"
+OUTPUT_GROUP="${PROPER_REFINEMENT_OUTPUT_GROUP:-proper_refinement}"
+if [[ ! "$OUTPUT_GROUP" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$ ]]; then
+  echo "unsafe PROPER_REFINEMENT_OUTPUT_GROUP" >&2
+  exit 2
+fi
+if [[ ! -f "$CONFIG" ]]; then
+  echo "proper-refinement config does not exist: $CONFIG" >&2
+  exit 2
+fi
+OUTPUT="/home/autoresearch_results/direct_dynamics_cascade_v2/$OUTPUT_GROUP/$RUN_ID"
+STATUS_ROOT="/home/autoresearch_results/direct_dynamics_cascade_v2/${OUTPUT_GROUP}_launches"
 mkdir -p "$STATUS_ROOT"
 if ! mkdir -m 700 "$STATUS_ROOT/$RUN_ID"; then
   echo "refusing to reuse proper-refinement launch" >&2
