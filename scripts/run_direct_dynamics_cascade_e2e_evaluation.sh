@@ -14,7 +14,8 @@ case "$CONFIG" in
   config/experiments/evaluate_direct_dynamics_cascade_e2e_fine2048_v2.json|\
   config/experiments/evaluate_direct_dynamics_cascade_e2e_fine6474_v3.json|\
   config/experiments/evaluate_direct_dynamics_cascade_e2e_matched2048_v5.json|\
-  config/experiments/evaluate_direct_dynamics_cascade_e2e_fine4096_v4.json) ;;
+  config/experiments/evaluate_direct_dynamics_cascade_e2e_fine4096_v4.json|\
+  config/experiments/evaluate_direct_dynamics_cascade_proper_refinement_v1.json) ;;
   *)
     echo "unsupported CASCADE_E2E_CONFIG" >&2
     exit 2
@@ -49,24 +50,56 @@ if ! flock -n 9; then
   echo "another project launch owns the GPU lock" >&2
   exit 5
 fi
-GPU_COUNT="$(nvidia-smi --query-gpu=count --format=csv,noheader | wc -l | tr -d ' ')"
-GPU_MEMORY_USED="$(nvidia-smi --query-gpu=memory.used --format=csv,noheader,nounits | head -n1 | tr -d ' ')"
-GPU_UTILIZATION="$(nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader,nounits | head -n1 | tr -d ' ')"
-if [[ "$GPU_COUNT" != "1" || ! "$GPU_MEMORY_USED" =~ ^[0-9]+$ || ! "$GPU_UTILIZATION" =~ ^[0-9]+$ ]]; then
-  echo "invalid single-GPU inventory" >&2
-  exit 6
+GPU_UUID="$(scripts/require_single_gpu_uuid.sh)"
+readonly GPU_UUID
+read_gpu() {
+  local observation
+  if ! observation="$(nvidia-smi --id=0 --query-gpu=memory.used,utilization.gpu --format=csv,noheader,nounits | tr -d ' ')"; then
+    return 1
+  fi
+  [[ "$observation" =~ ^[0-9]+,[0-9]+$ ]] || return 1
+  GPU_MEMORY_USED="${observation%%,*}"
+  GPU_UTILIZATION="${observation##*,}"
+}
+read_gpu || exit 6
+initial_memory="$GPU_MEMORY_USED"
+if [[ "$GPU_MEMORY_USED" -gt 1024 ]]; then
+  for sample in {1..11}; do
+    read_gpu || exit 7
+    if [[ "$GPU_UTILIZATION" -ge 5 ]]; then
+      echo "GPU busy: utilization=${GPU_UTILIZATION}%" >&2
+      exit 8
+    fi
+    [[ "$sample" -eq 11 ]] || sleep 30
+  done
 fi
-if [[ "$GPU_MEMORY_USED" -gt 1024 || "$GPU_UTILIZATION" -ge 5 ]]; then
-  echo "target GPU is not immediately free" >&2
-  exit 7
+read_gpu || exit 9
+if [[ "$initial_memory" -le 1024 && "$GPU_MEMORY_USED" -gt 1024 ]]; then
+  for sample in {1..11}; do
+    read_gpu || exit 10
+    if [[ "$GPU_UTILIZATION" -ge 5 ]]; then
+      echo "GPU became busy: utilization=${GPU_UTILIZATION}%" >&2
+      exit 11
+    fi
+    [[ "$sample" -eq 11 ]] || sleep 30
+  done
+  read_gpu || exit 12
 fi
+if [[ "$GPU_MEMORY_USED" -gt 1024 && "$GPU_UTILIZATION" -ge 5 ]]; then
+  echo "GPU busy at final observation" >&2
+  exit 13
+fi
+export CUDA_VISIBLE_DEVICES="$GPU_UUID"
 export CASCADE_E2E_STATUS_PATH="$STATUS_DIR/status.json"
 export CLEARML_REQUIRE_ONLINE=1
 export OMP_NUM_THREADS=6
 export MKL_NUM_THREADS=6
 export OPENBLAS_NUM_THREADS=6
 export NUMEXPR_NUM_THREADS=6
-timeout --signal=TERM --kill-after=2m 14280s python -m \
-  assim_lib.direct_dynamics_cascade_e2e_evaluation \
+MODULE="assim_lib.direct_dynamics_cascade_e2e_evaluation"
+if [[ "$CONFIG" == "config/experiments/evaluate_direct_dynamics_cascade_proper_refinement_v1.json" ]]; then
+  MODULE="assim_lib.direct_dynamics_cascade_proper_refinement_evaluation"
+fi
+timeout --foreground --signal=TERM --kill-after=60s 2640s python -m "$MODULE" \
   --config "$CONFIG" \
   --output "$OUTPUT"

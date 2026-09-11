@@ -163,6 +163,49 @@ def hybrid_terminal_sample(
     )
 
 
+class TerminalRefinedCoarseSampler:
+    """Production-compatible coarse sampler with only the last RK4 interval refined."""
+
+    def __init__(self, frozen_sampler: Any, terminal_model: torch.nn.Module):
+        self.frozen_sampler = frozen_sampler
+        self.sampler = frozen_sampler.sampler
+        self.terminal_model = terminal_model.eval()
+
+    @torch.no_grad()
+    def sample_conditioned(
+        self,
+        *,
+        structured_conditioning: torch.Tensor,
+        valid_mask: torch.Tensor,
+        initial_noise: torch.Tensor,
+        num_timesteps: int,
+        device: torch.device | None = None,
+        method: str = "rk4",
+        rtol: float = 1e-5,
+        atol: float = 1e-6,
+        end_time: float = 0.0,
+    ) -> torch.Tensor:
+        del rtol, atol
+        if num_timesteps != 17 or method != "rk4" or float(end_time) != 0.0:
+            raise ValueError("terminal refinement requires the reviewed 16-interval RK4 solver")
+        device = torch.device(device or structured_conditioning.device)
+        condition = structured_conditioning.to(device=device, dtype=torch.float32)
+        valid = valid_mask[:, :1].to(device=device, dtype=torch.float32)
+        noise = initial_noise.to(device=device, dtype=torch.float32)
+        encoded, active, _ = lossless_coarse_condition(condition, valid)
+        if noise.shape != (condition.shape[0], DIRECT_OUTPUT_CHANNELS, *encoded.shape[-2:]):
+            raise ValueError("terminal-refinement noise shape differs from coarse condition")
+        grid = make_normalized_xy_grid(
+            *encoded.shape[-2:], device=device, dtype=torch.float32
+        )
+        prefix = frozen_prefix(
+            self.sampler.model, noise, encoded, active, grid
+        )
+        return hybrid_terminal_sample(
+            self.terminal_model, prefix, encoded, active, grid
+        ).float()
+
+
 def _validate_score_inputs(
     members: torch.Tensor, truth: torch.Tensor, ocean_fraction: torch.Tensor
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:

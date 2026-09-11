@@ -6,6 +6,7 @@ from pathlib import Path
 import torch
 from torchdiffeq import odeint
 
+from assim_lib import direct_dynamics_cascade_proper_refinement_evaluation as evaluation
 from assim_lib.direct_dynamics_cascade_coarse_proper_refinement import (
     frozen_prefix,
     hybrid_terminal_sample,
@@ -15,6 +16,81 @@ from assim_lib.direct_dynamics_cascade_coarse_proper_refinement import (
     standardized_fair_crps,
     standardized_joint_energy,
 )
+
+
+def test_paired_evaluation_uses_reviewed_precision(monkeypatch):
+    active = {"value": False}
+
+    class Autocast:
+        def __enter__(self):
+            active["value"] = True
+
+        def __exit__(self, *_):
+            active["value"] = False
+
+    class Predictor:
+        def sample_ensemble(self, **kwargs):
+            assert active["value"]
+            assert kwargs == {"token": 7}
+            return {"ok": True}
+
+    monkeypatch.setattr(torch, "autocast", lambda **_: Autocast())
+    assert evaluation._sample_with_reviewed_precision(Predictor(), token=7) == {"ok": True}
+
+
+def test_raw_evidence_precedes_scoring_failure():
+    class ScoreFailure(RuntimeError):
+        pass
+
+    with tempfile.TemporaryDirectory() as directory:
+        path = Path(directory) / "candidate_raw.pt"
+        registered = []
+
+        def fail_score():
+            raise ScoreFailure("injected scorer failure")
+
+        try:
+            evaluation._persist_evidence_then_score(
+                path,
+                {"forecast": torch.ones(1), "raw_noise": torch.zeros(1)},
+                registered.append,
+                fail_score,
+            )
+        except ScoreFailure as error:
+            assert str(error) == "injected scorer failure"
+        else:
+            raise AssertionError("scoring failure was not preserved")
+        assert path.is_file()
+        assert registered == [evaluation._sha256(path)]
+
+
+def test_evaluation_failure_is_durable_and_closes_tracker(monkeypatch):
+    class PrimaryFailure(RuntimeError):
+        pass
+
+    class Tracker:
+        closed = 0
+
+        def close(self):
+            self.closed += 1
+            raise RuntimeError("secondary close failure")
+
+    def fail_run(*_):
+        raise PrimaryFailure("primary evaluation failure")
+
+    with tempfile.TemporaryDirectory() as directory:
+        output = Path(directory)
+        tracker = Tracker()
+        monkeypatch.setattr(evaluation, "_ACTIVE_TRACKER", tracker)
+        monkeypatch.setattr(evaluation, "_run_impl", fail_run)
+        try:
+            evaluation.run(Path("config.json"), output)
+        except PrimaryFailure as error:
+            assert str(error) == "primary evaluation failure"
+        else:
+            raise AssertionError("primary failure was not preserved")
+        assert json.loads((output / "failure.json").read_text())["error_type"] == "PrimaryFailure"
+        assert tracker.closed == 1
 
 
 def test_final_checkpoint_precedes_reporting_failure():
@@ -175,3 +251,11 @@ def test_launcher_pins_gpu_and_closes_lifecycle():
     assert "exit.json" in source
     assert "gpu became busy" in source.lower()
     assert "1740s" in source and "--kill-after=60s" in source
+    evaluation_source = open(
+        "scripts/run_direct_dynamics_cascade_e2e_evaluation.sh",
+        encoding="utf-8",
+    ).read()
+    assert "require_single_gpu_uuid.sh" in evaluation_source
+    assert 'export CUDA_VISIBLE_DEVICES="$GPU_UUID"' in evaluation_source
+    assert "GPU became busy" in evaluation_source
+    assert "2640s" in evaluation_source and "--kill-after=60s" in evaluation_source

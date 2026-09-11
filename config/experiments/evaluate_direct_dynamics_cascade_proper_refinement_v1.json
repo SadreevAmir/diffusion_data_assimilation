@@ -1,0 +1,50 @@
+{
+  "project_name": "sea_ice_two_stage",
+  "task_name": "direct_dynamics_cascade_proper_refinement_paired_e2e_v1",
+  "cases": 12,
+  "members": 8,
+  "coarse_rk4_timepoints": 17,
+  "fine_rk4_timepoints": 17,
+  "forecast_contract_sha256": "24ee4b6c2e543d5bba866d06a5eafb170de39360de6c71256d7c53bfcd89b146",
+  "case_indices": [0, 727, 1636, 2363, 3090, 3817, 4726, 5453, 6180, 6907, 7816, 8543],
+  "case_ids": [
+    "2022-01-01_slice00", "2022-01-31_slice07", "2022-03-10_slice04",
+    "2022-04-09_slice11", "2022-05-09_slice18", "2022-06-09_slice01",
+    "2022-07-16_slice22", "2022-08-16_slice05", "2022-09-15_slice12",
+    "2022-10-15_slice19", "2022-11-22_slice16", "2022-12-22_slice23"
+  ],
+  "coarse": {
+    "run_dir": "/home/autoresearch_results/direct_dynamics_cascade_v1/coarse_full_train_6e/lossless56_conv64_seed38119_full6e-coarse_full6e_final_bdafe1f",
+    "checkpoint": "ema_coarse_update_9711.pth",
+    "code_commit": "bdafe1f6407f747c4df5cd17c18b8099042b745b",
+    "sha256": {
+      "ema_coarse_update_9711.pth": "125f520c33cbea548a3de7d131220edbfc80900c120786202cdb34e8d0a4dcaa",
+      "config.json": "2615a0206bec10ea3851f04d490957bab83b76e54276cefaaa9c854412c0322b",
+      "metadata.json": "b918df3f32fa5809d816c2a9a53d92af5679acb72d646bfffe9a40a14216d92f",
+      "coarse_cascade_manifest.json": "f441382d73cbc4daf514d32b71ec6fd80f45b5d470170a2061c96f2a402ebe4a"
+    }
+  },
+  "fine": {
+    "run_dir": "/home/autoresearch_results/direct_dynamics_cascade_v2/fine_compact_mechanics/conv32_seed27181-fine_full_epoch_48622bc",
+    "checkpoint": "ema_mechanics_update_4096.pth",
+    "code_commit": "48622bcf99c541d3a30449b3264c38047f21f78b",
+    "sha256": {
+      "ema_mechanics_update_4096.pth": "5700d1ad12950af748b22a395743df2afea6aaff1502481aa6d065cf76eb35bf",
+      "config.json": "6d9f45adc64c4c7221a7505dc2d32d37b4a75e50cb7a1ce584adcd02b2483306",
+      "metadata.json": "109fe24784b8445331ebf32f02d39d4b778155d18d1447d9b32da96dfb3ab55e",
+      "fine_cascade_manifest.json": "0eb1645756773f94f1155bb5b313d72ffb187623f8a0a0efaf8d0aafce04046d"
+    }
+  },
+  "refinement": {
+    "checkpoint": "/home/autoresearch_results/direct_dynamics_cascade_v2/proper_refinement/proper_refine_train_b70cad7_v1/terminal_model_update_64.pth",
+    "sha256": "8635a90abbdfd39d47be14f09796bfee0eab4f089a2dd8dc968ed3b1cdda82db",
+    "training_record": "/home/autoresearch_results/direct_dynamics_cascade_v2/proper_refinement/proper_refine_train_b70cad7_v1/training.json",
+    "training_record_sha256": "84dac6633bea0b50cf96895d4e63f8e253e115beaa6e4cb3c89970fe81256a1e",
+    "code_commit": "b70cad7f170680014ca8220333f89d9eed0f222c",
+    "completed_updates": 64
+  },
+  "clearml": {
+    "env_path": "/home/.env",
+    "tags": ["proper-score-refinement", "paired-raw", "ema9711", "fine4096", "twelve-cases", "eight-members", "rank-histogram", "fixed-scale", "raw-unclipped", "common-random-numbers", "one-gpu"]
+  }
+}
