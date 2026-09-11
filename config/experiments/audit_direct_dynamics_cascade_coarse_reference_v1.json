@@ -1,0 +1,28 @@
+{
+  "task_name": "direct_dynamics_cascade_coarse_reference_audit_v1",
+  "project_name": "sea_ice_two_stage",
+  "data_config": "../data/m2m_2f_two_stage_dynamics_protocol.json",
+  "data_overrides": {
+    "hour_mode": "all",
+    "dynamic_forcing_stats": {
+      "source_split": "train",
+      "estimator_scope": "slice23_train_reused_for_all_hour_recovery_ablation",
+      "indices": [6, 7, 13, 14],
+      "means": [0.00024072701720376523, -0.017859677007622955, -0.106700353199528, -0.18476749778477272],
+      "stds": [0.06025002092600086, 0.0655322642143171, 4.434678472175259, 4.7337812043401915],
+      "finite_value_count_per_field": [100059986, 100059986, 104958646, 104958646]
+    }
+  },
+  "batch_size": 4,
+  "num_workers": 4,
+  "noise_seed": 93871,
+  "validation_indices": [0, 727, 1636, 2363, 3090, 3817, 4726, 5453, 6180, 6907, 7816, 8543],
+  "validation_ensemble": {
+    "path": "/home/autoresearch_results/direct_dynamics_cascade_v2/spatial_calibration/components/baseline2048.pt",
+    "sha256": "57df51edfe918ef581b7b7decd0f21725aa780dbc733cd225404041d80069a25"
+  },
+  "clearml": {
+    "env_path": "/home/.env",
+    "tags": ["cpu-only", "train-only-reference", "coarse-base-law", "absolute-flow", "increments", "covariance", "spectral", "date-blocked", "zero-training"]
+  }
+}
