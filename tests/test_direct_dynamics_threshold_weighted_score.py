@@ -6,6 +6,7 @@ from pathlib import Path
 
 import torch
 
+from assim_lib import direct_dynamics_cascade_proper_refinement_evaluation as evaluation
 from assim_lib.direct_dynamics_threshold_weighted_score import (
     boundary_emphasis_transform,
     threshold_weighted_fair_crps,
@@ -35,6 +36,14 @@ def _experiment() -> dict:
     )
 
 
+def _evaluation_experiment() -> dict:
+    return json.loads(
+        Path(
+            "config/experiments/evaluate_direct_dynamics_cascade_threshold_weighted_refinement_v1.json"
+        ).read_text()
+    )
+
+
 def test_threshold_weighted_protocol_is_exact_and_frozen():
     experiment = _experiment()
     _validate_reviewed_protocol(experiment["protocol"])
@@ -46,6 +55,17 @@ def test_threshold_weighted_protocol_is_exact_and_frozen():
         pass
     else:
         raise AssertionError("unreviewed threshold weight was accepted")
+
+
+def test_threshold_evaluation_is_explicitly_development_only_and_valid():
+    experiment = _evaluation_experiment()
+    assert experiment["panel"]["role"] == "development_reuse"
+    assert experiment["decision_gate"]["claim_policy"] == (
+        "development_only_not_independent_confirmation"
+    )
+    evaluation._validate(experiment)
+    launcher = Path("scripts/run_direct_dynamics_cascade_e2e_evaluation.sh").read_text()
+    assert "evaluate_direct_dynamics_cascade_threshold_weighted_refinement_v1.json" in launcher
 
 
 def test_launcher_rejects_unreviewed_config_before_gpu_admission():

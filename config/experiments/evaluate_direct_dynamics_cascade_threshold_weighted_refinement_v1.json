@@ -1,0 +1,69 @@
+{
+  "project_name": "sea_ice_two_stage",
+  "task_name": "direct_dynamics_cascade_threshold_weighted_refinement_e2e_v1",
+  "candidate_label": "threshold_weighted64_ema9711_fine4096",
+  "cases": 12,
+  "members": 8,
+  "coarse_rk4_timepoints": 17,
+  "fine_rk4_timepoints": 17,
+  "forecast_contract_sha256": "24ee4b6c2e543d5bba866d06a5eafb170de39360de6c71256d7c53bfcd89b146",
+  "case_indices": [420, 1147, 1970, 2697, 3424, 4271, 5070, 5797, 6500, 7155, 7522, 8153],
+  "case_ids": [
+    "2022-01-18_slice12", "2022-02-17_slice19", "2022-03-24_slice02",
+    "2022-04-23_slice09", "2022-05-23_slice16", "2022-06-27_slice23",
+    "2022-07-31_slice06", "2022-08-30_slice13", "2022-09-28_slice20",
+    "2022-10-26_slice03", "2022-11-10_slice10", "2022-12-06_slice17"
+  ],
+  "panel": {
+    "role": "development_reuse",
+    "provenance": "This panel was the independent confirmation for ordinary proper64, whose low-SIC failure motivated the threshold-weighted score. It is development-only for the new candidate and cannot support an independent confirmation claim.",
+    "selection_frozen_before_threshold_weighted_training": true
+  },
+  "decision_gate": {
+    "primary": "case_equal_six_channel_train_standardized_fair_crps",
+    "required_primary_delta": "negative_with_paired_date_bootstrap_95_ci_high_below_zero",
+    "relative_gain_definition": "ratio_of_aggregate_scores_not_mean_of_case_ratios",
+    "secondary_policy": "all_boundary_rank_spatial_temporal_checks_required",
+    "per_output_score_tolerance": 0.01,
+    "per_output_rank_tv_tolerance": 0.01,
+    "roughness_tolerance": 0.02,
+    "temporal_tolerance": 0.01,
+    "bootstrap_draws": 100000,
+    "bootstrap_seed": 20260912,
+    "claim_policy": "development_only_not_independent_confirmation"
+  },
+  "coarse": {
+    "run_dir": "/home/autoresearch_results/direct_dynamics_cascade_v1/coarse_full_train_6e/lossless56_conv64_seed38119_full6e-coarse_full6e_final_bdafe1f",
+    "checkpoint": "ema_coarse_update_9711.pth",
+    "code_commit": "bdafe1f6407f747c4df5cd17c18b8099042b745b",
+    "sha256": {
+      "ema_coarse_update_9711.pth": "125f520c33cbea548a3de7d131220edbfc80900c120786202cdb34e8d0a4dcaa",
+      "config.json": "2615a0206bec10ea3851f04d490957bab83b76e54276cefaaa9c854412c0322b",
+      "metadata.json": "b918df3f32fa5809d816c2a9a53d92af5679acb72d646bfffe9a40a14216d92f",
+      "coarse_cascade_manifest.json": "f441382d73cbc4daf514d32b71ec6fd80f45b5d470170a2061c96f2a402ebe4a"
+    }
+  },
+  "fine": {
+    "run_dir": "/home/autoresearch_results/direct_dynamics_cascade_v2/fine_compact_mechanics/conv32_seed27181-fine_full_epoch_48622bc",
+    "checkpoint": "ema_mechanics_update_4096.pth",
+    "code_commit": "48622bcf99c541d3a30449b3264c38047f21f78b",
+    "sha256": {
+      "ema_mechanics_update_4096.pth": "5700d1ad12950af748b22a395743df2afea6aaff1502481aa6d065cf76eb35bf",
+      "config.json": "6d9f45adc64c4c7221a7505dc2d32d37b4a75e50cb7a1ce584adcd02b2483306",
+      "metadata.json": "109fe24784b8445331ebf32f02d39d4b778155d18d1447d9b32da96dfb3ab55e",
+      "fine_cascade_manifest.json": "0eb1645756773f94f1155bb5b313d72ffb187623f8a0a0efaf8d0aafce04046d"
+    }
+  },
+  "refinement": {
+    "checkpoint": "/home/autoresearch_results/direct_dynamics_cascade_v2/threshold_weighted_refinement/threshold_weighted_train64_8e123ef_v1/terminal_model_update_64.pth",
+    "sha256": "4b5205541150528d53886ce53dd9072b9cf158b5afdc2e54d026dacbaaa5380e",
+    "training_record": "/home/autoresearch_results/direct_dynamics_cascade_v2/threshold_weighted_refinement/threshold_weighted_train64_8e123ef_v1/training.json",
+    "training_record_sha256": "cbd0c3ec37b55154ed3bc4a8b9b7f94c476aac62d1a33d4f845a6162f285cc9d",
+    "code_commit": "8e123ef108a1ebd540886a894aaf688c3000d043",
+    "completed_updates": 64
+  },
+  "clearml": {
+    "env_path": "/home/.env",
+    "tags": ["threshold-weighted-proper-score", "development-reuse", "paired-raw", "ema9711", "fine4096", "twelve-cases", "eight-members", "rank-histogram", "boundary-events", "fixed-scale", "raw-unclipped", "common-random-numbers", "zero-optimizer", "one-gpu"]
+  }
+}

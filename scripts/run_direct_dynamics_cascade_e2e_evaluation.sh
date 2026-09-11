@@ -16,7 +16,8 @@ case "$CONFIG" in
   config/experiments/evaluate_direct_dynamics_cascade_e2e_matched2048_v5.json|\
   config/experiments/evaluate_direct_dynamics_cascade_e2e_fine4096_v4.json|\
   config/experiments/evaluate_direct_dynamics_cascade_proper_refinement_v1.json|\
-  config/experiments/evaluate_direct_dynamics_cascade_proper_refinement_confirmation_v1.json) ;;
+  config/experiments/evaluate_direct_dynamics_cascade_proper_refinement_confirmation_v1.json|\
+  config/experiments/evaluate_direct_dynamics_cascade_threshold_weighted_refinement_v1.json) ;;
   *)
     echo "unsupported CASCADE_E2E_CONFIG" >&2
     exit 2

@@ -7,6 +7,7 @@ import copy
 import hashlib
 import json
 import os
+import re
 import signal
 from datetime import date
 from pathlib import Path
@@ -20,8 +21,8 @@ from .data import build_dataset
 from .direct_dynamics_cascade import masked_block_average
 from .direct_dynamics_cascade_checkpoint_evaluation import _save_rank_histograms
 from .direct_dynamics_cascade_coarse_proper_refinement import (
-    REVIEWED_PROTOCOL,
     TerminalRefinedCoarseSampler,
+    _validate_reviewed_protocol,
     standardized_fair_crps,
 )
 from .direct_dynamics_cascade_e2e_evaluation import _add_joint_consistency, _summary
@@ -33,6 +34,7 @@ from .direct_dynamics_cascade_paired_evaluation import (
     score_ensemble,
 )
 from .direct_dynamics_training import _repeat_field_stats, validate_direct_dataset
+from .direct_dynamics_affine_calibration import boundary_event_metrics
 from .trainer import _atomic_json
 from .transforms import channel_denormalize
 
@@ -199,6 +201,11 @@ def _validate(experiment: dict[str, Any]) -> None:
         raise ValueError("paired gate must keep EMA4096 fine fixed")
     if experiment["refinement"]["completed_updates"] != 64:
         raise ValueError("paired gate requires the approved 64-update candidate")
+    candidate_label = experiment.get(
+        "candidate_label", "proper64_ema9711_fine4096"
+    )
+    if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,79}", candidate_label) is None:
+        raise ValueError("unsafe paired candidate label")
     _validate_confirmation_panel(experiment)
 
 
@@ -224,11 +231,19 @@ def _run_impl(config_path: Path, output: Path) -> dict[str, Any]:
         _verify_file(fine_root / relative, expected, f"fine/{relative}")
     refinement_path = Path(refinement["checkpoint"])
     _verify_file(refinement_path, refinement["sha256"], "proper refinement checkpoint")
+    training_record_path = Path(refinement["training_record"])
     _verify_file(
-        Path(refinement["training_record"]),
+        training_record_path,
         refinement["training_record_sha256"],
         "proper refinement training record",
     )
+    training_record = load_json(training_record_path)
+    if training_record.get("checkpoint_sha256") != refinement["sha256"]:
+        raise ValueError("training record and refinement checkpoint SHA differ")
+    if training_record.get("code_identity", {}).get("git_commit") != refinement[
+        "code_commit"
+    ]:
+        raise ValueError("training record commit differs from paired refinement")
 
     coarse_config = load_json(coarse_root / "config.json")
     fine_config = load_json(fine_root / "config.json")
@@ -245,8 +260,11 @@ def _run_impl(config_path: Path, output: Path) -> dict[str, Any]:
         raise ValueError("frozen validation cases differ from the archive")
 
     payload = torch.load(refinement_path, map_location="cpu", weights_only=True)
-    if payload.get("completed_updates") != 64 or payload.get("protocol") != REVIEWED_PROTOCOL:
+    if payload.get("completed_updates") != 64:
         raise ValueError("refinement checkpoint differs from the reviewed protocol")
+    _validate_reviewed_protocol(payload.get("protocol", {}))
+    if training_record.get("protocol") != payload.get("protocol"):
+        raise ValueError("training record and checkpoint protocols differ")
     if payload.get("source", {}).get("checkpoint_sha256") != coarse["sha256"][
         coarse["checkpoint"]
     ]:
@@ -391,9 +409,12 @@ def _run_impl(config_path: Path, output: Path) -> dict[str, Any]:
     }
     reference_randomness = None
     local_images: list[tuple[str, str, Path]] = []
+    candidate_label = experiment.get(
+        "candidate_label", "proper64_ema9711_fine4096"
+    )
     for label, predictor in (
         ("raw_ema9711_fine4096", raw_predictor),
-        ("proper64_ema9711_fine4096", refined_predictor),
+        (candidate_label, refined_predictor),
     ):
         ensemble = _sample_with_reviewed_precision(
             predictor,
@@ -462,7 +483,7 @@ def _run_impl(config_path: Path, output: Path) -> dict[str, Any]:
             "replay_identity": ensemble["replay_identity"],
             "coarse": coarse,
             "fine": fine,
-            "refinement": refinement if label.startswith("proper64") else None,
+            "refinement": refinement if label == candidate_label else None,
         }
 
         def register_evidence(sha256: str) -> None:
@@ -479,6 +500,9 @@ def _run_impl(config_path: Path, output: Path) -> dict[str, Any]:
             ),
         )
         _add_joint_consistency(metrics, physical, valid)
+        metrics["boundary_events"] = boundary_event_metrics(
+            physical, truth_physical, valid
+        )
         metrics["exact_coarse_2x2_mean_error_max"] = exact_error
         metrics["primary_standardized_fair_crps"] = _primary_standardized_fair_crps(
             normalized, truth_normalized, valid
@@ -506,12 +530,12 @@ def _run_impl(config_path: Path, output: Path) -> dict[str, Any]:
         torch.cuda.empty_cache()
 
     raw_summary = result["candidates"]["raw_ema9711_fine4096"]["metrics"]["summary"]
-    refined_summary = result["candidates"]["proper64_ema9711_fine4096"]["metrics"]["summary"]
+    refined_summary = result["candidates"][candidate_label]["metrics"]["summary"]
     result["paired_summary_delta_refined_minus_raw"] = {
         key: float(refined_summary[key] - raw_summary[key]) for key in raw_summary
     }
     raw_metrics = result["candidates"]["raw_ema9711_fine4096"]["metrics"]
-    refined_metrics = result["candidates"]["proper64_ema9711_fine4096"]["metrics"]
+    refined_metrics = result["candidates"][candidate_label]["metrics"]
     result["paired_output_deltas_refined_minus_raw"] = {}
     for output_key in raw_metrics["outputs"]:
         raw_row = raw_metrics["outputs"][output_key]
@@ -561,6 +585,15 @@ def _run_impl(config_path: Path, output: Path) -> dict[str, Any]:
             "GO_PENDING_SECONDARY_AND_VISUAL_REVIEW"
             if result["frozen_confirmation"]["primary_passed"]
             else "HOLD"
+        )
+    elif experiment.get("panel", {}).get("role") == "development_reuse":
+        result["paired_development_diagnostic"] = _paired_primary_confirmation(
+            raw_metrics["primary_standardized_fair_crps"],
+            refined_metrics["primary_standardized_fair_crps"],
+            experiment["decision_gate"],
+        )
+        result["paired_development_diagnostic"]["claim_status"] = (
+            "DEVELOPMENT_ONLY_NOT_INDEPENDENT_CONFIRMATION"
         )
     _require_finite_scalars(result)
     _atomic_json(output / "proper_refinement_e2e_evaluation.json", result)
