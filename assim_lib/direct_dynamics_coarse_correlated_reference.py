@@ -230,15 +230,25 @@ def fit_weighted_second_moment_basis_exact(
     if torch.any(fraction <= 0) or max_rank <= 0 or max_rank >= min(x.shape):
         raise ValueError("fractions and rank are incompatible with the exact fit panel")
     weighted = x * torch.sqrt(fraction)[None]
-    gram = weighted @ weighted.T / x.shape[0]
-    eigenvalues, left = torch.linalg.eigh(gram)
-    order = torch.argsort(eigenvalues, descending=True)[:max_rank]
-    eigenvalues = eigenvalues[order]
+    if weighted.shape[1] <= weighted.shape[0]:
+        # Small synthetic or reduced-coordinate oracle: use the feature-space moment.
+        moment = weighted.T @ weighted / x.shape[0]
+        eigenvalues, weighted_vectors = torch.linalg.eigh(moment)
+        order = torch.argsort(eigenvalues, descending=True)[:max_rank]
+        eigenvalues = eigenvalues[order]
+        weighted_vectors = weighted_vectors[:, order]
+        basis = weighted_vectors * torch.sqrt(eigenvalues)[None]
+    else:
+        # Production path: exact non-zero spectrum through the smaller sample Gram matrix.
+        gram = weighted @ weighted.T / x.shape[0]
+        eigenvalues, left = torch.linalg.eigh(gram)
+        order = torch.argsort(eigenvalues, descending=True)[:max_rank]
+        eigenvalues = eigenvalues[order]
+        left = left[:, order]
+        weighted_vectors = weighted.T @ left / torch.sqrt(x.shape[0] * eigenvalues)[None]
+        basis = weighted_vectors * torch.sqrt(eigenvalues)[None]
     if torch.any(eigenvalues <= torch.finfo(torch.float64).eps):
         raise ValueError("exact reference basis contains a numerically zero requested mode")
-    left = left[:, order]
-    weighted_vectors = weighted.T @ left / torch.sqrt(x.shape[0] * eigenvalues)[None]
-    basis = weighted_vectors * torch.sqrt(eigenvalues)[None]
     basis = basis / torch.sqrt(fraction)[:, None]
     if not torch.isfinite(basis).all():
         raise FloatingPointError("exact reference basis fit produced NaN/Inf")
