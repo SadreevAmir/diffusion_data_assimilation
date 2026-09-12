@@ -3,6 +3,7 @@ import hashlib
 
 import pytest
 import torch
+from torchdiffeq import odeint
 
 import assim_lib.direct_dynamics_fine_support_proper_admission as admission
 from assim_lib.direct_dynamics_cascade_coarse_fine_boundary_audit import _load_normalization
@@ -15,8 +16,12 @@ from assim_lib.direct_dynamics_sic_support_decoder import (
     project_masked_blocks_to_unit_interval_mean,
 )
 from assim_lib.direct_dynamics_fine_support_proper_integration import (
+    CompactFineNetwork,
     compact_fine_integration_check,
+    fine_rk4_interval,
+    fine_velocity,
 )
+from assim_lib.runtime import make_normalized_xy_grid
 
 
 def test_differentiable_forward_is_bitwise_reviewed_projection():
@@ -133,3 +138,39 @@ def test_compact_fine_production_path_has_terminal_parameter_gradient():
     assert result["terminal_parameter_gradient_norm"] > 0
     assert result["frozen_prefix_has_no_graph"]
     assert result["frozen_parameter_gradients_absent"]
+
+
+def test_every_reverse_time_rk4_state_is_bitwise_torchdiffeq():
+    torch.manual_seed(31)
+    model = CompactFineNetwork().eval()
+    state = torch.randn(2, 6, 8, 8)
+    condition = torch.randn(2, 21, 8, 8)
+    active = torch.ones(2, 1, 8, 8)
+    grid = make_normalized_xy_grid(8, 8, device=torch.device("cpu"), dtype=torch.float32)
+    timepoints = torch.linspace(1.0, 0.0, 33, dtype=torch.float32)
+
+    def production_velocity(time, value):
+        return fine_velocity(model, value, condition, active, grid, time)
+
+    production = odeint(
+        production_velocity,
+        state,
+        timepoints,
+        method="rk4",
+        options={"step_size": 1.0 / 32.0},
+    )
+    custom = [state]
+    for index in range(32):
+        custom.append(
+            fine_rk4_interval(
+                model,
+                custom[-1],
+                condition,
+                active,
+                grid,
+                timepoints[index],
+                timepoints[index + 1],
+            )
+        )
+    custom = torch.stack(custom)
+    assert torch.equal(custom, production)

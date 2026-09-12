@@ -59,12 +59,13 @@ def fine_velocity(
     condition: torch.Tensor,
     active: torch.Tensor,
     grid: torch.Tensor,
-    time: float,
+    time: float | torch.Tensor,
 ) -> torch.Tensor:
     batch = state.shape[0]
-    timestamp = torch.full(
-        (batch,), 1000.0 * float(time), device=state.device, dtype=state.dtype
-    )
+    scalar_time = torch.as_tensor(time, device=state.device, dtype=state.dtype)
+    if scalar_time.ndim != 0:
+        raise ValueError("fine RK4 time must be scalar")
+    timestamp = scalar_time.expand(batch) * 1000.0
     model_input = torch.cat((state, grid.expand(batch, -1, -1, -1), condition), dim=1)
     with torch.autocast(
         device_type=state.device.type,
@@ -82,16 +83,37 @@ def fine_rk4_interval(
     condition: torch.Tensor,
     active: torch.Tensor,
     grid: torch.Tensor,
-    t0: float,
-    t1: float,
+    t0: float | torch.Tensor,
+    t1: float | torch.Tensor,
 ) -> torch.Tensor:
-    """One torchdiffeq-compatible RK4 3/8 interval."""
-    step = float(t1) - float(t0)
-    k1 = fine_velocity(model, state, condition, active, grid, t0)
-    k2 = fine_velocity(model, state + (step / 3.0) * k1, condition, active, grid, t0 + step / 3.0)
-    k3 = fine_velocity(model, state + step * (k2 - k1 / 3.0), condition, active, grid, t0 + 2.0 * step / 3.0)
-    k4 = fine_velocity(model, state + step * (k1 - k2 + k3), condition, active, grid, t1)
-    result = state + (step / 8.0) * (k1 + 3.0 * k2 + 3.0 * k3 + k4)
+    """Exactly reproduce torchdiffeq's reverse-time RK4 3/8 arithmetic."""
+    physical_t0 = torch.as_tensor(t0, device=state.device, dtype=state.dtype)
+    physical_t1 = torch.as_tensor(t1, device=state.device, dtype=state.dtype)
+    solver_t0 = -physical_t0
+    solver_t1 = -physical_t1
+    step = solver_t1 - solver_t0
+
+    def reverse_velocity(solver_time: torch.Tensor, value: torch.Tensor) -> torch.Tensor:
+        return -fine_velocity(
+            model, value, condition, active, grid, -solver_time
+        )
+
+    one_third = 1.0 / 3.0
+    two_thirds = 2.0 / 3.0
+    k1 = reverse_velocity(solver_t0, state)
+    k2 = reverse_velocity(
+        solver_t0 + step * one_third,
+        state + step * k1 * one_third,
+    )
+    k3 = reverse_velocity(
+        solver_t0 + step * two_thirds,
+        state + step * (k2 - k1 * one_third),
+    )
+    k4 = reverse_velocity(
+        solver_t1,
+        state + step * (k1 - k2 + k3),
+    )
+    result = state + (k1 + 3.0 * (k2 + k3) + k4) * step * 0.125
     return torch.where(active.expand_as(result) > 0, result, torch.zeros_like(result))
 
 
@@ -112,6 +134,13 @@ def fine_frozen_prefix(
         torch.zeros_like(initial_state.float()),
     )
     with torch.no_grad():
+        timepoints = torch.linspace(
+            1.0,
+            0.0,
+            intervals + 1,
+            device=state.device,
+            dtype=state.dtype,
+        )
         for interval in range(intervals - 1):
             state = fine_rk4_interval(
                 model,
@@ -119,8 +148,8 @@ def fine_frozen_prefix(
                 condition,
                 active,
                 grid,
-                1.0 - interval / intervals,
-                1.0 - (interval + 1) / intervals,
+                timepoints[interval],
+                timepoints[interval + 1],
             )
     return state.detach()
 
