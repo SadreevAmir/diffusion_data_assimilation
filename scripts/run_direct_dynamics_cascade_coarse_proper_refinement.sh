@@ -18,7 +18,8 @@ CONFIG="${PROPER_REFINEMENT_CONFIG:-config/experiments/train_direct_dynamics_cas
 OUTPUT_GROUP="${PROPER_REFINEMENT_OUTPUT_GROUP:-proper_refinement}"
 case "$CONFIG|$OUTPUT_GROUP" in
   "config/experiments/train_direct_dynamics_cascade_coarse_proper_refinement_v1.json|proper_refinement"|\
-  "config/experiments/train_direct_dynamics_cascade_threshold_weighted_refinement_v1.json|threshold_weighted_refinement") ;;
+  "config/experiments/train_direct_dynamics_cascade_threshold_weighted_refinement_v1.json|threshold_weighted_refinement"|\
+  "config/experiments/train_direct_dynamics_cascade_coarse_multiscale_refinement_v1.json|multiscale_refinement") ;;
   *)
     echo "unreviewed proper-refinement config/output pair" >&2
     exit 2

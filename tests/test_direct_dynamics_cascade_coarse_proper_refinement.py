@@ -12,6 +12,8 @@ from assim_lib import direct_dynamics_cascade_proper_refinement_evaluation as ev
 from assim_lib.direct_dynamics_cascade_coarse_proper_refinement import (
     frozen_prefix,
     hybrid_terminal_sample,
+    mask_aware_block_average_score_inputs,
+    multiscale_proper_objective,
     _persist_training_update_then_report,
     proper_objective,
     rk4_interval,
@@ -261,6 +263,31 @@ def test_joint_energy_two_member_closed_form():
     assert abs(standardized_joint_energy(members, truth, fraction).item()) < 1e-5
     objective, crps, energy = proper_objective(members, truth, fraction)
     assert torch.isfinite(objective + crps + energy)
+
+
+def test_mask_aware_four_by_four_average_does_not_mix_land_zero():
+    members = torch.full((1, 2, 6, 4, 4), 7.0)
+    truth = torch.full((1, 6, 4, 4), 5.0)
+    fraction = torch.ones(1, 1, 4, 4)
+    fraction[..., :2, :2] = 0.0
+    members[..., :2, :2] = 0.0
+    truth[..., :2, :2] = 0.0
+    coarse_members, coarse_truth, coarse_fraction = mask_aware_block_average_score_inputs(
+        members, truth, fraction
+    )
+    assert torch.equal(coarse_members, torch.full_like(coarse_members, 7.0))
+    assert torch.equal(coarse_truth, torch.full_like(coarse_truth, 5.0))
+    assert torch.equal(coarse_fraction, torch.full_like(coarse_fraction, 0.75))
+
+
+def test_multiscale_objective_preserves_backward():
+    members = torch.randn(1, 4, 6, 8, 8, requires_grad=True)
+    truth = torch.randn(1, 6, 8, 8)
+    fraction = torch.ones(1, 1, 8, 8)
+    objective, marginal, energy = multiscale_proper_objective(members, truth, fraction)
+    assert torch.isfinite(objective + marginal + energy)
+    objective.backward()
+    assert members.grad is not None and torch.isfinite(members.grad).all()
 
 
 def test_scores_ignore_inactive_nan_and_preserve_backward():

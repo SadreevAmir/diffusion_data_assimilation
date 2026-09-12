@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 import torch
+import torch.nn.functional as F
 from torch.utils.data import Subset
 
 from .clearml_tracking import ClearMLTracker
@@ -299,6 +300,55 @@ def proper_objective(
     return 0.75 * crps + 0.25 * energy, crps, energy
 
 
+def mask_aware_block_average_score_inputs(
+    members: torch.Tensor,
+    truth: torch.Tensor,
+    ocean_fraction: torch.Tensor,
+    *,
+    factor: int = 4,
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    """Aggregate a proper-score sample without mixing land zeros into ocean."""
+    _validate_score_inputs(members, truth, ocean_fraction)
+    if factor != 4 or members.shape[-2] % factor or members.shape[-1] % factor:
+        raise ValueError("multiscale refinement requires exact 4x4 coarse-grid blocks")
+    count = members.shape[1]
+    weight = ocean_fraction.to(device=members.device, dtype=members.dtype)
+    coarse_fraction = F.avg_pool2d(weight, factor, factor)
+    denominator = coarse_fraction.clamp_min(torch.finfo(members.dtype).tiny)
+    member_weight = weight[:, None].expand(-1, count, -1, -1, -1)
+    safe_members = torch.where(member_weight > 0, members, torch.zeros_like(members))
+    member_sum = F.avg_pool2d(
+        (safe_members * member_weight).flatten(0, 1), factor, factor
+    ).unflatten(0, (members.shape[0], count))
+    safe_truth = torch.where(weight.expand_as(truth) > 0, truth, torch.zeros_like(truth))
+    truth_sum = F.avg_pool2d(safe_truth * weight, factor, factor)
+    coarse_members = torch.where(
+        coarse_fraction[:, None] > 0,
+        member_sum / denominator[:, None],
+        torch.zeros_like(member_sum),
+    )
+    coarse_truth = torch.where(
+        coarse_fraction > 0,
+        truth_sum / denominator,
+        torch.zeros_like(truth_sum),
+    )
+    return coarse_members, coarse_truth, coarse_fraction
+
+
+def multiscale_proper_objective(
+    members: torch.Tensor, truth: torch.Tensor, ocean_fraction: torch.Tensor
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    """Frozen native/coarse marginal CRPS plus native joint energy score."""
+    native_crps = standardized_fair_crps(members, truth, ocean_fraction)
+    aggregated = mask_aware_block_average_score_inputs(
+        members, truth, ocean_fraction, factor=4
+    )
+    large_scale_crps = standardized_fair_crps(*aggregated)
+    energy = standardized_joint_energy(members, truth, ocean_fraction)
+    marginal = 0.5 * (native_crps + large_scale_crps)
+    return 0.75 * marginal + 0.25 * energy, marginal, energy
+
+
 def _sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as handle:
@@ -341,13 +391,23 @@ THRESHOLD_WEIGHTED_SCORE_CONTRACT = {
     "sit_physical_bands_metres": [[0.0, 0.02]],
 }
 
+MULTISCALE_PROPER_SCORE_CONTRACT = {
+    "kind": "native_plus_mask_aware_4x4_fair_crps_v1",
+    "native_crps_fraction": 0.5,
+    "large_scale_crps_fraction": 0.5,
+    "aggregation_factor": 4,
+}
+
 
 def _validate_reviewed_protocol(protocol: dict[str, Any]) -> None:
     core = {key: value for key, value in protocol.items() if key != "marginal_score"}
     if core != REVIEWED_PROTOCOL:
         raise ValueError("proper-refinement protocol differs from the reviewed bounded contract")
     score = protocol.get("marginal_score")
-    if score is not None and score != THRESHOLD_WEIGHTED_SCORE_CONTRACT:
+    if score is not None and score not in (
+        THRESHOLD_WEIGHTED_SCORE_CONTRACT,
+        MULTISCALE_PROPER_SCORE_CONTRACT,
+    ):
         raise ValueError("proper-refinement marginal score differs from a reviewed contract")
 
 
@@ -368,6 +428,8 @@ def _configured_proper_objective(
     score = _score_contract(protocol)
     if score["kind"] == "standardized_fair_crps_v1":
         return proper_objective(members, truth, ocean_fraction)
+    if score == MULTISCALE_PROPER_SCORE_CONTRACT:
+        return multiscale_proper_objective(members, truth, ocean_fraction)
     if score != THRESHOLD_WEIGHTED_SCORE_CONTRACT:
         raise ValueError("unknown proper-refinement marginal score")
     if data_config.get("fields") != ["siconc", "sithic"]:
