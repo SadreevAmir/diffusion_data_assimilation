@@ -291,6 +291,7 @@ def _gpu_admission_smoke(
     config: TrainingConfig,
     base_noise_channel_scales: tuple[float, ...] | None = None,
     preconditioning_scales: tuple[tuple[float, ...], tuple[float, ...]] | None = None,
+    colored_base: tuple[float, tuple[float, ...]] | None = None,
 ) -> dict:
     """Run the exact 29→6 projected training path without an optimizer step."""
     device = torch.device("cuda")
@@ -302,6 +303,17 @@ def _gpu_admission_smoke(
     batch_size = truth.shape[0]
     time = torch.linspace(0.05, 0.95, batch_size, device=device)
     noise = torch.randn_like(truth)
+    if colored_base is not None:
+        if base_noise_channel_scales is not None:
+            raise ValueError("GPU smoke cannot combine matched and colored base laws")
+        from .direct_dynamics_cascade_fine_colored import colored_projected_gaussian
+
+        noise = colored_projected_gaussian(
+            noise,
+            valid_mask,
+            blend=colored_base[0],
+            channel_scales=colored_base[1],
+        )
     if base_noise_channel_scales is None:
         state, target, _, _ = residual_flow_pair(truth, noise, valid_mask, time)
     else:
@@ -365,6 +377,11 @@ def _gpu_admission_smoke(
         "gradient_accumulation_steps": config.gradient_accumulation_steps,
         "base_noise_channel_scales": (
             None if base_noise_channel_scales is None else list(base_noise_channel_scales)
+        ),
+        "colored_base": (
+            None
+            if colored_base is None
+            else {"blend": colored_base[0], "channel_scales": list(colored_base[1])}
         ),
         "preconditioning": (
             None
@@ -431,6 +448,7 @@ def _run_impl(config_path: Path, *, preflight_only: bool, lifecycle: _Lifecycle)
         "compact_full_data_one_epoch_6474",
         "compact_matched_base_scale_2048",
         "compact_variance_preconditioned_512",
+        "compact_colored_preconditioned_512",
     }:
         raise ValueError("fine cascade experiment declares an unsupported pilot kind")
     train_case_count = int(pilot.get("train_case_count", 4096))
@@ -513,6 +531,7 @@ def _run_impl(config_path: Path, *, preflight_only: bool, lifecycle: _Lifecycle)
     trainer_class = FineCascadeDynamicsTrainer
     base_noise_channel_scales = None
     preconditioning_scales = None
+    colored_base = None
     if pilot.get("kind") == "compact_matched_base_scale_2048":
         from .direct_dynamics_cascade_fine_matched_scale import (
             MatchedScaleFineCascadeDynamicsTrainer,
@@ -536,12 +555,30 @@ def _run_impl(config_path: Path, *, preflight_only: bool, lifecycle: _Lifecycle)
             tuple(contract["projected_base_rms"]),
         )
         trainer_class = VariancePreconditionedFineCascadeDynamicsTrainer
+    elif pilot.get("kind") == "compact_colored_preconditioned_512":
+        from .direct_dynamics_cascade_fine_colored import (
+            ColoredVariancePreconditionedFineCascadeDynamicsTrainer,
+            validate_colored_base_contract,
+        )
+        from .direct_dynamics_cascade_fine_preconditioned import (
+            validate_preconditioning_contract,
+        )
+
+        precondition = validate_preconditioning_contract(experiment.get("fine_preconditioning"))
+        color = validate_colored_base_contract(experiment.get("fine_colored_base"))
+        preconditioning_scales = (
+            tuple(precondition["target_residual_rms"]),
+            tuple(precondition["projected_base_rms"]),
+        )
+        colored_base = (float(color["blend"]), tuple(color["channel_scales"]))
+        trainer_class = ColoredVariancePreconditionedFineCascadeDynamicsTrainer
     smoke = _gpu_admission_smoke(
         model,
         smoke_batch,
         config,
         base_noise_channel_scales=base_noise_channel_scales,
         preconditioning_scales=preconditioning_scales,
+        colored_base=colored_base,
     )
     result = {
         "status": "preflight_passed" if preflight_only else "training_pending",

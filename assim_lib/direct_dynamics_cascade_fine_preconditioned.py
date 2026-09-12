@@ -40,6 +40,7 @@ from .trainer import _atomic_json
 
 
 PRECONDITIONING_KIND = "variance_preconditioned_projected_gaussian_v1"
+PROJECTED_WHITE_BASE_KIND = "projected_white_gaussian_v1"
 
 
 def _validate_scales(values: Any, label: str) -> tuple[float, ...]:
@@ -326,6 +327,8 @@ def load_variance_preconditioned_fine_cascade_sampler(
     expected_code_commit: str,
     expected_forecast_contract_sha256: str,
     device=None,
+    *,
+    expected_base_parameterization: str = PROJECTED_WHITE_BASE_KIND,
 ) -> VariancePreconditionedFineCascadeSampler:
     root = Path(run_dir)
     manifest_path = root / "fine_cascade_preconditioning_manifest.json"
@@ -336,6 +339,9 @@ def load_variance_preconditioned_fine_cascade_sampler(
     if not primary_path.is_file():
         raise ValueError("fine checkpoint lacks its primary cascade manifest")
     primary = json.loads(primary_path.read_text(encoding="utf-8"))
+    actual_base_parameterization = primary.get(
+        "base_parameterization", PROJECTED_WHITE_BASE_KIND
+    )
     if (
         manifest.get("schema_version") != 1
         or manifest.get("sampler") != "VariancePreconditionedFineCascadeSampler"
@@ -344,6 +350,7 @@ def load_variance_preconditioned_fine_cascade_sampler(
         or primary.get("velocity_parameterization") != PRECONDITIONING_KIND
         or primary.get("parameterization_manifest") != manifest_path.name
         or primary.get("parameterization_manifest_sha256") != _sha256(manifest_path)
+        or actual_base_parameterization != expected_base_parameterization
     ):
         raise ValueError("fine preconditioning manifest is incompatible")
     contract = validate_preconditioning_contract(manifest.get("preconditioning"))

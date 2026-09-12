@@ -1,0 +1,63 @@
+{
+  "project_name": "sea_ice_two_stage",
+  "task_name": "direct_dynamics_cascade_fine_colored_preconditioned_512_v7",
+  "data_config": "../data/m2m_2f_two_stage_dynamics_protocol.json",
+  "model_config": "../methods/direct_dynamics_cascade_fine_compact_2f.json",
+  "data_overrides": {
+    "hour_mode": "all",
+    "dynamic_forcing_stats": {
+      "source_split": "train",
+      "estimator_scope": "slice23_train_reused_for_all_hour_recovery_ablation",
+      "indices": [6, 7, 13, 14],
+      "means": [0.00024072701720376523, -0.017859677007622955, -0.106700353199528, -0.18476749778477272],
+      "stds": [0.06025002092600086, 0.0655322642143171, 4.434678472175259, 4.7337812043401915],
+      "finite_value_count_per_field": [100059986, 100059986, 104958646, 104958646]
+    }
+  },
+  "training": {
+    "base_output_dir": "/home/autoresearch_results/direct_dynamics_cascade_v2/fine_colored_preconditioned_512",
+    "run_name": "conv32_seed27181",
+    "num_sample_timesteps": 33
+  },
+  "pilot": {
+    "kind": "compact_colored_preconditioned_512",
+    "train_case_count": 4096,
+    "validation_case_count": 48,
+    "optimizer_updates": 512
+  },
+  "candidate_scope": "combined_spatial_covariance_rms_match_and_induced_preconditioning_weight_change",
+  "causal_attribution_requirement": "compare_against_projected_white_control_with_identical_rms_and_preconditioning_before_claiming_coloring_gain",
+  "fine_preconditioning": {
+    "kind": "variance_preconditioned_projected_gaussian_v1",
+    "channel_order": ["d3_sic", "d3_sit", "d6_sic", "d6_sit", "d9_sic", "d9_sit"],
+    "target_residual_rms": [0.0573896712355006, 0.06839136593196717, 0.0589694602490544, 0.06945646175214688, 0.05666775315830616, 0.06648584259856442],
+    "projected_base_rms": [0.05738967123550061, 0.06839136593196717, 0.0589694602490544, 0.06945646175214688, 0.05666775315830616, 0.06648584259856442],
+    "source_audit_path": "/home/autoresearch_results/direct_dynamics_cascade_v2/colored_base_audit_b5e688e.json",
+    "source_audit_sha256": "b1e2a48d75c6c2454b649ddb930fd5454486d51f1523eb20db44aff2b5c9387e"
+  },
+  "fine_colored_base": {
+    "kind": "projected_binomial_blend_gaussian_v1",
+    "blend": 0.75,
+    "channel_scales": [0.18162891650024474, 0.21642298440580493, 0.18662267526363227, 0.2197794032989506, 0.17930794323631213, 0.210449343251341],
+    "source_audit_path": "/home/autoresearch_results/direct_dynamics_cascade_v2/colored_base_audit_b5e688e.json",
+    "source_audit_sha256": "b1e2a48d75c6c2454b649ddb930fd5454486d51f1523eb20db44aff2b5c9387e"
+  },
+  "clearml": {
+    "enabled": true,
+    "env_path": "/home/.env",
+    "tags": [
+      "cascade-fine-stage",
+      "compact-conv32",
+      "colored-full-support-gaussian-base",
+      "combined-candidate-not-covariance-only-ablation",
+      "variance-preconditioned-flow",
+      "unchanged-target-law",
+      "train-only-spectral-and-rms-fit",
+      "exact-512-updates",
+      "mechanics-gate",
+      "one-gpu",
+      "no-activation-checkpointing"
+    ],
+    "upload_checkpoints": false
+  }
+}

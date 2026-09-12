@@ -301,9 +301,37 @@ def load_cascade_predictor(
     preconditioned_manifest = (
         Path(fine_run_dir) / "fine_cascade_preconditioning_manifest.json"
     )
-    if matched_manifest.is_file() and preconditioned_manifest.is_file():
+    colored_manifest = Path(fine_run_dir) / "fine_cascade_colored_base_manifest.json"
+    fine_primary = json.loads(
+        (Path(fine_run_dir) / "fine_cascade_manifest.json").read_text(encoding="utf-8")
+    )
+    if (
+        fine_primary.get("base_parameterization")
+        == "projected_binomial_blend_gaussian_v1"
+        and not colored_manifest.is_file()
+    ):
+        raise ValueError("colored fine checkpoint is missing its colored-base manifest")
+    if matched_manifest.is_file() and (
+        preconditioned_manifest.is_file() or colored_manifest.is_file()
+    ):
         raise ValueError("fine checkpoint declares conflicting sampler parameterizations")
-    if preconditioned_manifest.is_file():
+    if colored_manifest.is_file() and not preconditioned_manifest.is_file():
+        raise ValueError("colored fine checkpoint lacks variance preconditioning")
+    if colored_manifest.is_file():
+        from .direct_dynamics_cascade_fine_colored import (
+            load_colored_variance_preconditioned_fine_cascade_sampler,
+        )
+
+        fine = load_colored_variance_preconditioned_fine_cascade_sampler(
+            fine_run_dir,
+            fine_checkpoint_name,
+            fine_model_config,
+            fine_checkpoint_sha256,
+            expected_fine_code_commit,
+            expected_forecast_contract_sha256,
+            device=device,
+        )
+    elif preconditioned_manifest.is_file():
         from .direct_dynamics_cascade_fine_preconditioned import (
             load_variance_preconditioned_fine_cascade_sampler,
         )
@@ -360,4 +388,6 @@ def load_cascade_predictor(
         replay_identity["fine_preconditioning_manifest_sha256"] = _sha256(
             preconditioned_manifest
         )
+    if colored_manifest.is_file():
+        replay_identity["fine_colored_base_manifest_sha256"] = _sha256(colored_manifest)
     return CascadePredictor(coarse, fine, replay_identity=replay_identity)

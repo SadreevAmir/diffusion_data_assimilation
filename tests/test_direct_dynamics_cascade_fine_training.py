@@ -56,6 +56,10 @@ class FineCascadeRunnerTests(unittest.TestCase):
             "train_direct_dynamics_cascade_fine_variance_preconditioned_512_v6.json",
             launcher,
         )
+        self.assertIn(
+            "train_direct_dynamics_cascade_fine_colored_preconditioned_512_v7.json",
+            launcher,
+        )
         self.assertIn("scripts/require_single_gpu_uuid.sh", launcher)
         self.assertIn(
             "nvidia-smi --id=0 --query-gpu=memory.used,utilization.gpu", launcher

@@ -14,6 +14,9 @@ from assim_lib.direct_dynamics_cascade_end_to_end import (
     load_cascade_predictor,
 )
 from assim_lib.direct_dynamics_cascade_fine import FineCascadeSampler
+from assim_lib.direct_dynamics_cascade_fine_colored import (
+    ColoredVariancePreconditionedFineCascadeSampler,
+)
 
 
 class ConstantVelocityModel(nn.Module):
@@ -148,6 +151,33 @@ class EndToEndCascadeTests(unittest.TestCase):
         for name in ("forecast", "coarse", "residual"):
             self.assertTrue(torch.equal(joint[name], torch.cat((left[name], right[name]), dim=1)))
 
+    def test_colored_member_records_the_actual_ode_initial_state(self):
+        fine = ColoredVariancePreconditionedFineCascadeSampler(
+            ZeroModel(),
+            target_residual_rms=(1.0,) * 6,
+            projected_base_rms=(1.0,) * 6,
+            blend=0.75,
+            channel_scales=(0.2,) * 6,
+        )
+        fine.capture_evidence = True
+        predictor = CascadePredictor(CoarseCascadeSampler(ZeroModel()), fine)
+        member = predictor.sample_member(
+            structured_conditioning=self.condition[:1],
+            valid_mask=self.mask[:1],
+            case_ids=self.case_ids[:1],
+            member=4,
+            coarse_num_timesteps=2,
+            fine_num_timesteps=2,
+            device=torch.device("cpu"),
+        )
+        self.assertEqual(len(fine.evidence), 1)
+        self.assertTrue(
+            torch.equal(
+                member.projected_fine_noise.cpu(),
+                fine.evidence[0]["projected_initial_noise"],
+            )
+        )
+
     def test_rejects_nonzero_flow_endpoint(self):
         predictor = CascadePredictor(CoarseCascadeSampler(ZeroModel()), FineCascadeSampler(ZeroModel()))
         with self.assertRaisesRegex(ValueError, "end_time=0"):
@@ -219,6 +249,91 @@ class EndToEndCascadeTests(unittest.TestCase):
             self.assertIn(
                 "fine_preconditioning_manifest_sha256", predictor.replay_identity
             )
+
+    def test_loader_dispatches_colored_preconditioned_fine(self):
+        holder = lambda: SimpleNamespace(  # noqa: E731 - compact sampler test double
+            sampler=SimpleNamespace(model=nn.Identity())
+        )
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            coarse = root / "coarse"
+            fine = root / "fine"
+            coarse.mkdir()
+            fine.mkdir()
+            (coarse / "coarse_cascade_manifest.json").write_text("{}")
+            (fine / "fine_cascade_manifest.json").write_text("{}")
+            (fine / "fine_cascade_preconditioning_manifest.json").write_text("{}")
+            (fine / "fine_cascade_colored_base_manifest.json").write_text("{}")
+            with (
+                patch(
+                    "assim_lib.direct_dynamics_cascade_end_to_end.load_coarse_cascade_sampler",
+                    return_value=holder(),
+                ),
+                patch(
+                    "assim_lib.direct_dynamics_cascade_end_to_end.load_fine_cascade_sampler"
+                ) as plain,
+                patch(
+                    "assim_lib.direct_dynamics_cascade_fine_preconditioned.load_variance_preconditioned_fine_cascade_sampler"
+                ) as preconditioned,
+                patch(
+                    "assim_lib.direct_dynamics_cascade_fine_colored.load_colored_variance_preconditioned_fine_cascade_sampler",
+                    return_value=holder(),
+                ) as colored,
+            ):
+                predictor = load_cascade_predictor(
+                    coarse_run_dir=str(coarse),
+                    coarse_checkpoint_name="coarse.pth",
+                    coarse_model_config={},
+                    coarse_checkpoint_sha256="c" * 64,
+                    fine_run_dir=str(fine),
+                    fine_checkpoint_name="fine.pth",
+                    fine_model_config={},
+                    fine_checkpoint_sha256="f" * 64,
+                    expected_coarse_code_commit="a" * 40,
+                    expected_fine_code_commit="b" * 40,
+                    replay_code_commit="d" * 40,
+                    expected_forecast_contract_sha256="e" * 64,
+                )
+            plain.assert_not_called()
+            preconditioned.assert_not_called()
+            colored.assert_called_once()
+            self.assertIn("fine_colored_base_manifest_sha256", predictor.replay_identity)
+
+    def test_loader_rejects_declared_colored_base_without_manifest(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            coarse = root / "coarse"
+            fine = root / "fine"
+            coarse.mkdir()
+            fine.mkdir()
+            (coarse / "coarse_cascade_manifest.json").write_text("{}")
+            (fine / "fine_cascade_manifest.json").write_text(
+                json.dumps(
+                    {"base_parameterization": "projected_binomial_blend_gaussian_v1"}
+                )
+            )
+            (fine / "fine_cascade_preconditioning_manifest.json").write_text("{}")
+            with (
+                patch(
+                    "assim_lib.direct_dynamics_cascade_end_to_end.load_coarse_cascade_sampler",
+                    return_value=SimpleNamespace(sampler=SimpleNamespace(model=nn.Identity())),
+                ),
+                self.assertRaisesRegex(ValueError, "missing its colored-base manifest"),
+            ):
+                load_cascade_predictor(
+                    coarse_run_dir=str(coarse),
+                    coarse_checkpoint_name="coarse.pth",
+                    coarse_model_config={},
+                    coarse_checkpoint_sha256="c" * 64,
+                    fine_run_dir=str(fine),
+                    fine_checkpoint_name="fine.pth",
+                    fine_model_config={},
+                    fine_checkpoint_sha256="f" * 64,
+                    expected_coarse_code_commit="a" * 40,
+                    expected_fine_code_commit="b" * 40,
+                    replay_code_commit="d" * 40,
+                    expected_forecast_contract_sha256="e" * 64,
+                )
 
 
 if __name__ == "__main__":

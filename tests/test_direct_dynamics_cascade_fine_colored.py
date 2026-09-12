@@ -4,9 +4,16 @@ import torch
 
 from assim_lib.direct_dynamics_cascade import masked_block_average, project_detail
 from assim_lib.direct_dynamics_cascade_fine_colored import (
+    ColoredVariancePreconditionedFineCascadeSampler,
     binomial_blur,
     colored_projected_gaussian,
 )
+
+
+class ZeroModel(torch.nn.Module):
+    def forward(self, model_input, timestep, return_dict=False):
+        del timestep, return_dict
+        return (torch.zeros_like(model_input[:, :6]),)
 
 
 class ColoredProjectedGaussianTests(unittest.TestCase):
@@ -49,6 +56,30 @@ class ColoredProjectedGaussianTests(unittest.TestCase):
                 colored_projected_gaussian(
                     white, mask, blend=blend, channel_scales=(1.0,) * 6
                 )
+
+    def test_sampler_exposes_exact_ode_initial_state(self):
+        sampler = ColoredVariancePreconditionedFineCascadeSampler(
+            ZeroModel(),
+            target_residual_rms=(1.0,) * 6,
+            projected_base_rms=(1.0,) * 6,
+            blend=0.75,
+            channel_scales=(0.2,) * 6,
+        )
+        generator = torch.Generator().manual_seed(91)
+        white = torch.randn((2, 6, 12, 10), generator=generator)
+        mask = torch.ones((2, 1, 12, 10))
+        mask[:, :, :2, :3] = 0
+        self.assertTrue(
+            torch.equal(
+                sampler.project_initial_noise(white, mask),
+                colored_projected_gaussian(
+                    white,
+                    mask,
+                    blend=0.75,
+                    channel_scales=(0.2,) * 6,
+                ),
+            )
+        )
 
 
 if __name__ == "__main__":

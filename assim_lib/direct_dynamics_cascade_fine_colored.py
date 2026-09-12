@@ -24,12 +24,17 @@ from .direct_dynamics_cascade import project_detail, residual_flow_pair
 from .direct_dynamics_cascade_fine import (
     CASCADE_FACTOR,
     DIRECT_OUTPUT_CHANNELS,
+    ProjectedDetailModel,
+    _sha256,
     validate_fine_condition,
 )
 from .direct_dynamics_cascade_fine_preconditioned import (
+    PRECONDITIONING_KIND,
     VariancePreconditionedFineCascadeDynamicsTrainer,
     VariancePreconditionedFineCascadeSampler,
+    load_variance_preconditioned_fine_cascade_sampler,
 )
+from .trainer import _atomic_json
 
 
 COLORED_BASE_KIND = "projected_binomial_blend_gaussian_v1"
@@ -53,8 +58,6 @@ def validate_colored_base_contract(value: Any) -> dict[str, Any]:
     scales = _channel_scales(value.get("channel_scales"))
     source = Path(str(value.get("source_audit_path", "")))
     expected_sha256 = str(value.get("source_audit_sha256", ""))
-    from .direct_dynamics_cascade_fine import _sha256
-
     if not source.is_file() or _sha256(source) != expected_sha256:
         raise ValueError("colored-base source audit is missing or differs")
     audit = json.loads(source.read_text(encoding="utf-8"))
@@ -113,6 +116,44 @@ def colored_projected_gaussian(
     return project_detail(result, valid_mask.float(), CASCADE_FACTOR)
 
 
+def write_colored_base_manifest(
+    output_dir: str | Path,
+    contract: dict[str, Any],
+    code_commit: str,
+) -> None:
+    root = Path(output_dir)
+    primary_path = root / "fine_cascade_manifest.json"
+    preconditioning_path = root / "fine_cascade_preconditioning_manifest.json"
+    if not primary_path.is_file() or not preconditioning_path.is_file():
+        raise ValueError("colored fine run lacks its primary preconditioning manifests")
+    path = root / "fine_cascade_colored_base_manifest.json"
+    _atomic_json(
+        path,
+        {
+            "schema_version": 1,
+            "sampler": "ColoredVariancePreconditionedFineCascadeSampler",
+            "colored_base": contract,
+            "target_law": "unchanged_exact_detail_R_equals_I_minus_UD_Y",
+            "implementation_sha256": _sha256(Path(__file__)),
+            "code_commit": code_commit,
+        },
+    )
+    primary = json.loads(primary_path.read_text(encoding="utf-8"))
+    if (
+        primary.get("code_commit") != code_commit
+        or primary.get("velocity_parameterization") != PRECONDITIONING_KIND
+    ):
+        raise ValueError("colored fine primary manifest is incompatible")
+    primary.update(
+        {
+            "base_parameterization": COLORED_BASE_KIND,
+            "colored_base_manifest": path.name,
+            "colored_base_manifest_sha256": _sha256(path),
+        }
+    )
+    _atomic_json(primary_path, primary)
+
+
 class ColoredVariancePreconditionedFineCascadeSampler(
     VariancePreconditionedFineCascadeSampler
 ):
@@ -121,6 +162,17 @@ class ColoredVariancePreconditionedFineCascadeSampler(
         self.blend = float(blend)
         self.channel_scales = tuple(float(value) for value in channel_scales)
 
+    def project_initial_noise(
+        self, raw_noise: torch.Tensor, valid_mask: torch.Tensor
+    ) -> torch.Tensor:
+        """Return the exact colored endpoint passed to the reverse ODE."""
+        return colored_projected_gaussian(
+            raw_noise.float(),
+            valid_mask.float(),
+            blend=self.blend,
+            channel_scales=self.channel_scales,
+        )
+
     @torch.no_grad()
     def sample_conditioned(self, **kwargs: Any) -> torch.Tensor:
         white = kwargs.get("initial_noise")
@@ -128,12 +180,7 @@ class ColoredVariancePreconditionedFineCascadeSampler(
         if white is None or condition is None:
             raise ValueError("colored fine sampler requires explicit noise and conditioning")
         valid_mask, _ = validate_fine_condition(condition)
-        colored = colored_projected_gaussian(
-            white.float(),
-            valid_mask.float(),
-            blend=self.blend,
-            channel_scales=self.channel_scales,
-        )
+        colored = self.project_initial_noise(white, valid_mask)
         previous = len(self.evidence)
         forwarded = dict(kwargs)
         forwarded["initial_noise"] = colored
@@ -161,6 +208,11 @@ class ColoredVariancePreconditionedFineCascadeDynamicsTrainer(
         self._colored_blend = float(contract["blend"])
         self._colored_channel_scales = tuple(contract["channel_scales"])
         super().__init__(*args, **kwargs)
+        write_colored_base_manifest(
+            self.output_dir,
+            contract,
+            self._fine_code_identity["git_commit"],
+        )
 
     def _make_training_pair(
         self,
@@ -203,3 +255,54 @@ class ColoredVariancePreconditionedFineCascadeDynamicsTrainer(
         sampler.capture_evidence = True
         self._latest_fine_sampler = sampler
         return sampler
+
+
+def load_colored_variance_preconditioned_fine_cascade_sampler(
+    run_dir: str,
+    checkpoint_name: str,
+    model_config: dict,
+    expected_checkpoint_sha256: str,
+    expected_code_commit: str,
+    expected_forecast_contract_sha256: str,
+    device=None,
+) -> ColoredVariancePreconditionedFineCascadeSampler:
+    root = Path(run_dir)
+    manifest_path = root / "fine_cascade_colored_base_manifest.json"
+    primary_path = root / "fine_cascade_manifest.json"
+    if not manifest_path.is_file() or not primary_path.is_file():
+        raise ValueError("colored fine checkpoint lacks its sampler manifests")
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    primary = json.loads(primary_path.read_text(encoding="utf-8"))
+    if (
+        manifest.get("schema_version") != 1
+        or manifest.get("sampler")
+        != "ColoredVariancePreconditionedFineCascadeSampler"
+        or manifest.get("code_commit") != expected_code_commit
+        or manifest.get("implementation_sha256") != _sha256(Path(__file__))
+        or primary.get("base_parameterization") != COLORED_BASE_KIND
+        or primary.get("colored_base_manifest") != manifest_path.name
+        or primary.get("colored_base_manifest_sha256") != _sha256(manifest_path)
+    ):
+        raise ValueError("colored fine sampler manifest is incompatible")
+    contract = validate_colored_base_contract(manifest.get("colored_base"))
+    base = load_variance_preconditioned_fine_cascade_sampler(
+        run_dir,
+        checkpoint_name,
+        model_config,
+        expected_checkpoint_sha256,
+        expected_code_commit,
+        expected_forecast_contract_sha256,
+        device=device,
+        expected_base_parameterization=COLORED_BASE_KIND,
+    )
+    velocity_model = base.sampler.model
+    projected = getattr(velocity_model, "model", None)
+    if not isinstance(projected, ProjectedDetailModel):
+        raise TypeError("colored fine loader did not recover the projected neural model")
+    return ColoredVariancePreconditionedFineCascadeSampler(
+        projected,
+        base.target_residual_rms,
+        base.projected_base_rms,
+        contract["blend"],
+        contract["channel_scales"],
+    )
