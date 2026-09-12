@@ -8,6 +8,15 @@ from assim_lib.direct_dynamics_coarse_budget_training import (
     _scored_candidate,
     _validate_training_config,
 )
+from assim_lib.direct_dynamics_coarse_budget_refinement_integration import (
+    anchored_canonical_physical_coarse,
+)
+from assim_lib.direct_dynamics_fine_support_proper_admission import (
+    apply_training_sic_decoder,
+)
+from assim_lib.direct_dynamics_sic_support_decoder_scoring import (
+    canonical_physical_decode,
+)
 
 
 def test_reviewed_training_config_is_exact_and_bounded():
@@ -39,7 +48,13 @@ def test_step_zero_physical_objective_replays_and_has_candidate_gradient():
     physical, objective, crps, energy = _scored_candidate(
         forecast, coarse, control, candidate, truth, valid, means, stds
     )
-    assert torch.equal(physical, forecast)
+    base_coarse, _ = anchored_canonical_physical_coarse(
+        coarse.detach(), coarse.detach(), means, stds
+    )
+    expected = apply_training_sic_decoder(
+        canonical_physical_decode(forecast, means, stds), base_coarse, valid
+    )
+    assert torch.equal(physical, expected)
     assert all(torch.isfinite(value) for value in (objective, crps, energy))
     objective.backward()
     assert candidate.grad is not None
