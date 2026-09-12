@@ -1,0 +1,73 @@
+{
+  "schema_version": "fine_support_proper_actual_gpu_preflight_v1",
+  "project_name": "sea_ice_two_stage",
+  "task_name": "direct_dynamics_fine_support_proper_actual_gpu_preflight_v1",
+  "data_config": "../data/m2m_2f_two_stage_dynamics_protocol.json",
+  "data_config_sha256": "6fb71cc079f17fc0888dd4b4c0d7f06dd57c217b0729403ee3916ac3f82903de",
+  "model_config": "../methods/direct_dynamics_cascade_fine_compact_2f.json",
+  "model_config_sha256": "c66ad03519876780124ced1ec5b2de0e0ca7ae6bb7715905cfe9242482ffc1ff",
+  "data_overrides": {
+    "hour_mode": "all",
+    "dynamic_forcing_stats": {
+      "source_split": "train",
+      "estimator_scope": "slice23_train_reused_for_all_hour_recovery_ablation",
+      "indices": [6, 7, 13, 14],
+      "means": [0.00024072701720376523, -0.017859677007622955, -0.106700353199528, -0.18476749778477272],
+      "stds": [0.06025002092600086, 0.0655322642143171, 4.434678472175259, 4.7337812043401915],
+      "finite_value_count_per_field": [100059986, 100059986, 104958646, 104958646]
+    }
+  },
+  "source": {
+    "run_dir": "/home/autoresearch_results/direct_dynamics_cascade_v2/fine_colored_preconditioned_2048/conv32_seed27181-fine_colored_2048_train_952a82b_v1",
+    "checkpoint": "mechanics_update_2048.pth",
+    "code_commit": "952a82b8f90294801733b43f1e8d05b2136f7159",
+    "forecast_contract_sha256": "24ee4b6c2e543d5bba866d06a5eafb170de39360de6c71256d7c53bfcd89b146",
+    "files_sha256": {
+      "mechanics_update_2048.pth": "f55fae2d18c4483c7115998c576a14a4928be151807aff02cd27ea9782faf7cb",
+      "config.json": "1d773bb2abe02566821ab42f789f87b2bef4a5bcd56b73834cd92b27deec0ac9",
+      "metadata.json": "6729d7aa011ac2896ea7b31534f192a5b1ba763b28e1d6e7131c3ccb194dc364",
+      "fine_cascade_manifest.json": "2271d91c0263656df612b21972ca851c5c58d694c7681577a403b5c29c6351b4",
+      "fine_cascade_preconditioning_manifest.json": "92db341249b57fa4b2d3d0b436be73202d9da786e3f7273c7b74c690c3614167",
+      "fine_cascade_colored_base_manifest.json": "eec3ee9f824b456d1099d26cea798d71e8faf32defd7288a24f3efbc43434148"
+    },
+    "implementation_sha256": {
+      "fine_conditioning": "4056b6d90b2e9ddaf94226730ceee72644bf372dbc8a9ca06ce3bc7711b8ac66",
+      "fine_preconditioning": "f264ec8f315ccc6f9af077fa9f5a5ebc4db4c0ac77c936d18cf14a8191bb93c6",
+      "fine_colored": "3c8c30be62a7832ed0d952179adb4ed894090a498f17af10e57e1a5ae7935f82"
+    }
+  },
+  "normalization_source_config": {
+    "path": "config/experiments/audit_direct_dynamics_sic_support_decoder_scoring_v1.json",
+    "sha256": "da10a68a85cc80c7b81005fdf081043448572bd06b6c37e08104fc2d3dd470e0",
+    "repo_relative": true
+  },
+  "parent_cpu_gate": {
+    "commit": "8d0af601e64d46795ae12f096a3cfbf5e6af7064",
+    "metrics_path": "/home/autoresearch_results/direct_dynamics_cascade_v2/fine_support_proper_admission/fine_support_proper_8d0af60_v1/status.metrics.json",
+    "metrics_sha256": "4c422f1e84d669784de07d559744ffd7a1d18cf7441c82f97f396b5de4df19a7"
+  },
+  "parent_integration_commit": "f3487351c4ae427a1191bd563d8fc591862ad16a",
+  "protocol": {
+    "split": "train",
+    "case_index": 0,
+    "members": 4,
+    "rk4_intervals": 32,
+    "frozen_prefix_intervals": 31,
+    "trainable_terminal_intervals": 1,
+    "network_precision": "bf16",
+    "state_precision": "fp32",
+    "score_precision": "fp64",
+    "optimizer_steps": 0,
+    "seed": 71693,
+    "test_2023": "closed",
+    "max_gpu_minutes": 30
+  },
+  "clearml": {
+    "env_path": "/home/.env",
+    "tags": [
+      "actual-fine2048", "zero-update-preflight", "support-aware-fine-refinement",
+      "rk4-31-plus-1", "four-members", "full-resolution", "teacher-coarse",
+      "proper-score", "one-gpu", "zero-optimizer", "test-2023-closed"
+    ]
+  }
+}
