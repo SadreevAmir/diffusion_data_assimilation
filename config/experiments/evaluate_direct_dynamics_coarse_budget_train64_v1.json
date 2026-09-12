@@ -1,0 +1,75 @@
+{
+  "schema_version": "coarse_budget_paired_validation_v1",
+  "project_name": "sea_ice_two_stage",
+  "task_name": "direct_dynamics_coarse_budget_train64_paired_validation_v1",
+  "split": "valid",
+  "test_2023": "closed",
+  "cases": 12,
+  "members": 8,
+  "coarse_rk4_timepoints": 17,
+  "fine_rk4_timepoints": 33,
+  "base_preflight_config": {
+    "path": "preflight_direct_dynamics_coarse_budget_actual_gpu_v1.json",
+    "sha256": "5796a8c35b2eba1c5fa52b820b0e11a936408919422c37993b69e87ffa684fb7"
+  },
+  "trained_terminal": {
+    "checkpoint": "/home/autoresearch_results/direct_dynamics_cascade_v2/coarse_budget_train64/coarse_budget_train64_5295ef5_v1/terminal_model_update_64.pth",
+    "checkpoint_name": "terminal_model_update_64.pth",
+    "checkpoint_sha256": "d33e0777f6721f1a5c0f3d99b0d1957ce508b43bb139e22dd8ee4a0d6c28a77d",
+    "training_record": "/home/autoresearch_results/direct_dynamics_cascade_v2/coarse_budget_train64/coarse_budget_train64_5295ef5_v1/training.json",
+    "training_record_sha256": "8ed0eced7430bffb71bc3dedaae1777d875464201f9749a91b13b829f4a22434",
+    "training_clearml_task_id": "7358bd31ce554ca0b1bf9295657d849f",
+    "code_commit": "5295ef5b0a5c590758ba59542c3d816f9da21496",
+    "completed_updates": 64
+  },
+  "case_indices": [
+    0, 727, 1636, 2363, 3090, 3817, 4726, 5453, 6180, 6907, 7816, 8543
+  ],
+  "case_ids": [
+    "2022-01-01_slice00",
+    "2022-01-31_slice07",
+    "2022-03-10_slice04",
+    "2022-04-09_slice11",
+    "2022-05-09_slice18",
+    "2022-06-09_slice01",
+    "2022-07-16_slice22",
+    "2022-08-16_slice05",
+    "2022-09-15_slice12",
+    "2022-10-15_slice19",
+    "2022-11-22_slice16",
+    "2022-12-22_slice23"
+  ],
+  "labels": {
+    "control": "ema9711_colored_fine2048_frozen_decoder",
+    "candidate": "coarse_budget_terminal64_frozen_fine2048"
+  },
+  "panel": {
+    "role": "development_reuse",
+    "provenance": "The same frozen 12-case validation-2022 panel used by prior cascade gates; development only, not independent confirmation."
+  },
+  "decision_gate": {
+    "primary": "case_equal_six_channel_train_standardized_fair_crps",
+    "required_primary_delta": "negative_with_paired_date_bootstrap_95_ci_high_below_zero",
+    "relative_gain_definition": "ratio_of_aggregate_scores_not_mean_of_case_ratios",
+    "secondary_policy": "inspect_fair_crps_spread_skill_rank_tv_energy_boundary_and_fixed_scale_members",
+    "bootstrap_draws": 100000,
+    "bootstrap_seed": 20260912,
+    "claim_policy": "development_only_not_independent_confirmation"
+  },
+  "clearml": {
+    "env_path": "/home/.env",
+    "tags": [
+      "coarse-budget",
+      "terminal64",
+      "paired-validation-2022",
+      "twelve-cases",
+      "eight-members",
+      "coarse-ema9711",
+      "raw-colored-fine2048",
+      "frozen-fine-allocation",
+      "rank-histogram",
+      "one-gpu",
+      "test-2023-closed"
+    ]
+  }
+}
