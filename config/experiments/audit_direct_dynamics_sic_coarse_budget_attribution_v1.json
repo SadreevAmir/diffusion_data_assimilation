@@ -1,0 +1,29 @@
+{
+  "schema_version": "sic_coarse_budget_attribution_v1",
+  "project_name": "sea_ice_two_stage",
+  "task_name": "direct_dynamics_sic_coarse_budget_attribution_v1",
+  "source_scoring_config": {
+    "path": "config/experiments/audit_direct_dynamics_sic_support_decoder_scoring_v1.json",
+    "sha256": "da10a68a85cc80c7b81005fdf081043448572bd06b6c37e08104fc2d3dd470e0"
+  },
+  "source_decoder_audit": {
+    "code_commit": "1a5d0899c55057ace7f6f3b9ba2a1cca3ecb40ae",
+    "clearml_task_id": "57859e68fcda4d96b3f7a93d7cb6061e",
+    "status": {
+      "path": "/home/autoresearch_results/direct_dynamics_cascade_v2/sic_support_decoder/sic_support_decoder_1a5d089_v1/status.json",
+      "sha256": "4cdd2c7cc2b0cf9ea44d901ea3bf4b31d8448c03b8dd9d6f5de3fbf326e612ab"
+    },
+    "metrics": {
+      "path": "/home/autoresearch_results/direct_dynamics_cascade_v2/sic_support_decoder/sic_support_decoder_1a5d089_v1/status.metrics.json",
+      "sha256": "9441c0e31f28917891afe0daf90901561ad00c783d58f5025724015431f3c77d"
+    }
+  },
+  "clearml": {
+    "env_path": "/home/.env",
+    "tags": [
+      "cpu-only", "frozen-paired-evidence", "sic-zero-atom",
+      "coarse-budget-attribution", "within-block-allocation", "case-equal",
+      "development-diagnostic", "zero-sampling", "zero-optimizer"
+    ]
+  }
+}
