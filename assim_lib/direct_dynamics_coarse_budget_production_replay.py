@@ -8,6 +8,8 @@ member-by-member batch size during actual-checkpoint replay.
 
 from __future__ import annotations
 
+import copy
+import math
 from typing import Any
 
 import torch
@@ -196,3 +198,232 @@ def sequential_terminal_candidate_control(
         candidates.append(candidate)
         controls.append(control)
     return torch.cat(candidates), torch.cat(controls), torch.cat(prefixes)
+
+
+class _DiagnosticCoarse(torch.nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+        self.input = torch.nn.Conv2d(14, 12, 3, padding=1)
+        self.output = torch.nn.Conv2d(12, 6, 3, padding=1)
+
+    def forward(
+        self, value: torch.Tensor, timestamp: torch.Tensor, return_dict: bool = True
+    ) -> tuple[torch.Tensor]:
+        del return_dict
+        time = timestamp.reshape(-1, 1, 1, 1) / 1000.0
+        return (self.output(torch.tanh(self.input(value))) + 0.017 * time,)
+
+
+class _RecordingModel(torch.nn.Module):
+    """Record exact solver/model boundaries without changing model arithmetic."""
+
+    def __init__(self, model: torch.nn.Module) -> None:
+        super().__init__()
+        self.model = model
+        self.calls: list[dict[str, torch.Tensor]] = []
+
+    def forward(
+        self,
+        value: torch.Tensor,
+        timestamp: torch.Tensor,
+        return_dict: bool = True,
+    ) -> Any:
+        output = self.model(value, timestamp, return_dict=return_dict)
+        tensor = _model_output(output)
+        self.calls.append(
+            {
+                "input": value.detach().clone(),
+                "timestamp": timestamp.detach().clone(),
+                "velocity": tensor.detach().clone(),
+            }
+        )
+        return output
+
+
+def _max_abs(left: torch.Tensor, right: torch.Tensor) -> float:
+    return float((left - right).abs().max())
+
+
+def _first_record_difference(
+    reference: list[dict[str, torch.Tensor]],
+    candidate: list[dict[str, torch.Tensor]],
+) -> dict[str, Any] | None:
+    if len(reference) != len(candidate):
+        return {
+            "kind": "call_count",
+            "reference_calls": len(reference),
+            "candidate_calls": len(candidate),
+        }
+    for call_index, (expected, actual) in enumerate(zip(reference, candidate)):
+        differences = {
+            name: _max_abs(expected[name], actual[name])
+            for name in ("input", "timestamp", "velocity")
+        }
+        if any(value != 0.0 for value in differences.values()):
+            return {
+                "kind": "rk4_stage",
+                "call_index": call_index,
+                "interval": call_index // 4,
+                "stage": call_index % 4 + 1,
+                **{f"{name}_max_abs": value for name, value in differences.items()},
+            }
+    return None
+
+
+def _production_sampler_terminal(
+    model: torch.nn.Module,
+    noise: torch.Tensor,
+    condition: torch.Tensor,
+    active: torch.Tensor,
+) -> torch.Tensor:
+    """Call the actual public Sampler path used by coarse production."""
+    from .sampler import Sampler
+
+    zeros = torch.zeros_like(condition)
+    return Sampler(model).sample_conditioned(
+        background=zeros,
+        background_mask=torch.ones_like(zeros),
+        obs_values=zeros,
+        obs_mask=zeros,
+        water_mask=active,
+        valid_mask=active,
+        state_mask=active.expand_as(noise),
+        size=tuple(noise.shape[-2:]),
+        num_timesteps=17,
+        device=torch.device("cpu"),
+        method="rk4",
+        start_mode="noise",
+        initial_noise=noise,
+        sample_target="state",
+        model_conditioning=condition,
+        state_channels=noise.shape[1],
+        end_time=0.0,
+    )
+
+
+def compact_first_divergence_diagnostic() -> dict[str, Any]:
+    """Prove exact replay against Sampler and localize the legacy divergence."""
+    from .direct_dynamics_cascade_coarse_proper_refinement import (
+        rk4_interval as legacy_rk4_interval,
+    )
+    from .runtime import make_normalized_xy_grid
+
+    torch.manual_seed(20260913)
+    base = _DiagnosticCoarse().eval()
+    frozen = copy.deepcopy(base).eval()
+    for parameter in frozen.parameters():
+        parameter.requires_grad_(False)
+    terminal = copy.deepcopy(frozen).train()
+    for parameter in terminal.parameters():
+        parameter.requires_grad_(True)
+    batch = 4
+    noise = torch.randn((batch, 6, 5, 4), dtype=torch.float32)
+    condition = torch.randn((batch, 6, 5, 4), dtype=torch.float32)
+    active = torch.ones((batch, 1, 5, 4), dtype=torch.float32)
+    active[:, :, 0, 0] = 0
+    noise = torch.where(active.expand_as(noise) > 0, noise, torch.zeros_like(noise))
+    grid = make_normalized_xy_grid(
+        5, 4, device=torch.device("cpu"), dtype=torch.float32
+    )
+    times = torch.linspace(1.0, 0.0, 17, dtype=torch.float32)
+
+    production_model = _RecordingModel(copy.deepcopy(base).eval())
+    reference_terminal = _production_sampler_terminal(
+        production_model, noise[:1], condition[:1], active[:1]
+    )
+    replay_model = _RecordingModel(copy.deepcopy(base).eval())
+    replay_states = [noise[:1]]
+    replay = noise[:1]
+    for index in range(16):
+        replay = production_rk4_interval(
+            replay_model,
+            replay,
+            condition[:1],
+            active[:1],
+            grid,
+            times[index],
+            times[index + 1],
+        )
+        replay_states.append(replay)
+    production_states = [
+        production_model.calls[4 * index]["input"][:, :6] for index in range(16)
+    ] + [reference_terminal]
+    state_deltas = [
+        _max_abs(expected, actual)
+        for expected, actual in zip(production_states, replay_states)
+    ]
+    replay_difference = _first_record_difference(
+        production_model.calls, replay_model.calls
+    )
+    if replay_difference is not None or any(value != 0.0 for value in state_deltas):
+        raise RuntimeError("versioned helper differs from the public production Sampler")
+
+    legacy_model = _RecordingModel(copy.deepcopy(base).eval())
+    legacy = noise[:1]
+    for index in range(16):
+        legacy = legacy_rk4_interval(
+            legacy_model,
+            legacy,
+            condition[:1],
+            active[:1],
+            grid,
+            float(times[index]),
+            float(times[index + 1]),
+        )
+    first_divergent = _first_record_difference(
+        production_model.calls, legacy_model.calls
+    )
+    if first_divergent is None and not torch.equal(reference_terminal, legacy):
+        first_divergent = {
+            "kind": "terminal_update",
+            "terminal_max_abs": _max_abs(reference_terminal, legacy),
+        }
+    if first_divergent is None:
+        raise RuntimeError("compact diagnostic did not expose legacy FP divergence")
+
+    batched_terminal = _production_sampler_terminal(
+        copy.deepcopy(base).eval(), noise, condition, active
+    )
+    sequential_terminal = torch.cat(
+        [
+            _production_sampler_terminal(
+                copy.deepcopy(base).eval(),
+                noise[index : index + 1],
+                condition[index : index + 1],
+                active[index : index + 1],
+            )
+            for index in range(batch)
+        ]
+    )
+    batch_sequential_max_abs = _max_abs(batched_terminal, sequential_terminal)
+
+    candidate, control, prefix = sequential_terminal_candidate_control(
+        frozen, terminal, noise, condition, active, grid
+    )
+    if not torch.equal(candidate.detach(), control):
+        raise RuntimeError("step-zero sequential candidate differs from control")
+    candidate.square().mean().backward()
+    gradients = [
+        parameter.grad for parameter in terminal.parameters() if parameter.grad is not None
+    ]
+    if not gradients or not all(torch.isfinite(value).all() for value in gradients):
+        raise FloatingPointError("versioned terminal path lacks finite gradients")
+    gradient_norm = float(
+        torch.sqrt(sum(value.double().square().sum() for value in gradients))
+    )
+    if not math.isfinite(gradient_norm) or gradient_norm <= 0:
+        raise FloatingPointError("versioned terminal path has a dead gradient")
+    if any(parameter.grad is not None for parameter in frozen.parameters()):
+        raise RuntimeError("versioned replay leaked gradient into frozen model")
+    return {
+        "status": "pass",
+        "first_legacy_divergence": first_divergent,
+        "production_state_max_abs": state_deltas,
+        "production_call_count": len(production_model.calls),
+        "production_order_all_states_bitwise_equal": True,
+        "batch4_vs_sequential_batch1_max_abs": batch_sequential_max_abs,
+        "sequential_candidate_control_bitwise_equal": True,
+        "prefix_has_no_graph": not prefix.requires_grad,
+        "terminal_parameter_gradient_norm": gradient_norm,
+        "frozen_parameter_gradients_absent": True,
+    }

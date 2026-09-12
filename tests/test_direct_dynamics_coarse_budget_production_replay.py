@@ -2,6 +2,7 @@ import torch
 from torchdiffeq import odeint
 
 from assim_lib.direct_dynamics_coarse_budget_production_replay import (
+    compact_first_divergence_diagnostic,
     production_frozen_prefix,
     production_terminal_sample,
     production_velocity,
@@ -81,3 +82,14 @@ def test_sequential_member_path_is_separate_from_batching_effect():
         )
     assert torch.equal(candidate, torch.cat(expected))
     assert prefix.shape == state.shape
+
+
+def test_first_divergence_and_terminal_gradient_are_explicit():
+    result = compact_first_divergence_diagnostic()
+    assert result["status"] == "pass"
+    assert result["first_legacy_divergence"] is not None
+    assert result["production_call_count"] == 64
+    assert result["production_order_all_states_bitwise_equal"]
+    assert result["terminal_parameter_gradient_norm"] > 0
+    assert result["prefix_has_no_graph"]
+    assert result["frozen_parameter_gradients_absent"]
