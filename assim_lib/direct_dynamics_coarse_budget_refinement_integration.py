@@ -349,8 +349,8 @@ def compact_coarse_budget_integration_check() -> dict[str, Any]:
         "loss_domain": "all valid ocean pixels; no unstable-block exclusion",
         "endpoint_generalized_gradient": (
             "C=0 right-continuation over tied fine maxima; C=1 left-continuation "
-            "over tied fine minima; C outside [0,1] locally flat; strict KKT "
-            "selection at interior active-set kinks; no STE"
+            "over tied fine minima; C outside [0,1] locally flat; strict KKT on "
+            "smooth interior active sets; exact interior kinks fail closed; no STE"
         ),
     }
 

@@ -11,7 +11,7 @@
     "physical_law": "Ytheta=Y0+smooth_right_inverse(Ctheta-C0), then identical capped-simplex SIC decoder with budget clip(Ctheta,0,1)",
     "objective": "0.75 standardized fair CRPS + 0.25 joint energy score on all valid water",
     "evaluation_law": "reuse the same frozen residual allocation; resampling fine conditional on Ctheta is a different generator and forbidden",
-    "endpoint_generalized_gradient": "C=0 right-continuation over tied maxima; C=1 left-continuation over tied minima; outside clipping range flat; strict KKT interior selection; no STE"
+    "endpoint_generalized_gradient": "C=0 right-continuation over tied maxima; C=1 left-continuation over tied minima; outside clipping range flat; strict KKT on smooth interior active sets; exact interior kinks fail closed; no STE"
   },
   "sources": {
     "cascade_core": {
