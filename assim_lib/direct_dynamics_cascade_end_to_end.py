@@ -287,6 +287,7 @@ def load_cascade_predictor(
     device: torch.device | None = None,
     expected_fine_conditioning_implementation_sha256: str | None = None,
     expected_fine_preconditioning_implementation_sha256: str | None = None,
+    expected_fine_colored_implementation_sha256: str | None = None,
 ) -> CascadePredictor:
     """Strictly reload two stage-specific commits under one forecast contract."""
     if re.fullmatch(r"[0-9a-f]{40}", replay_code_commit) is None:
@@ -321,11 +322,6 @@ def load_cascade_predictor(
     if colored_manifest.is_file() and not preconditioned_manifest.is_file():
         raise ValueError("colored fine checkpoint lacks variance preconditioning")
     if colored_manifest.is_file():
-        if (
-            expected_fine_conditioning_implementation_sha256 is not None
-            or expected_fine_preconditioning_implementation_sha256 is not None
-        ):
-            raise ValueError("colored replay does not accept a legacy white-loader override")
         from .direct_dynamics_cascade_fine_colored import (
             load_colored_variance_preconditioned_fine_cascade_sampler,
         )
@@ -338,6 +334,15 @@ def load_cascade_predictor(
             expected_fine_code_commit,
             expected_forecast_contract_sha256,
             device=device,
+            expected_colored_implementation_sha256=(
+                expected_fine_colored_implementation_sha256
+            ),
+            expected_preconditioning_implementation_sha256=(
+                expected_fine_preconditioning_implementation_sha256
+            ),
+            expected_conditioning_implementation_sha256=(
+                expected_fine_conditioning_implementation_sha256
+            ),
         )
     elif preconditioned_manifest.is_file():
         from .direct_dynamics_cascade_fine_preconditioned import (
@@ -403,6 +408,10 @@ def load_cascade_predictor(
     if expected_fine_preconditioning_implementation_sha256 is not None:
         replay_identity["historical_fine_preconditioning_implementation_sha256"] = (
             expected_fine_preconditioning_implementation_sha256
+        )
+    if expected_fine_colored_implementation_sha256 is not None:
+        replay_identity["historical_fine_colored_implementation_sha256"] = (
+            expected_fine_colored_implementation_sha256
         )
     if matched_manifest.is_file():
         replay_identity["fine_matched_base_manifest_sha256"] = _sha256(matched_manifest)

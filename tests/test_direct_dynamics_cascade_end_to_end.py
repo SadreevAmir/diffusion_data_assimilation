@@ -308,10 +308,17 @@ class EndToEndCascadeTests(unittest.TestCase):
                     expected_fine_code_commit="b" * 40,
                     replay_code_commit="d" * 40,
                     expected_forecast_contract_sha256="e" * 64,
+                    expected_fine_conditioning_implementation_sha256="1" * 64,
+                    expected_fine_preconditioning_implementation_sha256="2" * 64,
+                    expected_fine_colored_implementation_sha256="3" * 64,
                 )
             plain.assert_not_called()
             preconditioned.assert_not_called()
             colored.assert_called_once()
+            self.assertEqual(
+                colored.call_args.kwargs["expected_colored_implementation_sha256"],
+                "3" * 64,
+            )
             self.assertIn("fine_colored_base_manifest_sha256", predictor.replay_identity)
 
     def test_loader_rejects_declared_colored_base_without_manifest(self):

@@ -81,6 +81,7 @@ def _validate_experiment(experiment: dict[str, Any]) -> tuple[dict[str, Any], li
         for key in (
             "expected_conditioning_implementation_sha256",
             "expected_preconditioning_implementation_sha256",
+            "expected_colored_implementation_sha256",
         ):
             if key in row and len(str(row[key])) != 64:
                 raise ValueError(f"{key} must be an explicit SHA256")
@@ -308,6 +309,9 @@ def run(config_path: Path, output: Path) -> dict[str, Any]:
             ),
             expected_fine_preconditioning_implementation_sha256=spec.get(
                 "expected_preconditioning_implementation_sha256"
+            ),
+            expected_fine_colored_implementation_sha256=spec.get(
+                "expected_colored_implementation_sha256"
             ),
         )
 

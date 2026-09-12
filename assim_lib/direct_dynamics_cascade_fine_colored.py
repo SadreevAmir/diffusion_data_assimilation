@@ -262,6 +262,10 @@ def load_colored_variance_preconditioned_fine_cascade_sampler(
     expected_code_commit: str,
     expected_forecast_contract_sha256: str,
     device=None,
+    *,
+    expected_colored_implementation_sha256: str | None = None,
+    expected_preconditioning_implementation_sha256: str | None = None,
+    expected_conditioning_implementation_sha256: str | None = None,
 ) -> ColoredVariancePreconditionedFineCascadeSampler:
     root = Path(run_dir)
     manifest_path = root / "fine_cascade_colored_base_manifest.json"
@@ -270,12 +274,19 @@ def load_colored_variance_preconditioned_fine_cascade_sampler(
         raise ValueError("colored fine checkpoint lacks its sampler manifests")
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     primary = json.loads(primary_path.read_text(encoding="utf-8"))
+    colored_implementation_sha256 = (
+        _sha256(Path(__file__))
+        if expected_colored_implementation_sha256 is None
+        else expected_colored_implementation_sha256
+    )
+    if len(colored_implementation_sha256) != 64:
+        raise ValueError("colored fine implementation SHA256 is invalid")
     if (
         manifest.get("schema_version") != 1
         or manifest.get("sampler")
         != "ColoredVariancePreconditionedFineCascadeSampler"
         or manifest.get("code_commit") != expected_code_commit
-        or manifest.get("implementation_sha256") != _sha256(Path(__file__))
+        or manifest.get("implementation_sha256") != colored_implementation_sha256
         or primary.get("base_parameterization") != COLORED_BASE_KIND
         or primary.get("colored_base_manifest") != manifest_path.name
         or primary.get("colored_base_manifest_sha256") != _sha256(manifest_path)
@@ -291,6 +302,12 @@ def load_colored_variance_preconditioned_fine_cascade_sampler(
         expected_forecast_contract_sha256,
         device=device,
         expected_base_parameterization=COLORED_BASE_KIND,
+        expected_preconditioning_implementation_sha256=(
+            expected_preconditioning_implementation_sha256
+        ),
+        expected_conditioning_implementation_sha256=(
+            expected_conditioning_implementation_sha256
+        ),
     )
     velocity_model = base.sampler.model
     projected = getattr(velocity_model, "model", None)

@@ -1,6 +1,6 @@
 {
   "project_name": "sea_ice_two_stage",
-  "task_name": "direct_dynamics_cascade_colored_generated_coarse_gate_v1",
+  "task_name": "direct_dynamics_cascade_colored_generated_coarse_gate_v3",
   "split": "valid",
   "year": 2022,
   "cases": 12,
@@ -47,6 +47,9 @@
       "checkpoint": "mechanics_update_0512.pth",
       "checkpoint_sha256": "bda1a98321fe9b8abd89510c9c43e1b33e128bf61c2ba6856507539cb9b1d683",
       "code_commit": "2fd99aa761f194ea0ffda1f69e37c1d02df4db21",
+      "expected_conditioning_implementation_sha256": "0c0c0282a1aced04048d1bb195f72323d4db9c262e80b526d8bd41d8d1f4f5fa",
+      "expected_preconditioning_implementation_sha256": "dd1846fea14d2a9f5631c769b77afe32cca34e72d79871ba6da43501369f7a2a",
+      "expected_colored_implementation_sha256": "b56c8732e7d0f29b7e354fcd43f508b70f69aad759a9bcc05c3c3ca1b1602a75",
       "run_sha256": {
         "config.json": "e2676bc19d6fbfd2edb5ab7b74b0727023c612b62ecdc58a3c02d81ea4554fff",
         "metadata.json": "fb4bf343a8d796ac43ad77992d51c767905a33cc8ad7a280d5ab2bd798d39a55",
