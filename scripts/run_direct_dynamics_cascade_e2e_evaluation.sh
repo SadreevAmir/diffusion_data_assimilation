@@ -17,7 +17,8 @@ case "$CONFIG" in
   config/experiments/evaluate_direct_dynamics_cascade_e2e_fine4096_v4.json|\
   config/experiments/evaluate_direct_dynamics_cascade_proper_refinement_v1.json|\
   config/experiments/evaluate_direct_dynamics_cascade_proper_refinement_confirmation_v1.json|\
-  config/experiments/evaluate_direct_dynamics_cascade_threshold_weighted_refinement_v1.json) ;;
+  config/experiments/evaluate_direct_dynamics_cascade_threshold_weighted_refinement_v1.json|\
+  config/experiments/evaluate_direct_dynamics_cascade_sit_support_confirmation_v1.json) ;;
   *)
     echo "unsupported CASCADE_E2E_CONFIG" >&2
     exit 2
@@ -27,7 +28,8 @@ MODULE="assim_lib.direct_dynamics_cascade_e2e_evaluation"
 case "$CONFIG" in
   config/experiments/evaluate_direct_dynamics_cascade_proper_refinement_v1.json|\
   config/experiments/evaluate_direct_dynamics_cascade_proper_refinement_confirmation_v1.json|\
-  config/experiments/evaluate_direct_dynamics_cascade_threshold_weighted_refinement_v1.json)
+  config/experiments/evaluate_direct_dynamics_cascade_threshold_weighted_refinement_v1.json|\
+  config/experiments/evaluate_direct_dynamics_cascade_sit_support_confirmation_v1.json)
     MODULE="assim_lib.direct_dynamics_cascade_proper_refinement_evaluation"
     ;;
 esac

@@ -35,6 +35,13 @@ from .direct_dynamics_cascade_paired_evaluation import (
 )
 from .direct_dynamics_training import _repeat_field_stats, validate_direct_dataset
 from .direct_dynamics_affine_calibration import boundary_event_metrics
+from .direct_dynamics_cascade_memberwise_affine import compare
+from .direct_dynamics_sit_left_censor_audit import decode_with_exact_sit_zero
+from .direct_dynamics_sit_support_decoder_scoring import (
+    _score as score_support_decoder,
+    _stage_gate as support_decoder_stage_gate,
+    apply_support_decoder_physical,
+)
 from .trainer import _atomic_json
 from .transforms import channel_denormalize
 
@@ -172,6 +179,39 @@ def _persist_evidence_then_score(
     return sha256, score()
 
 
+def _apply_frozen_support_decoder(
+    forecast_normalized: torch.Tensor,
+    coarse_normalized: torch.Tensor,
+    valid: torch.Tensor,
+    means: torch.Tensor,
+    stds: torch.Tensor,
+) -> tuple[torch.Tensor, torch.Tensor, float]:
+    """Decode, project SIT support, and re-encode without fitting any parameter."""
+    means = torch.as_tensor(means, dtype=torch.float32)
+    stds = torch.as_tensor(stds, dtype=torch.float32)
+    physical = decode_with_exact_sit_zero(forecast_normalized.float(), means, stds)
+    coarse_physical = decode_with_exact_sit_zero(
+        coarse_normalized.float(), means, stds
+    )
+    decoded = apply_support_decoder_physical(physical, coarse_physical, valid)
+    means5 = means.reshape(1, 1, 6, 1, 1).to(decoded)
+    stds5 = stds.reshape(1, 1, 6, 1, 1).to(decoded)
+    normalized = (decoded - means5) / stds5
+    members = forecast_normalized.shape[1]
+    recovered, fraction = masked_block_average(
+        decoded.flatten(0, 1),
+        valid[:, None].expand(-1, members, -1, -1, -1).flatten(0, 1),
+    )
+    target = coarse_physical.flatten(0, 1).clone()
+    target[:, 1::2] = target[:, 1::2].clamp_min(0)
+    error = float(
+        (recovered - target)[fraction.expand_as(recovered) > 0].abs().max()
+    )
+    if error > 3e-6:
+        raise RuntimeError("support decoder changed its prescribed physical coarse means")
+    return normalized, decoded, error
+
+
 def _launch_status(status: str, **details: Any) -> None:
     raw = os.environ.get("CASCADE_E2E_STATUS_PATH", "").strip()
     if not raw:
@@ -207,6 +247,19 @@ def _validate(experiment: dict[str, Any]) -> None:
     if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,79}", candidate_label) is None:
         raise ValueError("unsafe paired candidate label")
     _validate_confirmation_panel(experiment)
+    support_decoder = experiment.get("support_decoder")
+    if support_decoder is not None:
+        if experiment.get("panel", {}).get("role") != "frozen_confirmation":
+            raise ValueError("support decoder may only run on a frozen confirmation panel")
+        if support_decoder.get("law") != "sit_nonnegative_block_simplex_projection":
+            raise ValueError("unreviewed support decoder law")
+        if support_decoder.get("fit_on_confirmation") is not False:
+            raise ValueError("support decoder confirmation must not fit on confirmation data")
+        inventory = experiment["panel"].get("prior_date_level_inventory_search", {})
+        if inventory.get("selected_date_matches") != 0 or not inventory.get(
+            "checked_before_manifest_commit"
+        ):
+            raise ValueError("confirmation dates were not frozen against prior inventory")
 
 
 @torch.no_grad()
@@ -223,6 +276,7 @@ def _run_impl(config_path: Path, output: Path) -> dict[str, Any]:
     coarse = experiment["coarse"]
     fine = experiment["fine"]
     refinement = experiment["refinement"]
+    support_decoder = experiment.get("support_decoder")
     coarse_root = Path(coarse["run_dir"])
     fine_root = Path(fine["run_dir"])
     for relative, expected in coarse["sha256"].items():
@@ -244,6 +298,37 @@ def _run_impl(config_path: Path, output: Path) -> dict[str, Any]:
         "code_commit"
     ]:
         raise ValueError("training record commit differs from paired refinement")
+    if support_decoder is not None:
+        repository_root = Path(__file__).resolve().parents[1]
+        inventory = experiment["panel"]["prior_date_level_inventory_search"]
+        inventory_path = Path(inventory["inventory_path"])
+        if inventory_path.is_absolute() or ".." in inventory_path.parts:
+            raise ValueError("unsafe prior-date inventory path")
+        _verify_file(
+            repository_root / inventory_path,
+            inventory["sorted_date_inventory_sha256"],
+            "prior-date inventory",
+        )
+        inventory_dates = (repository_root / inventory_path).read_text(
+            encoding="utf-8"
+        ).splitlines()
+        if (
+            inventory_dates != sorted(set(inventory_dates))
+            or len(inventory_dates) != inventory["observed_2022_date_count"]
+        ):
+            raise ValueError("prior-date inventory is not the frozen sorted unique list")
+        selected_dates = {case_id[:10] for case_id in experiment["case_ids"]}
+        if selected_dates.intersection(inventory_dates):
+            raise ValueError("confirmation date occurs in the prior-result inventory")
+        for key, label in (
+            ("implementation", "support decoder implementation"),
+            ("scoring", "support decoder scoring"),
+        ):
+            spec = support_decoder[key]
+            relative = Path(spec["path"])
+            if relative.is_absolute() or ".." in relative.parts:
+                raise ValueError(f"unsafe {label} path")
+            _verify_file(repository_root / relative, spec["sha256"], label)
 
     coarse_config = load_json(coarse_root / "config.json")
     fine_config = load_json(fine_root / "config.json")
@@ -296,14 +381,30 @@ def _run_impl(config_path: Path, output: Path) -> dict[str, Any]:
             "ode_state": "fp32",
             "score": "fp32_input_with_float64_reductions",
         },
-        "raw_unclipped_scoring": True,
-        "display_only_projection": True,
+        "raw_unclipped_scoring": support_decoder is None,
+        "display_only_projection": support_decoder is None,
+        "variant_scoring_semantics": {
+            "raw_ema9711_fine4096": "source raw, unclipped",
+            experiment.get("candidate_label", "proper64_ema9711_fine4096"): (
+                "fixed SIT support decoder is part of the scored candidate law; "
+                "no additional clipping or display-only projection"
+                if support_decoder is not None
+                else "source raw, unclipped"
+            ),
+            "stored_coarse_and_residual": (
+                "source/predecoder tensors; candidate residual does not reconstruct "
+                "the post-decoder forecast"
+                if support_decoder is not None
+                else "source tensors"
+            ),
+        },
         "optimizer_steps": 0,
         "panel": experiment.get("panel"),
         "decision_gate": experiment.get("decision_gate"),
         "coarse": coarse,
         "fine": fine,
         "refinement": refinement,
+        "support_decoder": support_decoder,
         "evidence_sha256": {},
     }
     fixed_inputs_path = output / "fixed_inputs.pt"
@@ -344,8 +445,19 @@ def _run_impl(config_path: Path, output: Path) -> dict[str, Any]:
     persistence_normalized = batch["background"].float()
     means = _repeat_field_stats(dataset.means)
     stds = _repeat_field_stats(dataset.stds)
-    truth_physical = channel_denormalize(truth_normalized, means, stds)
-    persistence_physical = channel_denormalize(persistence_normalized, means, stds)
+    if support_decoder is not None:
+        means = torch.as_tensor(means, dtype=torch.float32)
+        stds = torch.as_tensor(stds, dtype=torch.float32)
+    if support_decoder is None:
+        truth_physical = channel_denormalize(truth_normalized, means, stds)
+        persistence_physical = channel_denormalize(
+            persistence_normalized, means, stds
+        )
+    else:
+        truth_physical = decode_with_exact_sit_zero(truth_normalized, means, stds)
+        persistence_physical = decode_with_exact_sit_zero(
+            persistence_normalized, means, stds
+        )
 
     raw_predictor = load_cascade_predictor(
         coarse_run_dir=str(coarse_root),
@@ -408,7 +520,7 @@ def _run_impl(config_path: Path, output: Path) -> dict[str, Any]:
         "candidates": {},
     }
     reference_randomness = None
-    local_images: list[tuple[str, str, Path]] = []
+    deferred_visuals: list[tuple[str, int, torch.Tensor]] = []
     candidate_label = experiment.get(
         "candidate_label", "proper64_ema9711_fine4096"
     )
@@ -448,26 +560,53 @@ def _run_impl(config_path: Path, output: Path) -> dict[str, Any]:
                 equal = torch.equal(reference, value) if isinstance(value, torch.Tensor) else reference == value
                 if not equal:
                     raise RuntimeError(f"paired candidates differ in {key}")
-        normalized = ensemble["forecast"].float()
+        predecoder_normalized = ensemble["forecast"].float()
         recovered, fraction = masked_block_average(
-            normalized.flatten(0, 1),
+            predecoder_normalized.flatten(0, 1),
             valid[:, None].expand(-1, 8, -1, -1, -1).flatten(0, 1),
         )
-        exact_error = float(
+        predecoder_exact_error = float(
             (recovered - ensemble["coarse"].flatten(0, 1))[
                 fraction.expand_as(recovered) > 0
             ].abs().max()
         )
-        if exact_error > 3e-6:
+        if predecoder_exact_error > 3e-6:
             raise RuntimeError("fine forecast changed generated coarse 2x2 means")
-        physical = channel_denormalize(normalized.flatten(0, 1), means, stds).unflatten(
-            0, (12, 8)
-        )
+        if support_decoder is None:
+            predecoder_physical = channel_denormalize(
+                predecoder_normalized.flatten(0, 1), means, stds
+            ).unflatten(0, (12, 8))
+        else:
+            predecoder_physical = decode_with_exact_sit_zero(
+                predecoder_normalized, means, stds
+            )
+        physical = predecoder_physical
+        normalized = predecoder_normalized
+        support_decoder_applied = label == candidate_label and support_decoder is not None
+        support_coarse_error = None
+        if support_decoder_applied:
+            normalized, physical, support_coarse_error = (
+                _apply_frozen_support_decoder(
+                    predecoder_normalized,
+                    ensemble["coarse"],
+                    valid,
+                    means,
+                    stds,
+                )
+            )
         evidence_path = output / f"{label}_raw.pt"
         evidence_payload = {
-            "forecast_normalized": ensemble["forecast"],
+            "forecast_normalized": normalized,
+            "pre_support_decoder_forecast_normalized": (
+                predecoder_normalized if support_decoder_applied else None
+            ),
             "coarse_normalized": ensemble["coarse"],
             "residual_normalized": ensemble["residual"],
+            "residual_semantics": (
+                "source_pre_support_decoder"
+                if support_decoder_applied
+                else "source_forecast_residual"
+            ),
             "raw_coarse_noise": ensemble["raw_coarse_noise"],
             "raw_fine_noise": ensemble["raw_fine_noise"],
             "projected_fine_noise": ensemble["projected_fine_noise"],
@@ -484,6 +623,7 @@ def _run_impl(config_path: Path, output: Path) -> dict[str, Any]:
             "coarse": coarse,
             "fine": fine,
             "refinement": refinement if label == candidate_label else None,
+            "support_decoder": support_decoder if support_decoder_applied else None,
         }
 
         def register_evidence(sha256: str) -> None:
@@ -503,10 +643,15 @@ def _run_impl(config_path: Path, output: Path) -> dict[str, Any]:
         metrics["boundary_events"] = boundary_event_metrics(
             physical, truth_physical, valid
         )
-        metrics["exact_coarse_2x2_mean_error_max"] = exact_error
+        metrics["exact_coarse_2x2_mean_error_max"] = predecoder_exact_error
+        metrics["support_decoder_physical_coarse_error_max"] = support_coarse_error
         metrics["primary_standardized_fair_crps"] = _primary_standardized_fair_crps(
             normalized, truth_normalized, valid
         )
+        if support_decoder is not None:
+            metrics["support_decoder_scoring"] = score_support_decoder(
+                physical, truth_physical, valid, stds.float()
+            )
         metrics["summary"] = _summary(metrics)
         _require_finite_scalars(metrics)
         result["candidates"][label] = {
@@ -515,18 +660,9 @@ def _run_impl(config_path: Path, output: Path) -> dict[str, Any]:
             "raw_evidence_sha256": evidence_sha256,
         }
 
-        rank_path = ranks_dir / f"{label}.png"
-        _save_rank_histograms(rank_path, label, metrics)
-        local_images.append(("rank_histograms", label, rank_path))
         for position in (0, 4, 7, 11):
-            visual_path = visuals_dir / f"{label}_case{position:02d}_all8_fixed.png"
-            _save_contact_sheet(
-                visual_path, label, case_ids[position], physical[position],
-                truth_physical[position], persistence_physical[position], valid[position],
-                {"sic": (0.0, 1.0), "sit": (0.0, 3.5)},
-            )
-            local_images.append(("fixed_scale_members", f"{label}/case{position:02d}", visual_path))
-        del ensemble, normalized, physical
+            deferred_visuals.append((label, position, physical[position].clone()))
+        del ensemble, normalized, predecoder_normalized, predecoder_physical, physical
         torch.cuda.empty_cache()
 
     raw_summary = result["candidates"]["raw_ema9711_fine4096"]["metrics"]["summary"]
@@ -581,11 +717,40 @@ def _run_impl(config_path: Path, output: Path) -> dict[str, Any]:
             refined_metrics["primary_standardized_fair_crps"],
             experiment["decision_gate"],
         )
-        result["frozen_confirmation"]["numerical_decision"] = (
-            "GO_PENDING_SECONDARY_AND_VISUAL_REVIEW"
-            if result["frozen_confirmation"]["primary_passed"]
-            else "HOLD"
-        )
+        if support_decoder is not None:
+            raw_support = raw_metrics["support_decoder_scoring"]
+            candidate_support = refined_metrics["support_decoder_scoring"]
+            comparison = compare(
+                candidate_support,
+                raw_support,
+                experiment["decision_gate"],
+                0,
+            )
+            support_gate = support_decoder_stage_gate(
+                candidate_support,
+                raw_support,
+                comparison,
+                experiment["decision_gate"],
+            )
+            result["support_decoder_confirmation"] = {
+                "candidate_law": support_decoder["law"],
+                "comparison_versus_champion": comparison,
+                "stage_gate": support_gate,
+            }
+            secondary_passed = support_gate["passed_pending_visual_review"]
+            result["frozen_confirmation"]["secondary_passed"] = secondary_passed
+            result["frozen_confirmation"]["numerical_decision"] = (
+                "GO_PENDING_VISUAL_REVIEW"
+                if result["frozen_confirmation"]["primary_passed"]
+                and secondary_passed
+                else "HOLD"
+            )
+        else:
+            result["frozen_confirmation"]["numerical_decision"] = (
+                "GO_PENDING_SECONDARY_AND_VISUAL_REVIEW"
+                if result["frozen_confirmation"]["primary_passed"]
+                else "HOLD"
+            )
     elif experiment.get("panel", {}).get("role") == "development_reuse":
         result["paired_development_diagnostic"] = _paired_primary_confirmation(
             raw_metrics["primary_standardized_fair_crps"],
@@ -597,8 +762,22 @@ def _run_impl(config_path: Path, output: Path) -> dict[str, Any]:
         )
     _require_finite_scalars(result)
     _atomic_json(output / "proper_refinement_e2e_evaluation.json", result)
-    for title, series, path in local_images:
-        tracker.report_image(title, series, path, 0)
+    for label in ("raw_ema9711_fine4096", candidate_label):
+        rank_path = ranks_dir / f"{label}.png"
+        _save_rank_histograms(
+            rank_path, label, result["candidates"][label]["metrics"]
+        )
+        tracker.report_image("rank_histograms", label, rank_path, 0)
+    for label, position, values in deferred_visuals:
+        visual_path = visuals_dir / f"{label}_case{position:02d}_all8_fixed.png"
+        _save_contact_sheet(
+            visual_path, label, case_ids[position], values,
+            truth_physical[position], persistence_physical[position], valid[position],
+            {"sic": (0.0, 1.0), "sit": (0.0, 3.5)},
+        )
+        tracker.report_image(
+            "fixed_scale_members", f"{label}/case{position:02d}", visual_path, 0
+        )
     tracker.upload_artifact(
         "proper_refinement_e2e_evaluation",
         output / "proper_refinement_e2e_evaluation.json",

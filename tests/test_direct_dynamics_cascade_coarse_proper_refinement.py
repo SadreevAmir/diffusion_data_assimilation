@@ -18,12 +18,21 @@ from assim_lib.direct_dynamics_cascade_coarse_proper_refinement import (
     standardized_fair_crps,
     standardized_joint_energy,
 )
+from assim_lib.direct_dynamics_cascade import masked_block_average, smooth_right_inverse
 
 
 def _confirmation_experiment():
     return json.loads(
         Path(
             "config/experiments/evaluate_direct_dynamics_cascade_proper_refinement_confirmation_v1.json"
+        ).read_text()
+    )
+
+
+def _sit_support_confirmation_experiment():
+    return json.loads(
+        Path(
+            "config/experiments/evaluate_direct_dynamics_cascade_sit_support_confirmation_v1.json"
         ).read_text()
     )
 
@@ -35,6 +44,41 @@ def test_frozen_confirmation_panel_is_disjoint_and_valid():
     broken["case_ids"][0] = "2022-01-05_slice12"
     with unittest.TestCase().assertRaisesRegex(ValueError, "overlap"):
         evaluation._validate(broken)
+
+
+def test_sit_support_confirmation_manifest_is_new_disjoint_and_frozen():
+    experiment = _sit_support_confirmation_experiment()
+    evaluation._validate(experiment)
+    inventory = experiment["panel"]["prior_date_level_inventory_search"]
+    assert inventory["observed_2022_date_count"] == 223
+    assert inventory["selected_date_matches"] == 0
+    assert experiment["support_decoder"]["fit_on_confirmation"] is False
+
+    broken = deepcopy(experiment)
+    broken["support_decoder"]["fit_on_confirmation"] = True
+    with unittest.TestCase().assertRaisesRegex(ValueError, "must not fit"):
+        evaluation._validate(broken)
+
+
+def test_sit_support_confirmation_decoder_integration_accepts_tuple_stats():
+    coarse = torch.tensor(
+        [[[[[0.4]], [[-0.2]], [[0.6]], [[0.3]], [[0.2]], [[-0.1]]]]],
+        dtype=torch.float32,
+    )
+    valid = torch.ones(1, 1, 2, 2)
+    fine = smooth_right_inverse(coarse.flatten(0, 1), valid, 2).unflatten(0, (1, 1))
+    fine[:, :, 1::2, 0, 0] -= 0.4
+    fine[:, :, 1::2, 1, 1] += 0.4
+    normalized, physical, error = evaluation._apply_frozen_support_decoder(
+        fine, coarse, valid, (0.0,) * 6, (1.0,) * 6
+    )
+    recovered, fraction = masked_block_average(physical.flatten(0, 1), valid)
+    target = coarse.flatten(0, 1).clone()
+    target[:, 1::2].clamp_min_(0)
+    assert error < 3e-6
+    assert float(physical[:, :, 1::2].min()) == 0.0
+    assert torch.allclose(recovered[fraction.expand_as(recovered) > 0], target.flatten())
+    assert torch.equal(normalized, physical)
 
 
 def test_confirmation_primary_is_case_equal_and_bootstrapped():
