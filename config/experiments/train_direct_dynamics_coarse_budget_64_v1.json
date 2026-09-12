@@ -1,0 +1,60 @@
+{
+  "schema_version": "coarse_budget_train64_v1",
+  "project_name": "sea_ice_two_stage",
+  "task_name": "direct_dynamics_coarse_budget_train64_v1",
+  "base_preflight_config": {
+    "path": "preflight_direct_dynamics_coarse_budget_actual_gpu_v1.json",
+    "sha256": "5796a8c35b2eba1c5fa52b820b0e11a936408919422c37993b69e87ffa684fb7"
+  },
+  "actual_admission": {
+    "metrics_path": "/home/autoresearch_results/direct_dynamics_cascade_v2/coarse_budget_actual_gpu_preflight/coarse_budget_actual_7f11aec_v2/preflight.json",
+    "metrics_sha256": "24e1667715d7e04350d98052f6e085d3a6eb2a78fa0de77b37008b195ad26da4",
+    "status_path": "/home/autoresearch_results/direct_dynamics_cascade_v2/coarse_budget_actual_gpu_preflight/coarse_budget_actual_7f11aec_v2/status.json",
+    "status_sha256": "22a987a81abf19dcbfc9501151c4db5d0f06cb3faadbe68eb354cc36f55fe623",
+    "exit_path": "/home/autoresearch_results/direct_dynamics_cascade_v2/coarse_budget_actual_gpu_preflight_launches/coarse_budget_actual_7f11aec_v2/exit.json",
+    "exit_sha256": "355ef2c44abe06c5f5d0b00cd02f0a67baa2af32b380a9e092a628feaa6a97ff",
+    "code_commit": "7f11aecc2155aabcbd4d81bffa2bd69ff3e1787c",
+    "clearml_task_id": "9c5dd4a5a3b94a0b80d753328de1db73"
+  },
+  "protocol": {
+    "split": "train",
+    "updates": 64,
+    "cases_per_update": 1,
+    "member_indices": [0, 1, 2, 3],
+    "learning_rate": 0.00001,
+    "weight_decay": 0.0,
+    "optimizer": "AdamW",
+    "coarse_rk4_timepoints": 17,
+    "fine_rk4_timepoints": 33,
+    "network_precision": "bf16",
+    "state_precision": "fp32",
+    "score_precision": "fp64",
+    "objective": "0.75_fair_crps_plus_0.25_joint_energy_all_water",
+    "fine_allocation": "raw_colored_fine2048_at_frozen_C0_detached",
+    "coarse_chart": "anchored_canonical_physical",
+    "noise_rule": "case_id_member_index_stage_hash",
+    "test_2023": "closed",
+    "extension": "forbidden",
+    "max_gpu_minutes": 180
+  },
+  "train_indices": [
+    0, 822, 1644, 2466, 3288, 4110, 4932, 5755,
+    6577, 7399, 8221, 9043, 9865, 10687, 11509, 12331,
+    13103, 13925, 14747, 15569, 16391, 17213, 18035, 18857,
+    19679, 20501, 21323, 22145, 22967, 23789, 24611, 25433,
+    26358, 27180, 28002, 28824, 29646, 30468, 31290, 32112,
+    32934, 33756, 34578, 35400, 36222, 37044, 37866, 38688,
+    39510, 40332, 41154, 41976, 42798, 43620, 44442, 45264,
+    46086, 46908, 47730, 48552, 49374, 50196, 51018, 51791
+  ],
+  "train_indices_sha256": "e96865fc6ce66584057a04811263fb407e1e641cc3c263b992f28c3517da4f18",
+  "checkpoint_updates": [16, 32, 48, 64],
+  "clearml": {
+    "env_path": "/home/.env",
+    "tags": [
+      "coarse-budget", "train64", "terminal-interval-only",
+      "coarse-ema9711", "raw-colored-fine2048", "frozen-allocation",
+      "one-case-four-members", "one-gpu", "test-2023-closed"
+    ]
+  }
+}
