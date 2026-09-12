@@ -1,0 +1,24 @@
+{
+  "schema_version": "sit_support_feasibility_audit_v1",
+  "project_name": "sea_ice_two_stage",
+  "task_name": "direct_dynamics_sit_support_feasibility_audit_v1",
+  "evidence_config": {
+    "path": "/home/autoresearch_worktrees/proper_refinement_c73fd76/config/experiments/audit_direct_dynamics_cascade_coarse_fine_boundary_v1.json",
+    "sha256": "712be55efb7c48fef315c0d0f4e8284a77158765bdbbc63f7416e603b48f02db"
+  },
+  "source_censor_status": {
+    "path": "/home/autoresearch_results/direct_dynamics_cascade_v2/e2e_evaluation/sit_left_censor_audit_856293c_v1/status.json",
+    "sha256": "e4ed62b011b6e22651715a798b29a59568838671c9d284b6e02f7da2efdaae23"
+  },
+  "source_censor_metrics": {
+    "path": "/home/autoresearch_results/direct_dynamics_cascade_v2/e2e_evaluation/sit_left_censor_audit_856293c_v1/status.metrics.json",
+    "sha256": "89fbff749ba236a7359f334ba4c9c39b3d085d9ba124956cedfb1e242a8b901a"
+  },
+  "numerics": {
+    "fp32_source_tolerance_ulps": 128
+  },
+  "clearml": {
+    "env_path": "/home/.env",
+    "tags": ["cpu-only", "frozen-evidence", "sit-support", "coarse-feasibility", "tensor-probe", "zero-sampling", "zero-optimizer"]
+  }
+}
