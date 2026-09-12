@@ -7,13 +7,16 @@ from pathlib import Path
 import pytest
 import torch
 
+import assim_lib.direct_dynamics_coarse_budget_evaluation as evaluation
 from assim_lib.direct_dynamics_coarse_budget_evaluation import (
     CHECKPOINT_KEYS,
     _finalize_failure,
+    _finalize_success,
     _standardize_physical,
     _training_anchored_candidate,
     _validate_config,
     load_checkpoint_cpu_gate,
+    run,
 )
 from assim_lib.direct_dynamics_coarse_budget_training import EXPECTED_PROTOCOL
 
@@ -207,3 +210,61 @@ def test_failure_finalization_marks_tracker_and_preserves_evidence(tmp_path: Pat
     assert tracker.task.failed is True
     assert tracker.closed is True
     assert '"status": "failed"' in status.read_text()
+
+
+def test_failure_manifest_hash_error_does_not_mask_primary(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    manifest = {"artifacts": {}}
+    manifest_path = tmp_path / "evidence_manifest.json"
+    manifest_path.write_text("{}")
+
+    def fail_hash(path: Path) -> str:
+        if path == manifest_path:
+            raise OSError("injected manifest read failure")
+        return "b" * 64
+
+    monkeypatch.setattr(evaluation, "_sha256", fail_hash)
+    lifecycle = {
+        "output": tmp_path,
+        "status_path": tmp_path / "status.json",
+        "reservation": {"status": "reserved"},
+        "tracker": None,
+        "evidence_manifest": manifest,
+    }
+    failure = _finalize_failure(lifecycle, RuntimeError("primary"))
+    assert failure["error"] == "primary"
+    assert any("evidence_manifest_read" in row for row in failure["cleanup_errors"])
+
+
+def test_existing_output_is_never_modified_on_reservation_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    output = tmp_path / "existing"
+    output.mkdir()
+    marker = output / "owner.txt"
+    marker.write_text("pre-existing")
+    monkeypatch.setenv("CLEARML_REQUIRE_ONLINE", "1")
+    with pytest.raises(FileExistsError):
+        run(tmp_path / "unused.json", output)
+    assert marker.read_text() == "pre-existing"
+    assert sorted(path.name for path in output.iterdir()) == ["owner.txt"]
+
+
+def test_success_status_does_not_mutate_uploaded_numerical_bytes(tmp_path: Path) -> None:
+    result_path = tmp_path / "result.json"
+    result_path.write_bytes(b'{"metric":0.125}\n')
+    original = result_path.read_bytes()
+    digest = _sha256(result_path)
+    manifest = tmp_path / "evidence_manifest.json"
+    manifest.write_text("{}")
+    status = _finalize_success(
+        tmp_path / "status.json",
+        {"status": "reserved"},
+        result_path,
+        digest,
+        manifest,
+        "clearml-task",
+    )
+    assert result_path.read_bytes() == original
+    assert status["result_sha256"] == digest

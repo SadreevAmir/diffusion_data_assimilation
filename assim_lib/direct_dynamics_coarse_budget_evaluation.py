@@ -119,6 +119,29 @@ def _record_evidence(
     return digest
 
 
+def _finalize_success(
+    status_path: Path,
+    reservation: dict[str, Any],
+    result_path: Path,
+    uploaded_result_sha256: str,
+    evidence_manifest_path: Path,
+    clearml_task_id: str,
+) -> dict[str, Any]:
+    """Write terminal lifecycle state without mutating uploaded numerical bytes."""
+    if _sha256(result_path) != uploaded_result_sha256:
+        raise RuntimeError("numerical result changed after ClearML upload")
+    status = {
+        **reservation,
+        "status": "complete_pending_astra_and_visual_review",
+        "clearml_task_id": clearml_task_id,
+        "result_path": str(result_path),
+        "result_sha256": uploaded_result_sha256,
+        "evidence_manifest_sha256": _sha256(evidence_manifest_path),
+    }
+    _strict_atomic_json(status_path, status)
+    return status
+
+
 def _load_base_config(config: dict[str, Any], config_path: Path) -> dict[str, Any]:
     spec = config["base_preflight_config"]
     path = (config_path.parent / spec["path"]).resolve()
@@ -612,7 +635,7 @@ def _run_impl(
         ),
     }
     result: dict[str, Any] = {
-        "status": "scoring_complete_pending_tracker_close",
+        "status": "numerical_results_complete_lifecycle_in_status_json",
         "publication_claim_permitted": False,
         "clearml_task_id": str(tracker.task.id),
         "code_identity": code_identity,
@@ -709,25 +732,19 @@ def _run_impl(
             tracker.report_image(
                 "fixed_scale_members", f"{label}/case{position:02d}", visual_path, 0
             )
+    uploaded_result_sha256 = _sha256(result_path)
     tracker.upload_artifact("coarse_budget_paired_validation", result_path)
     tracker.upload_artifact("checkpoint_probe", output / "checkpoint_probe.json")
     tracker.close()
     lifecycle["tracker"] = None
     _ACTIVE_TRACKER = None
-    result["status"] = "complete_pending_astra_and_visual_review"
-    _strict_atomic_json(result_path, result)
-    _strict_atomic_json(
+    _finalize_success(
         lifecycle["status_path"],
-        {
-            **reservation,
-            "status": "complete_pending_astra_and_visual_review",
-            "clearml_task_id": result["clearml_task_id"],
-            "result_path": str(result_path),
-            "result_sha256": _sha256(result_path),
-            "evidence_manifest_sha256": _sha256(
-                output / "evidence_manifest.json"
-            ),
-        },
+        reservation,
+        result_path,
+        uploaded_result_sha256,
+        output / "evidence_manifest.json",
+        result["clearml_task_id"],
     )
     return result
 
@@ -747,10 +764,15 @@ def _finalize_failure(
     if isinstance(output, Path) and isinstance(manifest, dict):
         manifest_path = output / "evidence_manifest.json"
         if manifest_path.is_file():
-            failure["evidence_manifest_sha256"] = _sha256(manifest_path)
-            failure["evidence_artifacts"] = copy.deepcopy(
-                manifest.get("artifacts", {})
-            )
+            try:
+                failure["evidence_manifest_sha256"] = _sha256(manifest_path)
+                failure["evidence_artifacts"] = copy.deepcopy(
+                    manifest.get("artifacts", {})
+                )
+            except Exception as cleanup_error:
+                failure["cleanup_errors"].append(
+                    f"evidence_manifest_read: {cleanup_error}"
+                )
     status_path = lifecycle.get("status_path")
     if isinstance(status_path, Path):
         try:
@@ -793,9 +815,10 @@ def run(config_path: Path, output: Path) -> dict[str, Any]:
         return _run_impl(config_path, output, lifecycle)
     except BaseException as error:
         failure = _finalize_failure(lifecycle, error)
-        if output.is_dir():
+        created = lifecycle.get("output")
+        if isinstance(created, Path) and created.is_dir():
             try:
-                _strict_atomic_json(output / "failure.json", failure)
+                _strict_atomic_json(created / "failure.json", failure)
             except Exception:
                 pass
         _ACTIVE_TRACKER = None
