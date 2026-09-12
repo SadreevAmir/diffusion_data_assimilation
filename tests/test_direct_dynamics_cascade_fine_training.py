@@ -52,6 +52,18 @@ class FineCascadeRunnerTests(unittest.TestCase):
         self.assertIn("train_direct_dynamics_cascade_fine_compact_v2.json", launcher)
         self.assertIn("train_direct_dynamics_cascade_fine_compact_2048_v3.json", launcher)
         self.assertIn("train_direct_dynamics_cascade_fine_full_epoch_v4.json", launcher)
+        self.assertIn(
+            "train_direct_dynamics_cascade_fine_variance_preconditioned_512_v6.json",
+            launcher,
+        )
+        self.assertIn("scripts/require_single_gpu_uuid.sh", launcher)
+        self.assertIn(
+            "nvidia-smi --id=0 --query-gpu=memory.used,utilization.gpu", launcher
+        )
+        self.assertNotIn("head -n 1", launcher)
+        self.assertNotIn("--query-gpu=count", launcher)
+        self.assertIn('export CUDA_VISIBLE_DEVICES="$GPU_UUID"', launcher)
+        self.assertIn("timeout --foreground --signal=TERM --kill-after=2m", launcher)
         self.assertIn('PYTHON_MODE=("--preflight-only")', launcher)
         self.assertIn('"${PYTHON_MODE[@]}"', launcher)
         self.assertIn("usage: $0 [--preflight-only]", launcher)
@@ -153,21 +165,28 @@ class FineCascadeRunnerTests(unittest.TestCase):
             shared_launches.mkdir()
             captured = root / "captured_args"
             script = source.replace(
-                'RESULT_ROOT="/home/autoresearch_results/direct_dynamics_cascade_v1"',
+                'RESULT_ROOT="/home/autoresearch_results/direct_dynamics_cascade_v2"',
                 f'RESULT_ROOT="{result_root}"',
             ).replace(
-                'exec 9>"/home/autoresearch_results/direct_dynamics_all_hours_v1/launches/.gpu_job.lock"',
-                f'exec 9>"{shared_launches}/.gpu_job.lock"',
+                'GPU_LOCK_ROOT="/home/autoresearch_results/direct_dynamics_all_hours_v1/launches"',
+                f'GPU_LOCK_ROOT="{shared_launches}"',
             )
-            launcher = root / "launcher.sh"
+            scripts = root / "scripts"
+            scripts.mkdir()
+            helper = scripts / "require_single_gpu_uuid.sh"
+            helper.write_bytes(Path("scripts/require_single_gpu_uuid.sh").read_bytes())
+            helper.chmod(0o700)
+            launcher = scripts / "launcher.sh"
             launcher.write_text(script)
             launcher.chmod(0o700)
             commands = {
                 "git": "#!/usr/bin/env bash\nprintf '%040d\\n' 0\n",
                 "flock": "#!/usr/bin/env bash\nexit 0\n",
                 "nvidia-smi": """#!/usr/bin/env bash
-if [[ "$*" == *"query-gpu=count"* ]]; then echo 1
-else echo 0
+if [[ "$*" == *"query-gpu=uuid"* ]]; then
+  echo GPU-01234567-89ab-cdef-0123-456789abcdef
+else
+  echo 0,0
 fi
 """,
                 "timeout": "#!/usr/bin/env bash\nprintf '%s\\n' \"$@\" > \"$ARGS_CAPTURE\"\nexit 0\n",
@@ -210,6 +229,63 @@ fi
             self.assertTrue(
                 (result_root / "launches" / "compact-preflight" / "exit.json").is_file()
             )
+
+    def test_malformed_gpu_observation_never_reaches_python(self) -> None:
+        source = Path("scripts/run_direct_dynamics_cascade_fine_mechanics.sh").read_text()
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            fake_bin = root / "bin"
+            fake_bin.mkdir()
+            result_root = root / "results"
+            lock_root = root / "locks"
+            marker = root / "python_called"
+            script = source.replace(
+                'RESULT_ROOT="/home/autoresearch_results/direct_dynamics_cascade_v2"',
+                f'RESULT_ROOT="{result_root}"',
+            ).replace(
+                'GPU_LOCK_ROOT="/home/autoresearch_results/direct_dynamics_all_hours_v1/launches"',
+                f'GPU_LOCK_ROOT="{lock_root}"',
+            )
+            scripts = root / "scripts"
+            scripts.mkdir()
+            helper = scripts / "require_single_gpu_uuid.sh"
+            helper.write_bytes(Path("scripts/require_single_gpu_uuid.sh").read_bytes())
+            helper.chmod(0o700)
+            launcher = scripts / "launcher.sh"
+            launcher.write_text(script)
+            launcher.chmod(0o700)
+            commands = {
+                "git": "#!/usr/bin/env bash\nprintf '%040d\\n' 0\n",
+                "flock": "#!/usr/bin/env bash\nexit 0\n",
+                "nvidia-smi": """#!/usr/bin/env bash
+if [[ "$*" == *"query-gpu=uuid"* ]]; then
+  echo GPU-01234567-89ab-cdef-0123-456789abcdef
+else
+  echo malformed
+fi
+""",
+                "timeout": f"#!/usr/bin/env bash\ntouch '{marker}'\n",
+            }
+            for name, body in commands.items():
+                path = fake_bin / name
+                path.write_text(body)
+                path.chmod(0o700)
+            completed = subprocess.run(
+                ["bash", str(launcher), "--preflight-only"],
+                cwd=root,
+                env={
+                    **os.environ,
+                    "PATH": f"{fake_bin}:{os.environ['PATH']}",
+                    "FINE_CASCADE_LAUNCH_ID": "malformed-gpu",
+                    "FINE_CASCADE_CONFIG": "config/experiments/train_direct_dynamics_cascade_fine_variance_preconditioned_512_v6.json",
+                },
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            self.assertNotEqual(completed.returncode, 0)
+            self.assertIn("malformed observation", completed.stderr)
+            self.assertFalse(marker.exists())
 
     def test_forbidden_fine_config_never_reaches_python(self) -> None:
         with TemporaryDirectory() as directory:

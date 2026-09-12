@@ -290,6 +290,7 @@ def _gpu_admission_smoke(
     raw: dict,
     config: TrainingConfig,
     base_noise_channel_scales: tuple[float, ...] | None = None,
+    preconditioning_scales: tuple[tuple[float, ...], tuple[float, ...]] | None = None,
 ) -> dict:
     """Run the exact 29→6 projected training path without an optimizer step."""
     device = torch.device("cuda")
@@ -311,13 +312,36 @@ def _gpu_admission_smoke(
         )
     condition, _, _ = teacher_coarse_condition(truth, causal, valid_mask)
     grid = make_normalized_xy_grid(*config.image_size, device=device).expand(batch_size, -1, -1, -1)
-    model_input = torch.cat((state, grid, condition), dim=1)
+    model_state = state
+    if preconditioning_scales is not None:
+        from .direct_dynamics_cascade_fine_preconditioned import (
+            preconditioned_model_state,
+            reconstruct_preconditioned_velocity,
+        )
+
+        target_residual_rms, projected_base_rms = preconditioning_scales
+        model_state = preconditioned_model_state(
+            state, time, target_residual_rms, projected_base_rms
+        )
+    model_input = torch.cat((model_state, grid, condition), dim=1)
     if model_input.shape[1] != FINE_INPUT_CHANNELS:
         raise ValueError("GPU smoke constructed the wrong fine-stage input")
     with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
         prediction = projected_model(model_input, time * 1000)[0]
+    neural_prediction = prediction
+    if preconditioning_scales is not None:
+        prediction, neural_scale = reconstruct_preconditioned_velocity(
+            neural_prediction,
+            state,
+            time,
+            target_residual_rms,
+            projected_base_rms,
+        )
     mask = valid_mask.expand_as(prediction)
-    loss = ((prediction - target).square() * mask).sum() / mask.sum().clamp(min=1)
+    error = prediction - target
+    if preconditioning_scales is not None:
+        error = error / neural_scale
+    loss = (error.square() * mask).sum() / mask.sum().clamp(min=1)
     if not torch.isfinite(loss):
         raise FloatingPointError("fine-stage GPU smoke produced a non-finite loss")
     loss.backward()
@@ -341,6 +365,14 @@ def _gpu_admission_smoke(
         "gradient_accumulation_steps": config.gradient_accumulation_steps,
         "base_noise_channel_scales": (
             None if base_noise_channel_scales is None else list(base_noise_channel_scales)
+        ),
+        "preconditioning": (
+            None
+            if preconditioning_scales is None
+            else {
+                "target_residual_rms": list(preconditioning_scales[0]),
+                "projected_base_rms": list(preconditioning_scales[1]),
+            }
         ),
     }
     for parameter in projected_model.parameters():
@@ -398,6 +430,7 @@ def _run_impl(config_path: Path, *, preflight_only: bool, lifecycle: _Lifecycle)
         "compact_undertraining_test_2048",
         "compact_full_data_one_epoch_6474",
         "compact_matched_base_scale_2048",
+        "compact_variance_preconditioned_512",
     }:
         raise ValueError("fine cascade experiment declares an unsupported pilot kind")
     train_case_count = int(pilot.get("train_case_count", 4096))
@@ -479,6 +512,7 @@ def _run_impl(config_path: Path, *, preflight_only: bool, lifecycle: _Lifecycle)
     lifecycle.phase = "gpu_smoke"
     trainer_class = FineCascadeDynamicsTrainer
     base_noise_channel_scales = None
+    preconditioning_scales = None
     if pilot.get("kind") == "compact_matched_base_scale_2048":
         from .direct_dynamics_cascade_fine_matched_scale import (
             MatchedScaleFineCascadeDynamicsTrainer,
@@ -490,8 +524,24 @@ def _run_impl(config_path: Path, *, preflight_only: bool, lifecycle: _Lifecycle)
             raise ValueError("matched-scale pilot requires fine_base_law")
         base_noise_channel_scales = validate_channel_scales(law.get("channel_scales"))
         trainer_class = MatchedScaleFineCascadeDynamicsTrainer
+    elif pilot.get("kind") == "compact_variance_preconditioned_512":
+        from .direct_dynamics_cascade_fine_preconditioned import (
+            VariancePreconditionedFineCascadeDynamicsTrainer,
+            validate_preconditioning_contract,
+        )
+
+        contract = validate_preconditioning_contract(experiment.get("fine_preconditioning"))
+        preconditioning_scales = (
+            tuple(contract["target_residual_rms"]),
+            tuple(contract["projected_base_rms"]),
+        )
+        trainer_class = VariancePreconditionedFineCascadeDynamicsTrainer
     smoke = _gpu_admission_smoke(
-        model, smoke_batch, config, base_noise_channel_scales=base_noise_channel_scales
+        model,
+        smoke_batch,
+        config,
+        base_noise_channel_scales=base_noise_channel_scales,
+        preconditioning_scales=preconditioning_scales,
     )
     result = {
         "status": "preflight_passed" if preflight_only else "training_pending",

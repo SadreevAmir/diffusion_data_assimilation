@@ -23,6 +23,7 @@ case "$CONFIG_PATH" in
   config/experiments/train_direct_dynamics_cascade_fine_compact_v2.json|\
   config/experiments/train_direct_dynamics_cascade_fine_compact_2048_v3.json|\
   config/experiments/train_direct_dynamics_cascade_fine_matched_scale_2048_v5.json|\
+  config/experiments/train_direct_dynamics_cascade_fine_variance_preconditioned_512_v6.json|\
   config/experiments/train_direct_dynamics_cascade_fine_full_epoch_v4.json) ;;
   *)
     echo "unsafe FINE_CASCADE_CONFIG" >&2
@@ -30,7 +31,7 @@ case "$CONFIG_PATH" in
     ;;
 esac
 
-RESULT_ROOT="/home/autoresearch_results/direct_dynamics_cascade_v1"
+RESULT_ROOT="/home/autoresearch_results/direct_dynamics_cascade_v2"
 STATUS_ROOT="$RESULT_ROOT/launches"
 STATUS_DIR="$STATUS_ROOT/$RUN_ID"
 mkdir -p "$STATUS_ROOT"
@@ -49,32 +50,38 @@ finish() {
   exit "$code"
 }
 trap finish EXIT
-exec 9>"/home/autoresearch_results/direct_dynamics_all_hours_v1/launches/.gpu_job.lock"
+GPU_LOCK_ROOT="/home/autoresearch_results/direct_dynamics_all_hours_v1/launches"
+mkdir -p "$GPU_LOCK_ROOT"
+exec 9>"$GPU_LOCK_ROOT/.gpu_job.lock"
 if ! flock -n 9; then
   echo "another project launch owns the GPU lock" >&2
   exit 4
 fi
 
-GPU_COUNT="$(nvidia-smi --query-gpu=count --format=csv,noheader | wc -l | tr -d ' ')"
-if [[ ! "$GPU_COUNT" =~ ^[0-9]+$ || "$GPU_COUNT" != "1" ]]; then
-  echo "GPU admission failed: visible=$GPU_COUNT, expected exactly one" >&2
-  exit 5
-fi
-GPU_MEMORY_USED="$(nvidia-smi --query-gpu=memory.used --format=csv,noheader,nounits | head -n 1 | tr -d ' ')"
-if [[ ! "$GPU_MEMORY_USED" =~ ^[0-9]+$ ]]; then
-  echo "GPU admission failed: invalid memory reading '$GPU_MEMORY_USED'" >&2
-  exit 6
-fi
+GPU_UUID="$(scripts/require_single_gpu_uuid.sh)"
+readonly GPU_UUID
+
+read_gpu_into() {
+  local observation
+  if ! observation="$(nvidia-smi --id=0 --query-gpu=memory.used,utilization.gpu --format=csv,noheader,nounits | tr -d ' ')"; then
+    echo "GPU admission failed: nvidia-smi observation failed" >&2
+    return 1
+  fi
+  if [[ ! "$observation" =~ ^[0-9]+,[0-9]+$ ]]; then
+    echo "GPU admission failed: malformed observation '$observation'" >&2
+    return 1
+  fi
+  GPU_MEMORY="${observation%%,*}"
+  GPU_UTILIZATION="${observation##*,}"
+}
+read_gpu_into || exit 6
+GPU_MEMORY_USED="$GPU_MEMORY"
 observe_occupied_gpu_for_five_minutes() {
   samples=0
   while [[ "$samples" -lt 11 ]]; do
-    utilization="$(nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader,nounits | head -n 1 | tr -d ' ')"
-    if [[ ! "$utilization" =~ ^[0-9]+$ ]]; then
-      echo "GPU admission failed: invalid utilization reading '$utilization'" >&2
-      exit 7
-    fi
-    if [[ "$utilization" -ge 5 ]]; then
-      echo "GPU admission failed: another workload reached utilization=$utilization%" >&2
+    read_gpu_into || exit 7
+    if [[ "$GPU_UTILIZATION" -ge 5 ]]; then
+      echo "GPU admission failed: another workload reached utilization=$GPU_UTILIZATION%" >&2
       exit 8
     fi
     samples=$((samples + 1))
@@ -87,20 +94,14 @@ if [[ "$GPU_MEMORY_USED" -gt 1024 ]]; then
   observe_occupied_gpu_for_five_minutes
 fi
 
-FINAL_MEMORY_USED="$(nvidia-smi --query-gpu=memory.used --format=csv,noheader,nounits | head -n 1 | tr -d ' ')"
-FINAL_UTILIZATION="$(nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader,nounits | head -n 1 | tr -d ' ')"
-if [[ ! "$FINAL_MEMORY_USED" =~ ^[0-9]+$ || ! "$FINAL_UTILIZATION" =~ ^[0-9]+$ ]]; then
-  echo "GPU admission failed: invalid final observation" >&2
-  exit 9
-fi
+read_gpu_into || exit 9
+FINAL_MEMORY_USED="$GPU_MEMORY"
+FINAL_UTILIZATION="$GPU_UTILIZATION"
 if [[ "$GPU_MEMORY_USED" -le 1024 && "$FINAL_MEMORY_USED" -gt 1024 ]]; then
   observe_occupied_gpu_for_five_minutes
-  FINAL_MEMORY_USED="$(nvidia-smi --query-gpu=memory.used --format=csv,noheader,nounits | head -n 1 | tr -d ' ')"
-  FINAL_UTILIZATION="$(nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader,nounits | head -n 1 | tr -d ' ')"
-  if [[ ! "$FINAL_MEMORY_USED" =~ ^[0-9]+$ || ! "$FINAL_UTILIZATION" =~ ^[0-9]+$ ]]; then
-    echo "GPU admission failed: invalid post-window observation" >&2
-    exit 10
-  fi
+  read_gpu_into || exit 10
+  FINAL_MEMORY_USED="$GPU_MEMORY"
+  FINAL_UTILIZATION="$GPU_UTILIZATION"
 fi
 if [[ "$FINAL_MEMORY_USED" -gt 1024 && "$FINAL_UTILIZATION" -ge 5 ]]; then
   echo "GPU admission failed at final observation: memory_used_mib=$FINAL_MEMORY_USED utilization=$FINAL_UTILIZATION" >&2
@@ -111,10 +112,11 @@ printf '{"status":"running","run_id":"%s","started_at":"%s","code_commit":"%s"}\
   "$RUN_ID" "$started" "$(git rev-parse HEAD)" > "$STATUS_DIR/status.json"
 
 export FINE_CASCADE_STATUS_PATH="$STATUS_DIR/status.json"
+export CUDA_VISIBLE_DEVICES="$GPU_UUID"
 export CLEARML_REQUIRE_ONLINE=1
 export OMP_NUM_THREADS=6
 export MKL_NUM_THREADS=6
 export OPENBLAS_NUM_THREADS=6
 export NUMEXPR_NUM_THREADS=6
-timeout --signal=TERM --kill-after=2m 14280s python -m assim_lib.direct_dynamics_cascade_fine_training \
+timeout --foreground --signal=TERM --kill-after=2m 14280s python -m assim_lib.direct_dynamics_cascade_fine_training \
   --config "$CONFIG_PATH" "${PYTHON_MODE[@]}"

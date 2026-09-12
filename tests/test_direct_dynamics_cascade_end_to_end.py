@@ -1,11 +1,18 @@
 import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from types import SimpleNamespace
+from unittest.mock import patch
 
 import torch
 from torch import nn
 
 from assim_lib.direct_dynamics_cascade import masked_block_average, project_detail
 from assim_lib.direct_dynamics_cascade_coarse import CoarseCascadeSampler, coarse_target
-from assim_lib.direct_dynamics_cascade_end_to_end import CascadePredictor
+from assim_lib.direct_dynamics_cascade_end_to_end import (
+    CascadePredictor,
+    load_cascade_predictor,
+)
 from assim_lib.direct_dynamics_cascade_fine import FineCascadeSampler
 
 
@@ -165,6 +172,52 @@ class EndToEndCascadeTests(unittest.TestCase):
                 coarse_num_timesteps=2,
                 fine_num_timesteps=2,
                 device=torch.device("cpu"),
+            )
+
+    def test_loader_dispatches_preconditioned_fine_without_plain_fallback(self):
+        holder = lambda: SimpleNamespace(  # noqa: E731 - compact sampler test double
+            sampler=SimpleNamespace(model=nn.Identity())
+        )
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            coarse = root / "coarse"
+            fine = root / "fine"
+            coarse.mkdir()
+            fine.mkdir()
+            (coarse / "coarse_cascade_manifest.json").write_text("{}")
+            (fine / "fine_cascade_manifest.json").write_text("{}")
+            (fine / "fine_cascade_preconditioning_manifest.json").write_text("{}")
+            with (
+                patch(
+                    "assim_lib.direct_dynamics_cascade_end_to_end.load_coarse_cascade_sampler",
+                    return_value=holder(),
+                ),
+                patch(
+                    "assim_lib.direct_dynamics_cascade_end_to_end.load_fine_cascade_sampler"
+                ) as plain,
+                patch(
+                    "assim_lib.direct_dynamics_cascade_fine_preconditioned.load_variance_preconditioned_fine_cascade_sampler",
+                    return_value=holder(),
+                ) as preconditioned,
+            ):
+                predictor = load_cascade_predictor(
+                    coarse_run_dir=str(coarse),
+                    coarse_checkpoint_name="coarse.pth",
+                    coarse_model_config={},
+                    coarse_checkpoint_sha256="c" * 64,
+                    fine_run_dir=str(fine),
+                    fine_checkpoint_name="fine.pth",
+                    fine_model_config={},
+                    fine_checkpoint_sha256="f" * 64,
+                    expected_coarse_code_commit="a" * 40,
+                    expected_fine_code_commit="b" * 40,
+                    replay_code_commit="d" * 40,
+                    expected_forecast_contract_sha256="e" * 64,
+                )
+            plain.assert_not_called()
+            preconditioned.assert_called_once()
+            self.assertIn(
+                "fine_preconditioning_manifest_sha256", predictor.replay_identity
             )
 
 

@@ -298,7 +298,26 @@ def load_cascade_predictor(
         device=device,
     )
     matched_manifest = Path(fine_run_dir) / "fine_cascade_matched_base_manifest.json"
-    if matched_manifest.is_file():
+    preconditioned_manifest = (
+        Path(fine_run_dir) / "fine_cascade_preconditioning_manifest.json"
+    )
+    if matched_manifest.is_file() and preconditioned_manifest.is_file():
+        raise ValueError("fine checkpoint declares conflicting sampler parameterizations")
+    if preconditioned_manifest.is_file():
+        from .direct_dynamics_cascade_fine_preconditioned import (
+            load_variance_preconditioned_fine_cascade_sampler,
+        )
+
+        fine = load_variance_preconditioned_fine_cascade_sampler(
+            fine_run_dir,
+            fine_checkpoint_name,
+            fine_model_config,
+            fine_checkpoint_sha256,
+            expected_fine_code_commit,
+            expected_forecast_contract_sha256,
+            device=device,
+        )
+    elif matched_manifest.is_file():
         from .direct_dynamics_cascade_fine_matched_scale import (
             load_matched_scale_fine_cascade_sampler,
         )
@@ -337,4 +356,8 @@ def load_cascade_predictor(
     }
     if matched_manifest.is_file():
         replay_identity["fine_matched_base_manifest_sha256"] = _sha256(matched_manifest)
+    if preconditioned_manifest.is_file():
+        replay_identity["fine_preconditioning_manifest_sha256"] = _sha256(
+            preconditioned_manifest
+        )
     return CascadePredictor(coarse, fine, replay_identity=replay_identity)

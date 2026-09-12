@@ -41,6 +41,7 @@ FINE_CONDITION_CHANNELS = DIRECT_CONDITION_CHANNELS + DIRECT_OUTPUT_CHANNELS
 FINE_INPUT_CHANNELS = DIRECT_OUTPUT_CHANNELS + 2 + FINE_CONDITION_CHANNELS
 VALID_MASK_CONDITION_CHANNEL = 2
 VALID_MASK_MODEL_INPUT_CHANNEL = DIRECT_OUTPUT_CHANNELS + 2 + VALID_MASK_CONDITION_CHANNEL
+RAW_FINE_VELOCITY_PARAMETERIZATION = "raw_projected_velocity_v1"
 
 
 def _validate_causal_condition(
@@ -479,6 +480,7 @@ def write_fine_manifest(
         {
             "schema_version": 2,
             "sampler": "FineCascadeSampler",
+            "velocity_parameterization": RAW_FINE_VELOCITY_PARAMETERIZATION,
             "representation": "Y=U(C)+R; D(U(C))=C; D(R)=0",
             "conditional_law": "p(R|C_generated,c_causal)",
             "condition_channels": FINE_CONDITION_CHANNELS,
@@ -507,6 +509,8 @@ def load_fine_cascade_sampler(
     expected_code_commit: str,
     expected_forecast_contract_sha256: str,
     device=None,
+    *,
+    expected_velocity_parameterization: str = RAW_FINE_VELOCITY_PARAMETERIZATION,
 ) -> FineCascadeSampler:
     """Reload a fine-stage checkpoint without silently falling back to plain sampling."""
     root = Path(run_dir)
@@ -527,6 +531,13 @@ def load_fine_cascade_sampler(
     }
     if any(manifest.get(key) != value for key, value in expected.items()):
         raise ValueError("fine cascade sampler manifest is incompatible")
+    actual_parameterization = manifest.get(
+        "velocity_parameterization", RAW_FINE_VELOCITY_PARAMETERIZATION
+    )
+    if actual_parameterization != expected_velocity_parameterization:
+        raise ValueError(
+            "fine velocity parameterization differs from the requested loader"
+        )
     if manifest.get("conditioning_module_sha256") != _sha256(Path(__file__)):
         raise ValueError("fine conditioning implementation differs from the checkpoint manifest")
     if manifest.get("code_commit") != expected_code_commit:
