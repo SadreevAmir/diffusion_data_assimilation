@@ -37,6 +37,12 @@ def test_full_free_block_has_rank_three_and_removes_mean_gradient():
     assert result["jacobian_rank_sum"] == 3
     assert result["free_count_histogram"] == {"0": 0, "1": 0, "2": 0, "3": 0, "4": 1}
     assert result["proper_gradient_energy_fraction_retained"] == 0.0
+    decomposition = result["orthogonal_energy_decomposition"]
+    assert decomposition["coarse_budget_change"]["fraction"] == 1.0
+    assert decomposition["endpoint_budget_restriction"]["fraction"] == 0.0
+    assert decomposition["interior_box_saturation"]["fraction"] == 0.0
+    assert decomposition["available_fine_direction"]["fraction"] == 0.0
+    assert result["orthogonal_energy_closure_relative_error"] == 0.0
 
 
 def test_zero_budget_block_has_zero_rank_and_zero_retained_gradient():
@@ -47,6 +53,14 @@ def test_zero_budget_block_has_zero_rank_and_zero_retained_gradient():
     result = _jacobian_statistics(raw, coarse, mask, gradient)
     assert result["jacobian_rank_sum"] == 0
     assert result["proper_gradient_energy_fraction_retained"] == 0.0
+    decomposition = result["orthogonal_energy_decomposition"]
+    assert decomposition["interior_box_saturation"]["fraction"] == 0.0
+    assert decomposition["available_fine_direction"]["fraction"] == 0.0
+    assert abs(
+        decomposition["coarse_budget_change"]["fraction"]
+        + decomposition["endpoint_budget_restriction"]["fraction"]
+        - 1.0
+    ) < 1e-15
 
 
 def test_canonical_decode_preserves_atoms_but_not_nextafter_values():
@@ -76,3 +90,8 @@ def test_mixed_block_manual_jg_matches_reviewed_backward():
     expected_fraction = float(leaf.grad.square().sum() / gradient.square().sum())
     assert result["jacobian_rank_sum"] == 1
     assert result["proper_gradient_energy_fraction_retained"] == expected_fraction
+    fractions = [
+        component["fraction"]
+        for component in result["orthogonal_energy_decomposition"].values()
+    ]
+    assert abs(sum(fractions) - 1.0) < 1e-15

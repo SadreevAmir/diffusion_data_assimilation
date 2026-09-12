@@ -79,8 +79,32 @@ def _jacobian_statistics(
         / free_count.unsqueeze(-1).clamp_min(1)
     )
     retained = torch.where(free_blocks, gradient_blocks - free_mean, 0.0)
+    valid_mean = (
+        (gradient_blocks * mask_blocks).sum(dim=-1, keepdim=True)
+        / valid_count.unsqueeze(-1).clamp_min(1)
+    )
+    fixed_budget = torch.where(
+        mask_blocks, gradient_blocks - valid_mean, torch.zeros_like(gradient_blocks)
+    )
+    bounded_budget = torch.where(
+        interior_budget.unsqueeze(-1), fixed_budget, torch.zeros_like(fixed_budget)
+    )
+    components = {
+        "coarse_budget_change": torch.where(
+            mask_blocks, gradient_blocks - fixed_budget, torch.zeros_like(gradient_blocks)
+        ),
+        "endpoint_budget_restriction": fixed_budget - bounded_budget,
+        "interior_box_saturation": bounded_budget - retained,
+        "available_fine_direction": retained,
+    }
     raw_sq = torch.where(mask_blocks, gradient_blocks.square(), 0.0).sum()
     retained_sq = retained.square().sum()
+    component_sq = {name: value.square().sum() for name, value in components.items()}
+    reconstructed_sq = sum(component_sq.values())
+    closure_error = abs(float(reconstructed_sq - raw_sq))
+    closure_relative = closure_error / float(raw_sq) if float(raw_sq) else None
+    if closure_relative is not None and closure_relative > 1e-10:
+        raise RuntimeError("decoder gradient energy decomposition did not close")
     raw_norm = math.sqrt(float(raw_sq))
     retained_norm = math.sqrt(float(retained_sq))
     block_raw_sq = torch.where(mask_blocks, gradient_blocks.square(), 0.0).sum(dim=-1)
@@ -118,6 +142,16 @@ def _jacobian_statistics(
         "proper_gradient_energy_fraction_retained": (
             float(retained_sq / raw_sq) if float(raw_sq) else None
         ),
+        "proper_gradient_energy": float(raw_sq),
+        "orthogonal_energy_decomposition": {
+            name: {
+                "energy": float(value),
+                "fraction": float(value / raw_sq) if float(raw_sq) else None,
+            }
+            for name, value in component_sq.items()
+        },
+        "orthogonal_energy_closure_absolute_error": closure_error,
+        "orthogonal_energy_closure_relative_error": closure_relative,
         "informative_blocks": int(informative.sum()),
         "informative_blocks_with_zero_retained_gradient": int(dead.sum()),
         "informative_block_fraction_with_zero_retained_gradient": (
@@ -246,6 +280,12 @@ def run(config_path: Path, output: Path) -> dict[str, Any]:
                 ):
                     if row[name] is not None:
                         tracker.report_single_value(f"{branch}/{lead}/{name}", row[name])
+                for name, component in row["orthogonal_energy_decomposition"].items():
+                    if component["fraction"] is not None:
+                        tracker.report_single_value(
+                            f"{branch}/{lead}/energy_fraction/{name}",
+                            component["fraction"],
+                        )
         tracker.upload_artifact("sic_decoder_jacobian_audit", metrics_path)
         _finish_success(
             tracker,
@@ -354,6 +394,25 @@ def _run_bound(
             }
             before_sq = sum(row["proper_gradient_norm_before_decoder_jacobian"] ** 2 for row in rows)
             after_sq = sum(row["proper_gradient_norm_after_decoder_jacobian"] ** 2 for row in rows)
+            decomposition_energy = {
+                name: sum(
+                    row["orthogonal_energy_decomposition"][name]["energy"]
+                    for row in rows
+                )
+                for name in (
+                    "coarse_budget_change",
+                    "endpoint_budget_restriction",
+                    "interior_box_saturation",
+                    "available_fine_direction",
+                )
+            }
+            decomposition_total = sum(decomposition_energy.values())
+            closure_error = abs(decomposition_total - before_sq)
+            closure_relative = closure_error / before_sq if before_sq else None
+            if closure_relative is not None and closure_relative > 1e-10:
+                raise RuntimeError(
+                    "aggregate decoder gradient energy decomposition did not close"
+                )
             active_blocks = summed["active_blocks"]
             potential = summed["potential_fixed_budget_rank_sum"]
             per_lead[lead] = {
@@ -362,6 +421,15 @@ def _run_bound(
                 "rank_fraction_after_box_saturation": summed["jacobian_rank_sum"] / potential if potential else None,
                 "proper_gradient_norm_fraction_retained": math.sqrt(after_sq / before_sq) if before_sq else None,
                 "proper_gradient_energy_fraction_retained": after_sq / before_sq if before_sq else None,
+                "orthogonal_energy_decomposition": {
+                    name: {
+                        "energy": value,
+                        "fraction": value / before_sq if before_sq else None,
+                    }
+                    for name, value in decomposition_energy.items()
+                },
+                "orthogonal_energy_closure_absolute_error": closure_error,
+                "orthogonal_energy_closure_relative_error": closure_relative,
                 "interior_budget_fraction": summed["interior_budget_blocks"] / active_blocks,
                 "zero_budget_fraction": summed["zero_budget_blocks"] / active_blocks,
                 "one_budget_fraction": summed["one_budget_blocks"] / active_blocks,
