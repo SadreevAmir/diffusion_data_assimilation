@@ -517,6 +517,7 @@ def load_fine_cascade_sampler(
     device=None,
     *,
     expected_velocity_parameterization: str = RAW_FINE_VELOCITY_PARAMETERIZATION,
+    expected_conditioning_implementation_sha256: str | None = None,
 ) -> FineCascadeSampler:
     """Reload a fine-stage checkpoint without silently falling back to plain sampling."""
     root = Path(run_dir)
@@ -544,7 +545,14 @@ def load_fine_cascade_sampler(
         raise ValueError(
             "fine velocity parameterization differs from the requested loader"
         )
-    if manifest.get("conditioning_module_sha256") != _sha256(Path(__file__)):
+    conditioning_implementation_sha256 = (
+        _sha256(Path(__file__))
+        if expected_conditioning_implementation_sha256 is None
+        else expected_conditioning_implementation_sha256
+    )
+    if len(conditioning_implementation_sha256) != 64:
+        raise ValueError("fine conditioning implementation SHA256 is invalid")
+    if manifest.get("conditioning_module_sha256") != conditioning_implementation_sha256:
         raise ValueError("fine conditioning implementation differs from the checkpoint manifest")
     if manifest.get("code_commit") != expected_code_commit:
         raise ValueError("fine cascade code commit differs from the required identity")

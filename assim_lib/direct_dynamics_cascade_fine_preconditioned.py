@@ -329,6 +329,8 @@ def load_variance_preconditioned_fine_cascade_sampler(
     device=None,
     *,
     expected_base_parameterization: str = PROJECTED_WHITE_BASE_KIND,
+    expected_preconditioning_implementation_sha256: str | None = None,
+    expected_conditioning_implementation_sha256: str | None = None,
 ) -> VariancePreconditionedFineCascadeSampler:
     root = Path(run_dir)
     manifest_path = root / "fine_cascade_preconditioning_manifest.json"
@@ -342,11 +344,18 @@ def load_variance_preconditioned_fine_cascade_sampler(
     actual_base_parameterization = primary.get(
         "base_parameterization", PROJECTED_WHITE_BASE_KIND
     )
+    preconditioning_implementation_sha256 = (
+        _sha256(Path(__file__))
+        if expected_preconditioning_implementation_sha256 is None
+        else expected_preconditioning_implementation_sha256
+    )
+    if len(preconditioning_implementation_sha256) != 64:
+        raise ValueError("fine preconditioning implementation SHA256 is invalid")
     if (
         manifest.get("schema_version") != 1
         or manifest.get("sampler") != "VariancePreconditionedFineCascadeSampler"
         or manifest.get("code_commit") != expected_code_commit
-        or manifest.get("implementation_sha256") != _sha256(Path(__file__))
+        or manifest.get("implementation_sha256") != preconditioning_implementation_sha256
         or primary.get("velocity_parameterization") != PRECONDITIONING_KIND
         or primary.get("parameterization_manifest") != manifest_path.name
         or primary.get("parameterization_manifest_sha256") != _sha256(manifest_path)
@@ -363,6 +372,7 @@ def load_variance_preconditioned_fine_cascade_sampler(
         expected_forecast_contract_sha256,
         device=device,
         expected_velocity_parameterization=PRECONDITIONING_KIND,
+        expected_conditioning_implementation_sha256=expected_conditioning_implementation_sha256,
     )
     return VariancePreconditionedFineCascadeSampler(
         base.sampler.model,

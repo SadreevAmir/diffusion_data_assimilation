@@ -78,6 +78,12 @@ def _validate_experiment(experiment: dict[str, Any]) -> tuple[dict[str, Any], li
             raise ValueError("each fine candidate requires a checkpoint SHA256")
         if not isinstance(row.get("run_sha256"), dict):
             raise ValueError("each fine candidate requires a frozen run inventory")
+        for key in (
+            "expected_conditioning_implementation_sha256",
+            "expected_preconditioning_implementation_sha256",
+        ):
+            if key in row and len(str(row[key])) != 64:
+                raise ValueError(f"{key} must be an explicit SHA256")
     gate = experiment.get("gate")
     expected_gate = {
         "primary_standardized_crps_ratio_max": 1.01,
@@ -297,6 +303,12 @@ def run(config_path: Path, output: Path) -> dict[str, Any]:
             replay_code_commit=code_identity["git_commit"],
             expected_forecast_contract_sha256=experiment["forecast_contract_sha256"],
             device=device,
+            expected_fine_conditioning_implementation_sha256=spec.get(
+                "expected_conditioning_implementation_sha256"
+            ),
+            expected_fine_preconditioning_implementation_sha256=spec.get(
+                "expected_preconditioning_implementation_sha256"
+            ),
         )
 
     result: dict[str, Any] = {

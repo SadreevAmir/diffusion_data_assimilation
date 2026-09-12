@@ -244,9 +244,23 @@ class EndToEndCascadeTests(unittest.TestCase):
                     expected_fine_code_commit="b" * 40,
                     replay_code_commit="d" * 40,
                     expected_forecast_contract_sha256="e" * 64,
+                    expected_fine_conditioning_implementation_sha256="1" * 64,
+                    expected_fine_preconditioning_implementation_sha256="2" * 64,
                 )
             plain.assert_not_called()
             preconditioned.assert_called_once()
+            self.assertEqual(
+                preconditioned.call_args.kwargs[
+                    "expected_conditioning_implementation_sha256"
+                ],
+                "1" * 64,
+            )
+            self.assertEqual(
+                preconditioned.call_args.kwargs[
+                    "expected_preconditioning_implementation_sha256"
+                ],
+                "2" * 64,
+            )
             self.assertIn(
                 "fine_preconditioning_manifest_sha256", predictor.replay_identity
             )

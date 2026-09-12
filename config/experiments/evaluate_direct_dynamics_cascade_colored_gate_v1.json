@@ -32,6 +32,8 @@
       "checkpoint": "mechanics_update_0512.pth",
       "checkpoint_sha256": "c4f7a962a77f8e04009bb41f51cd12e4908153f4b6954cb05fce2709c661ff2a",
       "code_commit": "2478b64d69afe064c9658a72de258daa9eb697d3",
+      "expected_conditioning_implementation_sha256": "4943632b158d49528e0fb4215df8d14182421311e40fad86dea5a01382d7fdf1",
+      "expected_preconditioning_implementation_sha256": "41c1a37040adb1ec6bc3bbd5047f4ebf7f965e811194912f06d8f3fd938dfd6f",
       "run_sha256": {
         "config.json": "a9683c65bce012792e6ad4b201c65d33e9565478cab389afb52563090fb79a4d",
         "metadata.json": "777861a75e523db5c4d782294640c5f4b65cb4f800801102fb86452c3e6065fc",
