@@ -31,8 +31,6 @@ from .direct_dynamics_cascade_coarse_fine_boundary_audit import (
 )
 from .direct_dynamics_cascade_coarse_proper_refinement import (
     _atomic_torch_save,
-    frozen_prefix,
-    hybrid_terminal_sample,
     proper_objective,
 )
 from .direct_dynamics_cascade_contract import (
@@ -50,6 +48,9 @@ from .direct_dynamics_cascade_fine_training import (
 from .direct_dynamics_coarse_budget_refinement_integration import (
     anchored_canonical_physical_coarse,
     frozen_allocation_physical_law,
+)
+from .direct_dynamics_coarse_budget_production_replay import (
+    sequential_terminal_candidate_control,
 )
 from .direct_dynamics_fine_support_proper_admission import apply_training_sic_decoder
 from .direct_dynamics_sic_support_decoder_scoring import canonical_physical_decode
@@ -364,14 +365,16 @@ def run(config_path: Path, output_dir: Path) -> dict[str, Any]:
         grid = make_normalized_xy_grid(
             *encoded.shape[-2:], device=device, dtype=torch.float32
         )
-        prefix = frozen_prefix(frozen_coarse, raw_noise, encoded, active, grid)
-        candidate_normalized = hybrid_terminal_sample(
-            terminal_coarse, prefix, encoded, active, grid
-        ).unflatten(0, (1, members))
-        with torch.no_grad():
-            control_normalized = hybrid_terminal_sample(
-                frozen_coarse, prefix, encoded, active, grid
-            ).unflatten(0, (1, members))
+        candidate_flat, control_flat, prefix = sequential_terminal_candidate_control(
+            frozen_coarse,
+            terminal_coarse,
+            raw_noise,
+            encoded,
+            active,
+            grid,
+        )
+        candidate_normalized = candidate_flat.unflatten(0, (1, members))
+        control_normalized = control_flat.unflatten(0, (1, members))
         production_coarse = production["coarse"].to(device)
         candidate_control = float(
             (candidate_normalized.detach() - control_normalized).abs().max()

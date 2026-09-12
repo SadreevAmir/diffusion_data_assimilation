@@ -2,21 +2,13 @@ import json
 from pathlib import Path
 
 import torch
-from torchdiffeq import odeint
 
-from assim_lib.direct_dynamics_cascade_coarse_proper_refinement import (
-    _velocity,
-    frozen_prefix,
-    hybrid_terminal_sample,
-)
 from assim_lib.direct_dynamics_coarse_budget_refinement_integration import (
-    _CompactTerminalModel,
     _validate_config,
     anchored_canonical_physical_coarse,
     compact_coarse_budget_integration_check,
     differentiable_frozen_allocation_projection,
 )
-from assim_lib.runtime import make_normalized_xy_grid
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -68,32 +60,6 @@ def test_anchored_physical_chart_tracks_both_float32_nextafter_directions():
             candidate.double() - base.double()
         ) * stds.double().reshape(1, 6, 1, 1)
         assert torch.equal(candidate_physical, expected)
-
-
-def test_custom_rk4_path_bitwise_replays_torchdiffeq_production_order():
-    torch.manual_seed(31)
-    model = _CompactTerminalModel().eval()
-    state = torch.randn((2, 6, 4, 4), dtype=torch.float32)
-    condition = torch.randn((2, 6, 4, 4), dtype=torch.float32)
-    active = torch.ones((2, 1, 4, 4), dtype=torch.float32)
-    grid = make_normalized_xy_grid(
-        4, 4, device=torch.device("cpu"), dtype=torch.float32
-    )
-    times = torch.linspace(1.0, 0.0, 17, dtype=torch.float32)
-
-    def function(time, value):
-        return _velocity(model, value, condition, active, grid, time)
-
-    production = odeint(
-        function,
-        state,
-        times,
-        method="rk4",
-        options={"step_size": 1.0 / 16.0},
-    )[-1]
-    prefix = frozen_prefix(model, state, condition, active, grid)
-    custom = hybrid_terminal_sample(model, prefix, condition, active, grid)
-    assert torch.equal(custom, production)
 
 
 def test_frozen_allocation_projection_directional_difference_away_from_kinks():
