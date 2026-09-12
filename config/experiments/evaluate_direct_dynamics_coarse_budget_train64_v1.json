@@ -41,7 +41,8 @@
   ],
   "labels": {
     "control": "ema9711_colored_fine2048_frozen_decoder",
-    "candidate": "coarse_budget_terminal64_frozen_fine2048"
+    "candidate": "coarse_budget_terminal64_frozen_fine2048",
+    "raw_secondary": "ema9711_colored_fine2048_unbounded_secondary"
   },
   "panel": {
     "role": "development_reuse",

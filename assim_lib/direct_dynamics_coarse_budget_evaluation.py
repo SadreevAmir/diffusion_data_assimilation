@@ -12,6 +12,7 @@ import argparse
 import copy
 import math
 import os
+import signal
 from pathlib import Path
 from typing import Any
 
@@ -78,6 +79,46 @@ CHECKPOINT_KEYS = {
 _ACTIVE_TRACKER: ClearMLTracker | None = None
 
 
+def _terminate(signum: int, _frame: Any) -> None:
+    raise TimeoutError(f"coarse-budget paired evaluation received signal {signum}")
+
+
+def _training_anchored_candidate(
+    production_coarse: torch.Tensor,
+    control_coarse: torch.Tensor,
+    candidate_coarse: torch.Tensor,
+) -> torch.Tensor:
+    """Reproduce the exact FP32 anchoring expression used during train64."""
+    return production_coarse.detach() + (
+        candidate_coarse - control_coarse.detach()
+    )
+
+
+def _standardize_physical(
+    physical: torch.Tensor, stds: torch.Tensor
+) -> torch.Tensor:
+    shape = (1,) * (physical.ndim - 3) + (6, 1, 1)
+    return physical.double() / stds.double().reshape(shape)
+
+
+def _record_evidence(
+    output: Path,
+    manifest: dict[str, Any],
+    name: str,
+    payload: Any,
+) -> str:
+    """Durably save one stage and immediately bind it into the manifest."""
+    path = output / "evidence" / f"{name}.pt"
+    path.parent.mkdir(exist_ok=True)
+    digest = _atomic_torch_save(payload, path)
+    manifest["artifacts"][name] = {
+        "path": str(path),
+        "sha256": digest,
+    }
+    _strict_atomic_json(output / "evidence_manifest.json", manifest)
+    return digest
+
+
 def _load_base_config(config: dict[str, Any], config_path: Path) -> dict[str, Any]:
     spec = config["base_preflight_config"]
     path = (config_path.parent / spec["path"]).resolve()
@@ -117,6 +158,11 @@ def _validate_config(config: dict[str, Any]) -> None:
         or gate.get("bootstrap_draws") != 100000
     ):
         raise ValueError("paired decision gate differs from the frozen protocol")
+    labels = config.get("labels", {})
+    if set(labels) != {"control", "candidate", "raw_secondary"}:
+        raise ValueError("paired evaluation labels omit the raw secondary reference")
+    if len(set(labels.values())) != 3:
+        raise ValueError("paired evaluation labels must be unique")
 
 
 def _load_training_record(config: dict[str, Any]) -> dict[str, Any]:
@@ -240,16 +286,6 @@ def load_checkpoint_cpu_gate(
     return payload, report
 
 
-def _normalize_physical(
-    physical: torch.Tensor, means: torch.Tensor, stds: torch.Tensor
-) -> torch.Tensor:
-    shape = (1,) * (physical.ndim - 3) + (6, 1, 1)
-    return (
-        (physical.double() - means.double().reshape(shape))
-        / stds.double().reshape(shape)
-    ).float()
-
-
 @torch.no_grad()
 def _paired_case(
     predictor: Any,
@@ -260,6 +296,9 @@ def _paired_case(
     means: torch.Tensor,
     stds: torch.Tensor,
     device: torch.device,
+    output: Path,
+    evidence_manifest: dict[str, Any],
+    case_position: int,
 ) -> dict[str, torch.Tensor | tuple | dict | None]:
     with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
         production = predictor.sample_ensemble(
@@ -276,6 +315,19 @@ def _paired_case(
             atol=1e-6,
             end_time=0.0,
         )
+    _record_evidence(
+        output,
+        evidence_manifest,
+        f"case{case_position:02d}_production",
+        {
+            "case_id": case_id,
+            "member_indices": tuple(range(8)),
+            "production": {
+                key: value.detach().cpu() if isinstance(value, torch.Tensor) else value
+                for key, value in production.items()
+            },
+        },
+    )
     condition_m = _repeat_case(condition.to(device), 8)
     valid_m = _repeat_case(valid.to(device), 8)
     encoded, active, _ = lossless_coarse_condition(condition_m, valid_m)
@@ -294,12 +346,27 @@ def _paired_case(
         raise RuntimeError("evaluation prefix retained a gradient graph")
     candidate = candidate_flat.unflatten(0, (1, 8))
     control = control_flat.unflatten(0, (1, 8))
+    anchored_candidate = _training_anchored_candidate(
+        production["coarse"], control, candidate
+    )
+    _record_evidence(
+        output,
+        evidence_manifest,
+        f"case{case_position:02d}_candidate_control",
+        {
+            "case_id": case_id,
+            "production_coarse": production["coarse"].detach().cpu(),
+            "control_coarse": control.detach().cpu(),
+            "terminal_candidate_coarse": candidate.detach().cpu(),
+            "training_anchored_candidate_coarse": anchored_candidate.detach().cpu(),
+        },
+    )
     if not torch.equal(control, production["coarse"]):
         raise RuntimeError(
             "terminal evaluation control did not replay production coarse exactly"
         )
     base_coarse, candidate_coarse = anchored_canonical_physical_coarse(
-        production["coarse"], candidate, means, stds
+        production["coarse"], anchored_candidate, means, stds
     )
     base_physical = canonical_physical_decode(production["forecast"], means, stds)
     control_physical = apply_training_sic_decoder(
@@ -308,22 +375,47 @@ def _paired_case(
     candidate_physical = frozen_allocation_physical_law(
         base_physical.detach(), base_coarse.detach(), candidate_coarse, valid.to(device)
     )
+    _record_evidence(
+        output,
+        evidence_manifest,
+        f"case{case_position:02d}_scored_physical",
+        {
+            "case_id": case_id,
+            "raw_production_physical": base_physical.detach().cpu(),
+            "control_physical": control_physical.detach().cpu(),
+            "candidate_physical": candidate_physical.detach().cpu(),
+        },
+    )
     return {
         **production,
-        "candidate_coarse_normalized": candidate,
+        "terminal_candidate_coarse_normalized": candidate,
+        "candidate_coarse_normalized": anchored_candidate,
+        "raw_production_physical": base_physical,
         "control_physical": control_physical,
         "candidate_physical": candidate_physical,
-        "control_normalized": _normalize_physical(control_physical, means, stds),
-        "candidate_normalized": _normalize_physical(candidate_physical, means, stds),
     }
 
 
-def _run_impl(config_path: Path, output: Path) -> dict[str, Any]:
+def _run_impl(
+    config_path: Path, output: Path, lifecycle: dict[str, Any]
+) -> dict[str, Any]:
     global _ACTIVE_TRACKER
     if os.environ.get("CLEARML_REQUIRE_ONLINE") != "1":
         raise RuntimeError("paired coarse-budget evaluation requires online ClearML")
     if output.exists() or output.is_symlink():
         raise FileExistsError(f"refusing to reuse output {output}")
+    output.mkdir(parents=True)
+    lifecycle["output"] = output
+    lifecycle["status_path"] = output / "status.json"
+    reservation = {
+        "status": "reserved",
+        "config_path": str(config_path),
+        "config_sha256": _sha256(config_path),
+        "test_2023_used": False,
+        "optimizer_steps": 0,
+    }
+    lifecycle["reservation"] = reservation
+    _strict_atomic_json(lifecycle["status_path"], reservation)
     config = load_json(config_path)
     _validate_config(config)
     base = _load_base_config(config, config_path)
@@ -360,7 +452,6 @@ def _run_impl(config_path: Path, output: Path) -> dict[str, Any]:
     means, stds, normalization = _load_normalization_binding(base, repo)
     seed_everything(73127)
 
-    output.mkdir(parents=True)
     _strict_atomic_json(output / "checkpoint_probe.json", checkpoint_probe)
     tracker = ClearMLTracker(
         config["project_name"],
@@ -369,6 +460,7 @@ def _run_impl(config_path: Path, output: Path) -> dict[str, Any]:
         env_path=config["clearml"]["env_path"],
     )
     _ACTIVE_TRACKER = tracker
+    lifecycle["tracker"] = tracker
     tracker.connect("evaluation_contract", config)
     device = torch.device("cuda:0")
     coarse_spec, fine_spec = source["coarse"], source["fine"]
@@ -414,8 +506,50 @@ def _run_impl(config_path: Path, output: Path) -> dict[str, Any]:
     if delta_max_abs == 0.0:
         raise RuntimeError("terminal64 checkpoint is identical to control EMA9711")
 
+    evidence_manifest: dict[str, Any] = {
+        "schema_version": "coarse_budget_paired_evidence_manifest_v1",
+        "config_path": str(config_path),
+        "config_sha256": _sha256(config_path),
+        "code_identity": code_identity,
+        "normalization": normalization,
+        "source": source,
+        "trained_terminal": terminal_spec,
+        "seed": 73127,
+        "case_indices": config["case_indices"],
+        "case_ids": case_ids,
+        "member_indices": list(range(8)),
+        "artifacts": {},
+    }
+    lifecycle["evidence_manifest"] = evidence_manifest
+    _record_evidence(
+        output,
+        evidence_manifest,
+        "fixed_inputs",
+        {
+            "structured_conditioning": torch.stack(
+                [row["structured_conditioning"].float() for row in selected]
+            ),
+            "valid_mask": torch.stack(
+                [row["valid_mask"][:1].float() for row in selected]
+            ),
+            "truth": torch.stack([row["truth"].float() for row in selected]),
+            "background": torch.stack(
+                [row["background"].float() for row in selected]
+            ),
+            "case_indices": config["case_indices"],
+            "case_ids": case_ids,
+            "member_indices": tuple(range(8)),
+            "seed": 73127,
+            "normalization": normalization,
+            "config_sha256": _sha256(config_path),
+            "code_identity": code_identity,
+        },
+    )
+
     stored: list[dict[str, Any]] = []
-    for item, case_id in zip(selected, case_ids, strict=True):
+    for case_position, (item, case_id) in enumerate(
+        zip(selected, case_ids, strict=True)
+    ):
         stored.append(
             {
                 key: (
@@ -432,6 +566,9 @@ def _run_impl(config_path: Path, output: Path) -> dict[str, Any]:
                     means.to(device),
                     stds.to(device),
                     device,
+                    output,
+                    evidence_manifest,
+                    case_position,
                 ).items()
             }
         )
@@ -444,11 +581,11 @@ def _run_impl(config_path: Path, output: Path) -> dict[str, Any]:
         "raw_coarse_noise",
         "raw_fine_noise",
         "projected_fine_noise",
+        "terminal_candidate_coarse_normalized",
         "candidate_coarse_normalized",
+        "raw_production_physical",
         "control_physical",
         "candidate_physical",
-        "control_normalized",
-        "candidate_normalized",
     )
     combined = {key: torch.cat([row[key] for row in stored], dim=0) for key in tensor_keys}
     truth_normalized = torch.stack([row["truth"].float() for row in selected])
@@ -458,17 +595,24 @@ def _run_impl(config_path: Path, output: Path) -> dict[str, Any]:
     persistence_physical = canonical_physical_decode(
         persistence_normalized, means, stds
     )
+    truth_standardized = _standardize_physical(truth_physical, stds)
     labels = config["labels"]
     variants = {
         labels["control"]: (
-            combined["control_normalized"], combined["control_physical"]
+            _standardize_physical(combined["control_physical"], stds),
+            combined["control_physical"],
         ),
         labels["candidate"]: (
-            combined["candidate_normalized"], combined["candidate_physical"]
+            _standardize_physical(combined["candidate_physical"], stds),
+            combined["candidate_physical"],
+        ),
+        labels["raw_secondary"]: (
+            _standardize_physical(combined["raw_production_physical"], stds),
+            combined["raw_production_physical"],
         ),
     }
     result: dict[str, Any] = {
-        "status": "complete_pending_astra_and_visual_review",
+        "status": "scoring_complete_pending_tracker_close",
         "publication_claim_permitted": False,
         "clearml_task_id": str(tracker.task.id),
         "code_identity": code_identity,
@@ -479,6 +623,7 @@ def _run_impl(config_path: Path, output: Path) -> dict[str, Any]:
             "max_abs": delta_max_abs,
         },
         "fine_resampled_for_candidate": False,
+        "raw_secondary_role": "unbounded_production_reference_not_primary",
         "test_2023_used": False,
         "source_files_sha256": source_files,
         "normalization": normalization,
@@ -496,14 +641,15 @@ def _run_impl(config_path: Path, output: Path) -> dict[str, Any]:
         "trained_terminal": terminal_spec,
         "fine_resampled_for_candidate": False,
     }
-    evidence_path = output / "paired_raw_evidence.pt"
-    evidence_sha = _atomic_torch_save(evidence, evidence_path)
+    evidence_sha = _record_evidence(
+        output, evidence_manifest, "paired_raw_evidence", evidence
+    )
     result["raw_evidence_sha256"] = evidence_sha
     for label, (normalized, physical) in variants.items():
         metrics = score_ensemble(
             normalized,
             physical,
-            truth_normalized,
+            truth_standardized,
             truth_physical,
             persistence_physical,
             valid,
@@ -514,7 +660,7 @@ def _run_impl(config_path: Path, output: Path) -> dict[str, Any]:
             physical, truth_physical, valid
         )
         metrics["primary_standardized_fair_crps"] = _primary_standardized_fair_crps(
-            normalized, truth_normalized, valid
+            normalized, truth_standardized, valid
         )
         metrics["summary"] = _summary(metrics)
         _require_finite_scalars(metrics)
@@ -566,37 +712,99 @@ def _run_impl(config_path: Path, output: Path) -> dict[str, Any]:
     tracker.upload_artifact("coarse_budget_paired_validation", result_path)
     tracker.upload_artifact("checkpoint_probe", output / "checkpoint_probe.json")
     tracker.close()
+    lifecycle["tracker"] = None
     _ACTIVE_TRACKER = None
+    result["status"] = "complete_pending_astra_and_visual_review"
+    _strict_atomic_json(result_path, result)
+    _strict_atomic_json(
+        lifecycle["status_path"],
+        {
+            **reservation,
+            "status": "complete_pending_astra_and_visual_review",
+            "clearml_task_id": result["clearml_task_id"],
+            "result_path": str(result_path),
+            "result_sha256": _sha256(result_path),
+            "evidence_manifest_sha256": _sha256(
+                output / "evidence_manifest.json"
+            ),
+        },
+    )
     return result
+
+
+def _finalize_failure(
+    lifecycle: dict[str, Any], error: BaseException
+) -> dict[str, Any]:
+    failure = {
+        **lifecycle.get("reservation", {}),
+        "status": "failed",
+        "error_type": type(error).__name__,
+        "error": str(error)[:2000],
+        "cleanup_errors": [],
+    }
+    output = lifecycle.get("output")
+    manifest = lifecycle.get("evidence_manifest")
+    if isinstance(output, Path) and isinstance(manifest, dict):
+        manifest_path = output / "evidence_manifest.json"
+        if manifest_path.is_file():
+            failure["evidence_manifest_sha256"] = _sha256(manifest_path)
+            failure["evidence_artifacts"] = copy.deepcopy(
+                manifest.get("artifacts", {})
+            )
+    status_path = lifecycle.get("status_path")
+    if isinstance(status_path, Path):
+        try:
+            _strict_atomic_json(status_path, failure)
+        except Exception as cleanup_error:
+            failure["cleanup_errors"].append(f"status_write: {cleanup_error}")
+    tracker = lifecycle.get("tracker")
+    if tracker is not None:
+        try:
+            tracker.task.mark_failed(
+                status_reason=type(error).__name__,
+                status_message=str(error)[:1000],
+            )
+        except Exception as cleanup_error:
+            failure["cleanup_errors"].append(
+                f"clearml_mark_failed: {cleanup_error}"
+            )
+        try:
+            tracker.close()
+        except Exception as cleanup_error:
+            failure["cleanup_errors"].append(f"clearml_close: {cleanup_error}")
+    if isinstance(status_path, Path):
+        try:
+            _strict_atomic_json(status_path, failure)
+        except Exception:
+            pass
+    return failure
 
 
 def run(config_path: Path, output: Path) -> dict[str, Any]:
     global _ACTIVE_TRACKER
+    lifecycle: dict[str, Any] = {
+        "output": None,
+        "status_path": None,
+        "reservation": {},
+        "tracker": None,
+        "evidence_manifest": None,
+    }
     try:
-        return _run_impl(config_path, output)
+        return _run_impl(config_path, output, lifecycle)
     except BaseException as error:
+        failure = _finalize_failure(lifecycle, error)
         if output.is_dir():
             try:
-                _strict_atomic_json(
-                    output / "failure.json",
-                    {
-                        "status": "failed",
-                        "error_type": type(error).__name__,
-                        "error": str(error)[:2000],
-                    },
-                )
+                _strict_atomic_json(output / "failure.json", failure)
             except Exception:
                 pass
-        if _ACTIVE_TRACKER is not None:
-            try:
-                _ACTIVE_TRACKER.close()
-            except Exception:
-                pass
-            _ACTIVE_TRACKER = None
+        _ACTIVE_TRACKER = None
         raise
 
 
 def main() -> None:
+    signal.signal(signal.SIGTERM, _terminate)
+    signal.signal(signal.SIGINT, _terminate)
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)

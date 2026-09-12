@@ -9,6 +9,9 @@ import torch
 
 from assim_lib.direct_dynamics_coarse_budget_evaluation import (
     CHECKPOINT_KEYS,
+    _finalize_failure,
+    _standardize_physical,
+    _training_anchored_candidate,
     _validate_config,
     load_checkpoint_cpu_gate,
 )
@@ -139,8 +142,68 @@ def test_validation_contract_rejects_wrong_panel_or_solver() -> None:
             "primary": "case_equal_six_channel_train_standardized_fair_crps",
             "bootstrap_draws": 100000,
         },
+        "labels": {
+            "control": "control",
+            "candidate": "candidate",
+            "raw_secondary": "raw",
+        },
     }
     _validate_config(config)
     config["fine_rk4_timepoints"] = 17
     with pytest.raises(ValueError, match="RK4"):
         _validate_config(config)
+
+
+def test_training_anchor_preserves_exact_fp32_arithmetic() -> None:
+    production = torch.tensor([1.0, 0.0], dtype=torch.float32)
+    control = torch.tensor([1.0, torch.nextafter(torch.tensor(0.0), torch.tensor(1.0))])
+    candidate = torch.tensor([-1.0e-8, -torch.nextafter(torch.tensor(0.0), torch.tensor(1.0))])
+    expected = production.detach() + (candidate - control.detach())
+    actual = _training_anchored_candidate(production, control, candidate)
+    assert torch.equal(actual, expected)
+    assert not torch.equal(actual, candidate)
+
+
+def test_physical_standardization_stays_fp64_without_reencoding() -> None:
+    physical = torch.tensor([[[[[1.00000003]], [[2.0]], [[3.0]], [[4.0]], [[5.0]], [[6.0]]]]])
+    stds = torch.tensor([1.0, 2.0, 3.0, 4.0, 5.0, 6.0], dtype=torch.float64)
+    standardized = _standardize_physical(physical.double(), stds)
+    assert standardized.dtype == torch.float64
+    assert torch.equal(standardized, physical.double() / stds.reshape(1, 1, 6, 1, 1))
+
+
+def test_failure_finalization_marks_tracker_and_preserves_evidence(tmp_path: Path) -> None:
+    class Task:
+        def __init__(self) -> None:
+            self.failed = False
+
+        def mark_failed(self, **_kwargs) -> None:
+            self.failed = True
+
+    class Tracker:
+        def __init__(self) -> None:
+            self.task = Task()
+            self.closed = False
+
+        def close(self) -> None:
+            self.closed = True
+
+    tracker = Tracker()
+    status = tmp_path / "status.json"
+    manifest = {"artifacts": {"fixed_inputs": {"sha256": "a" * 64}}}
+    (tmp_path / "evidence_manifest.json").write_text(
+        __import__("json").dumps(manifest)
+    )
+    lifecycle = {
+        "output": tmp_path,
+        "status_path": status,
+        "reservation": {"status": "reserved", "optimizer_steps": 0},
+        "tracker": tracker,
+        "evidence_manifest": manifest,
+    }
+    failure = _finalize_failure(lifecycle, RuntimeError("injected"))
+    assert failure["status"] == "failed"
+    assert failure["evidence_artifacts"] == manifest["artifacts"]
+    assert tracker.task.failed is True
+    assert tracker.closed is True
+    assert '"status": "failed"' in status.read_text()
