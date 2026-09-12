@@ -4,10 +4,16 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 RUN_ID="${SPATIAL_AUDIT_RUN_ID:?SPATIAL_AUDIT_RUN_ID is required}"
+CONFIG="${SPATIAL_AUDIT_CONFIG:-config/experiments/audit_direct_dynamics_cascade_spatial_calibration_v1.json}"
 if [[ ! "$RUN_ID" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$ ]]; then
   echo "unsafe SPATIAL_AUDIT_RUN_ID" >&2
   exit 2
 fi
+case "$CONFIG" in
+  config/experiments/audit_direct_dynamics_cascade_spatial_calibration_v1.json|\
+  config/experiments/audit_direct_dynamics_cascade_colored2048_stage_v1.json) ;;
+  *) echo "unsupported spatial calibration audit config" >&2; exit 2 ;;
+esac
 OUTPUT="/home/autoresearch_results/direct_dynamics_cascade_v2/spatial_calibration/$RUN_ID"
 if [[ -e "$OUTPUT" || -L "$OUTPUT" ]]; then
   echo "refusing to reuse spatial calibration output" >&2
@@ -25,5 +31,5 @@ export OPENBLAS_NUM_THREADS=6
 export NUMEXPR_NUM_THREADS=6
 timeout --signal=TERM --kill-after=2m 14280s python -m \
   assim_lib.direct_dynamics_cascade_spatial_calibration_audit \
-  --config config/experiments/audit_direct_dynamics_cascade_spatial_calibration_v1.json \
+  --config "$CONFIG" \
   --output "$OUTPUT"

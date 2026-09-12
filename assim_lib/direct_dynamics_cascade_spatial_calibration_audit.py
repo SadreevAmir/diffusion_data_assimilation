@@ -187,10 +187,16 @@ def run(config_path: Path, output: Path) -> dict[str, Any]:
     if int(experiment.get("members", 0)) != 8:
         raise ValueError("audit requires eight members")
     candidates = experiment.get("candidates", [])
-    if [row.get("label") for row in candidates] != ["baseline2048", "matched2048", "champion4096"]:
-        raise ValueError("audit requires the frozen ordered candidate panel")
+    default_labels = ["baseline2048", "matched2048", "champion4096"]
+    expected_labels = experiment.get("candidate_labels", default_labels)
+    if not expected_labels or [row.get("label") for row in candidates] != expected_labels:
+        raise ValueError("audit candidates must match the frozen ordered candidate labels")
     for candidate in candidates:
         _candidate_spec_valid(candidate)
+    coarse_timepoints = int(experiment.get("coarse_rk4_timepoints", 17))
+    fine_timepoints = int(experiment.get("fine_rk4_timepoints", 17))
+    if coarse_timepoints not in {17, 33, 65} or fine_timepoints not in {17, 33, 65}:
+        raise ValueError("RK4 timepoints must be one of the frozen supported values: 17, 33, 65")
 
     coarse = experiment["coarse"]
     coarse_root = Path(coarse["run_dir"])
@@ -219,6 +225,9 @@ def run(config_path: Path, output: Path) -> dict[str, Any]:
         "code_identity": code_identity,
         "case_ids": list(case_ids),
         "members": 8,
+        "candidate_labels": expected_labels,
+        "coarse_rk4_timepoints": coarse_timepoints,
+        "fine_rk4_timepoints": fine_timepoints,
         "optimizer_steps": 0,
         "selection_or_tuning": False,
         "statistics_blocked_by": "date/case",
@@ -254,7 +263,8 @@ def run(config_path: Path, output: Path) -> dict[str, Any]:
         )
         ensemble = predictor.sample_ensemble(
             member_indices=tuple(range(8)), structured_conditioning=condition, valid_mask=valid_device,
-            case_ids=case_ids, coarse_num_timesteps=17, fine_num_timesteps=17, device=device,
+            case_ids=case_ids, coarse_num_timesteps=coarse_timepoints,
+            fine_num_timesteps=fine_timepoints, device=device,
             method="rk4", rtol=1e-5, atol=1e-6, end_time=0.0,
         )
         coarse_members = ensemble["coarse"].cpu()

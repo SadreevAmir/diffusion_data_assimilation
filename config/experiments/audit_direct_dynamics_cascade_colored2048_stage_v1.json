@@ -1,0 +1,47 @@
+{
+  "project_name": "sea_ice_two_stage",
+  "task_name": "direct_dynamics_cascade_colored2048_stage_audit_v1",
+  "members": 8,
+  "coarse_rk4_timepoints": 33,
+  "fine_rk4_timepoints": 33,
+  "forecast_contract_sha256": "24ee4b6c2e543d5bba866d06a5eafb170de39360de6c71256d7c53bfcd89b146",
+  "case_indices": [0, 727, 1636, 2363, 3090, 3817, 4726, 5453, 6180, 6907, 7816, 8543],
+  "case_ids": [
+    "2022-01-01_slice00", "2022-01-31_slice07", "2022-03-10_slice04",
+    "2022-04-09_slice11", "2022-05-09_slice18", "2022-06-09_slice01",
+    "2022-07-16_slice22", "2022-08-16_slice05", "2022-09-15_slice12",
+    "2022-10-15_slice19", "2022-11-22_slice16", "2022-12-22_slice23"
+  ],
+  "coarse": {
+    "run_dir": "/home/autoresearch_results/direct_dynamics_cascade_v1/coarse_full_train_6e/lossless56_conv64_seed38119_full6e-coarse_full6e_final_bdafe1f",
+    "checkpoint": "ema_coarse_update_9711.pth",
+    "code_commit": "bdafe1f6407f747c4df5cd17c18b8099042b745b",
+    "sha256": {
+      "ema_coarse_update_9711.pth": "125f520c33cbea548a3de7d131220edbfc80900c120786202cdb34e8d0a4dcaa",
+      "config.json": "2615a0206bec10ea3851f04d490957bab83b76e54276cefaaa9c854412c0322b",
+      "metadata.json": "b918df3f32fa5809d816c2a9a53d92af5679acb72d646bfffe9a40a14216d92f",
+      "coarse_cascade_manifest.json": "f441382d73cbc4daf514d32b71ec6fd80f45b5d470170a2061c96f2a402ebe4a"
+    }
+  },
+  "candidate_labels": ["raw_fine_2048"],
+  "candidates": [
+    {
+      "label": "raw_fine_2048",
+      "fine_run_dir": "/home/autoresearch_results/direct_dynamics_cascade_v2/fine_colored_preconditioned_2048/conv32_seed27181-fine_colored_2048_train_952a82b_v1",
+      "fine_code_commit": "952a82b8f90294801733b43f1e8d05b2136f7159",
+      "fine_sha256": {
+        "config.json": "1d773bb2abe02566821ab42f789f87b2bef4a5bcd56b73834cd92b27deec0ac9",
+        "metadata.json": "6729d7aa011ac2896ea7b31534f192a5b1ba763b28e1d6e7131c3ccb194dc364",
+        "fine_cascade_manifest.json": "2271d91c0263656df612b21972ca851c5c58d694c7681577a403b5c29c6351b4",
+        "fine_cascade_preconditioning_manifest.json": "92db341249b57fa4b2d3d0b436be73202d9da786e3f7273c7b74c690c3614167",
+        "fine_cascade_colored_base_manifest.json": "eec3ee9f824b456d1099d26cea798d71e8faf32defd7288a24f3efbc43434148"
+      },
+      "checkpoint": "mechanics_update_2048.pth",
+      "checkpoint_sha256": "f55fae2d18c4483c7115998c576a14a4928be151807aff02cd27ea9782faf7cb"
+    }
+  ],
+  "clearml": {
+    "env_path": "/home/.env",
+    "tags": ["frozen", "validation-2022", "colored2048", "raw-selected", "stage-resolved", "coarse-fine-cross", "rk4-33", "twelve-cases", "eight-members", "zero-training", "one-gpu"]
+  }
+}
