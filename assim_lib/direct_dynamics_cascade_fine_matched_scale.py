@@ -75,12 +75,7 @@ class MatchedScaleFineCascadeSampler(FineCascadeSampler):
         raw_noise = kwargs.get("initial_noise")
         if raw_noise is None:
             raise ValueError("matched fine sampler requires explicit unscaled Gaussian noise")
-        scales = torch.as_tensor(
-            self.channel_scales, dtype=raw_noise.dtype, device=raw_noise.device
-        ).reshape(1, DIRECT_OUTPUT_CHANNELS, 1, 1)
-        forwarded = dict(kwargs)
-        forwarded["initial_noise"] = raw_noise * scales
-        result = super().sample_conditioned(**forwarded)
+        result = super().sample_conditioned(**kwargs)
         if self.capture_evidence:
             self.evidence[-1]["unscaled_initial_noise"] = raw_noise.detach().cpu()
             self.evidence[-1]["base_noise_channel_scales"] = torch.tensor(self.channel_scales)

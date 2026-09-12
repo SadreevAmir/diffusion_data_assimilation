@@ -26,7 +26,6 @@ from .direct_dynamics_cascade_fine import (
     DIRECT_OUTPUT_CHANNELS,
     ProjectedDetailModel,
     _sha256,
-    validate_fine_condition,
 )
 from .direct_dynamics_cascade_fine_preconditioned import (
     PRECONDITIONING_KIND,
@@ -179,19 +178,17 @@ class ColoredVariancePreconditionedFineCascadeSampler(
         condition = kwargs.get("model_conditioning")
         if white is None or condition is None:
             raise ValueError("colored fine sampler requires explicit noise and conditioning")
-        valid_mask, _ = validate_fine_condition(condition)
-        colored = self.project_initial_noise(white, valid_mask)
         previous = len(self.evidence)
-        forwarded = dict(kwargs)
-        forwarded["initial_noise"] = colored
-        result = super().sample_conditioned(**forwarded)
+        result = super().sample_conditioned(**kwargs)
         if self.capture_evidence:
             if len(self.evidence) != previous + 1:
                 raise RuntimeError("colored fine sampler lost its evidence record")
             record = self.evidence[-1]
             record["white_initial_noise"] = white.detach().cpu()
             record["raw_initial_noise"] = white.detach().cpu()
-            record["colored_projected_initial_noise"] = colored.detach().cpu()
+            record["colored_projected_initial_noise"] = record[
+                "projected_initial_noise"
+            ]
         return result
 
 

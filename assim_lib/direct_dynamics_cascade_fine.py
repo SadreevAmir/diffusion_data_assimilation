@@ -153,6 +153,12 @@ class FineCascadeSampler:
         self.capture_evidence = False
         self.evidence: list[dict[str, torch.Tensor]] = []
 
+    def project_initial_noise(
+        self, raw_noise: torch.Tensor, valid_mask: torch.Tensor
+    ) -> torch.Tensor:
+        """Map member-bound white noise to the exact reverse-ODE endpoint."""
+        return project_detail(raw_noise.float(), valid_mask.float(), CASCADE_FACTOR)
+
     @torch.no_grad()
     def sample_conditioned(self, **kwargs: Any) -> torch.Tensor:
         condition = kwargs.get("model_conditioning")
@@ -177,7 +183,7 @@ class FineCascadeSampler:
         ):
             raise ValueError("sampler state_mask differs from embedded fine-condition mask")
         raw_initial_noise = initial_noise.detach().cpu() if self.capture_evidence else None
-        kwargs["initial_noise"] = project_detail(initial_noise.float(), valid_mask.float())
+        kwargs["initial_noise"] = self.project_initial_noise(initial_noise, valid_mask)
         kwargs["model_conditioning"] = condition.float()
         kwargs["valid_mask"] = valid_mask.float()
         kwargs["state_mask"] = expected_state_mask.float()
