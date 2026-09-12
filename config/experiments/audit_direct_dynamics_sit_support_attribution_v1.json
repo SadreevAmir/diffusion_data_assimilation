@@ -1,0 +1,69 @@
+{
+  "schema_version": "sit_support_attribution_v1",
+  "project_name": "sea_ice_two_stage",
+  "task_name": "direct_dynamics_sit_support_attribution_confirmation_v1",
+  "case_indices": [53, 1380, 1747, 2450, 2937, 3784, 4511, 5310, 6037, 6764, 7851, 8386],
+  "case_ids": [
+    "2022-01-03_slice05", "2022-02-27_slice12", "2022-03-14_slice19",
+    "2022-04-13_slice02", "2022-05-03_slice09", "2022-06-07_slice16",
+    "2022-07-07_slice23", "2022-08-10_slice06", "2022-09-09_slice13",
+    "2022-10-09_slice20", "2022-11-24_slice03", "2022-12-16_slice10"
+  ],
+  "source": {
+    "directory": "/home/autoresearch_results/direct_dynamics_cascade_v2/e2e_evaluation/sit_support_confirmation_6066516_v1",
+    "contract_sha256": "2fdfba9b5d316f400d7dbe052e7d77debbf08e84c991c8d926e7719066259182",
+    "numerical_sha256": "96f252c76a60bf8f29e0e700da755803286d62a041d41f093d8cb1a1c0597068",
+    "visual_review_sha256": "57a71e1e0f02f68f1ac90bc25936231735fbfb6cc9099e761cf7509ae6b514bd",
+    "code_commit": "6066516635885fc8029e021dee0e41fb52a84a77",
+    "clearml_task_id": "d55f9977ecd54bb19f978f4c6ec6ee30",
+    "evaluator": {
+      "path": "assim_lib/direct_dynamics_cascade_proper_refinement_evaluation.py",
+      "sha256": "31ef0a39dc0d11a9a965d6de10cf5674bdbf32ee96709a9c87767f4baeb1abc3"
+    }
+  },
+  "evidence": {
+    "raw": {
+      "path": "/home/autoresearch_results/direct_dynamics_cascade_v2/e2e_evaluation/sit_support_confirmation_6066516_v1/raw_ema9711_fine4096_raw.pt",
+      "sha256": "1204de925cf779962582c1f816dbdc34c7b9fb927e2f9a655796e61c7d756f26"
+    },
+    "threshold64": {
+      "path": "/home/autoresearch_results/direct_dynamics_cascade_v2/e2e_evaluation/sit_support_confirmation_6066516_v1/threshold_weighted64_support_decoder_raw.pt",
+      "sha256": "0aef0b368aedac1a693999e57aa10d96e8bed9aff4950ed116b9d180a29e40ce"
+    }
+  },
+  "support_decoder": {
+    "law": "sit_nonnegative_block_simplex_projection",
+    "fit_on_confirmation": false,
+    "code_commit": "c9f7588589e7fc4e899a7851cb0903ff220479ac",
+    "implementation": {
+      "path": "assim_lib/direct_dynamics_sit_support_decoder.py",
+      "sha256": "1d7ce7143b17985848a55cbdd2bf973656aae2f06b3b20a4fbcfd264b3ccd734"
+    },
+    "scoring": {
+      "path": "assim_lib/direct_dynamics_sit_support_decoder_scoring.py",
+      "sha256": "8d1769cb26d65b943148f009872375ab89fb64b993daddddd03fc135bfcb364c"
+    },
+    "development_source": {
+      "clearml_task_id": "2180593c1ffd4ea1bbfab0a2f356cce9",
+      "status_sha256": "d0d07d78556da8d7937e02ad43b31c74ff44a4c135c9fc6cbf3d46c0f78e91e4",
+      "metrics_sha256": "0db3e7b2b222e7cd111630965450b05aa9c590d27e9e6add3d554d3816d6b67d"
+    }
+  },
+  "decision_gate": {
+    "primary": "case_equal_six_channel_train_standardized_fair_crps",
+    "required_primary_delta": "negative_with_paired_date_bootstrap_95_ci_high_below_zero",
+    "relative_gain_definition": "ratio_of_aggregate_scores_not_mean_of_case_ratios",
+    "secondary_policy": "unchanged_predeclared_noninferiority_checks",
+    "per_output_score_tolerance": 0.01,
+    "per_output_rank_tv_tolerance": 0.01,
+    "roughness_tolerance": 0.02,
+    "temporal_tolerance": 0.01,
+    "bootstrap_draws": 100000,
+    "bootstrap_seed": 20260912,
+    "ambiguous_result": "NO_ADDITIONAL_REFINEMENT_CLAIM"
+  },
+  "clearml": {
+    "env_path": "/home/.env",
+    "tags": ["sit-support-decoder", "frozen-confirmation", "attribution", "raw-plus-decoder", "threshold64-plus-decoder", "paired", "cpu-only", "no-fit", "no-sampling"]
+  }
+}
