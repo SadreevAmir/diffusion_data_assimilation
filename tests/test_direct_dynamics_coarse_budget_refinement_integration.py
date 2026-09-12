@@ -13,7 +13,7 @@ from assim_lib.direct_dynamics_coarse_budget_refinement_integration import (
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_frozen_allocation_projection_gradcheck_away_from_kinks():
+def test_frozen_allocation_projection_directional_difference_away_from_kinks():
     base_fine = torch.tensor(
         [[[[0.18, 0.32, 0.41, 0.59],
            [0.28, 0.42, 0.51, 0.69],
@@ -24,15 +24,22 @@ def test_frozen_allocation_projection_gradcheck_away_from_kinks():
     base_coarse = torch.tensor([[[[0.30, 0.55], [0.45, 0.70]]]], dtype=torch.float64)
     candidate = base_coarse.clone().requires_grad_(True)
     mask = torch.ones_like(base_fine)
-    assert torch.autograd.gradcheck(
-        lambda value: differentiable_frozen_allocation_projection(
-            base_fine, base_coarse, value, mask
-        ),
-        (candidate,),
-        eps=1e-6,
-        atol=2e-6,
-        rtol=2e-5,
+    direction = torch.tensor([[[[0.3, -0.4], [0.2, 0.1]]]], dtype=torch.float64)
+    weight = torch.arange(1, 17, dtype=torch.float64).reshape_as(base_fine)
+    decoded = differentiable_frozen_allocation_projection(
+        base_fine, base_coarse, candidate, mask
     )
+    (decoded * weight).sum().backward()
+    predicted = float((candidate.grad * direction).sum())
+    epsilon = 1e-6
+    plus = differentiable_frozen_allocation_projection(
+        base_fine, base_coarse, base_coarse + epsilon * direction, mask
+    )
+    minus = differentiable_frozen_allocation_projection(
+        base_fine, base_coarse, base_coarse - epsilon * direction, mask
+    )
+    observed = float(((plus - minus) * weight).sum() / (2 * epsilon))
+    assert abs(predicted - observed) <= 2e-6 + 2e-5 * abs(predicted)
 
 
 def test_clip_outside_support_is_locally_flat():
