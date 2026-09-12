@@ -9,7 +9,7 @@ import json
 import os
 import re
 import signal
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
@@ -47,6 +47,10 @@ from .transforms import channel_denormalize
 
 
 _ACTIVE_TRACKER: ClearMLTracker | None = None
+FINAL_TEST_SINGLE_USE_MARKER = Path(
+    "/home/autoresearch_results/direct_dynamics_cascade_v2/launches/"
+    ".sit_support_final_test_2023_v1.consumed.json"
+)
 
 
 def _case_anchor(case_id: str) -> date:
@@ -60,7 +64,10 @@ def _case_anchor(case_id: str) -> date:
 
 def _validate_confirmation_panel(experiment: dict[str, Any]) -> None:
     panel = experiment.get("panel")
-    if not isinstance(panel, dict) or panel.get("role") != "frozen_confirmation":
+    if not isinstance(panel, dict) or panel.get("role") not in {
+        "frozen_confirmation",
+        "frozen_final_test",
+    }:
         return
     if panel.get("forecast_window_days") != 10 or panel.get(
         "minimum_anchor_separation_days"
@@ -88,6 +95,18 @@ def _validate_confirmation_panel(experiment: dict[str, Any]) -> None:
         "case_equal_six_channel_train_standardized_fair_crps"
     ):
         raise ValueError("confirmation primary score differs from reviewed protocol")
+    if panel["role"] == "frozen_final_test":
+        if experiment.get("split") != "test":
+            raise ValueError("frozen final test must use the test split")
+        if (
+            panel.get("single_use") is not True
+            or panel.get("final_test_identity") != "sit_support_final_test_2023_v1"
+            or panel.get("single_use_marker") != str(FINAL_TEST_SINGLE_USE_MARKER)
+            or panel.get("requires_explicit_user_authorization") is not True
+            or panel.get("authorization_state") != "sealed_not_authorized"
+            or panel.get("data_values_inspected_before_freeze") is not False
+        ):
+            raise ValueError("final-test sealing contract is incomplete")
 
 
 def _primary_standardized_fair_crps(
@@ -161,6 +180,60 @@ def _atomic_torch_save(payload: Any, path: Path) -> str:
     finally:
         temporary.unlink(missing_ok=True)
     return _sha256(path)
+
+
+def _consume_final_test_once(
+    experiment: dict[str, Any],
+    config_path: Path,
+    output: Path,
+    code_identity: dict[str, str],
+) -> Path:
+    panel = experiment["panel"]
+    marker = Path(panel["single_use_marker"])
+    if (
+        not marker.is_absolute()
+        or marker != FINAL_TEST_SINGLE_USE_MARKER
+    ):
+        raise ValueError("unsafe final-test single-use marker")
+    marker.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "status": "consumed_before_test_access",
+        "final_test_identity": panel["final_test_identity"],
+        "config_path": str(config_path),
+        "config_sha256": _sha256(config_path),
+        "code_identity": code_identity,
+        "output_dir": str(output),
+        "explicit_user_approval_recorded": True,
+        "consumed_at": datetime.now(timezone.utc).isoformat(),
+    }
+    encoded = (json.dumps(payload, indent=2, allow_nan=False) + "\n").encode()
+    descriptor = os.open(marker, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    try:
+        os.write(descriptor, encoded)
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+    directory_descriptor = os.open(marker.parent, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        os.fsync(directory_descriptor)
+    finally:
+        os.close(directory_descriptor)
+    return marker
+
+
+def _build_dataset_after_final_test_seal(
+    data_config: dict[str, Any],
+    split: str,
+    experiment: dict[str, Any],
+    config_path: Path,
+    output: Path,
+    code_identity: dict[str, str],
+):
+    if split == "test":
+        _consume_final_test_once(
+            experiment, config_path, output, code_identity
+        )
+    return build_dataset(data_config, split=split)
 
 
 def _sample_with_reviewed_precision(predictor: Any, **kwargs: Any) -> dict[str, Any]:
@@ -247,10 +320,21 @@ def _validate(experiment: dict[str, Any]) -> None:
     if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,79}", candidate_label) is None:
         raise ValueError("unsafe paired candidate label")
     _validate_confirmation_panel(experiment)
+    split = experiment.get("split", "valid")
+    panel_role = experiment.get("panel", {}).get("role")
+    if split not in {"valid", "test"}:
+        raise ValueError("proper-refinement evaluation split must be valid or test")
+    if split == "test" and panel_role != "frozen_final_test":
+        raise ValueError("test split requires the frozen final-test role")
+    if panel_role == "frozen_final_test" and split != "test":
+        raise ValueError("frozen final-test role requires the test split")
     support_decoder = experiment.get("support_decoder")
     if support_decoder is not None:
-        if experiment.get("panel", {}).get("role") != "frozen_confirmation":
-            raise ValueError("support decoder may only run on a frozen confirmation panel")
+        if experiment.get("panel", {}).get("role") not in {
+            "frozen_confirmation",
+            "frozen_final_test",
+        }:
+            raise ValueError("support decoder may only run on a frozen evaluation panel")
         if support_decoder.get("law") != "sit_nonnegative_block_simplex_projection":
             raise ValueError("unreviewed support decoder law")
         if support_decoder.get("fit_on_confirmation") is not False:
@@ -273,6 +357,12 @@ def _run_impl(config_path: Path, output: Path) -> dict[str, Any]:
         raise FileExistsError(f"refusing to reuse output {output}")
     experiment = load_json(config_path)
     _validate(experiment)
+    panel_role = experiment.get("panel", {}).get("role")
+    split = experiment.get("split", "valid")
+    if split == "test" and os.environ.get(
+        "FINAL_TEST_2023_AUTHORIZATION"
+    ) != "EXPLICIT_USER_APPROVAL_RECORDED":
+        raise RuntimeError("frozen final test remains sealed without explicit user approval")
     coarse = experiment["coarse"]
     fine = experiment["fine"]
     refinement = experiment["refinement"]
@@ -312,9 +402,12 @@ def _run_impl(config_path: Path, output: Path) -> dict[str, Any]:
         inventory_dates = (repository_root / inventory_path).read_text(
             encoding="utf-8"
         ).splitlines()
+        observed_count = inventory.get(
+            "observed_date_count", inventory.get("observed_2022_date_count")
+        )
         if (
             inventory_dates != sorted(set(inventory_dates))
-            or len(inventory_dates) != inventory["observed_2022_date_count"]
+            or len(inventory_dates) != observed_count
         ):
             raise ValueError("prior-date inventory is not the frozen sorted unique list")
         selected_dates = {case_id[:10] for case_id in experiment["case_ids"]}
@@ -336,7 +429,15 @@ def _run_impl(config_path: Path, output: Path) -> dict[str, Any]:
     fine_metadata = load_json(fine_root / "metadata.json")
     if coarse_metadata["data_config"] != fine_metadata["data_config"]:
         raise ValueError("coarse and fine data laws differ")
-    dataset = build_dataset(fine_metadata["data_config"], split="valid")
+    code_identity = _clean_code_identity(Path(__file__).resolve().parents[1])
+    dataset = _build_dataset_after_final_test_seal(
+        fine_metadata["data_config"],
+        split,
+        experiment,
+        config_path,
+        output,
+        code_identity,
+    )
     validate_direct_dataset(dataset)
     indices = list(experiment["case_indices"])
     batch = _fine_collate([dataset[index] for index in indices])
@@ -366,11 +467,10 @@ def _run_impl(config_path: Path, output: Path) -> dict[str, Any]:
     ranks_dir = output / "rank_histograms"
     visuals_dir.mkdir()
     ranks_dir.mkdir()
-    code_identity = _clean_code_identity(Path(__file__).resolve().parents[1])
     contract = {
         "schema_version": "terminal_proper_refinement_paired_e2e_v1",
         "code_identity": code_identity,
-        "split": "valid",
+        "split": split,
         "case_indices": indices,
         "case_ids": list(case_ids),
         "members": 8,
@@ -711,8 +811,9 @@ def _run_impl(config_path: Path, output: Path) -> dict[str, Any]:
             strict=True,
         )
     ]
-    if experiment.get("panel", {}).get("role") == "frozen_confirmation":
-        result["frozen_confirmation"] = _paired_primary_confirmation(
+    if panel_role in {"frozen_confirmation", "frozen_final_test"}:
+        decision_key = panel_role
+        result[decision_key] = _paired_primary_confirmation(
             raw_metrics["primary_standardized_fair_crps"],
             refined_metrics["primary_standardized_fair_crps"],
             experiment["decision_gate"],
@@ -738,17 +839,17 @@ def _run_impl(config_path: Path, output: Path) -> dict[str, Any]:
                 "stage_gate": support_gate,
             }
             secondary_passed = support_gate["passed_pending_visual_review"]
-            result["frozen_confirmation"]["secondary_passed"] = secondary_passed
-            result["frozen_confirmation"]["numerical_decision"] = (
+            result[decision_key]["secondary_passed"] = secondary_passed
+            result[decision_key]["numerical_decision"] = (
                 "GO_PENDING_VISUAL_REVIEW"
-                if result["frozen_confirmation"]["primary_passed"]
+                if result[decision_key]["primary_passed"]
                 and secondary_passed
                 else "HOLD"
             )
         else:
-            result["frozen_confirmation"]["numerical_decision"] = (
+            result[decision_key]["numerical_decision"] = (
                 "GO_PENDING_SECONDARY_AND_VISUAL_REVIEW"
-                if result["frozen_confirmation"]["primary_passed"]
+                if result[decision_key]["primary_passed"]
                 else "HOLD"
             )
     elif experiment.get("panel", {}).get("role") == "development_reuse":

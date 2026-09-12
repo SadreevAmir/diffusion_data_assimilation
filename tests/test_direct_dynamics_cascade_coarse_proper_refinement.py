@@ -37,6 +37,14 @@ def _sit_support_confirmation_experiment():
     )
 
 
+def _sit_support_final_test_experiment():
+    return json.loads(
+        Path(
+            "config/experiments/evaluate_direct_dynamics_cascade_sit_support_final_test_2023_v1.json"
+        ).read_text()
+    )
+
+
 def test_frozen_confirmation_panel_is_disjoint_and_valid():
     experiment = _confirmation_experiment()
     evaluation._validate(experiment)
@@ -79,6 +87,51 @@ def test_sit_support_confirmation_decoder_integration_accepts_tuple_stats():
     assert float(physical[:, :, 1::2].min()) == 0.0
     assert torch.allclose(recovered[fraction.expand_as(recovered) > 0], target.flatten())
     assert torch.equal(normalized, physical)
+
+
+def test_sit_support_final_test_is_sealed_and_calendar_frozen():
+    experiment = _sit_support_final_test_experiment()
+    evaluation._validate(experiment)
+    assert experiment["split"] == "test"
+    assert experiment["panel"]["authorization_state"] == "sealed_not_authorized"
+    assert experiment["panel"]["data_values_inspected_before_freeze"] is False
+    assert experiment["case_ids"][0] == "2023-01-03_slice01"
+    assert experiment["case_ids"][-1] == "2023-07-09_slice06"
+
+    broken = deepcopy(experiment)
+    broken["panel"]["requires_explicit_user_authorization"] = False
+    with unittest.TestCase().assertRaisesRegex(ValueError, "sealing contract"):
+        evaluation._validate(broken)
+
+    bypass = deepcopy(experiment)
+    bypass["panel"]["role"] = "frozen_confirmation"
+    with unittest.TestCase().assertRaisesRegex(ValueError, "test split requires"):
+        evaluation._validate(bypass)
+
+
+def test_final_test_single_use_blocks_before_second_dataset_access(monkeypatch):
+    experiment = _sit_support_final_test_experiment()
+    with tempfile.TemporaryDirectory() as directory:
+        root = Path(directory)
+        marker = root / ".sit_support_final_test_2023_v1.consumed.json"
+        experiment["panel"]["single_use_marker"] = str(marker)
+        config_path = root / "config.json"
+        config_path.write_text(json.dumps(experiment))
+        calls = []
+        monkeypatch.setattr(
+            evaluation,
+            "build_dataset",
+            lambda config, split: calls.append((config, split)) or "dataset",
+        )
+        monkeypatch.setattr(evaluation, "FINAL_TEST_SINGLE_USE_MARKER", marker)
+        assert evaluation._build_dataset_after_final_test_seal(
+            {}, "test", experiment, config_path, root / "first", {"git_commit": "a" * 40}
+        ) == "dataset"
+        with unittest.TestCase().assertRaises(FileExistsError):
+            evaluation._build_dataset_after_final_test_seal(
+                {}, "test", experiment, config_path, root / "second", {"git_commit": "a" * 40}
+            )
+        assert len(calls) == 1
 
 
 def test_confirmation_primary_is_case_equal_and_bootstrapped():
