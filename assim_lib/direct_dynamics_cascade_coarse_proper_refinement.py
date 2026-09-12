@@ -64,13 +64,16 @@ def _velocity(
     encoded_condition: torch.Tensor,
     active: torch.Tensor,
     grid: torch.Tensor,
-    time: float,
+    time: float | torch.Tensor,
 ) -> torch.Tensor:
     batch = state.shape[0]
-    timestamp = torch.full((batch,), 1000.0 * float(time), device=state.device)
+    scalar_time = torch.as_tensor(time, device=state.device, dtype=state.dtype)
+    if scalar_time.ndim != 0:
+        raise ValueError("RK4 time must be scalar")
+    timestamp = scalar_time.expand(batch) * 1000.0
     model_input = torch.cat((state, grid.expand(batch, -1, -1, -1), encoded_condition), dim=1)
     with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
-        velocity = _model_output(model(model_input, timestamp, return_dict=False))
+        velocity = _model_output(model(model_input, timestamp))
     velocity = velocity.float()
     support = active.expand_as(velocity) > 0
     return torch.where(support, velocity, torch.zeros_like(velocity))
@@ -91,23 +94,27 @@ def rk4_interval(
     the classical RK4 tableau.  Keeping the exact 1/3, 2/3 and 3/8 rule is
     necessary for a valid step-zero replay against the production sampler.
     """
-    step = float(t1) - float(t0)
-    k1 = _velocity(model, state, encoded_condition, active, grid, t0)
+    start = torch.as_tensor(t0, device=state.device, dtype=state.dtype)
+    end = torch.as_tensor(t1, device=state.device, dtype=state.dtype)
+    step = end - start
+    one_third = 1.0 / 3.0
+    two_thirds = 2.0 / 3.0
+    k1 = _velocity(model, state, encoded_condition, active, grid, start)
     k2 = _velocity(
         model,
-        state + (step / 3.0) * k1,
+        state + step * k1 * one_third,
         encoded_condition,
         active,
         grid,
-        float(t0) + step / 3.0,
+        start + step * one_third,
     )
     k3 = _velocity(
         model,
-        state + step * (k2 - k1 / 3.0),
+        state + step * (k2 - k1 * one_third),
         encoded_condition,
         active,
         grid,
-        float(t0) + 2.0 * step / 3.0,
+        start + step * two_thirds,
     )
     k4 = _velocity(
         model,
@@ -117,7 +124,7 @@ def rk4_interval(
         grid,
         t1,
     )
-    result = state + (step / 8.0) * (k1 + 3.0 * k2 + 3.0 * k3 + k4)
+    result = state + (k1 + 3.0 * (k2 + k3) + k4) * step * 0.125
     support = active.expand_as(result) > 0
     result = torch.where(support, result, torch.zeros_like(result))
     if not torch.isfinite(result[support]).all():
@@ -138,10 +145,13 @@ def frozen_prefix(
         raise ValueError("proper refinement requires exactly sixteen RK4 intervals")
     support = active.expand_as(noise) > 0
     state = torch.where(support, noise.float(), torch.zeros_like(noise.float()))
+    timesteps = torch.linspace(
+        1.0, 0.0, intervals + 1, device=state.device, dtype=state.dtype
+    )
     with torch.no_grad():
         for interval in range(intervals - 1):
-            t0 = 1.0 - interval / intervals
-            t1 = 1.0 - (interval + 1) / intervals
+            t0 = timesteps[interval]
+            t1 = timesteps[interval + 1]
             state = rk4_interval(model, state, encoded_condition, active, grid, t0, t1)
     return state.detach()
 
