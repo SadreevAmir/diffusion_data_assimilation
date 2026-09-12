@@ -1,0 +1,125 @@
+import json
+from pathlib import Path
+
+import torch
+
+from assim_lib.direct_dynamics_coarse_budget_refinement_integration import (
+    _validate_config,
+    compact_coarse_budget_integration_check,
+    differentiable_frozen_allocation_projection,
+)
+
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_frozen_allocation_projection_gradcheck_away_from_kinks():
+    base_fine = torch.tensor(
+        [[[[0.18, 0.32, 0.41, 0.59],
+           [0.28, 0.42, 0.51, 0.69],
+           [0.31, 0.49, 0.58, 0.72],
+           [0.41, 0.59, 0.68, 0.82]]]],
+        dtype=torch.float64,
+    )
+    base_coarse = torch.tensor([[[[0.30, 0.55], [0.45, 0.70]]]], dtype=torch.float64)
+    candidate = base_coarse.clone().requires_grad_(True)
+    mask = torch.ones_like(base_fine)
+    assert torch.autograd.gradcheck(
+        lambda value: differentiable_frozen_allocation_projection(
+            base_fine, base_coarse, value, mask
+        ),
+        (candidate,),
+        eps=1e-6,
+        atol=2e-6,
+        rtol=2e-5,
+    )
+
+
+def test_clip_outside_support_is_locally_flat():
+    base_fine = torch.tensor([[[[0.2, 0.4], [0.6, 0.8]]]], dtype=torch.float64)
+    base_coarse = torch.full((1, 1, 1, 1), 0.5, dtype=torch.float64)
+    candidate = torch.tensor([[[[-0.2]]]], dtype=torch.float64, requires_grad=True)
+    mask = torch.ones_like(base_fine)
+    decoded = differentiable_frozen_allocation_projection(
+        base_fine, base_coarse, candidate, mask
+    )
+    decoded.sum().backward()
+    assert torch.equal(candidate.grad, torch.zeros_like(candidate.grad))
+
+
+def test_endpoint_generalized_gradient_can_move_atom_inward():
+    base_fine = torch.tensor([[[[0.1, 0.4], [0.7, 0.9]]]], dtype=torch.float64)
+    base_coarse = torch.zeros((1, 1, 1, 1), dtype=torch.float64)
+    candidate = base_coarse.clone().requires_grad_(True)
+    mask = torch.ones_like(base_fine)
+    decoded = differentiable_frozen_allocation_projection(
+        base_fine, base_coarse, candidate, mask
+    )
+    decoded[0, 0, 1, 1].backward()
+    assert float(candidate.grad) == 4.0
+
+
+def test_interior_kkt_kink_fails_closed_instead_of_silent_surrogate():
+    base_fine = torch.tensor([[[[0.0, 0.5], [0.5, 1.0]]]], dtype=torch.float64)
+    base_coarse = torch.full((1, 1, 1, 1), 0.5, dtype=torch.float64)
+    candidate = base_coarse.clone().requires_grad_(True)
+    mask = torch.ones_like(base_fine)
+    try:
+        differentiable_frozen_allocation_projection(
+            base_fine, base_coarse, candidate, mask
+        )
+    except RuntimeError as error:
+        assert "undefined at an exact interior KKT kink" in str(error)
+    else:
+        raise AssertionError("exact interior KKT kink did not fail closed")
+
+
+def test_endpoint_tie_and_coast_match_declared_one_sided_derivatives():
+    base_fine = torch.tensor([[[[0.9, 0.9], [0.2, 0.0]]]], dtype=torch.float64)
+    mask = torch.tensor([[[[1.0, 1.0], [1.0, 0.0]]]], dtype=torch.float64)
+    weight = torch.tensor([[[[2.0, 5.0], [1.0, 0.0]]]], dtype=torch.float64)
+    epsilon = 1e-7
+
+    zero = torch.zeros((1, 1, 1, 1), dtype=torch.float64, requires_grad=True)
+    at_zero = differentiable_frozen_allocation_projection(
+        base_fine, zero.detach(), zero, mask
+    )
+    (at_zero * weight).sum().backward()
+    plus = differentiable_frozen_allocation_projection(
+        base_fine, zero.detach(), zero.detach() + epsilon, mask
+    )
+    right = float(((plus - at_zero.detach()) * weight).sum() / epsilon)
+    assert abs(float(zero.grad) - right) < 1e-6
+
+    one = torch.ones((1, 1, 1, 1), dtype=torch.float64, requires_grad=True)
+    at_one = differentiable_frozen_allocation_projection(
+        base_fine, one.detach(), one, mask
+    )
+    (at_one * weight).sum().backward()
+    minus = differentiable_frozen_allocation_projection(
+        base_fine, one.detach(), one.detach() - epsilon, mask
+    )
+    left = float(((at_one.detach() - minus) * weight).sum() / epsilon)
+    assert abs(float(one.grad) - left) < 1e-6
+
+
+def test_compact_terminal_path_replays_and_reaches_parameters():
+    result = compact_coarse_budget_integration_check()
+    assert result["status"] == "pass"
+    assert result["candidate_control_max_abs"] <= 1e-7
+    assert result["step0_replay_max_abs"] == 0.0
+    assert result["terminal_parameter_gradient_norm"] > 0
+    assert result["frozen_prefix_has_no_graph"]
+    assert result["frozen_residual_has_no_graph"]
+    assert result["frozen_parameter_gradients_absent"]
+    assert result["loss_domain"].startswith("all valid ocean")
+
+
+def test_config_freezes_allocation_and_test_2023():
+    config = json.loads(
+        (ROOT / "config/experiments/admit_direct_dynamics_coarse_budget_refinement_cpu_v1.json").read_text()
+    )
+    _validate_config(config)
+    assert config["optimizer_steps"] == 0
+    assert config["sampling_performed"] is False
+    assert config["test_2023"] == "closed"

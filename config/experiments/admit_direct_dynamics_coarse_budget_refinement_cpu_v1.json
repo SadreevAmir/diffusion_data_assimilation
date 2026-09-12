@@ -1,0 +1,61 @@
+{
+  "schema_version": "coarse_budget_refinement_cpu_integration_v1",
+  "project_name": "sea_ice_two_stage",
+  "task_name": "direct_dynamics_coarse_budget_refinement_cpu_integration_v1",
+  "optimizer_steps": 0,
+  "sampling_performed": false,
+  "test_2023": "closed",
+  "candidate_contract": {
+    "generator": "C0 from frozen 15-interval prefix and frozen terminal control; Ctheta from the same prefix and trainable terminal interval",
+    "fine_allocation": "frozen residual and frozen conditioning",
+    "physical_law": "Ytheta=Y0+smooth_right_inverse(Ctheta-C0), then identical capped-simplex SIC decoder with budget clip(Ctheta,0,1)",
+    "objective": "0.75 standardized fair CRPS + 0.25 joint energy score on all valid water",
+    "evaluation_law": "reuse the same frozen residual allocation; resampling fine conditional on Ctheta is a different generator and forbidden",
+    "endpoint_generalized_gradient": "C=0 right-continuation over tied maxima; C=1 left-continuation over tied minima; outside clipping range flat; strict KKT interior selection; no STE"
+  },
+  "sources": {
+    "cascade_core": {
+      "path": "assim_lib/direct_dynamics_cascade.py",
+      "sha256": "217397bda804a1683a83d82c5909cdddc00b9ec1109485e12f859c58596674a3",
+      "repo_relative": true
+    },
+    "terminal_interval": {
+      "path": "assim_lib/direct_dynamics_cascade_coarse_proper_refinement.py",
+      "sha256": "d45bfb98aea0a434e11f2a666b08389cd69c73c594f51bd31def59a61c39a13a",
+      "repo_relative": true
+    },
+    "fixed_budget_backward": {
+      "path": "assim_lib/direct_dynamics_fine_support_proper_admission.py",
+      "sha256": "95e57526608607b76a699bc7b1a15e3ae6672b382339b44be8124bd75ed2c09e",
+      "repo_relative": true
+    },
+    "sic_projection": {
+      "path": "assim_lib/direct_dynamics_sic_support_decoder.py",
+      "sha256": "5ef5057da6e11287a5d91cbc47c9c5999015593e96eb882a795579c31a2e4889",
+      "repo_relative": true
+    },
+    "coarse_budget_sensitivity_code": {
+      "path": "assim_lib/direct_dynamics_sic_coarse_budget_sensitivity.py",
+      "sha256": "9026f55a1a348b9b60cea37dfad785a43af3656fcb38c48fc15a1782f812059f",
+      "repo_relative": true
+    },
+    "coarse_budget_sensitivity_metrics": {
+      "path": "/home/autoresearch_results/direct_dynamics_cascade_v2/sic_coarse_budget_sensitivity/sic_coarse_budget_e490d84_v1/status.metrics.json",
+      "sha256": "e43082c8b7b1c564ff37b6ba9ad62f4568d10751679193e336bfda3ba75ce76e",
+      "repo_relative": false
+    }
+  },
+  "clearml": {
+    "env_path": "/home/.env",
+    "tags": [
+      "coarse-budget-refinement",
+      "cpu-integration",
+      "frozen-allocation",
+      "proper-score",
+      "full-lift-budget-backward",
+      "zero-optimizer",
+      "no-sampling",
+      "test-2023-closed"
+    ]
+  }
+}
