@@ -1,0 +1,43 @@
+{
+  "schema_version": "fine_support_proper_cpu_admission_v1",
+  "project_name": "sea_ice_two_stage",
+  "task_name": "direct_dynamics_fine_support_proper_cpu_admission_v1",
+  "sources": {
+    "source_scoring_config": {
+      "path": "config/experiments/audit_direct_dynamics_sic_support_decoder_scoring_v1.json",
+      "sha256": "da10a68a85cc80c7b81005fdf081043448572bd06b6c37e08104fc2d3dd470e0",
+      "repo_relative": true
+    },
+    "support_decoder_metrics": {
+      "path": "/home/autoresearch_results/direct_dynamics_cascade_v2/sic_support_decoder/sic_support_decoder_1a5d089_v1/status.metrics.json",
+      "sha256": "9441c0e31f28917891afe0daf90901561ad00c783d58f5025724015431f3c77d",
+      "code_commit": "1a5d0899c55057ace7f6f3b9ba2a1cca3ecb40ae",
+      "repo_relative": false
+    },
+    "coarse_budget_attribution": {
+      "path": "/home/autoresearch_results/direct_dynamics_cascade_v2/sic_coarse_budget_attribution/sic_budget_823b1b1_v1/status.metrics.json",
+      "sha256": "c4d3db69cb54f7eec592b2dd66ee1de4826e38469d54d230c70217d0b8047924",
+      "code_commit": "823b1b1a6af8b86438407b0d55c7d6956e66e526",
+      "repo_relative": false
+    }
+  },
+  "candidate_contract": {
+    "coarse_model": "fixed EMA9711; train conditioning C=D(y), forecast evaluation uses generated C",
+    "fine_model": "initialize from colored fine mechanics update 2048; refine fine law only",
+    "physical_sample": "Y_m = capped_simplex_C(upsample(C) + R_theta_m) for SIC; SIT remains joint and uncensored in this candidate",
+    "objective": "0.75 * case-equal standardized unbiased finite-ensemble fair CRPS + 0.25 * case-equal standardized unbiased joint energy score",
+    "outputs": ["d3_sic", "d3_sit", "d6_sic", "d6_sit", "d9_sic", "d9_sit"],
+    "water_law": "one identical decoder law on every valid-ocean SIC pixel; no ice/non-ice classifier or fitted threshold",
+    "control": "unchanged colored fine model evaluated through the identical capped-simplex decoder",
+    "backward": "exact active-set Jacobian of fixed-budget Euclidean projection almost everywhere; no STE",
+    "test_2023": "closed"
+  },
+  "clearml": {
+    "env_path": "/home/.env",
+    "tags": [
+      "cpu-only", "synthetic-admission", "support-aware-fine-refinement",
+      "proper-score", "fair-crps", "joint-energy", "exact-projection-jacobian",
+      "no-ste", "zero-sampling", "zero-optimizer", "test-2023-closed"
+    ]
+  }
+}
