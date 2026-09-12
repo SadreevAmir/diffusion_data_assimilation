@@ -1,0 +1,73 @@
+{
+  "schema_version": "sic_coarse_budget_sensitivity_v1",
+  "split": "valid",
+  "cases": 12,
+  "members": 8,
+  "optimizer_steps": 0,
+  "sampling_performed": false,
+  "test_2023": "closed",
+  "finite_difference_epsilon": 1e-6,
+  "kink_margin": 0.0001,
+  "finite_difference_atol": 1e-10,
+  "finite_difference_rtol": 1e-5,
+  "project_name": "sea_ice_two_stage",
+  "task_name": "sic_coarse_budget_sensitivity_v1",
+  "source_evaluator_commit": "ef14aee3c36223c77c278c06f5dc3004896bd228",
+  "source_contract": {
+    "path": "/home/autoresearch_results/direct_dynamics_cascade_v2/fine_support_proper_evaluation/fine_support_paired_ef14aee_v1/contract.json",
+    "sha256": "0a953f7a368987371784d14ade8a91e10b1fc8c13310b1cd27816f28f2f21f5e"
+  },
+  "source_evidence_names": {
+    "fixed_inputs": "fixed_inputs.pt",
+    "control": "raw_fine2048_same_sic_decoder_raw_ensemble.pt",
+    "candidate": "support64_terminal_fine_same_sic_decoder_raw_ensemble.pt"
+  },
+  "fixed_inputs": {
+    "path": "/home/autoresearch_results/direct_dynamics_cascade_v2/fine_support_proper_evaluation/fine_support_paired_ef14aee_v1/fixed_inputs.pt",
+    "sha256": "ed26b0dcfb25e7f5cb7e4a2b5a2097d43792a9b6a34ba5e4a643a9b33d089f7d"
+  },
+  "branches": {
+    "control": {
+      "path": "/home/autoresearch_results/direct_dynamics_cascade_v2/fine_support_proper_evaluation/fine_support_paired_ef14aee_v1/raw_fine2048_same_sic_decoder_raw_ensemble.pt",
+      "sha256": "a96bdaee9aef73a324073a359c61e5fd4e5458fae8488a76f16556af894de8d5"
+    },
+    "candidate": {
+      "path": "/home/autoresearch_results/direct_dynamics_cascade_v2/fine_support_proper_evaluation/fine_support_paired_ef14aee_v1/support64_terminal_fine_same_sic_decoder_raw_ensemble.pt",
+      "sha256": "6ddf89e9054d9f7b624e11acfc0e0ffb26181a2c14fca5b10ebd4a8da5010d28"
+    }
+  },
+  "implementation_bindings": {
+    "cascade_core": {
+      "path": "assim_lib/direct_dynamics_cascade.py",
+      "sha256": "217397bda804a1683a83d82c5909cdddc00b9ec1109485e12f859c58596674a3"
+    },
+    "decoder_backward": {
+      "path": "assim_lib/direct_dynamics_fine_support_proper_admission.py",
+      "sha256": "95e57526608607b76a699bc7b1a15e3ae6672b382339b44be8124bd75ed2c09e"
+    },
+    "sic_projection": {
+      "path": "assim_lib/direct_dynamics_sic_support_decoder.py",
+      "sha256": "5ef5057da6e11287a5d91cbc47c9c5999015593e96eb882a795579c31a2e4889"
+    },
+    "canonical_decode": {
+      "path": "assim_lib/direct_dynamics_sic_support_decoder_scoring.py",
+      "sha256": "51c413b47c7c459779fb4cca859eb2f835186c4405d3f10dd3b179efff0a99d5"
+    },
+    "proper_score": {
+      "path": "assim_lib/direct_dynamics_cascade_coarse_proper_refinement.py",
+      "sha256": "d45bfb98aea0a434e11f2a666b08389cd69c73c594f51bd31def59a61c39a13a"
+    }
+  },
+  "clearml": {
+    "env_path": "/home/.env",
+    "tags": [
+      "sic-coarse-budget-sensitivity",
+      "cpu-only",
+      "frozen-evidence",
+      "zero-optimizer",
+      "no-sampling",
+      "validation-2022-development-reuse",
+      "test-2023-closed"
+    ]
+  }
+}
