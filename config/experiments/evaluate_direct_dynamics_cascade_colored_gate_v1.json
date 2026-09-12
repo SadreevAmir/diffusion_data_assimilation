@@ -1,0 +1,73 @@
+{
+  "project_name": "sea_ice_two_stage",
+  "task_name": "direct_dynamics_cascade_colored_generated_coarse_gate_v1",
+  "split": "valid",
+  "year": 2022,
+  "cases": 12,
+  "members": 8,
+  "rk4_timepoints": [33, 65],
+  "forecast_contract_sha256": "24ee4b6c2e543d5bba866d06a5eafb170de39360de6c71256d7c53bfcd89b146",
+  "case_indices": [0, 727, 1636, 2363, 3090, 3817, 4726, 5453, 6180, 6907, 7816, 8543],
+  "case_ids": [
+    "2022-01-01_slice00", "2022-01-31_slice07", "2022-03-10_slice04",
+    "2022-04-09_slice11", "2022-05-09_slice18", "2022-06-09_slice01",
+    "2022-07-16_slice22", "2022-08-16_slice05", "2022-09-15_slice12",
+    "2022-10-15_slice19", "2022-11-22_slice16", "2022-12-22_slice23"
+  ],
+  "coarse": {
+    "run_dir": "/home/autoresearch_results/direct_dynamics_cascade_v1/coarse_full_train_6e/lossless56_conv64_seed38119_full6e-coarse_full6e_final_bdafe1f",
+    "checkpoint": "ema_coarse_update_9711.pth",
+    "code_commit": "bdafe1f6407f747c4df5cd17c18b8099042b745b",
+    "sha256": {
+      "ema_coarse_update_9711.pth": "125f520c33cbea548a3de7d131220edbfc80900c120786202cdb34e8d0a4dcaa",
+      "config.json": "2615a0206bec10ea3851f04d490957bab83b76e54276cefaaa9c854412c0322b",
+      "metadata.json": "b918df3f32fa5809d816c2a9a53d92af5679acb72d646bfffe9a40a14216d92f",
+      "coarse_cascade_manifest.json": "f441382d73cbc4daf514d32b71ec6fd80f45b5d470170a2061c96f2a402ebe4a"
+    }
+  },
+  "fine_candidates": [
+    {
+      "label": "white_raw512",
+      "run_dir": "/home/autoresearch_results/direct_dynamics_cascade_v2/fine_variance_preconditioned_512/conv32_seed27181-fine_precond_512_train_2478b64_v1",
+      "checkpoint": "mechanics_update_0512.pth",
+      "checkpoint_sha256": "c4f7a962a77f8e04009bb41f51cd12e4908153f4b6954cb05fce2709c661ff2a",
+      "code_commit": "2478b64d69afe064c9658a72de258daa9eb697d3",
+      "run_sha256": {
+        "config.json": "a9683c65bce012792e6ad4b201c65d33e9565478cab389afb52563090fb79a4d",
+        "metadata.json": "777861a75e523db5c4d782294640c5f4b65cb4f800801102fb86452c3e6065fc",
+        "fine_cascade_manifest.json": "c62f38a820ccf297e90e262d16fa266a065e21fc76c9a9cb46a0bc5069bf9aee",
+        "fine_cascade_preconditioning_manifest.json": "df761bc88ba0b9c4a7320554b55ab0e827bfd47a3e4d194f12b73acf523b00fa"
+      }
+    },
+    {
+      "label": "colored_raw512",
+      "run_dir": "/home/autoresearch_results/direct_dynamics_cascade_v2/fine_colored_preconditioned_512/conv32_seed27181-fine_colored_512_train_2fd99aa_v1",
+      "checkpoint": "mechanics_update_0512.pth",
+      "checkpoint_sha256": "bda1a98321fe9b8abd89510c9c43e1b33e128bf61c2ba6856507539cb9b1d683",
+      "code_commit": "2fd99aa761f194ea0ffda1f69e37c1d02df4db21",
+      "run_sha256": {
+        "config.json": "e2676bc19d6fbfd2edb5ab7b74b0727023c612b62ecdc58a3c02d81ea4554fff",
+        "metadata.json": "fb4bf343a8d796ac43ad77992d51c767905a33cc8ad7a280d5ab2bd798d39a55",
+        "fine_cascade_manifest.json": "8e0d64c609c42c8891a2a84e87b92c2a8d9434e9ad7a5538b9656670350baa16",
+        "fine_cascade_preconditioning_manifest.json": "f506fa876257d494400b51751728bbaad881dfdb5b7f40a3731280dc6f00ce65",
+        "fine_cascade_colored_base_manifest.json": "b98e1cd9c4b998c906ec7dd04e758300c33f3fa176c88134a405c97b0bb0dcd9"
+      }
+    }
+  ],
+  "gate": {
+    "primary_standardized_crps_ratio_max": 1.01,
+    "per_output_crps_ratio_max": 1.01,
+    "per_output_rmse_ratio_max": 1.01,
+    "per_output_rank_tv_increase_max": 0.01,
+    "per_output_adjusted_ssr_error_increase_max": 0.02
+  },
+  "clearml": {
+    "env_path": "/home/.env",
+    "tags": [
+      "generated-coarse-gate", "validation-2022", "white-vs-colored",
+      "raw512-only", "paired-common-random-numbers", "rk4-33-primary",
+      "rk4-65-sensitivity", "twelve-cases", "eight-members",
+      "rank-histogram", "fair-crps", "one-gpu", "zero-optimizer-steps"
+    ]
+  }
+}

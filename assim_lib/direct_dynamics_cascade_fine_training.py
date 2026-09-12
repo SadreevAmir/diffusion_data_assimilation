@@ -449,6 +449,7 @@ def _run_impl(config_path: Path, *, preflight_only: bool, lifecycle: _Lifecycle)
         "compact_matched_base_scale_2048",
         "compact_variance_preconditioned_512",
         "compact_colored_preconditioned_512",
+        "compact_colored_preconditioned_2048",
     }:
         raise ValueError("fine cascade experiment declares an unsupported pilot kind")
     train_case_count = int(pilot.get("train_case_count", 4096))
@@ -456,6 +457,10 @@ def _run_impl(config_path: Path, *, preflight_only: bool, lifecycle: _Lifecycle)
     declared_updates = int(pilot.get("optimizer_updates", -1))
     if declared_updates not in {512, 2048, 6474}:
         raise ValueError("fine cascade experiment must declare 512, 2048, or 6474 optimizer updates")
+    if pilot.get("kind") == "compact_colored_preconditioned_512" and declared_updates != 512:
+        raise ValueError("colored 512 pilot must declare exactly 512 optimizer updates")
+    if pilot.get("kind") == "compact_colored_preconditioned_2048" and declared_updates != 2048:
+        raise ValueError("colored 2048 pilot must declare exactly 2048 optimizer updates")
     lifecycle.phase = "dataset_preflight"
     seed_everything(config.seed)
     train_dataset = build_dataset(data_config, split="train")
@@ -555,7 +560,10 @@ def _run_impl(config_path: Path, *, preflight_only: bool, lifecycle: _Lifecycle)
             tuple(contract["projected_base_rms"]),
         )
         trainer_class = VariancePreconditionedFineCascadeDynamicsTrainer
-    elif pilot.get("kind") == "compact_colored_preconditioned_512":
+    elif pilot.get("kind") in {
+        "compact_colored_preconditioned_512",
+        "compact_colored_preconditioned_2048",
+    }:
         from .direct_dynamics_cascade_fine_colored import (
             ColoredVariancePreconditionedFineCascadeDynamicsTrainer,
             validate_colored_base_contract,

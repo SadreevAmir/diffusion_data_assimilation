@@ -25,6 +25,7 @@ case "$CONFIG_PATH" in
   config/experiments/train_direct_dynamics_cascade_fine_matched_scale_2048_v5.json|\
   config/experiments/train_direct_dynamics_cascade_fine_variance_preconditioned_512_v6.json|\
   config/experiments/train_direct_dynamics_cascade_fine_colored_preconditioned_512_v7.json|\
+  config/experiments/train_direct_dynamics_cascade_fine_colored_preconditioned_2048_v8.json|\
   config/experiments/train_direct_dynamics_cascade_fine_full_epoch_v4.json) ;;
   *)
     echo "unsafe FINE_CASCADE_CONFIG" >&2

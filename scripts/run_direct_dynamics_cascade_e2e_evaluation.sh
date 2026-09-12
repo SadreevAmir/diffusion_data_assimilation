@@ -18,6 +18,7 @@ case "$CONFIG" in
   config/experiments/evaluate_direct_dynamics_cascade_proper_refinement_v1.json|\
   config/experiments/evaluate_direct_dynamics_cascade_proper_refinement_confirmation_v1.json|\
   config/experiments/evaluate_direct_dynamics_cascade_threshold_weighted_refinement_v1.json|\
+  config/experiments/evaluate_direct_dynamics_cascade_colored_gate_v1.json|\
   config/experiments/evaluate_direct_dynamics_cascade_sit_support_confirmation_v1.json|\
   config/experiments/evaluate_direct_dynamics_cascade_sit_support_final_test_2023_v1.json) ;;
   *)
@@ -26,6 +27,9 @@ case "$CONFIG" in
     ;;
 esac
 MODULE="assim_lib.direct_dynamics_cascade_e2e_evaluation"
+if [[ "$CONFIG" == "config/experiments/evaluate_direct_dynamics_cascade_colored_gate_v1.json" ]]; then
+  MODULE="assim_lib.direct_dynamics_cascade_colored_gate"
+fi
 case "$CONFIG" in
   config/experiments/evaluate_direct_dynamics_cascade_proper_refinement_v1.json|\
   config/experiments/evaluate_direct_dynamics_cascade_proper_refinement_confirmation_v1.json|\
@@ -120,6 +124,7 @@ if [[ "$GPU_MEMORY_USED" -gt 1024 && "$GPU_UTILIZATION" -ge 5 ]]; then
 fi
 export CUDA_VISIBLE_DEVICES="$GPU_UUID"
 export CASCADE_E2E_STATUS_PATH="$STATUS_DIR/status.json"
+export CASCADE_COLORED_GATE_STATUS_PATH="$STATUS_DIR/status.json"
 export CLEARML_REQUIRE_ONLINE=1
 export OMP_NUM_THREADS=6
 export MKL_NUM_THREADS=6
