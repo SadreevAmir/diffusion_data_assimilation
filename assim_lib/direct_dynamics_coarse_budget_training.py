@@ -16,7 +16,7 @@ import math
 import signal
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import torch
 
@@ -217,6 +217,35 @@ def _mark_failed(
             pass
 
 
+def _durable_optimizer_step(
+    optimizer: torch.optim.Optimizer,
+    update: int,
+    status_path: Path,
+    progress: dict[str, Any],
+    record: dict[str, Any],
+    *,
+    post_step_check: Callable[[], None],
+) -> None:
+    """Make the optimizer boundary explicit even when later checks fail."""
+    if (
+        update != int(progress["executed_updates"]) + 1
+        or int(progress["completed_updates"]) != int(progress["executed_updates"])
+        or progress["step_pending"] is not None
+    ):
+        raise RuntimeError("optimizer progress counters are inconsistent")
+    progress["attempted_update"] = update
+    progress["step_pending"] = update
+    _strict_atomic_json(status_path, progress)
+    optimizer.step()
+    progress["executed_updates"] = update
+    progress["step_pending"] = None
+    progress["history"].append(
+        {**record, "optimizer_step_executed": True, "post_step_checks_complete": False}
+    )
+    _strict_atomic_json(status_path, progress)
+    post_step_check()
+
+
 def run(config_path: Path, output_dir: Path) -> dict[str, Any]:
     config = load_json(config_path)
     _validate_training_config(config)
@@ -226,11 +255,21 @@ def run(config_path: Path, output_dir: Path) -> dict[str, Any]:
         raise FileExistsError(f"refusing to reuse output directory {output_dir}")
     output_dir.mkdir(parents=True)
     status_path = output_dir / "status.json"
-    reservation = {"status": "reserved", "completed_updates": 0}
+    reservation = {
+        "status": "reserved",
+        "attempted_update": 0,
+        "step_pending": None,
+        "executed_updates": 0,
+        "completed_updates": 0,
+        "last_checkpoint_update": 0,
+        "history": [],
+        "checkpoint_sha256": {},
+    }
     _strict_atomic_json(status_path, reservation)
     tracker: ClearMLTracker | None = None
     history: list[dict[str, Any]] = []
     checkpoint_sha256: dict[str, str] = {}
+    progress = {**reservation, "history": history, "checkpoint_sha256": checkpoint_sha256}
     try:
         started = time.monotonic()
         repo = Path(__file__).resolve().parents[1]
@@ -279,7 +318,7 @@ def run(config_path: Path, output_dir: Path) -> dict[str, Any]:
         _strict_atomic_json(
             status_path,
             {
-                **reservation,
+                **progress,
                 "status": "running",
                 "code_identity": code_identity,
                 "clearml_task_id": str(tracker.task.id),
@@ -330,6 +369,8 @@ def run(config_path: Path, output_dir: Path) -> dict[str, Any]:
             lr=EXPECTED_PROTOCOL["learning_rate"],
             weight_decay=0.0,
         )
+        progress["status"] = "running"
+        progress["clearml_task_id"] = str(tracker.task.id)
         means = means.to(device)
         stds = stds.to(device)
         grid: torch.Tensor | None = None
@@ -422,9 +463,6 @@ def run(config_path: Path, output_dir: Path) -> dict[str, Any]:
                 raise RuntimeError("gradient leaked into frozen coarse model")
             if any(parameter.grad is not None for parameter in frozen_fine.parameters()):
                 raise RuntimeError("gradient leaked into frozen fine model")
-            optimizer.step()
-            if not all(torch.isfinite(parameter).all() for parameter in terminal_coarse.parameters()):
-                raise FloatingPointError(f"non-finite terminal model at update {update}")
             record = {
                 "update": update,
                 "train_index": index,
@@ -436,7 +474,24 @@ def run(config_path: Path, output_dir: Path) -> dict[str, Any]:
                 "production_replay_max_abs": replay_error,
                 "elapsed_seconds": time.monotonic() - started,
             }
-            history.append(record)
+
+            def check_updated_model() -> None:
+                if not all(
+                    torch.isfinite(parameter).all()
+                    for parameter in terminal_coarse.parameters()
+                ):
+                    raise FloatingPointError(
+                        f"non-finite terminal model at update {update}"
+                    )
+
+            _durable_optimizer_step(
+                optimizer,
+                update,
+                status_path,
+                progress,
+                record,
+                post_step_check=check_updated_model,
+            )
             if update in config["checkpoint_updates"]:
                 name = f"terminal_model_update_{update}.pth"
                 checkpoint_sha256[name] = _atomic_torch_save(
@@ -452,13 +507,15 @@ def run(config_path: Path, output_dir: Path) -> dict[str, Any]:
                     },
                     output_dir / name,
                 )
+                progress["last_checkpoint_update"] = update
+            history[-1]["post_step_checks_complete"] = True
+            progress["completed_updates"] = update
+            progress["status"] = "running"
             _strict_atomic_json(
                 status_path,
                 {
-                    "status": "running",
-                    "completed_updates": update,
-                    "last": record,
-                    "checkpoint_sha256": checkpoint_sha256,
+                    **progress,
+                    "last": history[-1],
                     "clearml_task_id": str(tracker.task.id),
                 },
             )
@@ -511,9 +568,8 @@ def run(config_path: Path, output_dir: Path) -> dict[str, Any]:
             tracker,
             status_path,
             {
-                "completed_updates": len(history),
-                "history": history,
-                "checkpoint_sha256": checkpoint_sha256,
+                **progress,
+                "ambiguous_inflight_step": progress["step_pending"] is not None,
             },
             error,
         )

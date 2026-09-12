@@ -68,6 +68,6 @@ fi
 export CUDA_VISIBLE_DEVICES="$GPU_UUID"
 export CLEARML_REQUIRE_ONLINE=1
 export OMP_NUM_THREADS=6 MKL_NUM_THREADS=6 OPENBLAS_NUM_THREADS=6 NUMEXPR_NUM_THREADS=6
-timeout --foreground --signal=TERM --kill-after=60s 10800s \
+timeout --foreground --signal=TERM --kill-after=60s 10740s \
   python -m assim_lib.direct_dynamics_coarse_budget_training \
   --config "$CONFIG" --output "$OUTPUT"

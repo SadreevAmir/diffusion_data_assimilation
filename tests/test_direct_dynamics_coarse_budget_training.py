@@ -1,9 +1,11 @@
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 import torch
 
 from assim_lib.config import load_json
 from assim_lib.direct_dynamics_coarse_budget_training import (
+    _durable_optimizer_step,
     _indices_sha256,
     _scored_candidate,
     _validate_training_config,
@@ -62,3 +64,47 @@ def test_step_zero_physical_objective_replays_and_has_candidate_gradient():
     assert candidate.grad is not None
     assert torch.isfinite(candidate.grad).all()
     assert float(candidate.grad.norm()) > 0
+
+
+def test_tiny_adamw_post_step_failure_preserves_executed_counter():
+    parameter = torch.nn.Parameter(torch.tensor([1.0]))
+    optimizer = torch.optim.AdamW([parameter], lr=1e-3, weight_decay=0.0)
+    parameter.grad = torch.tensor([0.5])
+    progress = {
+        "status": "running",
+        "attempted_update": 0,
+        "step_pending": None,
+        "executed_updates": 0,
+        "completed_updates": 0,
+        "last_checkpoint_update": 0,
+        "history": [],
+        "checkpoint_sha256": {},
+    }
+
+    def injected_failure() -> None:
+        raise RuntimeError("injected after AdamW returned")
+
+    with TemporaryDirectory() as directory:
+        status = Path(directory) / "status.json"
+        try:
+            _durable_optimizer_step(
+                optimizer,
+                1,
+                status,
+                progress,
+                {"update": 1, "objective": 1.0},
+                post_step_check=injected_failure,
+            )
+        except RuntimeError as error:
+            assert str(error) == "injected after AdamW returned"
+        else:
+            raise AssertionError("failure injection did not run")
+        saved = load_json(status)
+    assert saved["attempted_update"] == 1
+    assert saved["step_pending"] is None
+    assert saved["executed_updates"] == 1
+    assert saved["completed_updates"] == 0
+    assert saved["last_checkpoint_update"] == 0
+    assert len(saved["history"]) == 1
+    assert saved["history"][0]["optimizer_step_executed"] is True
+    assert saved["history"][0]["post_step_checks_complete"] is False
