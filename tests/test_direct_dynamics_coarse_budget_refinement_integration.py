@@ -5,12 +5,61 @@ import torch
 
 from assim_lib.direct_dynamics_coarse_budget_refinement_integration import (
     _validate_config,
+    anchored_canonical_physical_coarse,
     compact_coarse_budget_integration_check,
     differentiable_frozen_allocation_projection,
 )
 
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def _normalization():
+    means = torch.tensor([0.31, 0.42, 0.27, 0.63, 0.38, 0.81], dtype=torch.float32)
+    stds = torch.tensor([0.22, 0.35, 0.19, 0.44, 0.24, 0.51], dtype=torch.float32)
+    return means, stds
+
+
+def test_anchored_physical_chart_restores_sic_atoms_and_replays_step_zero():
+    means, stds = _normalization()
+    zero = -means / stds
+    one = (torch.ones_like(means) - means) / stds
+    base = torch.stack((zero, one), dim=-1).reshape(1, 6, 1, 2)
+    candidate = base.clone().requires_grad_(True)
+    base_physical, candidate_physical = anchored_canonical_physical_coarse(
+        base, candidate, means, stds
+    )
+    assert torch.equal(base_physical, candidate_physical.detach())
+    for channel in (0, 2, 4):
+        assert float(base_physical[0, channel, 0, 0]) == 0.0
+        assert float(base_physical[0, channel, 0, 1]) == 1.0
+
+
+def test_anchored_physical_chart_has_declared_affine_derivative_at_atoms():
+    means, stds = _normalization()
+    encoded_zero = -means / stds
+    base = encoded_zero.reshape(1, 6, 1, 1)
+    candidate = base.clone().requires_grad_(True)
+    _, physical = anchored_canonical_physical_coarse(base, candidate, means, stds)
+    weights = torch.arange(1, 7, dtype=torch.float64).reshape(1, 6, 1, 1)
+    (physical * weights).sum().backward()
+    expected = weights.float() * stds.reshape(1, 6, 1, 1)
+    assert torch.equal(candidate.grad, expected)
+
+
+def test_anchored_physical_chart_tracks_both_float32_nextafter_directions():
+    means, stds = _normalization()
+    encoded_one = (torch.ones_like(means) - means) / stds
+    base = encoded_one.reshape(1, 6, 1, 1)
+    for direction in (-torch.inf, torch.inf):
+        candidate = torch.nextafter(base, torch.full_like(base, direction))
+        base_physical, candidate_physical = anchored_canonical_physical_coarse(
+            base, candidate, means, stds
+        )
+        expected = base_physical + (
+            candidate.double() - base.double()
+        ) * stds.double().reshape(1, 6, 1, 1)
+        assert torch.equal(candidate_physical, expected)
 
 
 def test_frozen_allocation_projection_directional_difference_away_from_kinks():

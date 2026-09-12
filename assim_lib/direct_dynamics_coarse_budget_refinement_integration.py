@@ -43,11 +43,52 @@ from .direct_dynamics_sic_support_decoder import (
     project_masked_blocks_to_unit_interval_mean,
 )
 from .direct_dynamics_sic_coarse_budget_sensitivity import _projection_unconstrained
+from .direct_dynamics_sic_support_decoder_scoring import canonical_physical_decode
 from .direct_dynamics_sit_support_decoder import _from_blocks, _to_blocks
 from .runtime import make_normalized_xy_grid
 
 
 SIC_CHANNELS = (0, 2, 4)
+
+
+def anchored_canonical_physical_coarse(
+    base_normalized: torch.Tensor,
+    candidate_normalized: torch.Tensor,
+    means: torch.Tensor,
+    stds: torch.Tensor,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Anchor a continuous train-time physical chart at a canonical coarse draw.
+
+    The frozen draw is decoded by the canonical scoring law, including exact
+    restoration of physical SIC atoms.  The trainable draw is then represented
+    by a continuous physical displacement from that same normalized draw::
+
+        C_0 = canonical(z_0)
+        C_theta = C_0 + sigma_32 * (z_theta - z_0)
+
+    This deliberately declares the chart optimized by coarse-budget training;
+    it is not an STE and does not claim equality to an independently atom-fixed
+    ``canonical(z_theta)`` away from the anchor.
+    """
+    if base_normalized.requires_grad:
+        raise ValueError("anchored physical base must be detached")
+    if base_normalized.shape != candidate_normalized.shape:
+        raise ValueError("anchored coarse tensors must have identical shapes")
+    if not base_normalized.is_floating_point() or base_normalized.shape[-3] != 6:
+        raise ValueError("anchored coarse chart requires six floating-point channels")
+    base_source = base_normalized.float()
+    candidate_source = candidate_normalized.float()
+    if not torch.isfinite(base_source).all() or not torch.isfinite(candidate_source).all():
+        raise FloatingPointError("anchored coarse chart received NaN/Inf")
+    base_physical = canonical_physical_decode(base_source, means, stds).detach()
+    stds32 = stds.float().reshape(
+        (1,) * (candidate_source.ndim - 3) + (6, 1, 1)
+    )
+    displacement = (
+        candidate_source.double() - base_source.double()
+    ) * stds32.double()
+    candidate_physical = base_physical + displacement
+    return base_physical, candidate_physical
 
 
 def _selected_joint_free_set(
