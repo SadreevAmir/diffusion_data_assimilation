@@ -14,6 +14,8 @@ case "$CONFIG" in
   config/experiments/evaluate_direct_dynamics_cascade_e2e_fine2048_v2.json|\
   config/experiments/evaluate_direct_dynamics_cascade_e2e_fine6474_v3.json|\
   config/experiments/evaluate_direct_dynamics_cascade_e2e_matched2048_v5.json|\
+  config/experiments/evaluate_direct_dynamics_cascade_colored2048_rk33_v1.json|\
+  config/experiments/evaluate_direct_dynamics_cascade_colored2048_rk65_v1.json|\
   config/experiments/evaluate_direct_dynamics_cascade_e2e_fine4096_v4.json|\
   config/experiments/evaluate_direct_dynamics_cascade_proper_refinement_v1.json|\
   config/experiments/evaluate_direct_dynamics_cascade_proper_refinement_confirmation_v1.json|\

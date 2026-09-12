@@ -33,6 +33,14 @@ class CascadeE2EEvaluationTests(unittest.TestCase):
         ]
         _, fine = _validate_experiment(experiment)
         self.assertEqual([row["label"] for row in fine], ["raw_fine_2048", "ema_fine_2048"])
+        experiment["coarse_rk4_timepoints"] = 33
+        experiment["fine_rk4_timepoints"] = 33
+        _validate_experiment(experiment)
+        experiment["fine_rk4_timepoints"] = 65
+        with self.assertRaisesRegex(ValueError, "matched coarse/fine"):
+            _validate_experiment(experiment)
+        experiment["coarse_rk4_timepoints"] = 17
+        experiment["fine_rk4_timepoints"] = 17
         experiment["fine_checkpoints"][1]["label"] = "ema_fine_512"
         with self.assertRaisesRegex(ValueError, "same update"):
             _validate_experiment(experiment)

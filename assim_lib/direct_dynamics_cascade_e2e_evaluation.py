@@ -57,10 +57,12 @@ def _verify_inventory(root: Path, inventory: dict[str, str], label: str) -> None
 def _validate_experiment(experiment: dict[str, Any]) -> tuple[dict[str, Any], list[dict[str, str]]]:
     if int(experiment.get("cases", 0)) != 12 or int(experiment.get("members", 0)) != 8:
         raise ValueError("cascade evaluation requires exactly 12 cases and 8 members")
-    if int(experiment.get("coarse_rk4_timepoints", 0)) != 17:
-        raise ValueError("cascade evaluation requires 17 coarse RK4 timepoints")
-    if int(experiment.get("fine_rk4_timepoints", 0)) != 17:
-        raise ValueError("cascade evaluation requires 17 fine RK4 timepoints")
+    coarse_timepoints = int(experiment.get("coarse_rk4_timepoints", 0))
+    fine_timepoints = int(experiment.get("fine_rk4_timepoints", 0))
+    if coarse_timepoints != fine_timepoints or coarse_timepoints not in {17, 33, 65}:
+        raise ValueError(
+            "cascade evaluation requires matched coarse/fine RK4 timepoints in {17, 33, 65}"
+        )
     case_indices = experiment.get("case_indices")
     case_ids = experiment.get("case_ids")
     if (
