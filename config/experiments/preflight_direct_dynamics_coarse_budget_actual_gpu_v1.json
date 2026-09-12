@@ -58,6 +58,10 @@
     "metrics_path": "/home/autoresearch_results/direct_dynamics_cascade_v2/coarse_budget_refinement_cpu/coarse_budget_integration_3362922_v1/status.metrics.json",
     "metrics_sha256": "99fa9b6f413c51a03ae91ddec1dc2cb1bbda20b20de094a16744c9e8bc2791bc"
   },
+  "proved_source_contract": {
+    "path": "/home/autoresearch_results/direct_dynamics_cascade_v2/fine_support_proper_evaluation/fine_support_paired_ef14aee_v1/contract.json",
+    "sha256": "0a953f7a368987371784d14ade8a91e10b1fc8c13310b1cd27816f28f2f21f5e"
+  },
   "protocol": {
     "split": "train",
     "case_index": 0,

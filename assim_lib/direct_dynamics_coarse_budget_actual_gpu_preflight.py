@@ -25,7 +25,6 @@ from .direct_dynamics_cascade_coarse import lossless_coarse_condition
 from .direct_dynamics_cascade_coarse_fine_boundary_audit import (
     _finish_success,
     _load_normalization,
-    _record_failure,
     _sha256,
     _strict_atomic_json,
     _terminate,
@@ -84,6 +83,10 @@ def _validate_config(config: dict[str, Any]) -> None:
     source = config.get("source", {})
     if source.get("coarse", {}).get("checkpoint") != "ema_coarse_update_9711.pth":
         raise ValueError("preflight must use coarse EMA9711")
+    if source.get("coarse", {}).get("checkpoint_sha256") != (
+        "125f520c33cbea548a3de7d131220edbfc80900c120786202cdb34e8d0a4dcaa"
+    ):
+        raise ValueError("preflight coarse checkpoint differs from the proved chain")
     if source.get("fine", {}).get("checkpoint") != "mechanics_update_2048.pth":
         raise ValueError("preflight must use raw colored fine2048")
     if source.get("fine", {}).get("checkpoint_sha256") != (
@@ -134,8 +137,73 @@ def _validate_parent(config: dict[str, Any]) -> dict[str, Any]:
     return {"path": str(path), "sha256": spec["metrics_sha256"]}
 
 
+def _validate_proved_contract(config: dict[str, Any]) -> dict[str, Any]:
+    spec = config["proved_source_contract"]
+    path = Path(spec["path"])
+    if not path.is_file() or _sha256(path) != spec["sha256"]:
+        raise ValueError("proved source contract SHA mismatch")
+    payload = load_json(path)
+    coarse = config["source"]["coarse"]
+    fine = config["source"]["fine"]
+    if (
+        payload.get("coarse", {}).get("checkpoint") != coarse["checkpoint"]
+        or payload.get("coarse", {}).get("sha256", {}).get(coarse["checkpoint"])
+        != coarse["checkpoint_sha256"]
+        or payload.get("fine", {}).get("checkpoint") != fine["checkpoint"]
+        or payload.get("fine", {}).get("sha256", {}).get(fine["checkpoint"])
+        != fine["checkpoint_sha256"]
+    ):
+        raise ValueError("actual preflight source differs from the proved contract")
+    return {"path": str(path), "sha256": spec["sha256"]}
+
+
 def _repeat_case(value: torch.Tensor, members: int) -> torch.Tensor:
     return value[:, None].expand(-1, members, *value.shape[1:]).flatten(0, 1)
+
+
+def _require_exact_coarse_replay(
+    control: torch.Tensor, production: torch.Tensor
+) -> None:
+    if not torch.equal(control, production):
+        error = float((control - production).abs().max())
+        raise RuntimeError(
+            f"custom terminal coarse path is not exact production EMA9711: {error}"
+        )
+
+
+def _finalize_failure(
+    status_path: Path,
+    reservation: dict[str, Any],
+    error: BaseException,
+    tracker: ClearMLTracker | None,
+    evidence_sha256: dict[str, str],
+) -> None:
+    """Preserve the primary failure while independently closing each lifecycle edge."""
+    failure = {
+        **reservation,
+        "status": "failed",
+        "error_type": type(error).__name__,
+        "error": str(error)[:2000],
+        "evidence_sha256": dict(evidence_sha256),
+        "cleanup_errors": [],
+    }
+    try:
+        _strict_atomic_json(status_path, failure)
+    except Exception as cleanup_error:
+        failure["cleanup_errors"].append(f"status_write: {cleanup_error}")
+    if tracker is not None:
+        try:
+            tracker.task.mark_failed(status_reason=str(error)[:1000])
+        except Exception as cleanup_error:
+            failure["cleanup_errors"].append(f"clearml_mark_failed: {cleanup_error}")
+        try:
+            tracker.close()
+        except Exception as cleanup_error:
+            failure["cleanup_errors"].append(f"clearml_close: {cleanup_error}")
+    try:
+        _strict_atomic_json(status_path, failure)
+    except Exception:
+        pass
 
 
 def run(config_path: Path, output_dir: Path) -> dict[str, Any]:
@@ -156,10 +224,12 @@ def run(config_path: Path, output_dir: Path) -> dict[str, Any]:
     }
     _strict_atomic_json(status_path, reservation)
     tracker: ClearMLTracker | None = None
+    evidence_sha256: dict[str, str] = {}
     try:
         repo = Path(__file__).resolve().parents[1]
         code_identity = _clean_code_identity(repo)
         parent = _validate_parent(config)
+        proved_contract = _validate_proved_contract(config)
         coarse_spec = config["source"]["coarse"]
         fine_spec = config["source"]["fine"]
         coarse_files = _validate_files(coarse_spec, "coarse")
@@ -210,6 +280,20 @@ def run(config_path: Path, output_dir: Path) -> dict[str, Any]:
                 "clearml_task_id": str(tracker.task.id),
             },
         )
+        fixed_inputs_path = output_dir / "fixed_inputs.pth"
+        evidence_sha256["fixed_inputs.pth"] = _atomic_torch_save(
+            {
+                "structured_conditioning": condition,
+                "valid_mask": valid,
+                "truth_normalized": truth,
+                "case_index": index,
+                "case_id": case_id,
+                "source": config["source"],
+                "proved_source_contract": proved_contract,
+                "code_identity": code_identity,
+            },
+            fixed_inputs_path,
+        )
         coarse_root = Path(coarse_spec["run_dir"])
         fine_root = Path(fine_spec["run_dir"])
         predictor = load_cascade_predictor(
@@ -241,7 +325,10 @@ def run(config_path: Path, output_dir: Path) -> dict[str, Any]:
         for parameter in predictor.fine_sampler.sampler.model.parameters():
             parameter.requires_grad_(False)
         members = int(config["protocol"]["members"])
-        with torch.no_grad():
+        torch.cuda.reset_peak_memory_stats(device)
+        with torch.no_grad(), torch.autocast(
+            device_type="cuda", dtype=torch.bfloat16
+        ):
             production = predictor.sample_ensemble(
                 member_indices=tuple(range(members)),
                 storage_device="cpu",
@@ -256,6 +343,16 @@ def run(config_path: Path, output_dir: Path) -> dict[str, Any]:
                 atol=1e-6,
                 end_time=0.0,
             )
+        production_path = output_dir / "production_samples.pth"
+        evidence_sha256["production_samples.pth"] = _atomic_torch_save(
+            {
+                "production": production,
+                "case_index": index,
+                "case_id": case_id,
+                "code_identity": code_identity,
+            },
+            production_path,
+        )
         frozen_coarse = predictor.coarse_sampler.sampler.model.eval()
         terminal_coarse = copy.deepcopy(frozen_coarse).train()
         for parameter in terminal_coarse.parameters():
@@ -267,7 +364,6 @@ def run(config_path: Path, output_dir: Path) -> dict[str, Any]:
         grid = make_normalized_xy_grid(
             *encoded.shape[-2:], device=device, dtype=torch.float32
         )
-        torch.cuda.reset_peak_memory_stats(device)
         prefix = frozen_prefix(frozen_coarse, raw_noise, encoded, active, grid)
         candidate_normalized = hybrid_terminal_sample(
             terminal_coarse, prefix, encoded, active, grid
@@ -280,13 +376,31 @@ def run(config_path: Path, output_dir: Path) -> dict[str, Any]:
         candidate_control = float(
             (candidate_normalized.detach() - control_normalized).abs().max()
         )
+        candidate_control_path = output_dir / "candidate_control_coarse.pth"
+        evidence_sha256["candidate_control_coarse.pth"] = _atomic_torch_save(
+            {
+                "candidate_coarse_normalized": candidate_normalized.detach().cpu(),
+                "control_coarse_normalized": control_normalized.cpu(),
+                "production_coarse_normalized": production["coarse"],
+                "prefix_state": prefix.cpu(),
+                "code_identity": code_identity,
+            },
+            candidate_control_path,
+        )
         production_replay = float((control_normalized - production_coarse).abs().max())
-        if candidate_control > 1e-6 or production_replay > 2e-5:
-            raise RuntimeError("custom terminal coarse path does not replay EMA9711")
+        if candidate_control > 1e-6:
+            raise RuntimeError("terminal model copy differs from frozen EMA9711")
+        _require_exact_coarse_replay(control_normalized, production_coarse)
         means_gpu = means.to(device)
         stds_gpu = stds.to(device)
+        anchored_candidate_normalized = production_coarse.detach() + (
+            candidate_normalized - control_normalized.detach()
+        )
         base_coarse, candidate_coarse = anchored_canonical_physical_coarse(
-            control_normalized.detach(), candidate_normalized, means_gpu, stds_gpu
+            production_coarse.detach(),
+            anchored_candidate_normalized,
+            means_gpu,
+            stds_gpu,
         )
         base_physical = canonical_physical_decode(
             production["forecast"].to(device), means_gpu, stds_gpu
@@ -347,6 +461,7 @@ def run(config_path: Path, output_dir: Path) -> dict[str, Any]:
             },
             evidence_path,
         )
+        evidence_sha256["step0_samples.pth"] = evidence_sha
         result = {
             "status": "preflight_passed_pending_astra_review",
             "scientific_role": "actual_checkpoint_zero_update_preflight_not_training",
@@ -357,6 +472,7 @@ def run(config_path: Path, output_dir: Path) -> dict[str, Any]:
             "fine_resampled_for_candidate": False,
             "code_identity": code_identity,
             "parent_cpu_integration": parent,
+            "proved_source_contract": proved_contract,
             "source_files_sha256": {"coarse": coarse_files, "fine": fine_files},
             "normalization": normalization,
             "dataset_sentinel": sentinel,
@@ -379,6 +495,7 @@ def run(config_path: Path, output_dir: Path) -> dict[str, Any]:
                     torch.cuda.max_memory_allocated(device) / 2**20
                 ),
                 "evidence_sha256": evidence_sha,
+                "fixed_inputs_sha256": evidence_sha256["fixed_inputs.pth"],
             },
             "clearml_task_id": str(tracker.task.id),
         }
@@ -393,15 +510,17 @@ def run(config_path: Path, output_dir: Path) -> dict[str, Any]:
             "scientific_role": result["scientific_role"],
             "evidence_path": str(evidence_path),
             "evidence_sha256": evidence_sha,
+            "fixed_inputs_path": str(fixed_inputs_path),
+            "fixed_inputs_sha256": evidence_sha256["fixed_inputs.pth"],
         }
         _finish_success(tracker, status_path, metrics_path, terminal)
         tracker = None
         return result
     except BaseException as error:
-        try:
-            _record_failure(status_path, reservation, error)
-        except Exception:
-            pass
+        _finalize_failure(
+            status_path, reservation, error, tracker, evidence_sha256
+        )
+        tracker = None
         raise
     finally:
         if tracker is not None:
