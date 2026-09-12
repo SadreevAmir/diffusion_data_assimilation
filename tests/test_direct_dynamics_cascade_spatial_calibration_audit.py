@@ -32,6 +32,19 @@ def test_zero_residual_has_zero_cross_statistics():
     assert torch.equal(cross_power, torch.zeros_like(cross_power))
 
 
+def test_cross_statistics_include_mean_error_cross_term():
+    coarse = torch.full((1, 8, 2, 32, 32), 3.0)
+    residual = torch.full_like(coarse, -2.0)
+    coarse_truth = torch.full((1, 2, 32, 32), 1.0)
+    residual_truth = torch.full_like(coarse_truth, -1.0)
+    valid = torch.ones(1, 1, 32, 32)
+    result = cross_statistics(coarse, residual, valid, coarse_truth, residual_truth)
+    error_cross = torch.tensor(
+        result["regions"]["ocean"]["case_channel_mean_error_cross_product"]
+    )
+    assert torch.equal(error_cross, torch.full_like(error_cross, -2.0))
+
+
 def test_patch_power_rejects_shape_mismatch():
     value = torch.zeros(1, 8, 2, 32, 32)
     valid = torch.ones(1, 1, 31, 32)

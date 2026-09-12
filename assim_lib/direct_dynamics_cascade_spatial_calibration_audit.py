@@ -150,21 +150,41 @@ def component_statistics(
 
 
 def cross_statistics(
-    coarse_members: torch.Tensor, residual_members: torch.Tensor, valid: torch.Tensor
+    coarse_members: torch.Tensor,
+    residual_members: torch.Tensor,
+    valid: torch.Tensor,
+    coarse_truth: torch.Tensor | None = None,
+    residual_truth: torch.Tensor | None = None,
 ) -> dict[str, Any]:
     coarse_anomaly = coarse_members - coarse_members.mean(dim=1, keepdim=True)
     residual_anomaly = residual_members - residual_members.mean(dim=1, keepdim=True)
     covariance = (coarse_anomaly * residual_anomaly).sum(dim=1) / (coarse_members.shape[1] - 1)
-    regions = {
-        name: {"case_channel_cross_covariance": _case_mean(covariance, mask).tolist()}
-        for name, mask in _region_masks(valid).items()
-    }
-    return {
+    error_cross = None
+    if (coarse_truth is None) != (residual_truth is None):
+        raise ValueError("both component truths are required for mean-error cross statistics")
+    if coarse_truth is not None and residual_truth is not None:
+        coarse_error = coarse_members.mean(dim=1) - coarse_truth
+        residual_error = residual_members.mean(dim=1) - residual_truth
+        error_cross = coarse_error * residual_error
+    regions = {}
+    for name, mask in _region_masks(valid).items():
+        row = {"case_channel_cross_covariance": _case_mean(covariance, mask).tolist()}
+        if error_cross is not None:
+            row["case_channel_mean_error_cross_product"] = _case_mean(error_cross, mask).tolist()
+        regions[name] = row
+    result = {
         "regions": regions,
         "fully_ocean_patch_cross_power_low_mid_high": _case_ocean_patch_cross_power(
             coarse_anomaly, residual_anomaly, valid
         ).tolist(),
     }
+    if error_cross is not None:
+        result["fully_ocean_patch_mean_error_cross_power_low_mid_high"] = (
+            _case_ocean_patch_cross_power(
+                coarse_error[:, None], residual_error[:, None], valid
+            ).tolist()
+        )
+    return result
 
 
 def _candidate_spec_valid(candidate: dict[str, Any]) -> None:
@@ -278,13 +298,59 @@ def run(config_path: Path, output: Path) -> dict[str, Any]:
         reconstructed = lifted + residual
         if not torch.allclose(reconstructed, ensemble["forecast"].cpu(), atol=3e-6, rtol=0):
             raise RuntimeError("component reconstruction failed")
+        coarse_stats = component_statistics(lifted, truth_lift, valid)
+        residual_stats = component_statistics(residual, truth_residual, valid)
+        total_stats = component_statistics(reconstructed, truth, valid)
+        cross = cross_statistics(lifted, residual, valid, truth_lift, truth_residual)
+        variance_identity_max = 0.0
+        mse_identity_max = 0.0
+        for region in REGIONS:
+            coarse_var = torch.tensor(
+                coarse_stats["regions"][region]["case_channel_ensemble_variance"]
+            )
+            residual_var = torch.tensor(
+                residual_stats["regions"][region]["case_channel_ensemble_variance"]
+            )
+            covariance = torch.tensor(
+                cross["regions"][region]["case_channel_cross_covariance"]
+            )
+            total_var = torch.tensor(
+                total_stats["regions"][region]["case_channel_ensemble_variance"]
+            )
+            variance_identity_max = max(
+                variance_identity_max,
+                float((total_var - coarse_var - residual_var - 2.0 * covariance).abs().max()),
+            )
+            coarse_mse = torch.tensor(
+                coarse_stats["regions"][region]["case_channel_squared_mean_error"]
+            )
+            residual_mse = torch.tensor(
+                residual_stats["regions"][region]["case_channel_squared_mean_error"]
+            )
+            error_cross = torch.tensor(
+                cross["regions"][region]["case_channel_mean_error_cross_product"]
+            )
+            total_mse = torch.tensor(
+                total_stats["regions"][region]["case_channel_squared_mean_error"]
+            )
+            mse_identity_max = max(
+                mse_identity_max,
+                float((total_mse - coarse_mse - residual_mse - 2.0 * error_cross).abs().max()),
+            )
+        if variance_identity_max > 1e-6 or mse_identity_max > 1e-6:
+            raise RuntimeError("coarse/fine spatial decomposition identity failed")
         row = {
             "checkpoint_sha256": candidate["checkpoint_sha256"],
             "components": {
-                "coarse_lift": component_statistics(lifted, truth_lift, valid),
-                "fine_residual": component_statistics(residual, truth_residual, valid),
+                "coarse_lift": coarse_stats,
+                "fine_residual": residual_stats,
+                "total_forecast": total_stats,
             },
-            "coarse_fine_cross": cross_statistics(lifted, residual, valid),
+            "coarse_fine_cross": cross,
+            "identity_max_abs": {
+                "ensemble_variance": variance_identity_max,
+                "squared_mean_error": mse_identity_max,
+            },
         }
         result["candidates"][candidate["label"]] = row
         del predictor, ensemble, coarse_members, lifted, residual, reconstructed
