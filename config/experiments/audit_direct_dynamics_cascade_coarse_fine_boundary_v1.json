@@ -1,0 +1,86 @@
+{
+  "schema_version": "coarse_fine_boundary_audit_v1",
+  "project_name": "sea_ice_two_stage",
+  "task_name": "direct_dynamics_coarse_fine_boundary_audit_v1",
+  "case_indices": [420, 1147, 1970, 2697, 3424, 4271, 5070, 5797, 6500, 7155, 7522, 8153],
+  "case_ids": [
+    "2022-01-18_slice12", "2022-02-17_slice19", "2022-03-24_slice02",
+    "2022-04-23_slice09", "2022-05-23_slice16", "2022-06-27_slice23",
+    "2022-07-31_slice06", "2022-08-30_slice13", "2022-09-28_slice20",
+    "2022-10-26_slice03", "2022-11-10_slice10", "2022-12-06_slice17"
+  ],
+  "solver": {
+    "method": "rk4", "coarse_num_timesteps": 17, "fine_num_timesteps": 17,
+    "rtol": 0.00001, "atol": 0.000001, "end_time": 0.0
+  },
+  "normalization_source": {
+    "path": "/home/autoresearch_results/direct_dynamics_cascade_v2/fine_compact_mechanics/conv32_seed27181-fine_full_epoch_48622bc/metadata.json",
+    "sha256": "109fe24784b8445331ebf32f02d39d4b778155d18d1447d9b32da96dfb3ab55e"
+  },
+  "coarse": {
+    "run_dir": "/home/autoresearch_results/direct_dynamics_cascade_v1/coarse_full_train_6e/lossless56_conv64_seed38119_full6e-coarse_full6e_final_bdafe1f",
+    "checkpoint": "ema_coarse_update_9711.pth",
+    "code_commit": "bdafe1f6407f747c4df5cd17c18b8099042b745b",
+    "sha256": {
+      "ema_coarse_update_9711.pth": "125f520c33cbea548a3de7d131220edbfc80900c120786202cdb34e8d0a4dcaa",
+      "config.json": "2615a0206bec10ea3851f04d490957bab83b76e54276cefaaa9c854412c0322b",
+      "metadata.json": "b918df3f32fa5809d816c2a9a53d92af5679acb72d646bfffe9a40a14216d92f",
+      "coarse_cascade_manifest.json": "f441382d73cbc4daf514d32b71ec6fd80f45b5d470170a2061c96f2a402ebe4a"
+    }
+  },
+  "fine": {
+    "run_dir": "/home/autoresearch_results/direct_dynamics_cascade_v2/fine_compact_mechanics/conv32_seed27181-fine_full_epoch_48622bc",
+    "checkpoint": "ema_mechanics_update_4096.pth",
+    "code_commit": "48622bcf99c541d3a30449b3264c38047f21f78b",
+    "sha256": {
+      "ema_mechanics_update_4096.pth": "5700d1ad12950af748b22a395743df2afea6aaff1502481aa6d065cf76eb35bf",
+      "config.json": "6d9f45adc64c4c7221a7505dc2d32d37b4a75e50cb7a1ce584adcd02b2483306",
+      "metadata.json": "109fe24784b8445331ebf32f02d39d4b778155d18d1447d9b32da96dfb3ab55e",
+      "fine_cascade_manifest.json": "0eb1645756773f94f1155bb5b313d72ffb187623f8a0a0efaf8d0aafce04046d"
+    }
+  },
+  "common_replay_identity": {
+    "coarse_checkpoint_sha256": "125f520c33cbea548a3de7d131220edbfc80900c120786202cdb34e8d0a4dcaa",
+    "fine_checkpoint_sha256": "5700d1ad12950af748b22a395743df2afea6aaff1502481aa6d065cf76eb35bf",
+    "coarse_training_commit": "bdafe1f6407f747c4df5cd17c18b8099042b745b",
+    "fine_training_commit": "48622bcf99c541d3a30449b3264c38047f21f78b",
+    "forecast_contract_sha256": "24ee4b6c2e543d5bba866d06a5eafb170de39360de6c71256d7c53bfcd89b146",
+    "coarse_manifest_sha256": "f441382d73cbc4daf514d32b71ec6fd80f45b5d470170a2061c96f2a402ebe4a",
+    "fine_manifest_sha256": "0eb1645756773f94f1155bb5b313d72ffb187623f8a0a0efaf8d0aafce04046d",
+    "cascade_core_sha256": "217397bda804a1683a83d82c5909cdddc00b9ec1109485e12f859c58596674a3",
+    "coarse_loader_sha256": "0fe8c1a24966b2f458e325e89b2771447c0adc2c6066409d122733df4f08409d",
+    "fine_loader_sha256": "a82303ca59a8afb4d1fb5eba08c8ffb9db6695dbec5b0918c62cfc70d4f5ce11"
+  },
+  "evidence": {
+    "raw": {
+      "path": "/home/autoresearch_results/direct_dynamics_cascade_v2/e2e_evaluation/threshold_weighted_e2e_45dfa36_v1/raw_ema9711_fine4096_raw.pt",
+      "sha256": "f619dd2aa46b0a535083d6f7bdab11c48034cc492ae62b6a03bf7959f565ac0d",
+      "replay_code_commit": "45dfa36d8adda738cde9fc0f4d1c107b3013c5c5"
+    },
+    "ordinary_raw": {
+      "path": "/home/autoresearch_results/direct_dynamics_cascade_v2/e2e_evaluation/proper_refine_confirmation_01a19b0_v1/raw_ema9711_fine4096_raw.pt",
+      "sha256": "19a4c943a526e4dfdf8b7d90a67c165e8020d1f51b99645fb1c55fe040eee83b",
+      "replay_code_commit": "01a19b08bb034ee0d0fec7b9fa6ab3ea56cf4281"
+    },
+    "ordinary64": {
+      "path": "/home/autoresearch_results/direct_dynamics_cascade_v2/e2e_evaluation/proper_refine_confirmation_01a19b0_v1/proper64_ema9711_fine4096_raw.pt",
+      "sha256": "7f86215bce69b52ce3f0e0faff5fdcb15cb4d6b92ebedeafbc02cfff5ed96868",
+      "replay_code_commit": "01a19b08bb034ee0d0fec7b9fa6ab3ea56cf4281",
+      "refinement_checkpoint_sha256": "8635a90abbdfd39d47be14f09796bfee0eab4f089a2dd8dc968ed3b1cdda82db",
+      "refinement_training_commit": "b70cad7f170680014ca8220333f89d9eed0f222c",
+      "refinement_present": true
+    },
+    "threshold64": {
+      "path": "/home/autoresearch_results/direct_dynamics_cascade_v2/e2e_evaluation/threshold_weighted_e2e_45dfa36_v1/threshold_weighted64_ema9711_fine4096_raw.pt",
+      "sha256": "e91b4b1181516640c26d0f5975d2e7c3a7bd71f34fd57a9fb3ae5c3ef2d07654",
+      "replay_code_commit": "45dfa36d8adda738cde9fc0f4d1c107b3013c5c5",
+      "refinement_checkpoint_sha256": "4b5205541150528d53886ce53dd9072b9cf158b5afdc2e54d026dacbaaa5380e",
+      "refinement_training_commit": "8e123ef108a1ebd540886a894aaf688c3000d043",
+      "refinement_present": true
+    }
+  },
+  "clearml": {
+    "env_path": "/home/.env",
+    "tags": ["cpu-only", "frozen-evidence", "coarse-vs-fine", "boundary-calibration", "rank-histogram", "development-diagnostic", "zero-sampling", "zero-optimizer"]
+  }
+}
