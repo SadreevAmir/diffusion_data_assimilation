@@ -14,6 +14,9 @@ from assim_lib.direct_dynamics_fine_support_proper_admission import (
 from assim_lib.direct_dynamics_sic_support_decoder import (
     project_masked_blocks_to_unit_interval_mean,
 )
+from assim_lib.direct_dynamics_fine_support_proper_integration import (
+    compact_fine_integration_check,
+)
 
 
 def test_differentiable_forward_is_bitwise_reviewed_projection():
@@ -117,3 +120,16 @@ def test_failure_after_reservation_is_durable(tmp_path, monkeypatch):
     assert status["status"] == "failed"
     assert status["error_type"] == "RuntimeError"
     assert status["error"] == "synthetic failure"
+
+
+def test_compact_fine_production_path_has_terminal_parameter_gradient():
+    result = compact_fine_integration_check()
+    assert result["status"] == "pass"
+    assert result["rk4_intervals"] == 32
+    assert result["frozen_prefix_intervals"] == 31
+    assert result["trainable_terminal_intervals"] == 1
+    assert result["candidate_control_max_abs"] <= 1e-6
+    assert result["production_replay_max_abs"] <= 2e-5
+    assert result["terminal_parameter_gradient_norm"] > 0
+    assert result["frozen_prefix_has_no_graph"]
+    assert result["frozen_parameter_gradients_absent"]
