@@ -40,6 +40,8 @@ def test_step_zero_physical_objective_replays_and_has_candidate_gradient():
     forecast = torch.full((1, 4, 6, height, width), 0.4, dtype=torch.float64)
     forecast[:, :, 1::2] = 0.2
     truth = forecast[:, 0].clone()
+    truth[:, 0::2] = 0.6
+    truth[:, 1::2] = 0.3
     coarse = torch.nn.functional.avg_pool2d(
         forecast.flatten(0, 1), 2, 2
     ).unflatten(0, (1, 4))
@@ -59,3 +61,4 @@ def test_step_zero_physical_objective_replays_and_has_candidate_gradient():
     objective.backward()
     assert candidate.grad is not None
     assert torch.isfinite(candidate.grad).all()
+    assert float(candidate.grad.norm()) > 0
