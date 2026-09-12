@@ -18,6 +18,7 @@ case "$CONFIG" in
   config/experiments/evaluate_direct_dynamics_cascade_colored2048_rk65_v1.json|\
   config/experiments/evaluate_direct_dynamics_cascade_e2e_fine4096_v4.json|\
   config/experiments/evaluate_direct_dynamics_cascade_proper_refinement_v1.json|\
+  config/experiments/evaluate_direct_dynamics_cascade_multiscale_refinement_v1.json|\
   config/experiments/evaluate_direct_dynamics_cascade_proper_refinement_confirmation_v1.json|\
   config/experiments/evaluate_direct_dynamics_cascade_threshold_weighted_refinement_v1.json|\
   config/experiments/evaluate_direct_dynamics_cascade_colored_gate_v1.json|\
@@ -34,6 +35,7 @@ if [[ "$CONFIG" == "config/experiments/evaluate_direct_dynamics_cascade_colored_
 fi
 case "$CONFIG" in
   config/experiments/evaluate_direct_dynamics_cascade_proper_refinement_v1.json|\
+  config/experiments/evaluate_direct_dynamics_cascade_multiscale_refinement_v1.json|\
   config/experiments/evaluate_direct_dynamics_cascade_proper_refinement_confirmation_v1.json|\
   config/experiments/evaluate_direct_dynamics_cascade_threshold_weighted_refinement_v1.json|\
   config/experiments/evaluate_direct_dynamics_cascade_sit_support_confirmation_v1.json|\

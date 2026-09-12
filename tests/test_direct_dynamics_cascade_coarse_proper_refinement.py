@@ -31,6 +31,49 @@ def _confirmation_experiment():
     )
 
 
+def _multiscale_refinement_experiment():
+    return json.loads(
+        Path(
+            "config/experiments/evaluate_direct_dynamics_cascade_multiscale_refinement_v1.json"
+        ).read_text()
+    )
+
+
+def test_multiscale_paired_gate_keeps_colored_fine_checkpoint_fixed():
+    experiment = _multiscale_refinement_experiment()
+    evaluation._validate(experiment)
+    assert experiment["coarse_rk4_timepoints"] == 17
+    assert experiment["fine_rk4_timepoints"] == 33
+    assert evaluation._solver_timepoints(experiment) == (17, 33)
+    assert experiment["panel"]["role"] == "development_reuse"
+    assert experiment["decision_gate"]["bootstrap_draws"] == 100000
+    broken = deepcopy(experiment)
+    broken["fine"]["checkpoint"] = "ema_mechanics_update_2048.pth"
+    with unittest.TestCase().assertRaisesRegex(ValueError, "declared fine checkpoint"):
+        evaluation._validate(broken)
+    missing_gate = deepcopy(experiment)
+    missing_gate.pop("decision_gate")
+    with unittest.TestCase().assertRaisesRegex(ValueError, "frozen paired primary gate"):
+        evaluation._validate(missing_gate)
+
+
+def test_multiscale_paired_gate_passes_coarse17_fine33_to_predictor():
+    captured = {}
+
+    class Predictor:
+        def sample_ensemble(self, **kwargs):
+            captured.update(kwargs)
+            return kwargs
+
+    experiment = _multiscale_refinement_experiment()
+    result = evaluation._sample_with_reviewed_precision(
+        Predictor(), **evaluation._solver_kwargs(experiment)
+    )
+    assert result["coarse_num_timesteps"] == 17
+    assert result["fine_num_timesteps"] == 33
+    assert captured == result
+
+
 def _sit_support_confirmation_experiment():
     return json.loads(
         Path(

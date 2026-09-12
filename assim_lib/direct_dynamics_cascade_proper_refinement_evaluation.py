@@ -295,13 +295,33 @@ def _launch_status(status: str, **details: Any) -> None:
     _atomic_json(path, {"status": status, **details})
 
 
+def _solver_timepoints(experiment: dict[str, Any]) -> tuple[int, int]:
+    return (
+        int(experiment["coarse_rk4_timepoints"]),
+        int(experiment["fine_rk4_timepoints"]),
+    )
+
+
+def _solver_kwargs(experiment: dict[str, Any]) -> dict[str, Any]:
+    coarse_timepoints, fine_timepoints = _solver_timepoints(experiment)
+    return {
+        "coarse_num_timesteps": coarse_timepoints,
+        "fine_num_timesteps": fine_timepoints,
+        "method": "rk4",
+        "rtol": 1e-5,
+        "atol": 1e-6,
+        "end_time": 0.0,
+    }
+
+
 def _validate(experiment: dict[str, Any]) -> None:
     if experiment.get("cases") != 12 or experiment.get("members") != 8:
         raise ValueError("proper-refinement evaluation requires exactly 12x8")
-    if experiment.get("coarse_rk4_timepoints") != 17 or experiment.get(
-        "fine_rk4_timepoints"
-    ) != 17:
-        raise ValueError("proper-refinement evaluation requires 16 RK4 intervals per stage")
+    coarse_timepoints, fine_timepoints = _solver_timepoints(experiment)
+    if coarse_timepoints != 17:
+        raise ValueError("terminal refinement requires 16 coarse RK4 intervals")
+    if fine_timepoints not in {17, 33, 65}:
+        raise ValueError("fine RK4 timepoints must be one of 17, 33, or 65")
     if len(experiment.get("case_indices", [])) != 12 or len(
         set(experiment["case_indices"])
     ) != 12:
@@ -310,18 +330,36 @@ def _validate(experiment: dict[str, Any]) -> None:
         raise ValueError("proper-refinement evaluation requires 12 unique case ids")
     if experiment["coarse"]["checkpoint"] != "ema_coarse_update_9711.pth":
         raise ValueError("raw comparator must be EMA9711")
-    if experiment["fine"]["checkpoint"] != "ema_mechanics_update_4096.pth":
-        raise ValueError("paired gate must keep EMA4096 fine fixed")
+    expected_fine = experiment.get(
+        "expected_fine_checkpoint", "ema_mechanics_update_4096.pth"
+    )
+    if experiment["fine"]["checkpoint"] != expected_fine:
+        raise ValueError("paired gate must keep its declared fine checkpoint fixed")
     if experiment["refinement"]["completed_updates"] != 64:
         raise ValueError("paired gate requires the approved 64-update candidate")
     candidate_label = experiment.get(
         "candidate_label", "proper64_ema9711_fine4096"
     )
+    baseline_label = experiment.get("baseline_label", "raw_ema9711_fine4096")
     if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,79}", candidate_label) is None:
         raise ValueError("unsafe paired candidate label")
+    if (
+        re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,79}", baseline_label) is None
+        or baseline_label == candidate_label
+    ):
+        raise ValueError("unsafe or duplicate paired baseline label")
     _validate_confirmation_panel(experiment)
     split = experiment.get("split", "valid")
     panel_role = experiment.get("panel", {}).get("role")
+    if panel_role == "development_reuse":
+        gate = experiment.get("decision_gate", {})
+        if (
+            gate.get("primary")
+            != "case_equal_six_channel_train_standardized_fair_crps"
+            or gate.get("bootstrap_draws") != 100000
+            or not isinstance(gate.get("bootstrap_seed"), int)
+        ):
+            raise ValueError("development reuse requires a frozen paired primary gate")
     if split not in {"valid", "test"}:
         raise ValueError("proper-refinement evaluation split must be valid or test")
     if split == "test" and panel_role != "frozen_final_test":
@@ -484,7 +522,7 @@ def _run_impl(config_path: Path, output: Path) -> dict[str, Any]:
         "raw_unclipped_scoring": support_decoder is None,
         "display_only_projection": support_decoder is None,
         "variant_scoring_semantics": {
-            "raw_ema9711_fine4096": "source raw, unclipped",
+            experiment.get("baseline_label", "raw_ema9711_fine4096"): "source raw, unclipped",
             experiment.get("candidate_label", "proper64_ema9711_fine4096"): (
                 "fixed SIT support decoder is part of the scored candidate law; "
                 "no additional clipping or display-only projection"
@@ -624,8 +662,9 @@ def _run_impl(config_path: Path, output: Path) -> dict[str, Any]:
     candidate_label = experiment.get(
         "candidate_label", "proper64_ema9711_fine4096"
     )
+    baseline_label = experiment.get("baseline_label", "raw_ema9711_fine4096")
     for label, predictor in (
-        ("raw_ema9711_fine4096", raw_predictor),
+        (baseline_label, raw_predictor),
         (candidate_label, refined_predictor),
     ):
         ensemble = _sample_with_reviewed_precision(
@@ -634,13 +673,8 @@ def _run_impl(config_path: Path, output: Path) -> dict[str, Any]:
             structured_conditioning=condition,
             valid_mask=valid_device,
             case_ids=case_ids,
-            coarse_num_timesteps=17,
-            fine_num_timesteps=17,
             device=device,
-            method="rk4",
-            rtol=1e-5,
-            atol=1e-6,
-            end_time=0.0,
+            **_solver_kwargs(experiment),
         )
         randomness = {
             key: ensemble[key]
@@ -765,12 +799,12 @@ def _run_impl(config_path: Path, output: Path) -> dict[str, Any]:
         del ensemble, normalized, predecoder_normalized, predecoder_physical, physical
         torch.cuda.empty_cache()
 
-    raw_summary = result["candidates"]["raw_ema9711_fine4096"]["metrics"]["summary"]
+    raw_summary = result["candidates"][baseline_label]["metrics"]["summary"]
     refined_summary = result["candidates"][candidate_label]["metrics"]["summary"]
     result["paired_summary_delta_refined_minus_raw"] = {
         key: float(refined_summary[key] - raw_summary[key]) for key in raw_summary
     }
-    raw_metrics = result["candidates"]["raw_ema9711_fine4096"]["metrics"]
+    raw_metrics = result["candidates"][baseline_label]["metrics"]
     refined_metrics = result["candidates"][candidate_label]["metrics"]
     result["paired_output_deltas_refined_minus_raw"] = {}
     for output_key in raw_metrics["outputs"]:
@@ -852,7 +886,7 @@ def _run_impl(config_path: Path, output: Path) -> dict[str, Any]:
                 if result[decision_key]["primary_passed"]
                 else "HOLD"
             )
-    elif experiment.get("panel", {}).get("role") == "development_reuse":
+    elif panel_role == "development_reuse":
         result["paired_development_diagnostic"] = _paired_primary_confirmation(
             raw_metrics["primary_standardized_fair_crps"],
             refined_metrics["primary_standardized_fair_crps"],
@@ -863,7 +897,7 @@ def _run_impl(config_path: Path, output: Path) -> dict[str, Any]:
         )
     _require_finite_scalars(result)
     _atomic_json(output / "proper_refinement_e2e_evaluation.json", result)
-    for label in ("raw_ema9711_fine4096", candidate_label):
+    for label in (baseline_label, candidate_label):
         rank_path = ranks_dir / f"{label}.png"
         _save_rank_histograms(
             rank_path, label, result["candidates"][label]["metrics"]
