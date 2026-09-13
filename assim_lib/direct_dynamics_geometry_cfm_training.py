@@ -17,7 +17,7 @@ import signal
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import numpy as np
 import torch
@@ -477,6 +477,7 @@ def _one_forward(
     grid: torch.Tensor,
     geometry_weight: float,
     spec: GeometryCFMSpec,
+    prediction_callback: Callable[[torch.Tensor], None] | None = None,
 ) -> tuple[torch.Tensor, dict[str, torch.Tensor], dict[str, torch.Tensor]]:
     evidence = _make_forward_evidence(batch, timesteps, noise_seed, grid)
     torch.manual_seed(int(dropout_seed))
@@ -487,14 +488,17 @@ def _one_forward(
             timesteps.to(evidence["model_input"].device) * 1000,
             return_dict=False,
         )[0]
+    prediction_fp32 = prediction.float()
+    if prediction_callback is not None:
+        prediction_callback(prediction_fp32.detach())
     loss, diagnostics = compute_matched_loss(
-        prediction,
+        prediction_fp32,
         evidence["target_velocity"],
         batch,
         geometry_weight=geometry_weight,
         spec=spec,
     )
-    evidence["prediction_fp32"] = prediction.float()
+    evidence["prediction_fp32"] = prediction_fp32
     return loss, diagnostics, evidence
 
 
@@ -606,6 +610,22 @@ def run_preflight(config_path: Path, output_dir: Path) -> dict[str, Any]:
             fixed_inputs_and_predictions_sha256=fixed_inputs_sha,
         )
         prediction_evidence: dict[str, dict[str, torch.Tensor]] = {}
+
+        def prediction_saver(key: str, phase: str):
+            def save(prediction: torch.Tensor) -> None:
+                nonlocal fixed_inputs_sha
+                saved_predictions[key] = prediction
+                fixed_inputs_sha = _persist_preflight_evidence(
+                    fixed_inputs_path, common_evidence, saved_predictions
+                )
+                _merge_status(
+                    status_path,
+                    status=phase,
+                    fixed_inputs_and_predictions_sha256=fixed_inputs_sha,
+                )
+
+            return save
+
         with torch.no_grad():
             for arm, weight in (("control", 0.0), ("treatment", treatment_weight)):
                 model.train()
@@ -618,23 +638,16 @@ def run_preflight(config_path: Path, output_dir: Path) -> dict[str, Any]:
                     grid,
                     weight,
                     spec,
+                    prediction_callback=prediction_saver(
+                        f"{arm}_evidence_forward",
+                        f"{arm}_prediction_saved_before_scoring",
+                    ),
                 )
                 prediction_evidence[arm] = {
                     "prediction": evidence["prediction_fp32"].detach().cpu(),
                     "native": diagnostics["native"].detach().cpu(),
                     "loss": loss.detach().cpu(),
                 }
-                saved_predictions[f"{arm}_evidence_forward"] = evidence[
-                    "prediction_fp32"
-                ]
-                fixed_inputs_sha = _persist_preflight_evidence(
-                    fixed_inputs_path, common_evidence, saved_predictions
-                )
-                _merge_status(
-                    status_path,
-                    status=f"{arm}_prediction_saved_before_checks",
-                    fixed_inputs_and_predictions_sha256=fixed_inputs_sha,
-                )
                 if not torch.isfinite(loss):
                     raise FloatingPointError(f"non-finite {arm} preflight loss")
                 if arm == "control":
@@ -676,17 +689,10 @@ def run_preflight(config_path: Path, output_dir: Path) -> dict[str, Any]:
                 grid,
                 weight,
                 spec,
-            )
-            saved_predictions[f"{arm}_backward_forward"] = evidence[
-                "prediction_fp32"
-            ]
-            fixed_inputs_sha = _persist_preflight_evidence(
-                fixed_inputs_path, common_evidence, saved_predictions
-            )
-            _merge_status(
-                status_path,
-                status=f"{arm}_backward_prediction_saved_before_checks",
-                fixed_inputs_and_predictions_sha256=fixed_inputs_sha,
+                prediction_callback=prediction_saver(
+                    f"{arm}_backward_forward",
+                    f"{arm}_backward_prediction_saved_before_scoring",
+                ),
             )
             if not torch.isfinite(loss):
                 raise FloatingPointError(f"non-finite {arm} backward loss")

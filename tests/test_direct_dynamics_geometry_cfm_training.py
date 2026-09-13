@@ -1,3 +1,4 @@
+import contextlib
 import json
 from pathlib import Path
 from unittest import mock
@@ -10,12 +11,14 @@ from assim_lib.direct_dynamics_geometry_cfm_training import (
     _assert_exact_matched_prediction,
     _load_frozen_metric,
     _merge_status,
+    _one_forward,
     _persist_preflight_evidence,
     _record_terminal_failure,
     compute_matched_loss,
     make_matched_schedule,
     training_contract_sha256,
 )
+from assim_lib.direct_dynamics_geometry_cfm import GeometryCFMSpec
 from assim_lib.trainer import UNetTrainer
 
 
@@ -183,6 +186,57 @@ def test_failure_status_write_cannot_skip_cleanup_or_mask_primary(tmp_path):
     assert result["error"] == "primary failure"
     assert result["error_type"] == "RuntimeError"
     assert any("failure_status_write" in item for item in result["cleanup_errors"])
+
+
+def test_production_forward_persists_prediction_before_scoring_failure(tmp_path):
+    class Model(torch.nn.Module):
+        def forward(self, model_input, _time, return_dict=False):
+            assert return_dict is False
+            return (torch.full_like(model_input[:, :6], 2.5),)
+
+    batch = {
+        "truth": torch.zeros((1, 6, 2, 2)),
+        "valid": torch.ones((1, 1, 2, 2)),
+        "condition": torch.zeros((1, 15, 2, 2)),
+        "initial_sic": torch.zeros((1, 1, 2, 2)),
+        "initial_sit": torch.zeros((1, 1, 2, 2)),
+    }
+    evidence_path = tmp_path / "scoring_failure_evidence.pt"
+
+    def persist(prediction):
+        _persist_preflight_evidence(
+            evidence_path,
+            {"truth": batch["truth"]},
+            {"prediction_before_scoring": prediction},
+        )
+
+    with (
+        mock.patch("torch.autocast", return_value=contextlib.nullcontext()),
+        mock.patch(
+            "assim_lib.direct_dynamics_geometry_cfm_training.compute_matched_loss",
+            side_effect=RuntimeError("injected scoring failure"),
+        ),
+    ):
+        try:
+            _one_forward(
+                Model(),
+                batch,
+                torch.tensor([0.5]),
+                7,
+                8,
+                torch.zeros((1, 2, 2, 2)),
+                0.0,
+                GeometryCFMSpec(),
+                prediction_callback=persist,
+            )
+        except RuntimeError as error:
+            assert str(error) == "injected scoring failure"
+        else:
+            raise AssertionError("injected scoring failure was swallowed")
+    payload = torch.load(evidence_path, map_location="cpu", weights_only=True)
+    saved = payload["predictions"]["prediction_before_scoring"]
+    assert torch.equal(saved, torch.full((1, 6, 2, 2), 2.5))
+    assert payload["prediction_sha256"]["prediction_before_scoring"]
 
 
 def test_launcher_has_exact_clean_one_gpu_admission_and_timeout():
