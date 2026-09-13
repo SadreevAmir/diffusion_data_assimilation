@@ -14,6 +14,7 @@ import json
 import math
 import os
 import signal
+import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -54,6 +55,66 @@ def _atomic_torch_save(payload: Any, path: Path) -> str:
     finally:
         temporary.unlink(missing_ok=True)
     return _sha256(path)
+
+
+def _merge_status(path: Path, **updates: Any) -> dict[str, Any]:
+    current: dict[str, Any] = {}
+    if path.exists():
+        loaded = load_json(path)
+        if isinstance(loaded, dict):
+            current = loaded
+    current.update(updates)
+    current["updated_at"] = _utc_now()
+    _atomic_json(path, current)
+    return current
+
+
+def _record_terminal_failure(
+    status_path: Path,
+    tracker: ClearMLTracker | None,
+    error: BaseException,
+) -> dict[str, Any]:
+    failure = _merge_status(
+        status_path,
+        status="failed_terminal_non_resumable",
+        error_type=type(error).__name__,
+        error=str(error),
+    )
+    cleanup_errors: list[str] = []
+    if tracker is not None:
+        try:
+            tracker.task.mark_failed(
+                status_reason=type(error).__name__, status_message=str(error)[:1000]
+            )
+        except Exception as cleanup_error:
+            cleanup_errors.append(f"clearml_mark_failed: {cleanup_error}")
+        try:
+            tracker.close()
+        except Exception as cleanup_error:
+            cleanup_errors.append(f"clearml_close: {cleanup_error}")
+    if cleanup_errors:
+        failure = _merge_status(status_path, cleanup_errors=cleanup_errors)
+    return failure
+
+
+def _repository_identity(repository_root: Path) -> dict[str, Any]:
+    commit = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=repository_root,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    dirty = subprocess.run(
+        ["git", "status", "--porcelain", "--untracked-files=all"],
+        cwd=repository_root,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout
+    if dirty:
+        raise RuntimeError("preflight requires an exact clean git worktree")
+    return {"git_commit": commit, "git_clean": True}
 
 
 def _json_sha256(payload: Any) -> str:
@@ -274,7 +335,10 @@ def _gradient_norm(model: torch.nn.Module) -> float:
     values = [parameter.grad.detach().float() for parameter in model.parameters() if parameter.grad is not None]
     if not values or not all(torch.isfinite(value).all() for value in values):
         raise FloatingPointError("missing or non-finite matched training gradient")
-    return float(torch.sqrt(sum(value.square().sum() for value in values)).cpu())
+    norm = float(torch.sqrt(sum(value.square().sum() for value in values)).cpu())
+    if not math.isfinite(norm) or norm <= 0.0:
+        raise FloatingPointError("matched training gradient norm must be finite and strictly positive")
+    return norm
 
 
 def _load_source(experiment: dict, repository_root: Path, device: torch.device):
@@ -308,7 +372,7 @@ def _load_source(experiment: dict, repository_root: Path, device: torch.device):
     return sampler.model, config, dataset, sentinel, metadata
 
 
-def _prepare_contract(config_path: Path, device: torch.device):
+def _prepare_static_contract(config_path: Path):
     experiment = load_json(config_path)
     if experiment.get("schema_version") != SCHEMA_VERSION:
         raise ValueError("unexpected matched full-CFM schema")
@@ -320,9 +384,57 @@ def _prepare_contract(config_path: Path, device: torch.device):
     spec, treatment_weight, admission = _load_frozen_metric(metric_path, metric_binding["sha256"])
     if treatment_weight != 0.1:
         raise ValueError("unreviewed treatment geometry weight")
+    return experiment, protocol, spec, treatment_weight, admission, repository_root, metric_path
+
+
+def _prepare_contract(config_path: Path, device: torch.device):
+    (
+        experiment,
+        protocol,
+        spec,
+        treatment_weight,
+        admission,
+        repository_root,
+        _metric_path,
+    ) = _prepare_static_contract(config_path)
     model, model_config, dataset, sentinel, metadata = _load_source(experiment, repository_root, device)
     schedule = make_matched_schedule(len(dataset), protocol)
     return experiment, protocol, spec, treatment_weight, admission, model, model_config, dataset, sentinel, metadata, schedule
+
+
+def _implementation_manifest(
+    config_path: Path,
+    experiment: dict[str, Any],
+    repository_root: Path,
+    metric_path: Path,
+) -> dict[str, Any]:
+    checkpoint = str(experiment["source"]["checkpoint"])
+    sha_map = experiment["source"]["sha256"]
+    if checkpoint not in sha_map:
+        raise ValueError("selected source checkpoint is absent from the verified SHA map")
+    checkpoint_path = Path(experiment["source"]["run_dir"]) / checkpoint
+    checkpoint_sha = _sha256(checkpoint_path)
+    if checkpoint_sha != sha_map[checkpoint]:
+        raise ValueError("selected source checkpoint does not match its exact SHA-map entry")
+    identity = _repository_identity(repository_root)
+    identity.update(
+        {
+            "runner_path": str(Path(__file__).resolve().relative_to(repository_root)),
+            "runner_sha256": _sha256(Path(__file__)),
+            "objective_path": str(
+                Path(__file__).with_name("direct_dynamics_geometry_cfm.py").resolve().relative_to(repository_root)
+            ),
+            "objective_sha256": _sha256(Path(__file__).with_name("direct_dynamics_geometry_cfm.py")),
+            "metric_config_path": str(metric_path.resolve().relative_to(repository_root)),
+            "metric_config_sha256": _sha256(metric_path),
+            "preflight_config_sha256": _sha256(config_path),
+            "scientific_contract_sha256": training_contract_sha256(experiment),
+            "source_checkpoint_relative_path": checkpoint,
+            "source_checkpoint_sha256": checkpoint_sha,
+            "source_checkpoint_sha_map_entry": sha_map[checkpoint],
+        }
+    )
+    return identity
 
 
 def _one_forward(
@@ -364,93 +476,213 @@ def _one_forward(
 
 
 def run_preflight(config_path: Path, output_dir: Path) -> dict[str, Any]:
-    if torch.cuda.device_count() != 1:
-        raise RuntimeError("zero-update preflight requires exactly one visible GPU")
-    device = torch.device("cuda:0")
-    (
-        experiment,
-        protocol,
-        spec,
-        treatment_weight,
-        admission,
-        model,
-        model_config,
-        dataset,
-        sentinel,
-        _metadata,
-        schedule,
-    ) = _prepare_contract(config_path, device)
     output_dir.mkdir(parents=True, exist_ok=False)
-    _atomic_json(output_dir / "schedule.json", schedule)
-    loader = _make_loader(dataset, schedule, protocol)
-    raw = next(iter(loader))
-    batch = _batch_to_device(raw, device)
-    timesteps = torch.tensor(schedule["timesteps"][0], dtype=torch.float32, device=device)
-    grid = make_normalized_xy_grid(*model_config.image_size, device=device, dtype=torch.float32)
-    source_parameter_sha = _json_sha256(
-        {name: _tensor_sha256(value) for name, value in model.state_dict().items()}
-    )
-    branches = {}
-    torch.cuda.reset_peak_memory_stats(device)
-    for arm, weight in (("control", 0.0), ("treatment", treatment_weight)):
-        model.zero_grad(set_to_none=True)
-        model.train()
-        loss, diagnostics, evidence = _one_forward(
-            model,
-            batch,
-            timesteps,
-            schedule["noise_seeds"][0],
-            schedule["dropout_seeds"][0],
-            grid,
-            weight,
-            spec,
-        )
-        loss.backward()
-        if arm == "control":
-            native = UNetTrainer._masked_mse(
-                evidence["prediction_fp32"], evidence["target_velocity"], batch["valid"]
-            )
-            if not torch.equal(loss.detach(), native.detach()):
-                raise RuntimeError("real control path differs from native masked MSE")
-        branches[arm] = {
-            "loss": float(loss.detach().cpu()),
-            "native": float(diagnostics["native"].detach().cpu()),
-            "geometry": float(diagnostics["geometry"].detach().cpu()),
-            "gradient_norm": _gradient_norm(model),
-            "prediction_dtype_before_loss": str(evidence["prediction_fp32"].dtype),
-            "target_dtype_at_loss": str(evidence["target_velocity"].dtype),
-            "input_fingerprints": {
-                key: _tensor_sha256(value)
-                for key, value in evidence.items()
-                if key not in {"prediction_fp32"}
-            },
-        }
-    if branches["control"]["input_fingerprints"] != branches["treatment"]["input_fingerprints"]:
-        raise RuntimeError("preflight arms did not receive exact common inputs")
-    final_parameter_sha = _json_sha256(
-        {name: _tensor_sha256(value) for name, value in model.state_dict().items()}
-    )
-    if source_parameter_sha != final_parameter_sha:
-        raise RuntimeError("zero-update preflight changed model parameters")
-    result = {
-        "schema_version": f"{SCHEMA_VERSION}_zero_update_preflight",
-        "status": "passed",
-        "optimizer_steps": 0,
-        "test_2023_accessed": False,
-        "source_parameter_sha256": source_parameter_sha,
-        "parameters_unchanged": True,
-        "schedule_sha256": schedule["sha256"],
-        "dataset_sentinel": sentinel,
-        "metric_admission": admission,
-        "branches": branches,
-        "peak_gpu_memory_mib": float(torch.cuda.max_memory_allocated(device) / 2**20),
-        "config_sha256": _sha256(config_path),
-        "training_contract_sha256": training_contract_sha256(experiment),
-        "code_sha256": _sha256(Path(__file__)),
-        "completed_at": _utc_now(),
+    status_path = output_dir / "status.json"
+    _merge_status(status_path, status="initializing", optimizer_steps=0, test_2023_accessed=False)
+    tracker: ClearMLTracker | None = None
+    previous = {
+        signal_number: signal.getsignal(signal_number)
+        for signal_number in (signal.SIGINT, signal.SIGTERM)
     }
-    _atomic_json(output_dir / "preflight.json", result)
-    return result
+
+    def terminate(signum, _frame):
+        raise InterruptedError(f"zero-update preflight received signal {signum}")
+
+    for signal_number in previous:
+        signal.signal(signal_number, terminate)
+    try:
+        (
+            experiment,
+            protocol,
+            spec,
+            treatment_weight,
+            admission,
+            repository_root,
+            metric_path,
+        ) = _prepare_static_contract(config_path)
+        manifest = _implementation_manifest(
+            config_path, experiment, repository_root, metric_path
+        )
+        tracker = ClearMLTracker(
+            experiment["project_name"],
+            f"{experiment['task_name']}-preflight-{output_dir.name}",
+            tags=[*experiment["clearml"]["tags"], "zero-update-preflight"],
+            env_path=experiment["clearml"]["env_path"],
+        )
+        tracker.connect(
+            "zero_update_preflight_contract",
+            {"experiment": experiment, "implementation_manifest": manifest},
+        )
+        _merge_status(
+            status_path,
+            status="reserved_before_gpu",
+            clearml_task_id=str(getattr(tracker.task, "id", "")),
+            implementation_manifest=manifest,
+        )
+        if torch.cuda.device_count() != 1:
+            raise RuntimeError("zero-update preflight requires exactly one visible GPU")
+        device = torch.device("cuda:0")
+        model, model_config, dataset, sentinel, _metadata = _load_source(
+            experiment, repository_root, device
+        )
+        schedule = make_matched_schedule(len(dataset), protocol)
+        _atomic_json(output_dir / "schedule.json", schedule)
+        loader = _make_loader(dataset, schedule, protocol)
+        raw = next(iter(loader))
+        batch = _batch_to_device(raw, device)
+        timesteps = torch.tensor(schedule["timesteps"][0], dtype=torch.float32, device=device)
+        grid = make_normalized_xy_grid(*model_config.image_size, device=device, dtype=torch.float32)
+        source_parameter_sha = _json_sha256(
+            {name: _tensor_sha256(value) for name, value in model.state_dict().items()}
+        )
+        torch.cuda.reset_peak_memory_stats(device)
+
+        # Produce and durably save both matched predictions before any backward.
+        prediction_evidence: dict[str, dict[str, torch.Tensor]] = {}
+        with torch.no_grad():
+            for arm, weight in (("control", 0.0), ("treatment", treatment_weight)):
+                model.train()
+                loss, diagnostics, evidence = _one_forward(
+                    model,
+                    batch,
+                    timesteps,
+                    schedule["noise_seeds"][0],
+                    schedule["dropout_seeds"][0],
+                    grid,
+                    weight,
+                    spec,
+                )
+                prediction_evidence[arm] = {
+                    "prediction": evidence["prediction_fp32"].detach().cpu(),
+                    "native": diagnostics["native"].detach().cpu(),
+                    "loss": loss.detach().cpu(),
+                }
+                if arm == "control":
+                    native = UNetTrainer._masked_mse(
+                        evidence["prediction_fp32"], evidence["target_velocity"], batch["valid"]
+                    )
+                    if not torch.equal(loss.detach(), native.detach()):
+                        raise RuntimeError("real control path differs from native masked MSE")
+                    common_evidence = {
+                        key: value.detach().cpu()
+                        for key, value in evidence.items()
+                        if key != "prediction_fp32"
+                    }
+        if not torch.equal(
+            prediction_evidence["control"]["prediction"],
+            prediction_evidence["treatment"]["prediction"],
+        ):
+            raise RuntimeError("matched control/treatment predictions differ")
+        if not torch.equal(
+            prediction_evidence["control"]["native"],
+            prediction_evidence["treatment"]["native"],
+        ):
+            raise RuntimeError("matched control/treatment native losses differ")
+        fixed_inputs_path = output_dir / "fixed_inputs_and_predictions.pt"
+        fixed_inputs_sha = _atomic_torch_save(
+            {
+                "common": common_evidence,
+                "control_prediction": prediction_evidence["control"]["prediction"],
+                "treatment_prediction": prediction_evidence["treatment"]["prediction"],
+                "schedule_update": 0,
+                "optimizer_steps": 0,
+            },
+            fixed_inputs_path,
+        )
+        _merge_status(
+            status_path,
+            status="fixed_inputs_and_predictions_saved_before_backward",
+            fixed_inputs_and_predictions_sha256=fixed_inputs_sha,
+        )
+        if os.environ.get("DIRECT_DYNAMICS_CFM_PREFLIGHT_FAIL_AFTER_EVIDENCE") == "1":
+            raise RuntimeError("injected failure after durable preflight evidence")
+
+        branches: dict[str, dict[str, Any]] = {}
+        expected_prediction_sha = _tensor_sha256(
+            prediction_evidence["control"]["prediction"]
+        )
+        for arm, weight in (("control", 0.0), ("treatment", treatment_weight)):
+            model.zero_grad(set_to_none=True)
+            model.train()
+            loss, diagnostics, evidence = _one_forward(
+                model,
+                batch,
+                timesteps,
+                schedule["noise_seeds"][0],
+                schedule["dropout_seeds"][0],
+                grid,
+                weight,
+                spec,
+            )
+            if _tensor_sha256(evidence["prediction_fp32"]) != expected_prediction_sha:
+                raise RuntimeError(f"{arm} backward forward differs from saved prediction")
+            loss.backward()
+            branches[arm] = {
+                "loss": float(loss.detach().cpu()),
+                "native": float(diagnostics["native"].detach().cpu()),
+                "geometry": float(diagnostics["geometry"].detach().cpu()),
+                "gradient_norm": _gradient_norm(model),
+                "prediction_sha256": _tensor_sha256(evidence["prediction_fp32"]),
+                "prediction_dtype_before_loss": str(evidence["prediction_fp32"].dtype),
+                "target_dtype_at_loss": str(evidence["target_velocity"].dtype),
+                "input_fingerprints": {
+                    key: _tensor_sha256(value)
+                    for key, value in evidence.items()
+                    if key != "prediction_fp32"
+                },
+            }
+            _merge_status(status_path, status=f"backward_{arm}_passed")
+        if branches["control"]["input_fingerprints"] != branches["treatment"]["input_fingerprints"]:
+            raise RuntimeError("preflight arms did not receive exact common inputs")
+        if branches["control"]["prediction_sha256"] != branches["treatment"]["prediction_sha256"]:
+            raise RuntimeError("preflight branch predictions are not exact matches")
+        if branches["control"]["native"] != branches["treatment"]["native"]:
+            raise RuntimeError("preflight branch native losses are not exact matches")
+        final_parameter_sha = _json_sha256(
+            {name: _tensor_sha256(value) for name, value in model.state_dict().items()}
+        )
+        if source_parameter_sha != final_parameter_sha:
+            raise RuntimeError("zero-update preflight changed model parameters")
+        result = {
+            "schema_version": f"{SCHEMA_VERSION}_zero_update_preflight",
+            "status": "passed_pending_clearml_close",
+            "optimizer_steps": 0,
+            "test_2023_accessed": False,
+            "source_parameter_sha256": source_parameter_sha,
+            "parameters_unchanged": True,
+            "fixed_inputs_and_predictions_sha256": fixed_inputs_sha,
+            "schedule_sha256": schedule["sha256"],
+            "dataset_sentinel": sentinel,
+            "metric_admission": admission,
+            "implementation_manifest": manifest,
+            "branches": branches,
+            "peak_gpu_memory_mib": float(torch.cuda.max_memory_allocated(device) / 2**20),
+            "config_sha256": _sha256(config_path),
+            "training_contract_sha256": training_contract_sha256(experiment),
+            "code_sha256": _sha256(Path(__file__)),
+            "completed_at": _utc_now(),
+        }
+        result_path = output_dir / "preflight.json"
+        _atomic_json(result_path, result)
+        _merge_status(status_path, status="closing_clearml", preflight_sha256=_sha256(result_path))
+        tracker.close()
+        tracker = None
+        result["status"] = "passed"
+        result["clearml_closed_before_terminal_success"] = True
+        _atomic_json(result_path, result)
+        _merge_status(
+            status_path,
+            status="passed",
+            preflight_sha256=_sha256(result_path),
+            clearml_closed_before_terminal_success=True,
+        )
+        return result
+    except BaseException as error:
+        _record_terminal_failure(status_path, tracker, error)
+        raise
+    finally:
+        for signal_number, handler in previous.items():
+            signal.signal(signal_number, handler)
 
 
 def _save_checkpoint(
@@ -494,6 +726,10 @@ def run_training(config_path: Path, output_dir: Path) -> dict[str, Any]:
     if _sha256(preflight_path) != preflight["sha256"]:
         raise ValueError("required zero-update preflight SHA mismatch")
     preflight_payload = load_json(preflight_path)
+    preflight_manifest = preflight_payload.get("implementation_manifest", {})
+    objective_path = Path(__file__).with_name("direct_dynamics_geometry_cfm.py")
+    selected_checkpoint = experiment["source"]["checkpoint"]
+    selected_checkpoint_sha = experiment["source"]["sha256"].get(selected_checkpoint)
     if (
         preflight_payload.get("status") != "passed"
         or preflight_payload.get("optimizer_steps") != 0
@@ -501,6 +737,14 @@ def run_training(config_path: Path, output_dir: Path) -> dict[str, Any]:
         or preflight_payload.get("training_contract_sha256") != training_contract_sha256(experiment)
         or preflight_payload.get("code_sha256") != _sha256(Path(__file__))
         or preflight_payload.get("schedule_sha256") != schedule["sha256"]
+        or preflight_manifest.get("runner_sha256") != _sha256(Path(__file__))
+        or preflight_manifest.get("objective_sha256") != _sha256(objective_path)
+        or preflight_manifest.get("metric_config_sha256") != experiment["metric_admission"]["sha256"]
+        or preflight_manifest.get("source_checkpoint_relative_path") != selected_checkpoint
+        or preflight_manifest.get("source_checkpoint_sha256") != selected_checkpoint_sha
+        or preflight_manifest.get("source_checkpoint_sha_map_entry") != selected_checkpoint_sha
+        or preflight_manifest.get("scientific_contract_sha256")
+        != training_contract_sha256(experiment)
     ):
         raise ValueError("required preflight is not bound to this exact training law")
     del source_model

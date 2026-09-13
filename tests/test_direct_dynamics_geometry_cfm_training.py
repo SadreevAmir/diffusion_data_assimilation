@@ -5,7 +5,10 @@ import torch
 
 from assim_lib.direct_dynamics_geometry_cfm_training import (
     _check_protocol,
+    _gradient_norm,
     _load_frozen_metric,
+    _merge_status,
+    _record_terminal_failure,
     compute_matched_loss,
     make_matched_schedule,
     training_contract_sha256,
@@ -93,3 +96,55 @@ def test_preflight_binding_does_not_change_scientific_contract_hash():
     original = training_contract_sha256(experiment)
     experiment["required_preflight"] = {"path": "/new/preflight.json", "sha256": "f" * 64}
     assert training_contract_sha256(experiment) == original
+
+
+def test_gradient_norm_rejects_zero_parameter_gradient():
+    model = torch.nn.Linear(2, 1)
+    for parameter in model.parameters():
+        parameter.grad = torch.zeros_like(parameter)
+    try:
+        _gradient_norm(model)
+    except FloatingPointError as error:
+        assert "strictly positive" in str(error)
+    else:
+        raise AssertionError("zero parameter gradient was accepted")
+
+
+def test_failure_after_evidence_preserves_evidence_and_closes_tracker(tmp_path):
+    calls = []
+
+    class Task:
+        def mark_failed(self, **_kwargs):
+            calls.append("mark_failed")
+
+    class Tracker:
+        task = Task()
+
+        def close(self):
+            calls.append("close")
+
+    status = tmp_path / "status.json"
+    _merge_status(
+        status,
+        status="fixed_inputs_and_predictions_saved_before_backward",
+        fixed_inputs_and_predictions_sha256="a" * 64,
+    )
+    _record_terminal_failure(status, Tracker(), RuntimeError("injected"))
+    payload = json.loads(status.read_text())
+    assert payload["status"] == "failed_terminal_non_resumable"
+    assert payload["fixed_inputs_and_predictions_sha256"] == "a" * 64
+    assert calls == ["mark_failed", "close"]
+
+
+def test_launcher_has_exact_clean_one_gpu_admission_and_timeout():
+    source = (ROOT / "scripts/run_direct_dynamics_geometry_full_cfm_ab.sh").read_text()
+    assert "GEOMETRY_FULL_CFM_EXPECTED_COMMIT" in source
+    assert "git status --porcelain --untracked-files=all" in source
+    assert "scripts/require_single_gpu_uuid.sh" in source
+    assert "GPU-40ff1cbb-07cc-992e-23cb-8fe181972b76" in source
+    assert "memory.used,utilization.gpu" in source
+    assert "for sample in {1..11}" in source
+    assert 'export CUDA_VISIBLE_DEVICES="$GPU_UUID"' in source
+    assert "CLEARML_REQUIRE_ONLINE=1" in source
+    assert "timeout --foreground" in source
+    assert "RESULT_ROOT=\"/home/autoresearch_results/direct_dynamics_geometry_cfm_v1\"" in source
