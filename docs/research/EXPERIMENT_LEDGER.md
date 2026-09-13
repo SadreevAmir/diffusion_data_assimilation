@@ -26,7 +26,7 @@
 | GEO-H1 | Endpoint-only geometry suffix continuation | REJECTED | Обе ветви хуже EMA6; это не был geometry-CFM test |
 | GEO-P0 | Geometry-CFM zero-update preflight | COMPLETED | Математика, gradients и lifecycle прошли Astra audit |
 | GEO-T1 | Full-CFM control512/treatment512 | REJECTED | Geometry term даёт малый matched-control gain, но обе ветви значительно хуже EMA6 |
-| IDEA-F1 | One-shot front-plus-source mixed-support flow | CPU PASS / GPU HOLD | Representation корректен; проверяется реальный source+masked-CFM runner |
+| IDEA-F1 | One-shot front-plus-source mixed-support flow | CPU INTEGRATION PASS / ASTRA REVIEW | Реальный source+masked-CFM runner прошёл gate; GPU ещё не разрешён |
 
 ## DYN-B0 — direct EMA6
 
@@ -237,6 +237,20 @@ regression, а также birth/death вне исходной кромки и н
 параметров настоящей source branch. Поэтому текущий результат является
 математическим admission representation, но не доказательством калибровки или
 работоспособности конкретного sampler.
+
+Следующий CPU integration будущего mask-only runner прошёл на exact commit
+`6ac883633a7b94e06b9e2ca0be5a7f6afc91275d`; JSON SHA-256
+`d2575d8ba0c8f00ace07d8bcdce6109c9ea7d44f029cc798e297b7b6c32e3515`.
+Admission tests `5/5`, runner tests `5/5`, реальный train case
+`2016-01-01_slice23`, test-2023 не использовался. Candidate/control имеют по
+`2,158` параметров и идентичную seeded initialization. Реальный masked CFM
+loss конечен (`4.38166/4.38128` candidate/control), source-head gradients
+положительны. Forward и sampling инвариантны к изменению land inputs, decoded
+land равен нулю. На synthetic remote birth из полностью пустого d0 и death из
+полностью ледового d0 исходный front support равен нулю, front gradients равны
+нулю, а обе пары source gradients положительны. Per-case denominator обязан
+быть положительным и не использует clamp. Этот результат передан Astra на
+exact-code review; `gpu_training_authorized=false` до её решения.
 
 Первый falsifier: compact 80×64 joint mask-only front+source против
 equal-capacity ordinary conv mask generator, leave-one-train-year-out, joint
