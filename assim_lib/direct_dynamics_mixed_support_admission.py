@@ -170,8 +170,8 @@ def dequantized_cfm_gradient_check(binary: torch.Tensor, valid: torch.Tensor, *,
     }
 
 
-def synthetic_source_support_check(*, seed: int) -> dict[str, Any]:
-    """Show that future birth/death is representable without an initial edge."""
+def synthetic_representation_birth_death_check(*, seed: int) -> dict[str, Any]:
+    """Show only that the codec represents birth/death without an initial edge."""
     initial_empty = torch.zeros((1, 1, 8, 8), dtype=torch.float32)
     future_birth = initial_empty.clone()
     future_birth[..., 2:5, 3:7] = 1
@@ -190,8 +190,13 @@ def synthetic_source_support_check(*, seed: int) -> dict[str, Any]:
         "empty_edge_birth_roundtrip_exact": roundtrip(future_birth),
         "future_death_count": int(initial_ice.sum().item()),
         "death_roundtrip_exact": roundtrip(future_death),
-        "source_branch_restriction": "unrestricted_over_valid_ocean",
+        "scope": "representation_codec_only_not_a_model_source_branch_test",
     }
+
+
+# Compatibility alias for immutable admission callers.  New evidence must use
+# the explicit representation-only name above.
+synthetic_source_support_check = synthetic_representation_birth_death_check
 
 
 def run_admission(config_path: str | Path, output_path: str | Path) -> dict[str, Any]:
@@ -259,7 +264,7 @@ def run_admission(config_path: str | Path, output_path: str | Path) -> dict[str,
     if first_binary is None or first_valid is None:
         raise RuntimeError("no admission anchors were evaluated")
     gradient = dequantized_cfm_gradient_check(first_binary, first_valid, seed=int(config["seed"]) + 1000)
-    source_support = synthetic_source_support_check(seed=int(config["seed"]) + 2000)
+    source_support = synthetic_representation_birth_death_check(seed=int(config["seed"]) + 2000)
     changed = totals["native_changed_cells"]
     retention = totals["native_changed_cells_visible_at_coarse"] / max(changed, 1)
     roundtrip_pass = all(

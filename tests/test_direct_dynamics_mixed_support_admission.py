@@ -8,7 +8,7 @@ from assim_lib.direct_dynamics_mixed_support_admission import (
     decode_binary_dequantized_logit,
     dequantized_cfm_gradient_check,
     occurrence_change_counts,
-    synthetic_source_support_check,
+    synthetic_representation_birth_death_check,
 )
 
 
@@ -50,12 +50,13 @@ class MixedSupportAdmissionTests(unittest.TestCase):
         self.assertTrue(result["all_parameter_gradients_finite_positive"])
         self.assertEqual(result["objective"], "continuous_dequantized_binary_cfm_no_ste")
 
-    def test_source_branch_represents_birth_without_initial_edge(self):
-        result = synthetic_source_support_check(seed=9)
+    def test_representation_codec_roundtrips_birth_without_initial_edge(self):
+        result = synthetic_representation_birth_death_check(seed=9)
         self.assertFalse(result["initial_empty_has_edge"])
         self.assertGreater(result["future_birth_count"], 0)
         self.assertTrue(result["empty_edge_birth_roundtrip_exact"])
         self.assertTrue(result["death_roundtrip_exact"])
+        self.assertEqual(result["scope"], "representation_codec_only_not_a_model_source_branch_test")
 
 
 if __name__ == "__main__":
