@@ -1,0 +1,107 @@
+{
+  "schema_version": "direct_dynamics_geometry_paired_validation_v1",
+  "project_name": "sea_ice_two_stage",
+  "task_name": "direct_dynamics_geometry_objective_paired_validation_v1",
+  "source": {
+    "run_dir": "/home/autoresearch_results/direct_dynamics_all_hours_v1/training/seed1701-night_20260909_v1",
+    "checkpoint": "epoch_snapshots/epoch_0006/ema_last_model.pth",
+    "sha256": {
+      "metadata.json": "73c530dc669b539237bc7b295a352ef6093f0936b970ecb9c96b321bc7745da0",
+      "config.json": "898b5414cb921569b33dbd6bab89df01b0952742ed41648ab948f4ff9a5b05a6",
+      "epoch_snapshots/epoch_0006/ema_last_model.pth": "9b8bb6954b7a19179aee2e58b0c6cdddfcb8b489b1e29d6f503086c704fa0b1b"
+    }
+  },
+  "training_result": {
+    "path": "/home/autoresearch_results/direct_dynamics_geometry_objective_v1/training/matched-e137ad0-r1/training_result.json",
+    "sha256": "e54523d0081bad9c20d8cfde4e9d637de767bf6811b44992aaa67cf6b8299a34"
+  },
+  "training_commit": "e137ad0b6bd089526e1bf1dd1d421a47f3e78aea",
+  "training_completion": {
+    "status": {
+      "path": "/home/autoresearch_results/direct_dynamics_geometry_objective_v1/training/matched-e137ad0-r1/status.json",
+      "sha256": "7a380a7df232fd920915ccc0b90b768f36081f2e0403376dcb3f479ac1711a6c"
+    },
+    "launch": {
+      "path": "/home/autoresearch_results/direct_dynamics_geometry_objective_v1/training_launches/matched-e137ad0-r1/status.json",
+      "sha256": "12fd12f700779e502f38729cc6d9bb37a0f8a67f39e5539577ebde3a908f3ba1"
+    }
+  },
+  "checkpoints": {
+    "control": {
+      "path": "/home/autoresearch_results/direct_dynamics_geometry_objective_v1/training/matched-e137ad0-r1/control_final_checkpoint.pth",
+      "sha256": "2301935d53b11736f9373f62092a8e6d84c96d37595660f5716c7cb4e58a32b5"
+    },
+    "treatment": {
+      "path": "/home/autoresearch_results/direct_dynamics_geometry_objective_v1/training/matched-e137ad0-r1/treatment_final_checkpoint.pth",
+      "sha256": "831b183d96ec2ad83afbbded0e26bb4c2d812014f2e3225fb2e75b3f3a02179a"
+    }
+  },
+  "cell_geometry": {
+    "latitude_path": "/mnt/sciml/data_assimilation/meta_latitudes.npy",
+    "longitude_path": "/mnt/sciml/data_assimilation/meta_longitudes.npy"
+  },
+  "product_scale": 0.3980696029516097,
+  "product_scale_audit": {
+    "path": "docs/research/geometry_product_scale_train_cpu_audit.json",
+    "sha256": "d360e40a6c67d70f3b0169c9ac73834084512b886fca2bfbcf012e0c8d695fc2",
+    "script_path": "docs/research/audit_geometry_product_scale_cpu.py",
+    "script_sha256": "800e33dda39064be2d7b970cab104e667d6eaeba2cb2ecd994c01ac635bf13ad"
+  },
+  "case_identities": [
+    {"dataset_index": 0, "case_id": "2022-01-01_slice00", "archive_slice_index": 0, "target_paths": ["/mnt/sciml/data_assimilation/da_arctic_2015-2024_v0.1/preds/ocean+atmosphere_24_2022-01-04.npy", "/mnt/sciml/data_assimilation/da_arctic_2015-2024_v0.1/preds/ocean+atmosphere_24_2022-01-07.npy", "/mnt/sciml/data_assimilation/da_arctic_2015-2024_v0.1/preds/ocean+atmosphere_24_2022-01-10.npy"]},
+    {"dataset_index": 777, "case_id": "2022-02-02_slice09", "archive_slice_index": 9, "target_paths": ["/mnt/sciml/data_assimilation/da_arctic_2015-2024_v0.1/preds/ocean+atmosphere_24_2022-02-05.npy", "/mnt/sciml/data_assimilation/da_arctic_2015-2024_v0.1/preds/ocean+atmosphere_24_2022-02-08.npy", "/mnt/sciml/data_assimilation/da_arctic_2015-2024_v0.1/preds/ocean+atmosphere_24_2022-02-11.npy"]},
+    {"dataset_index": 1553, "case_id": "2022-03-06_slice17", "archive_slice_index": 17, "target_paths": ["/mnt/sciml/data_assimilation/da_arctic_2015-2024_v0.1/preds/ocean+atmosphere_24_2022-03-09.npy", "/mnt/sciml/data_assimilation/da_arctic_2015-2024_v0.1/preds/ocean+atmosphere_24_2022-03-12.npy", "/mnt/sciml/data_assimilation/da_arctic_2015-2024_v0.1/preds/ocean+atmosphere_24_2022-03-15.npy"]},
+    {"dataset_index": 2330, "case_id": "2022-04-08_slice02", "archive_slice_index": 2, "target_paths": ["/mnt/sciml/data_assimilation/da_arctic_2015-2024_v0.1/preds/ocean+atmosphere_24_2022-04-11.npy", "/mnt/sciml/data_assimilation/da_arctic_2015-2024_v0.1/preds/ocean+atmosphere_24_2022-04-14.npy", "/mnt/sciml/data_assimilation/da_arctic_2015-2024_v0.1/preds/ocean+atmosphere_24_2022-04-17.npy"]},
+    {"dataset_index": 3107, "case_id": "2022-05-10_slice11", "archive_slice_index": 11, "target_paths": ["/mnt/sciml/data_assimilation/da_arctic_2015-2024_v0.1/preds/ocean+atmosphere_24_2022-05-13.npy", "/mnt/sciml/data_assimilation/da_arctic_2015-2024_v0.1/preds/ocean+atmosphere_24_2022-05-16.npy", "/mnt/sciml/data_assimilation/da_arctic_2015-2024_v0.1/preds/ocean+atmosphere_24_2022-05-19.npy"]},
+    {"dataset_index": 3883, "case_id": "2022-06-11_slice19", "archive_slice_index": 19, "target_paths": ["/mnt/sciml/data_assimilation/da_arctic_2015-2024_v0.1/preds/ocean+atmosphere_24_2022-06-14.npy", "/mnt/sciml/data_assimilation/da_arctic_2015-2024_v0.1/preds/ocean+atmosphere_24_2022-06-17.npy", "/mnt/sciml/data_assimilation/da_arctic_2015-2024_v0.1/preds/ocean+atmosphere_24_2022-06-20.npy"]},
+    {"dataset_index": 4660, "case_id": "2022-07-14_slice04", "archive_slice_index": 4, "target_paths": ["/mnt/sciml/data_assimilation/da_arctic_2015-2024_v0.1/preds/ocean+atmosphere_24_2022-07-17.npy", "/mnt/sciml/data_assimilation/da_arctic_2015-2024_v0.1/preds/ocean+atmosphere_24_2022-07-20.npy", "/mnt/sciml/data_assimilation/da_arctic_2015-2024_v0.1/preds/ocean+atmosphere_24_2022-07-23.npy"]},
+    {"dataset_index": 5436, "case_id": "2022-08-15_slice12", "archive_slice_index": 12, "target_paths": ["/mnt/sciml/data_assimilation/da_arctic_2015-2024_v0.1/preds/ocean+atmosphere_24_2022-08-18.npy", "/mnt/sciml/data_assimilation/da_arctic_2015-2024_v0.1/preds/ocean+atmosphere_24_2022-08-21.npy", "/mnt/sciml/data_assimilation/da_arctic_2015-2024_v0.1/preds/ocean+atmosphere_24_2022-08-24.npy"]},
+    {"dataset_index": 6213, "case_id": "2022-09-16_slice21", "archive_slice_index": 21, "target_paths": ["/mnt/sciml/data_assimilation/da_arctic_2015-2024_v0.1/preds/ocean+atmosphere_24_2022-09-19.npy", "/mnt/sciml/data_assimilation/da_arctic_2015-2024_v0.1/preds/ocean+atmosphere_24_2022-09-22.npy", "/mnt/sciml/data_assimilation/da_arctic_2015-2024_v0.1/preds/ocean+atmosphere_24_2022-09-25.npy"]},
+    {"dataset_index": 6990, "case_id": "2022-10-19_slice06", "archive_slice_index": 6, "target_paths": ["/mnt/sciml/data_assimilation/da_arctic_2015-2024_v0.1/preds/ocean+atmosphere_24_2022-10-22.npy", "/mnt/sciml/data_assimilation/da_arctic_2015-2024_v0.1/preds/ocean+atmosphere_24_2022-10-25.npy", "/mnt/sciml/data_assimilation/da_arctic_2015-2024_v0.1/preds/ocean+atmosphere_24_2022-10-28.npy"]},
+    {"dataset_index": 7766, "case_id": "2022-11-20_slice14", "archive_slice_index": 14, "target_paths": ["/mnt/sciml/data_assimilation/da_arctic_2015-2024_v0.1/preds/ocean+atmosphere_24_2022-11-23.npy", "/mnt/sciml/data_assimilation/da_arctic_2015-2024_v0.1/preds/ocean+atmosphere_24_2022-11-26.npy", "/mnt/sciml/data_assimilation/da_arctic_2015-2024_v0.1/preds/ocean+atmosphere_24_2022-11-29.npy"]},
+    {"dataset_index": 8543, "case_id": "2022-12-22_slice23", "archive_slice_index": 23, "target_paths": ["/mnt/sciml/data_assimilation/da_arctic_2015-2024_v0.1/preds/ocean+atmosphere_24_2022-12-25.npy", "/mnt/sciml/data_assimilation/da_arctic_2015-2024_v0.1/preds/ocean+atmosphere_24_2022-12-28.npy", "/mnt/sciml/data_assimilation/da_arctic_2015-2024_v0.1/preds/ocean+atmosphere_24_2022-12-31.npy"]}
+  ],
+  "protocol": {
+    "split": "valid",
+    "validation_year": 2022,
+    "development_reuse": true,
+    "case_indices": [0, 777, 1553, 2330, 3107, 3883, 4660, 5436, 6213, 6990, 7766, 8543],
+    "members": 8,
+    "rk4_timepoints": 17,
+    "network_precision": "bf16",
+    "state_precision": "fp32",
+    "raw_unclipped": true,
+    "optimizer_steps": 0,
+    "noise_seed": 314159,
+    "bootstrap_replicates": 100000,
+    "bootstrap_seed": 20260912,
+    "visual_case_orders": [0, 3, 6, 9],
+    "test_2023_accessed": false
+  },
+  "gate": {
+    "geometry_effect": "treatment-control geometry-ES paired bootstrap upper95 < 0 and native CRPS ratio upper95 <= 1.01",
+    "replacement": "treatment-EMA6 primary CRPS paired bootstrap upper95 < 0 plus all frozen safety margins",
+    "per_output_crps_rmse_ratio_max": 1.01,
+    "native_energy_ratio_max": 1.01,
+    "rank_tv_increase_max": 0.01,
+    "coverage_absolute_error_increase_max": 0.01,
+    "adjusted_ssr_absolute_error_increase_max": 0.02,
+    "roughness_ratio_max": 1.02,
+    "manual_visual_review_required": true
+  },
+  "clearml": {
+    "env_path": "/home/.env",
+    "tags": [
+      "validation-2022-development-reuse",
+      "ema6-control-treatment",
+      "paired-common-random-numbers",
+      "eight-members",
+      "rank-histograms",
+      "full-ensemble-artifact",
+      "raw-unclipped",
+      "zero-optimizer-steps",
+      "one-gpu",
+      "test-2023-closed"
+    ]
+  }
+}
