@@ -1,0 +1,55 @@
+{
+  "schema_version": "direct_dynamics_geometry_full_cfm_ab_v1",
+  "project_name": "sea_ice_two_stage",
+  "task_name": "direct_dynamics_geometry_full_cfm_ab_v1",
+  "source": {
+    "run_dir": "/home/autoresearch_results/direct_dynamics_all_hours_v1/training/seed1701-night_20260909_v1",
+    "checkpoint": "epoch_snapshots/epoch_0006/ema_last_model.pth",
+    "sha256": {
+      "metadata.json": "73c530dc669b539237bc7b295a352ef6093f0936b970ecb9c96b321bc7745da0",
+      "config.json": "898b5414cb921569b33dbd6bab89df01b0952742ed41648ab948f4ff9a5b05a6",
+      "epoch_snapshots/epoch_0006/ema_last_model.pth": "9b8bb6954b7a19179aee2e58b0c6cdddfcb8b489b1e29d6f503086c704fa0b1b"
+    }
+  },
+  "metric_admission": {
+    "path": "config/admission/direct_dynamics_geometry_weighted_cfm_v1.json",
+    "sha256": "6b44cbbff783084264c290b89d429b01270d4179cfa164cf1ef6f09b099c33c8"
+  },
+  "protocol": {
+    "arms": ["control", "treatment"],
+    "updates_per_arm": 512,
+    "batch_size": 8,
+    "num_workers": 4,
+    "prefetch_factor": 2,
+    "learning_rate": 0.00001,
+    "weight_decay": 0.0,
+    "optimizer": "AdamW",
+    "lr_schedule": "constant",
+    "gradient_clip_norm": 1.0,
+    "ema_decay": 0.999,
+    "checkpoint_updates": [128, 256, 512],
+    "network_precision": "bf16",
+    "loss_precision": "fp32",
+    "timestep_sampler": "source_beta_1.0_1.5",
+    "activation_checkpointing": false,
+    "torch_compile": false,
+    "seed": 47117,
+    "test_2023_accessed": false
+  },
+  "required_preflight": {
+    "path": "/home/autoresearch_results/direct_dynamics_geometry_cfm_v1/preflight/REVIEWED_RUN_ID/preflight.json",
+    "sha256": "REVIEWED_AFTER_ZERO_UPDATE_PREFLIGHT"
+  },
+  "clearml": {
+    "env_path": "/home/.env",
+    "tags": [
+      "ema6",
+      "matched-ab",
+      "full-cfm",
+      "all-hour",
+      "geometry-preconditioned",
+      "one-gpu",
+      "test-2023-closed"
+    ]
+  }
+}
