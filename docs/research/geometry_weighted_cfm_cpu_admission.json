@@ -1,0 +1,28 @@
+{
+  "condition_sources": [
+    "valid_ocean",
+    "d0_sic",
+    "d0_sit",
+    "fixed_regions"
+  ],
+  "future_truth_weights": false,
+  "measurements": {
+    "adjoint_relative_error": 4.469582131746037e-16,
+    "finite_difference_relative_error": 2.1887420348365438e-10,
+    "lambda_zero_gradient_max_abs": 0.0,
+    "lambda_zero_loss_max_abs": 0.0,
+    "oracle_directional_curvature": 4.9087538922520935,
+    "oracle_gradient_max_abs": 3.469446951953614e-18
+  },
+  "schema_version": "direct_dynamics_geometry_weighted_cfm_cpu_admission_v1",
+  "scope": "CPU-only implementation and law-preservation admission; not a calibration result",
+  "status": "passed",
+  "thresholds": {
+    "adjoint_relative_error": 1e-12,
+    "finite_difference_relative_error": 1e-07,
+    "lambda_zero_gradient_max_abs": 0.0,
+    "lambda_zero_loss_max_abs": 0.0,
+    "oracle_directional_curvature_min": 0.0,
+    "oracle_gradient_max_abs": 1e-12
+  }
+}
