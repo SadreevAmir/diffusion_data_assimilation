@@ -144,24 +144,57 @@ def _write_ahead_update(
         arm=arm,
         attempted_update=int(update),
         committed_updates_by_arm=dict(committed),
-        optimizer_mutation_may_have_occurred=False,
+        optimizer_step_state="not_started",
+        ema_step_state="not_started",
+        mutation_evidence_committed=False,
+        resume_permitted=False,
         attempt=attempt,
     )
 
 
-def _record_mutation_boundary(
+def _run_optimizer_and_ema_with_boundaries(
     status_path: Path,
     arm: str,
     update: int,
     committed: dict[str, int],
+    optimizer: torch.optim.Optimizer,
+    ema: EMAModel,
+    model: torch.nn.Module,
 ) -> None:
     _merge_status(
         status_path,
-        status="optimizer_and_ema_mutated_pending_durable_evidence",
+        status="optimizer_step_pending_unknown",
         arm=arm,
         attempted_update=int(update),
         committed_updates_by_arm=dict(committed),
-        optimizer_mutation_may_have_occurred=True,
+        optimizer_step_state="pending_unknown",
+        ema_step_state="not_started",
+        mutation_evidence_committed=False,
+        resume_permitted=False,
+    )
+    optimizer.step()
+    _merge_status(
+        status_path,
+        status="optimizer_completed_ema_step_pending_unknown",
+        arm=arm,
+        attempted_update=int(update),
+        committed_updates_by_arm=dict(committed),
+        optimizer_step_state="completed",
+        ema_step_state="pending_unknown",
+        mutation_evidence_committed=False,
+        resume_permitted=False,
+    )
+    ema.step(model.parameters())
+    _merge_status(
+        status_path,
+        status="optimizer_and_ema_completed_pending_durable_evidence",
+        arm=arm,
+        attempted_update=int(update),
+        committed_updates_by_arm=dict(committed),
+        optimizer_step_state="completed",
+        ema_step_state="completed",
+        mutation_evidence_committed=False,
+        resume_permitted=False,
     )
 
 
@@ -181,7 +214,10 @@ def _commit_update_evidence(
         arm=arm,
         attempted_update=int(history[-1]["update"]),
         committed_updates_by_arm=dict(committed),
-        optimizer_mutation_may_have_occurred=False,
+        optimizer_step_state="completed",
+        ema_step_state="completed",
+        mutation_evidence_committed=True,
+        resume_permitted=False,
         latest_record=history[-1],
         checkpoints=checkpoints,
     )
@@ -379,10 +415,14 @@ def run_training(config_path: Path, output_dir: Path) -> dict[str, Any]:
                 torch.nn.utils.clip_grad_norm_(
                     model.parameters(), float(protocol["gradient_clip_norm"])
                 )
-                optimizer.step()
-                ema.step(model.parameters())
-                _record_mutation_boundary(
-                    status_path, arm, update_index, committed
+                _run_optimizer_and_ema_with_boundaries(
+                    status_path,
+                    arm,
+                    update_index,
+                    committed,
+                    optimizer,
+                    ema,
+                    model,
                 )
                 record = {
                     "update": update_index,
@@ -396,6 +436,12 @@ def run_training(config_path: Path, output_dir: Path) -> dict[str, Any]:
                         "truth": _tensor_sha256(evidence["truth"]),
                         "noise": _tensor_sha256(evidence["noise"]),
                         "timesteps": _tensor_sha256(evidence["timesteps"]),
+                        "condition": _tensor_sha256(evidence["condition"]),
+                        "valid": _tensor_sha256(evidence["valid"]),
+                        "initial_sic": _tensor_sha256(evidence["initial_sic"]),
+                        "initial_sit": _tensor_sha256(evidence["initial_sit"]),
+                        "model_input": _tensor_sha256(evidence["model_input"]),
+                        "target_velocity": _tensor_sha256(evidence["target_velocity"]),
                     },
                 }
                 history.append(record)
@@ -431,6 +477,8 @@ def run_training(config_path: Path, output_dir: Path) -> dict[str, Any]:
         )
         result = {
             "schema_version": TRANSACTIONAL_SCHEMA_VERSION,
+            "resume_supported": False,
+            "checkpoint_semantics": "bounded_nonresumable_forensic_snapshots_only",
             "completed_updates_per_arm": int(protocol["updates_per_arm"]),
             "committed_updates_by_arm": committed,
             "schedule_sha256": schedule["sha256"],
