@@ -1,0 +1,63 @@
+{
+  "schema_version": "direct_dynamics_geometry_objective_actual_preflight_v1",
+  "project_name": "sea_ice_two_stage",
+  "task_name": "direct_dynamics_geometry_objective_actual_preflight_v1",
+  "source": {
+    "run_dir": "/home/autoresearch_results/direct_dynamics_all_hours_v1/training/seed1701-night_20260909_v1",
+    "checkpoint": "epoch_snapshots/epoch_0006/ema_last_model.pth",
+    "sha256": {
+      "metadata.json": "73c530dc669b539237bc7b295a352ef6093f0936b970ecb9c96b321bc7745da0",
+      "config.json": "898b5414cb921569b33dbd6bab89df01b0952742ed41648ab948f4ff9a5b05a6",
+      "epoch_snapshots/epoch_0006/ema_last_model.pth": "9b8bb6954b7a19179aee2e58b0c6cdddfcb8b489b1e29d6f503086c704fa0b1b"
+    }
+  },
+  "cell_geometry": {
+    "latitude_path": "/mnt/sciml/data_assimilation/meta_latitudes.npy",
+    "longitude_path": "/mnt/sciml/data_assimilation/meta_longitudes.npy",
+    "status": "center_coordinate_area_proxy_not_verified_cell_corners"
+  },
+  "product_scale_audit": {
+    "path": "docs/research/geometry_product_scale_train_cpu_audit.json",
+    "sha256": "d360e40a6c67d70f3b0169c9ac73834084512b886fca2bfbcf012e0c8d695fc2",
+    "script_path": "docs/research/audit_geometry_product_scale_cpu.py",
+    "script_sha256": "800e33dda39064be2d7b970cab104e667d6eaeba2cb2ecd994c01ac635bf13ad"
+  },
+  "protocol": {
+    "members": 4,
+    "updates_per_arm": 256,
+    "batch_size": 1,
+    "total_rk4_intervals": 16,
+    "frozen_prefix_intervals": 12,
+    "trainable_suffix_intervals": 4,
+    "network_precision": "bf16",
+    "state_precision": "fp32",
+    "score_precision": "fp32",
+    "control_objective": "0.75_fair_native_crps_plus_0.25_unbiased_native_joint_energy",
+    "treatment_addition": "0.25_unbiased_geometry_observable_energy",
+    "geometry_weight": 0.25,
+    "product_scale": 0.3980696029516097,
+    "product_scale_source": "142_train_anchors_x_d0_d3_d6_d9_slice23_population_std",
+    "product_semantics": "mean_sic_times_mean_sit_proxy_not_verified_hourly_volume",
+    "seed": 81373,
+    "production_replay_atol": 0.00002,
+    "step_zero_atol": 0.000001,
+    "suffix_replay_atol": 0.0,
+    "rank_or_hard_event_training_loss": false,
+    "new_support_decoder": false,
+    "optimizer_steps_in_preflight": 0,
+    "test_2023_accessed": false
+  },
+  "clearml": {
+    "env_path": "/home/.env",
+    "tags": [
+      "ema6",
+      "native-joint-flow",
+      "geometry-proper-score",
+      "four-member-all-pairs",
+      "exact-two-pass-vjp",
+      "zero-update",
+      "one-gpu",
+      "test-2023-closed"
+    ]
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "schema_version": "train_geometry_product_scale_v1",
+  "split": "train-2016-2021",
+  "anchor_rule": "8th_and_22nd_each_month",
+  "archive_slice": 23,
+  "lead_days": [
+    0,
+    3,
+    6,
+    9
+  ],
+  "anchors": 142,
+  "values": 27625816,
+  "area_times_sit_mean": 0.16664513694758898,
+  "area_times_sit_population_std": 0.3980696029516097,
+  "test_2023_read": false
+}
