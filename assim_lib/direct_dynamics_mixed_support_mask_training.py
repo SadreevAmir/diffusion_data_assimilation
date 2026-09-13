@@ -49,13 +49,16 @@ class _CoarseMaskDataset(Dataset):
     def __len__(self) -> int:
         return len(self.indices)
 
-    def __getitem__(self, position: int) -> dict[str, torch.Tensor]:
+    def __getitem__(self, position: int) -> dict[str, Any]:
+        dataset_index = self.indices[position]
+        item = self.dataset[dataset_index]
         batch = coarse_mask_batch_from_item(
-            self.dataset[self.indices[position]], self.means, self.stds
+            item, self.means, self.stds
         )
         return {
             "target": batch.target[0], "condition": batch.condition[0],
             "d0_occurrence": batch.d0_occurrence[0], "valid": batch.valid[0],
+            "dataset_index": dataset_index, "case_id": item["meta"]["case_id"],
         }
 
 
@@ -78,6 +81,7 @@ def _validate_contract(config: dict[str, Any], repo: Path) -> tuple[dict[str, An
         "coarse_shape": [80, 64], "updates_per_arm": 512, "batch_size": 8,
         "hidden_channels": 8, "learning_rate": 0.001, "weight_decay": 0.0,
         "adam_betas": [0.9, 0.999], "ema_decay": 0.99,
+        "evaluation_checkpoint": "ema_update_0512",
         "checkpoint_updates": [128, 256, 384, 512], "precision": "bf16",
         "workers": 4, "prefetch_factor": 2, "seed": 91731, "test_2023": "closed",
     }
@@ -114,6 +118,85 @@ def _finite_model(model: torch.nn.Module, label: str) -> None:
     for name, value in model.state_dict().items():
         if not torch.isfinite(value).all():
             raise FloatingPointError(f"{label} parameter {name} is not finite")
+
+
+def _tensor_fingerprint(value: torch.Tensor) -> str:
+    tensor = value.detach().contiguous().cpu()
+    digest = hashlib.sha256()
+    digest.update(str(tensor.dtype).encode())
+    digest.update(str(tuple(tensor.shape)).encode())
+    digest.update(tensor.numpy().tobytes())
+    return digest.hexdigest()
+
+
+def _transactional_arm_update(
+    *,
+    label: str,
+    update: int,
+    model: torch.nn.Module,
+    optimizer: torch.optim.Optimizer,
+    ema: dict[str, torch.Tensor],
+    loss: torch.Tensor,
+    ema_decay: float,
+    record_stage,
+    fail_after: str | None = None,
+) -> float:
+    record_stage(label, update, "write_ahead")
+    loss.backward()
+    gradients = [parameter.grad for parameter in model.parameters() if parameter.grad is not None]
+    if not gradients or any(not torch.isfinite(value).all() for value in gradients):
+        raise FloatingPointError(f"{label} invalid gradient at update {update}")
+    gradient_norm = math.sqrt(sum(float(value.float().square().sum().item()) for value in gradients))
+    optimizer.step()
+    record_stage(label, update, "optimizer_executed")
+    if fail_after == "optimizer_executed":
+        raise RuntimeError("injected failure between optimizer and EMA")
+    _ema_update(ema, model, ema_decay)
+    record_stage(label, update, "ema_executed")
+    if fail_after == "ema_executed":
+        raise RuntimeError("injected failure after EMA before commit")
+    return gradient_norm
+
+
+def _finite_tree(value: Any) -> bool:
+    if torch.is_tensor(value):
+        return bool(torch.isfinite(value).all())
+    if isinstance(value, dict):
+        return all(_finite_tree(item) for item in value.values())
+    if isinstance(value, (list, tuple)):
+        return all(_finite_tree(item) for item in value)
+    return True
+
+
+def _validate_completion(
+    *,
+    history: list[dict[str, Any]],
+    updates: int,
+    checkpoints: dict[str, str],
+    output_dir: Path,
+    models: dict[str, torch.nn.Module],
+    ema: dict[str, dict[str, torch.Tensor]],
+    optimizers: dict[str, torch.optim.Optimizer],
+) -> None:
+    if [row.get("update") for row in history] != list(range(1, updates + 1)):
+        raise RuntimeError("matched history is incomplete or out of order")
+    required_common = {"dataset_indices", "case_ids", "target", "condition", "d0", "valid", "uniform", "noise", "time"}
+    for row in history:
+        if set(row.get("common", {})) != required_common or set(row.get("arms", {})) != {"candidate", "control"}:
+            raise RuntimeError("matched history lacks common or per-arm evidence")
+    for update in (128, 256, 384, 512):
+        name = f"checkpoint_{update:04d}.pt"
+        path = output_dir / name
+        if name not in checkpoints or not path.is_file() or _sha256(path) != checkpoints[name]:
+            raise RuntimeError(f"checkpoint evidence mismatch: {name}")
+    if not all(_finite_tree(model.state_dict()) for model in models.values()):
+        raise FloatingPointError("final model state is not finite")
+    if not _finite_tree(ema) or not all(_finite_tree(optimizer.state_dict()) for optimizer in optimizers.values()):
+        raise FloatingPointError("final EMA/AdamW state is not finite")
+    for label, optimizer in optimizers.items():
+        steps = {int(state["step"].item()) for state in optimizer.state.values() if "step" in state}
+        if steps != {updates}:
+            raise RuntimeError(f"{label} AdamW state is not at optimizer step {updates}")
 
 
 def run(config_path: str | Path, output_dir: str | Path) -> dict[str, Any]:
@@ -171,7 +254,18 @@ def run(config_path: str | Path, output_dir: str | Path) -> dict[str, Any]:
         ema = {label: {name: value.detach().clone() for name, value in model.state_dict().items()}
                for label, model in models.items()}
         cuda_generator = torch.Generator(device=device).manual_seed(config["protocol"]["seed"] + 1)
-        history = {"candidate": [], "control": []}
+        loss_history = {"candidate": [], "control": []}
+        matched_history: list[dict[str, Any]] = []
+        progress_path = output_dir / "progress.json"
+        history_path = output_dir / "matched_history.json"
+
+        def record_stage(label: str, update: int, stage: str) -> None:
+            _atomic_json(progress_path, {
+                **reservation, "status": "running", "arm": label, "update": update,
+                "stage": stage, "last_committed_update": reservation.get("last_committed_update", 0),
+                "resume_supported": False, "evidence_sha256": evidence,
+            })
+
         iterator = iter(loader)
         for update in range(1, 513):
             try:
@@ -185,6 +279,21 @@ def run(config_path: str | Path, output_dir: str | Path) -> dict[str, Any]:
             uniform = torch.rand(batch.target.shape, device=device, generator=cuda_generator).clamp(1e-5, 1 - 1e-5)
             noise = torch.randn(batch.target.shape, device=device, generator=cuda_generator)
             times = torch.rand((batch.target.shape[0],), device=device, generator=cuda_generator).clamp(1e-4, 1 - 1e-4)
+            row = {
+                "update": update,
+                "common": {
+                    "dataset_indices": [int(value) for value in raw["dataset_index"]],
+                    "case_ids": list(raw["case_id"]),
+                    "target": _tensor_fingerprint(batch.target),
+                    "condition": _tensor_fingerprint(batch.condition),
+                    "d0": _tensor_fingerprint(batch.d0_occurrence),
+                    "valid": _tensor_fingerprint(batch.valid),
+                    "uniform": _tensor_fingerprint(uniform),
+                    "noise": _tensor_fingerprint(noise),
+                    "time": _tensor_fingerprint(times),
+                },
+                "arms": {},
+            }
             for label in ("candidate", "control"):
                 optimizer, model = optimizers[label], models[label]
                 optimizer.zero_grad(set_to_none=True)
@@ -194,16 +303,23 @@ def run(config_path: str | Path, output_dir: str | Path) -> dict[str, Any]:
                     )
                 if not torch.isfinite(loss):
                     raise FloatingPointError(f"{label} nonfinite loss at update {update}")
-                loss.backward()
-                if any(p.grad is not None and not torch.isfinite(p.grad).all() for p in model.parameters()):
-                    raise FloatingPointError(f"{label} nonfinite gradient at update {update}")
-                optimizer.step()
+                gradient_norm = _transactional_arm_update(
+                    label=label, update=update, model=model, optimizer=optimizer,
+                    ema=ema[label], loss=loss, ema_decay=0.99, record_stage=record_stage,
+                )
                 _finite_model(model, label)
-                _ema_update(ema[label], model, 0.99)
                 value = float(loss.detach().item())
-                history[label].append(value)
-                if update == 1 or update % 8 == 0:
-                    tracker.report_scalar("train_cfm_loss", label, value, update)
+                loss_history[label].append(value)
+                row["arms"][label] = {"loss": value, "gradient_norm": gradient_norm,
+                                      "optimizer_executed": update, "ema_executed": update}
+            latest_path = output_dir / "latest.pt"
+            latest_sha = _atomic_torch_save({
+                "schema_version": MODE, "code_commit": commit, "update": update,
+                "optimizer_steps_per_arm": update, "models": {k: v.state_dict() for k, v in models.items()},
+                "ema": ema, "optimizers": {k: v.state_dict() for k, v in optimizers.items()},
+                "stats_binding": stats_binding, "preflight": config["preflight"],
+                "resume_supported": False,
+            }, latest_path)
             if update in {128, 256, 384, 512}:
                 checkpoint_path = output_dir / f"checkpoint_{update:04d}.pt"
                 evidence[checkpoint_path.name] = _atomic_torch_save({
@@ -214,10 +330,19 @@ def run(config_path: str | Path, output_dir: str | Path) -> dict[str, Any]:
                     "train_dates_sha256": _dates_sha(train_dates),
                     "heldout_dates_sha256": _dates_sha(heldout_dates),
                 }, checkpoint_path)
-                _atomic_json(status_path, {
-                    **reservation, "status": "running", "optimizer_steps_per_arm": update,
-                    "evidence_sha256": evidence,
-                })
+            matched_history.append(row)
+            _atomic_json(history_path, {"schema_version": MODE, "updates": matched_history})
+            reservation.update({"last_committed_update": update, "optimizer_steps_per_arm": update,
+                                "latest_sha256": latest_sha, "resume_supported": False})
+            _atomic_json(status_path, {**reservation, "status": "running", "stage": "committed",
+                                      "evidence_sha256": evidence})
+            if update == 1 or update % 8 == 0:
+                for label in ("candidate", "control"):
+                    tracker.report_scalar("train_cfm_loss", label, row["arms"][label]["loss"], update)
+        _validate_completion(
+            history=matched_history, updates=512, checkpoints=evidence, output_dir=output_dir,
+            models=models, ema=ema, optimizers=optimizers,
+        )
         result = {
             "schema_version": MODE, "status": "training_complete", "code_commit": commit,
             "clearml_task_id": str(tracker.task.id), "optimizer_steps_per_arm": 512,
@@ -226,9 +351,12 @@ def run(config_path: str | Path, output_dir: str | Path) -> dict[str, Any]:
             "heldout_values_accessed": False, "test_2023_accessed": False,
             "train_dates_sha256": _dates_sha(train_dates), "heldout_dates_sha256": _dates_sha(heldout_dates),
             "conditioning_stats_binding": stats_binding, "preflight_binding": config["preflight"],
+            "matched_history_path": str(history_path), "matched_history_sha256": _sha256(history_path),
+            "primary_evaluation_checkpoint": "ema_update_0512",
+            "resume_supported": False,
             "loss": {label: {"first32_mean": sum(values[:32]) / 32,
                               "last32_mean": sum(values[-32:]) / 32,
-                              "final": values[-1]} for label, values in history.items()},
+                              "final": values[-1]} for label, values in loss_history.items()},
             "checkpoint_sha256": evidence, "evaluation_authorized": False,
             "claim_boundary": "bounded 80x64 occurrence A/B training; no validation, skill or calibration claim",
         }
