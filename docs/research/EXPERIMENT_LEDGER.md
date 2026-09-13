@@ -26,7 +26,7 @@
 | GEO-H1 | Endpoint-only geometry suffix continuation | REJECTED | Обе ветви хуже EMA6; это не был geometry-CFM test |
 | GEO-P0 | Geometry-CFM zero-update preflight | COMPLETED | Математика, gradients и lifecycle прошли Astra audit |
 | GEO-T1 | Full-CFM control512/treatment512 | REJECTED | Geometry term даёт малый matched-control gain, но обе ветви значительно хуже EMA6 |
-| IDEA-F1 | One-shot front-plus-source mixed-support flow | PROPOSED | Основной кандидат следующей полноценной модели |
+| IDEA-F1 | One-shot front-plus-source mixed-support flow | CPU PASS / GPU HOLD | Representation корректен; проверяется реальный source+masked-CFM runner |
 
 ## DYN-B0 — direct EMA6
 
@@ -215,6 +215,28 @@ representation admission. До обучения нужно явно опреде
 mixed-support round trip, land invariance и birth/death при пустой исходной
 кромке. Прохождение этого gate подтвердит только корректность representation,
 не калибровку.
+
+CPU admission выполнен на exact commit
+`be2a345ef185794cfeb62003a4cbedca14ef7de7`, без CUDA, только на train
+(`test-2023=false`). JSON результата:
+`direct_dynamics_mixed_support_cpu_admission_v1/be2a345/admission.json`,
+SHA-256 `f340a6623f31df6854266cd24f4e474184b1439173f7ef627d93a029deb37f9f`.
+Новые тесты: `5/5 PASS`. Из `86,859` native occurrence changes на 12
+strided anchors в coarse 80×64 видимы `58,772` (`67.66%`); среди coarse
+изменений `3,084` births и `2,762` deaths. Mixed-support round trip прошёл:
+максимальная ошибка SIC `8.20e-8`, SIT `9.99e-7`; land invariance прошёл;
+все четыре проверенных gradient norms конечны и положительны. Synthetic
+empty-edge birth/death декодируются точно, без STE.
+
+Astra verdict: `GO` для representation и подготовки compact A/B, но `HOLD`
+на GPU. Текущий synthetic source check проверяет codec, а не actual source
+branch. До zero-update GPU preflight требуется CPU integration будущего runner:
+time+d0 conditioning, одинаковое зануление land до forward и sampling,
+положительный per-case denominator без `clamp_min(1)`, land-perturbation
+regression, а также birth/death вне исходной кромки и ненулевой gradient
+параметров настоящей source branch. Поэтому текущий результат является
+математическим admission representation, но не доказательством калибровки или
+работоспособности конкретного sampler.
 
 Первый falsifier: compact 80×64 joint mask-only front+source против
 equal-capacity ordinary conv mask generator, leave-one-train-year-out, joint
