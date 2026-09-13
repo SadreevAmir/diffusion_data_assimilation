@@ -1,0 +1,40 @@
+{
+  "schema_version": "direct_dynamics_geometry_weighted_cfm_admission_v1",
+  "status": "cpu_only_gpu_hold",
+  "source": {
+    "run_dir": "/home/autoresearch_results/direct_dynamics_all_hours_v1/training/seed1701-night_20260909_v1",
+    "checkpoint": "epoch_snapshots/epoch_0006/ema_last_model.pth",
+    "sha256": "9b8bb6954b7a19179aee2e58b0c6cdddfcb8b489b1e29d6f503086c704fa0b1b"
+  },
+  "metric": {
+    "semantics": "fixed_condition_dependent_SPD_quadratic_on_valid_ocean_velocity_error",
+    "trajectory_channel_order": ["d3_sic", "d3_sit", "d6_sic", "d6_sit", "d9_sic", "d9_sit"],
+    "multiscale_factors": [2, 4],
+    "multiscale_grid_shapes": [[160, 128], [80, 64]],
+    "pooling": "equal_valid_ocean_cell_block_mean_not_area_weighted",
+    "field_stds": [0.36890927421384667, 0.4359687842884708],
+    "product_scale": 0.3980696029516097,
+    "product_scale_source": "train_2016_2021_geometry_product_scale_train_cpu_audit",
+    "product_linearization": "d0_sit_times_sigma_sic_error_plus_d0_sic_times_sigma_sit_error",
+    "edge_source": "valid_valid_d0_sic_differences_only_with_masked_5x5_smoothing",
+    "regions_enabled": false,
+    "group_weights": {
+      "multiscale_sum_of_two_levels": 0.125,
+      "lead_difference": 0.25,
+      "d0_linearized_product": 0.25,
+      "d0_ice_edge_tube": 0.25,
+      "regions": 0.0
+    },
+    "geometry_weight_lambda": 0.1,
+    "selection_policy": "single_train_only_fixed_value_no_validation_sweep",
+    "future_truth_weights": false
+  },
+  "matched_gpu_ab_if_admitted": {
+    "control": "native_full_cfm_continuation",
+    "treatment": "native_plus_fixed_geometry_metric_full_cfm_continuation",
+    "same_examples_times_noises_optimizer_lr_updates_compute": true,
+    "all_hour_training_distribution": true,
+    "endpoint_score": false,
+    "test_2023_accessed": false
+  }
+}

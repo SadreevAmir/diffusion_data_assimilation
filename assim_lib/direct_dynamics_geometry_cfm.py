@@ -74,10 +74,33 @@ def _validate_inputs(
         raise ValueError("error contains non-finite values")
     if bool(torch.any(valid_mask < 0)) or bool(torch.any(valid_mask > 1)):
         raise ValueError("valid_mask must lie in [0,1]")
+    if not bool(torch.all((valid_mask == 0) | (valid_mask == 1))):
+        raise ValueError("valid_mask must be binary")
+    if bool(torch.any(valid_mask.flatten(1).sum(dim=1) <= 0)):
+        raise ValueError("every case must contain at least one valid ocean cell")
 
 
 def _expanded_mask(error: torch.Tensor, valid_mask: torch.Tensor) -> torch.Tensor:
-    return valid_mask.to(dtype=error.dtype, device=error.device).expand_as(error)
+    return valid_mask.detach().to(dtype=error.dtype, device=error.device).expand_as(error)
+
+
+def _validate_region_masks(
+    error: torch.Tensor,
+    valid_mask: torch.Tensor,
+    region_masks: torch.Tensor | None,
+) -> None:
+    if region_masks is None:
+        return
+    expected = (error.shape[0], region_masks.shape[1], *error.shape[-2:])
+    if region_masks.ndim != 4 or tuple(region_masks.shape) != expected:
+        raise ValueError("region_masks must have shape [B,R,H,W]")
+    if region_masks.shape[1] <= 0:
+        raise ValueError("region_masks must contain at least one region")
+    if not bool(torch.isfinite(region_masks).all()) or bool(torch.any(region_masks < 0)):
+        raise ValueError("region_masks must be finite and non-negative")
+    active = region_masks.detach() * valid_mask.detach()
+    if bool(torch.any(active.sum(dim=(-2, -1)) <= 0)):
+        raise ValueError("every region must overlap valid ocean in every case")
 
 
 def masked_mean_pool(error: torch.Tensor, valid_mask: torch.Tensor, factor: int) -> torch.Tensor:
@@ -110,7 +133,7 @@ def masked_mean_pool_adjoint(
 
 def lead_difference(error: torch.Tensor, valid_mask: torch.Tensor) -> torch.Tensor:
     trajectory = error.reshape(error.shape[0], LEADS, FIELDS, *error.shape[-2:])
-    mask = valid_mask.to(dtype=error.dtype, device=error.device).unsqueeze(1)
+    mask = valid_mask.detach().to(dtype=error.dtype, device=error.device).unsqueeze(1)
     return (trajectory[:, 1:] - trajectory[:, :-1]) * mask
 
 
@@ -122,7 +145,7 @@ def lead_difference_adjoint(probe: torch.Tensor, valid_mask: torch.Tensor) -> to
     result[:, 0] -= probe[:, 0]
     result[:, 1] += probe[:, 0] - probe[:, 1]
     result[:, 2] += probe[:, 1]
-    result *= valid_mask.to(dtype=probe.dtype, device=probe.device).unsqueeze(1)
+    result *= valid_mask.detach().to(dtype=probe.dtype, device=probe.device).unsqueeze(1)
     return result.reshape(probe.shape[0], CHANNELS, *probe.shape[-2:])
 
 
@@ -138,7 +161,7 @@ def linearized_volume_error(
     trajectory = error.reshape(error.shape[0], LEADS, FIELDS, *error.shape[-2:])
     sic0 = initial_sic.detach().to(dtype=error.dtype, device=error.device).unsqueeze(1)
     sit0 = initial_sit.detach().to(dtype=error.dtype, device=error.device).unsqueeze(1)
-    mask = valid_mask.to(dtype=error.dtype, device=error.device).unsqueeze(1)
+    mask = valid_mask.detach().to(dtype=error.dtype, device=error.device).unsqueeze(1)
     result = sit0 * float(field_stds[0]) * trajectory[:, :, 0:1]
     result = result + sic0 * float(field_stds[1]) * trajectory[:, :, 1:2]
     return (result.squeeze(2) / float(product_scale)) * mask.squeeze(2)
@@ -155,7 +178,7 @@ def linearized_volume_adjoint(
     expected = (valid_mask.shape[0], LEADS, *valid_mask.shape[-2:])
     if tuple(probe.shape) != expected:
         raise ValueError(f"product probe must have shape {expected}")
-    mask = valid_mask.to(dtype=probe.dtype, device=probe.device).unsqueeze(1)
+    mask = valid_mask.detach().to(dtype=probe.dtype, device=probe.device).unsqueeze(1)
     sic0 = initial_sic.detach().to(dtype=probe.dtype, device=probe.device).unsqueeze(1)
     sit0 = initial_sit.detach().to(dtype=probe.dtype, device=probe.device).unsqueeze(1)
     active = probe.unsqueeze(2) * mask / float(product_scale)
@@ -168,19 +191,26 @@ def linearized_volume_adjoint(
 def initial_edge_weight(initial_sic: torch.Tensor, valid_mask: torch.Tensor) -> torch.Tensor:
     """A bounded d0-only ice-edge tube weight, detached from model gradients."""
     sic = initial_sic.detach()
-    dy = F.pad((sic[..., 1:, :] - sic[..., :-1, :]).abs(), (0, 0, 0, 1))
-    dx = F.pad((sic[..., :, 1:] - sic[..., :, :-1]).abs(), (0, 1, 0, 0))
-    gradient = F.avg_pool2d(dx + dy, 5, stride=1, padding=2)
-    maximum = gradient.flatten(1).amax(dim=1).view(-1, 1, 1, 1).clamp_min(1e-12)
-    return (gradient / maximum).clamp(0.0, 1.0) * valid_mask.detach()
+    valid = valid_mask.detach().to(dtype=sic.dtype, device=sic.device)
+    dy_pair = valid[..., 1:, :] * valid[..., :-1, :]
+    dx_pair = valid[..., :, 1:] * valid[..., :, :-1]
+    dy = F.pad((sic[..., 1:, :] - sic[..., :-1, :]).abs() * dy_pair, (0, 0, 0, 1))
+    dx = F.pad((sic[..., :, 1:] - sic[..., :, :-1]).abs() * dx_pair, (0, 1, 0, 0))
+    raw = (dx + dy) * valid
+    numerator = F.avg_pool2d(raw, 5, stride=1, padding=2)
+    denominator = F.avg_pool2d(valid, 5, stride=1, padding=2)
+    smoothed = torch.where(
+        denominator > 0,
+        numerator / denominator.clamp_min(torch.finfo(sic.dtype).tiny),
+        0,
+    ) * valid
+    maximum = smoothed.flatten(1).amax(dim=1).view(-1, 1, 1, 1).clamp_min(1e-12)
+    return (smoothed / maximum).clamp(0.0, 1.0) * valid
 
 
 def region_mean(error: torch.Tensor, valid_mask: torch.Tensor, region_masks: torch.Tensor) -> torch.Tensor:
-    expected = (error.shape[0], region_masks.shape[1], *error.shape[-2:])
-    if region_masks.ndim != 4 or tuple(region_masks.shape) != expected:
-        raise ValueError("region_masks must have shape [B,R,H,W]")
     weights = region_masks.detach().to(dtype=error.dtype, device=error.device).unsqueeze(1)
-    weights = weights * valid_mask.to(dtype=error.dtype, device=error.device).unsqueeze(2)
+    weights = weights * valid_mask.detach().to(dtype=error.dtype, device=error.device).unsqueeze(2)
     denominator = weights.sum(dim=(-2, -1)).clamp_min(torch.finfo(error.dtype).tiny)
     numerator = (error.unsqueeze(2) * weights).sum(dim=(-2, -1))
     return numerator / denominator
@@ -196,7 +226,7 @@ def region_mean_adjoint(
     if tuple(probe.shape) != expected:
         raise ValueError(f"region probe must have shape {expected}")
     weights = region_masks.detach().to(dtype=probe.dtype, device=probe.device).unsqueeze(1)
-    weights = weights * valid_mask.to(dtype=probe.dtype, device=probe.device).unsqueeze(2)
+    weights = weights * valid_mask.detach().to(dtype=probe.dtype, device=probe.device).unsqueeze(2)
     denominator = weights.sum(dim=(-2, -1)).clamp_min(torch.finfo(probe.dtype).tiny)
     return (probe[..., None, None] * weights / denominator[..., None, None]).sum(dim=2)
 
@@ -212,6 +242,7 @@ def apply_conditioned_geometry_operator(
 ) -> dict[str, torch.Tensor]:
     spec.validate()
     _validate_inputs(error, valid_mask, initial_sic, initial_sit)
+    _validate_region_masks(error, valid_mask, region_masks)
     mask = _expanded_mask(error, valid_mask)
     edge = initial_edge_weight(initial_sic, valid_mask).to(dtype=error.dtype, device=error.device)
     result = {
@@ -254,7 +285,7 @@ def adjoint_conditioned_geometry_operator(
         )
     if "edge" in probes:
         edge = initial_edge_weight(initial_sic, valid_mask).to(dtype=result.dtype, device=result.device)
-        mask = valid_mask.to(dtype=result.dtype, device=result.device).expand_as(result)
+        mask = valid_mask.detach().to(dtype=result.dtype, device=result.device).expand_as(result)
         result += probes["edge"] * mask * edge.sqrt().expand_as(result)
     if "region" in probes:
         if region_masks is None:
@@ -325,6 +356,12 @@ def geometry_weighted_cfm_loss(
 ) -> tuple[torch.Tensor, dict[str, torch.Tensor]]:
     if not math.isfinite(float(geometry_weight)) or geometry_weight < 0:
         raise ValueError("geometry_weight must be finite and non-negative")
+    if tuple(prediction.shape) != tuple(target_velocity.shape):
+        raise ValueError("prediction and target_velocity must have exactly matching shapes")
+    if prediction.dtype != target_velocity.dtype or prediction.device != target_velocity.device:
+        raise ValueError("prediction and target_velocity must share dtype and device")
+    _validate_inputs(prediction - target_velocity, valid_mask, initial_sic, initial_sit)
+    _validate_region_masks(prediction, valid_mask, region_masks)
     mask = _expanded_mask(prediction, valid_mask)
     native = ((prediction - target_velocity).square() * mask).sum() / mask.sum().clamp_min(1.0)
     # Preserve the production baseline bit-for-bit and gradient-for-gradient.

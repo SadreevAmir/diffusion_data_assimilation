@@ -8,6 +8,7 @@ from assim_lib.direct_dynamics_geometry_cfm import (
     geometry_weighted_cfm_loss,
     run_cpu_admission,
 )
+from assim_lib.trainer import UNetTrainer
 
 
 def _inputs():
@@ -28,7 +29,7 @@ def test_lambda_zero_is_exact_native_masked_cfm_loss_and_gradient():
     baseline_prediction = prediction.clone().requires_grad_(True)
     weighted_prediction = prediction.clone().requires_grad_(True)
     mask = valid.expand_as(prediction)
-    baseline = ((baseline_prediction - target).square() * mask).sum() / mask.sum().clamp_min(1.0)
+    baseline = UNetTrainer._masked_mse(baseline_prediction, target, mask)
     candidate, diagnostics = geometry_weighted_cfm_loss(
         weighted_prediction,
         target,
@@ -85,14 +86,90 @@ def test_geometry_quadratic_gradient_matches_central_difference():
 
 def test_conditioning_is_detached_from_geometry_metric():
     error, valid, sic0, sit0, regions, _ = _inputs()
+    valid.requires_grad_(True)
     sic0.requires_grad_(True)
     sit0.requires_grad_(True)
     regions.requires_grad_(True)
     loss = geometry_quadratic(error.requires_grad_(True), valid, sic0, sit0, region_masks=regions)[0]
     loss.backward()
+    assert valid.grad is None
     assert sic0.grad is None
     assert sit0.grad is None
     assert regions.grad is None
+
+
+def test_coast_is_not_mistaken_for_an_ice_edge():
+    from assim_lib.direct_dynamics_geometry_cfm import initial_edge_weight
+
+    valid = torch.ones((1, 1, 16, 16), dtype=torch.float64)
+    valid[..., :, :4] = 0
+    constant_ocean_a = torch.full_like(valid, 0.65)
+    constant_ocean_a[..., :, :4] = 0
+    constant_ocean_b = constant_ocean_a.clone()
+    constant_ocean_b[..., :, :4] = 91.0
+    edge_a = initial_edge_weight(constant_ocean_a, valid)
+    edge_b = initial_edge_weight(constant_ocean_b, valid)
+    assert torch.count_nonzero(edge_a) == 0
+    assert torch.equal(edge_a, edge_b)
+
+    true_edge = constant_ocean_a.clone()
+    true_edge[..., :, 10:] = 0.0
+    detected = initial_edge_weight(true_edge, valid)
+    assert detected[..., :, 8:12].max() > 0
+
+
+def test_loss_fails_closed_on_malformed_target_and_empty_mask():
+    prediction, valid, sic0, sit0, regions, _ = _inputs()
+    try:
+        geometry_weighted_cfm_loss(
+            prediction,
+            prediction[:, :1],
+            valid,
+            sic0,
+            sit0,
+            geometry_weight=0.0,
+            region_masks=regions,
+        )
+    except ValueError as error:
+        assert "matching shapes" in str(error)
+    else:
+        raise AssertionError("broadcastable malformed target was accepted")
+
+    empty = valid.clone()
+    empty[0] = 0
+    try:
+        geometry_weighted_cfm_loss(
+            prediction,
+            prediction,
+            empty,
+            sic0,
+            sit0,
+            geometry_weight=0.0,
+            region_masks=regions,
+        )
+    except ValueError as error:
+        assert "valid ocean" in str(error)
+    else:
+        raise AssertionError("empty valid-ocean case was accepted")
+
+
+def test_loss_fails_closed_on_invalid_regions():
+    prediction, valid, sic0, sit0, regions, _ = _inputs()
+    regions[0, 0] = 0
+    try:
+        geometry_weighted_cfm_loss(
+            prediction,
+            prediction,
+            valid,
+            sic0,
+            sit0,
+            geometry_weight=0.1,
+            region_masks=regions,
+        )
+    except ValueError as error:
+        assert "overlap valid ocean" in str(error)
+    else:
+        raise AssertionError("empty conditioned region was accepted")
 
 
 def test_cpu_admission_passes_and_is_explicitly_not_scientific_evidence():
