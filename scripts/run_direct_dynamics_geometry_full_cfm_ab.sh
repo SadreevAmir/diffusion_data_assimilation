@@ -97,10 +97,13 @@ export NUMEXPR_NUM_THREADS=6
 if [[ "$MODE" == "preflight" ]]; then
   TIMEOUT_SECONDS=3540
   KILL_AFTER_SECONDS=60
+  timeout --foreground --signal=TERM --kill-after="${KILL_AFTER_SECONDS}s" "${TIMEOUT_SECONDS}s" \
+    python -m assim_lib.direct_dynamics_geometry_cfm_training \
+    --config "$CONFIG" --mode preflight --output-dir "$OUTPUT"
 else
   TIMEOUT_SECONDS=28680
   KILL_AFTER_SECONDS=120
+  timeout --foreground --signal=TERM --kill-after="${KILL_AFTER_SECONDS}s" "${TIMEOUT_SECONDS}s" \
+    python -m assim_lib.direct_dynamics_geometry_cfm_transactional_training \
+    --config "$CONFIG" --output-dir "$OUTPUT"
 fi
-timeout --foreground --signal=TERM --kill-after="${KILL_AFTER_SECONDS}s" "${TIMEOUT_SECONDS}s" \
-  python -m assim_lib.direct_dynamics_geometry_cfm_training \
-  --config "$CONFIG" --mode "$MODE" --output-dir "$OUTPUT"
