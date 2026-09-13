@@ -1,0 +1,127 @@
+{
+  "schema_version": "direct_dynamics_geometry_full_cfm_paired_validation_v1",
+  "project_name": "sea_ice_two_stage",
+  "task_name": "direct_dynamics_geometry_full_cfm_paired_validation_v1",
+  "panel_source": {
+    "path": "config/experiments/evaluate_direct_dynamics_geometry_objective_ab_v1.json",
+    "sha256": "7fc2292a8b50779bd2f45dc7f92d4c101d8fb276d0067f8295d39cadb0a6a5da",
+    "identity_key": "case_identities"
+  },
+  "source": {
+    "label": "ema6",
+    "run_dir": "/home/autoresearch_results/direct_dynamics_all_hours_v1/training/seed1701-night_20260909_v1",
+    "checkpoint": "epoch_snapshots/epoch_0006/ema_last_model.pth",
+    "checkpoint_sha256": "9b8bb6954b7a19179aee2e58b0c6cdddfcb8b489b1e29d6f503086c704fa0b1b",
+    "metadata_sha256": "73c530dc669b539237bc7b295a352ef6093f0936b970ecb9c96b321bc7745da0",
+    "config_sha256": "898b5414cb921569b33dbd6bab89df01b0952742ed41648ab948f4ff9a5b05a6"
+  },
+  "training_evidence": {
+    "commit": "8e432ee9404f90d664ac95281af480e1db4de461",
+    "run_id": "geometry-full-cfm-ab-8e432ee-20260913-0638",
+    "training_result": {
+      "path": "/home/autoresearch_results/direct_dynamics_geometry_cfm_v1/train/geometry-full-cfm-ab-8e432ee-20260913-0638/training_result.json",
+      "sha256": "f5aadba59042b2700c41060b5239886053276ad5f7da096d042899b2afd2542d"
+    },
+    "status": {
+      "path": "/home/autoresearch_results/direct_dynamics_geometry_cfm_v1/train/geometry-full-cfm-ab-8e432ee-20260913-0638/status.json",
+      "sha256": "3cbdf7bccb8d108549a7d2191cbf02cbef302da9475987947d5a0204283ebb23"
+    },
+    "schedule": {
+      "path": "/home/autoresearch_results/direct_dynamics_geometry_cfm_v1/train/geometry-full-cfm-ab-8e432ee-20260913-0638/schedule.json",
+      "sha256": "8f8622da932279da66ae6442a16125b338260b2565daf1e333c38942b388b32e"
+    },
+    "launch_status": {
+      "path": "/home/autoresearch_results/direct_dynamics_geometry_cfm_v1/train_launches/geometry-full-cfm-ab-8e432ee-20260913-0638/status.json",
+      "sha256": "cf15143341db431e32424c2d2229f647d88b179d4fe536b04b5f65e4b95b9ca5"
+    },
+    "launch_exit": {
+      "path": "/home/autoresearch_results/direct_dynamics_geometry_cfm_v1/train_launches/geometry-full-cfm-ab-8e432ee-20260913-0638/exit.json",
+      "sha256": "c647e7621babad097d0c8904a86f9162bc75744a62918d528eb0feb2f6d820e2"
+    }
+  },
+  "laws": [
+    {
+      "label": "ema6",
+      "kind": "source_public_sampler"
+    },
+    {
+      "label": "control512",
+      "kind": "raw_full_model_state",
+      "path": "/home/autoresearch_results/direct_dynamics_geometry_cfm_v1/train/geometry-full-cfm-ab-8e432ee-20260913-0638/control/update_0512/model.pth",
+      "sha256": "569d68d4f142ea8071b6bf1cf60c8a936a1b1038357b16e6939a7ddb94ba1207"
+    },
+    {
+      "label": "treatment512",
+      "kind": "raw_full_model_state",
+      "path": "/home/autoresearch_results/direct_dynamics_geometry_cfm_v1/train/geometry-full-cfm-ab-8e432ee-20260913-0638/treatment/update_0512/model.pth",
+      "sha256": "e1832b3b3b1dee9a16342dd66451ab1efd51ea29754aa494bb12107a87ca8561"
+    }
+  ],
+  "protocol": {
+    "split": "valid",
+    "validation_year": 2022,
+    "development_reuse": true,
+    "case_indices": [0, 777, 1553, 2330, 3107, 3883, 4660, 5436, 6213, 6990, 7766, 8543],
+    "members": 8,
+    "rk4_timepoints": 17,
+    "network_precision": "bf16",
+    "state_precision": "fp32",
+    "raw_unclipped": true,
+    "optimizer_steps": 0,
+    "noise_seed": 314159,
+    "bootstrap_unit": "whole_date",
+    "bootstrap_replicates": 100000,
+    "bootstrap_seed": 20260912,
+    "visual_case_orders": [0, 3, 6, 9],
+    "test_2023_accessed": false
+  },
+  "scores": {
+    "primary": "case_equal_six_channel_standardized_fair_crps",
+    "fair_member_denominator": "8x7_ordered_equivalent_to_all_28_unordered_pairs",
+    "physical_crps": true,
+    "rmse_definition": "sqrt_of_case_equal_mean_mse",
+    "native_joint_energy": true,
+    "frozen_geometry_energy": true,
+    "spread_skill_reference_raw": 0.9428090415820634,
+    "spread_skill_reference_adjusted": 1.0,
+    "tie_aware_coverage": true
+  },
+  "rank_strata": {
+    "seasons": {"DJF": [12, 1, 2], "MAM": [3, 4, 5], "JJA": [6, 7, 8], "SON": [9, 10, 11]},
+    "sic_truth_groups": ["exact_zero", "interior", "exact_one"],
+    "sit_truth_groups": ["exact_zero", "positive"],
+    "truth_group_source": "structured_physical_truth_before_any_projection",
+    "empty_group_policy": "null_with_counts",
+    "conditional_rank_role": "diagnostic_not_uniformity_gate",
+    "occurrence_threshold": 0.01,
+    "sic_cap_threshold": 0.99,
+    "occurrence_and_cap_scores": ["brier", "ece"]
+  },
+  "gate": {
+    "geometry_effect": "treatment512-control512 geometry-ES paired date-bootstrap upper95 < 0 and primary CRPS ratio upper95 <= 1.01",
+    "replacement": "treatment512-ema6 primary CRPS paired date-bootstrap upper95 < 0 plus all frozen safety margins against ema6 and control512",
+    "per_output_crps_rmse_ratio_max": 1.01,
+    "native_energy_ratio_max": 1.01,
+    "rank_tv_increase_max": 0.01,
+    "coverage_absolute_error_increase_max": 0.01,
+    "adjusted_ssr_absolute_error_increase_max": 0.02,
+    "roughness_ratio_max": 1.02,
+    "manual_visual_review_required": true
+  },
+  "display": {
+    "sic_limits": [0.0, 1.0],
+    "sit_limits_m": [0.0, 4.0],
+    "individual_members_per_case": 8,
+    "paired_deltas": true,
+    "rank_figures": ["overall_per_output", "seasonal", "truth_support_strata"]
+  },
+  "cell_geometry": {
+    "latitude_path": "/mnt/sciml/data_assimilation/meta_latitudes.npy",
+    "longitude_path": "/mnt/sciml/data_assimilation/meta_longitudes.npy"
+  },
+  "product_scale": 0.3980696029516097,
+  "clearml": {
+    "env_path": "/home/.env",
+    "tags": ["validation-2022-development-reuse", "ema6-control512-treatment512", "full-public-rk4-17", "paired-common-random-numbers", "eight-members", "raw-unclipped", "one-gpu", "test-2023-closed"]
+  }
+}
