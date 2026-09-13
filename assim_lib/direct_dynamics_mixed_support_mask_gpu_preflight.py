@@ -226,6 +226,18 @@ def run(config_path: str | Path, output_dir: str | Path) -> dict[str, Any]:
             gradients = _finite_positive_gradients(model)
             if not gradients["all_finite_positive"]:
                 raise FloatingPointError(f"{label} has missing or invalid gradients")
+            terminal_path = output_dir / f"{label}_terminal_latent.pt"
+
+            def save_terminal_latent(latent: torch.Tensor, *, path=terminal_path, arm=label) -> None:
+                evidence_sha256[path.name] = _atomic_torch_save(
+                    {"terminal_latent": latent.cpu(), "code_commit": commit}, path
+                )
+                _atomic_json(status_path, {
+                    **reservation,
+                    "status": f"{arm}_terminal_latent_evidence",
+                    "evidence_sha256": evidence_sha256,
+                })
+
             with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
                 decoded = sample_masks(
                     model,
@@ -234,6 +246,7 @@ def run(config_path: str | Path, output_dir: str | Path) -> dict[str, Any]:
                     valid=batch.valid,
                     noise=noise,
                     steps=1,
+                    before_decode=save_terminal_latent,
                 )
             sample_path = output_dir / f"{label}_sample.pt"
             evidence_sha256[sample_path.name] = _atomic_torch_save(
@@ -259,6 +272,7 @@ def run(config_path: str | Path, output_dir: str | Path) -> dict[str, Any]:
                 "decoded_ice_cells": int(decoded.sum().item()),
                 "parameters_unchanged": True,
                 "prediction_evidence_sha256": evidence_sha256[prediction_path.name],
+                "terminal_latent_evidence_sha256": evidence_sha256[terminal_path.name],
                 "sample_evidence_sha256": evidence_sha256[sample_path.name],
             }
             model.zero_grad(set_to_none=True)

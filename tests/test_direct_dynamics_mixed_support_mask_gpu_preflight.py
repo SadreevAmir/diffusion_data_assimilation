@@ -2,7 +2,11 @@ import json
 import tempfile
 from pathlib import Path
 
+import torch
+
 from assim_lib.direct_dynamics_mixed_support_mask_gpu_preflight import _finalize_failure
+from assim_lib.direct_dynamics_mixed_support_mask_gpu_preflight import _atomic_torch_save
+from assim_lib.direct_dynamics_mixed_support_mask_runner import sample_masks
 
 
 def test_preflight_is_zero_update_and_train_only():
@@ -15,6 +19,7 @@ def test_preflight_is_zero_update_and_train_only():
     assert "fixed_inputs.pt" in source
     assert "prediction.pt" in source
     assert "sample.pt" in source
+    assert "terminal_latent.pt" in source
     assert "parameters changed during zero-update preflight" in source
     assert "CLEARML_REQUIRE_ONLINE" in source
     assert "signal.SIGTERM" in source and "signal.SIGINT" in source
@@ -61,3 +66,32 @@ def test_failure_injection_boundary_preserves_primary_error_and_closes_tracker()
     assert payload["error"] == "injected preflight failure after fixed_evidence"
     assert payload["evidence_sha256"]["fixed_inputs.pt"] == "abc"
     assert any("clearml_mark_failed" in item for item in payload["cleanup_errors"])
+
+
+def test_nonfinite_sampling_latent_is_saved_before_decoder_preserves_primary_error():
+    class NaNVelocity(torch.nn.Module):
+        def forward(self, state, *_args):
+            return torch.full_like(state, float("nan"))
+
+    condition = torch.zeros((1, 15, 4, 4))
+    d0 = torch.zeros((1, 1, 4, 4))
+    valid = torch.ones_like(d0)
+    noise = torch.zeros((1, 3, 4, 4))
+    with tempfile.TemporaryDirectory() as directory:
+        terminal = Path(directory) / "terminal.pt"
+
+        def save(value):
+            _atomic_torch_save({"terminal_latent": value}, terminal)
+
+        try:
+            sample_masks(
+                NaNVelocity(), condition=condition, d0_occurrence=d0,
+                valid=valid, noise=noise, steps=1, before_decode=save,
+            )
+        except ValueError as error:
+            primary = str(error)
+        else:
+            raise AssertionError("nonfinite terminal latent reached the decoder unnoticed")
+        saved = torch.load(terminal, weights_only=True)["terminal_latent"]
+    assert not torch.isfinite(saved).all()
+    assert primary == "binary latent must be finite"

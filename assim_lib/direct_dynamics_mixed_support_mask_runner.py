@@ -10,7 +10,7 @@ convolution and after every sampling step.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Callable
 
 import torch
 import torch.nn.functional as F
@@ -179,6 +179,7 @@ def sample_masks(
     valid: torch.Tensor,
     noise: torch.Tensor,
     steps: int = 4,
+    before_decode: Callable[[torch.Tensor], None] | None = None,
 ) -> torch.Tensor:
     if steps <= 0:
         raise ValueError("steps must be positive")
@@ -190,6 +191,8 @@ def sample_masks(
         time = torch.full((state.shape[0],), 1.0 - index / steps, dtype=state.dtype, device=state.device)
         state = state + dt * model(state, time, condition, d0_occurrence, ocean)
         state = torch.where(ocean > 0, state, torch.zeros_like(state))
+    if before_decode is not None:
+        before_decode(state.detach())
     decoded = decode_binary_dequantized_logit(state)
     return torch.where(ocean > 0, decoded, torch.zeros_like(decoded))
 
