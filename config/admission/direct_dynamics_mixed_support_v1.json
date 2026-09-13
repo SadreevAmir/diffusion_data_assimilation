@@ -1,0 +1,20 @@
+{
+  "mode": "direct_dynamics_mixed_support_cpu_admission_v1",
+  "resource_kind": "cpu",
+  "dataset_config": "config/data/m2m_2f_two_stage_dynamics_protocol.json",
+  "structured_state_stats": "config/data/m2m_2f_structured_joint_train_stats.json",
+  "dataset_split": "train",
+  "test_2023_access_allowed": false,
+  "dynamic_forcing_stats": {
+    "source_split": "train",
+    "estimator_scope": "slice23_train_reused_for_fixed_slice_representation_admission",
+    "indices": [6, 7, 13, 14],
+    "means": [0.00024072701720376523, -0.017859677007622955, -0.106700353199528, -0.18476749778477272],
+    "stds": [0.06025002092600086, 0.0655322642143171, 4.434678472175259, 4.7337812043401915],
+    "finite_value_count_per_field": [100059986, 100059986, 104958646, 104958646]
+  },
+  "coarse_factor": 4,
+  "max_cases": 12,
+  "stride_days": 180,
+  "seed": 91731
+}
