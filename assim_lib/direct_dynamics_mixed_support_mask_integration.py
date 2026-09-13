@@ -21,6 +21,7 @@ from .direct_dynamics_mixed_support_mask_runner import (
     masked_cfm_loss,
     sample_masks,
 )
+from .direct_dynamics_mixed_support_train_stats import apply_verified_conditioning_stats
 
 
 MODE = "direct_dynamics_mixed_support_mask_cpu_integration_v1"
@@ -159,14 +160,42 @@ def run(config_path: str | Path, output_path: str | Path) -> dict[str, Any]:
         raise ValueError("integration is CPU-only and train-only")
     if bool(config.get("test_2023_access_allowed", True)):
         raise ValueError("test-2023 must remain sealed")
-    dataset_config = dict(load_json(config["dataset_config"]))
-    dataset_config["dynamic_forcing_stats"] = config["dynamic_forcing_stats"]
+    base_data_config = dict(load_json(config["dataset_config"]))
+    bootstrap_config = dict(base_data_config)
+    bootstrap_config["dynamic_forcing_stats"] = config["dynamic_forcing_stats"]
+    stats_binding = None
+    if "conditioning_stats_artifact" in config:
+        dataset_config, stats_binding = apply_verified_conditioning_stats(
+            base_data_config, config["conditioning_stats_artifact"]
+        )
+    else:
+        dataset_config = bootstrap_config
     dataset = build_dataset(dataset_config, "train")
     indices = dataset.strided_case_indices(max_cases=1, stride_days=int(config["stride_days"]))
     if len(indices) != 1:
         raise RuntimeError("no train integration case")
     seed = int(config["seed"])
-    real = _real_case_check(dataset[indices[0]], dataset_config["means"], dataset_config["stds"], seed=seed)
+    selected_item = dataset[indices[0]]
+    normalized_batch = coarse_mask_batch_from_item(
+        selected_item, dataset_config["means"], dataset_config["stds"]
+    )
+    normalization_check = {
+        "conditioning_all_finite": bool(torch.isfinite(normalized_batch.condition).all()),
+        "d0_occurrence_unchanged": True,
+        "future_B80_unchanged": True,
+    }
+    if stats_binding is not None:
+        bootstrap_dataset = build_dataset(bootstrap_config, "train")
+        bootstrap_batch = coarse_mask_batch_from_item(
+            bootstrap_dataset[indices[0]], bootstrap_config["means"], bootstrap_config["stds"]
+        )
+        normalization_check["d0_occurrence_unchanged"] = bool(
+            torch.equal(normalized_batch.d0_occurrence, bootstrap_batch.d0_occurrence)
+        )
+        normalization_check["future_B80_unchanged"] = bool(
+            torch.equal(normalized_batch.target, bootstrap_batch.target)
+        )
+    real = _real_case_check(selected_item, dataset_config["means"], dataset_config["stds"], seed=seed)
     birth = _synthetic_source_case(birth=True, seed=seed + 10)
     death = _synthetic_source_case(birth=False, seed=seed + 20)
     checks = (
@@ -181,6 +210,7 @@ def run(config_path: str | Path, output_path: str | Path) -> dict[str, Any]:
         death["initial_front_support_cells"] == 0,
         death["source_gradients_finite_positive"],
         death["front_gradients_exact_zero_without_front_support"],
+        *normalization_check.values(),
     )
     result = {
         "schema_version": MODE,
@@ -192,6 +222,8 @@ def run(config_path: str | Path, output_path: str | Path) -> dict[str, Any]:
         "conditioning": "causal d0 plus forcing/calendar; no future fields",
         "loss": "continuous dequantized CFM, positive per-case denominator, no clamp and no STE",
         "land_contract": "zero before every forward and after every sampling step",
+        "conditioning_stats_binding": stats_binding,
+        "normalization_check": normalization_check,
         "real_case": real,
         "synthetic_source_branch": {"birth": birth, "death": death},
         "gate": {

@@ -21,6 +21,39 @@ from .forecast import field_at_hour
 MODE = "direct_dynamics_mixed_support_train2016_2020_stats_v1"
 
 
+def apply_verified_conditioning_stats(
+    data_config: dict[str, Any], spec: dict[str, Any]
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Bind a data config to the immutable train-2016-2020 stats artifact."""
+    path = Path(spec["path"])
+    if not path.is_file():
+        raise ValueError("conditioning stats artifact is missing")
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    if digest != spec.get("sha256"):
+        raise ValueError("conditioning stats artifact SHA mismatch")
+    stats = load_json(path)
+    if (
+        stats.get("schema_version") != MODE
+        or stats.get("source_split") != "train_years_2016_2020"
+        or stats.get("heldout_year_accessed") is not False
+        or stats.get("test_2023_accessed") is not False
+    ):
+        raise ValueError("conditioning stats provenance is not heldout-safe")
+    updated = dict(data_config)
+    updated["means"] = stats["state"]["means"]
+    updated["stds"] = stats["state"]["stds"]
+    updated["dynamic_forcing_stats"] = {
+        "source_split": "train",
+        "source_years": [2016, 2017, 2018, 2019, 2020],
+        "heldout_year": 2021,
+        "indices": stats["forcing"]["indices"],
+        "means": stats["forcing"]["means"],
+        "stds": stats["forcing"]["stds"],
+        "finite_value_count_per_field": stats["forcing"]["finite_value_count_per_field"],
+    }
+    return updated, {"path": str(path), "sha256": digest, "schema_version": MODE}
+
+
 def _atomic_json(path: Path, payload: dict[str, Any]) -> None:
     temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
     try:

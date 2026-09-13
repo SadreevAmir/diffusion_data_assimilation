@@ -25,6 +25,7 @@ from .direct_dynamics_mixed_support_mask_runner import (
     coarse_mask_batch_from_item,
     sample_masks,
 )
+from .direct_dynamics_mixed_support_train_stats import apply_verified_conditioning_stats
 
 
 MODE = "direct_dynamics_mixed_support_mask_gpu_preflight_v1"
@@ -153,7 +154,13 @@ def run(config_path: str | Path, output_dir: str | Path) -> dict[str, Any]:
         torch.cuda.set_device(0)
         torch.cuda.reset_peak_memory_stats(0)
         dataset_config = dict(load_json(config["dataset_config"]))
-        dataset_config["dynamic_forcing_stats"] = config["dynamic_forcing_stats"]
+        if "conditioning_stats_artifact" in config:
+            dataset_config, conditioning_stats_binding = apply_verified_conditioning_stats(
+                dataset_config, config["conditioning_stats_artifact"]
+            )
+        else:
+            dataset_config["dynamic_forcing_stats"] = config["dynamic_forcing_stats"]
+            conditioning_stats_binding = None
         dataset = build_dataset(dataset_config, "train")
         indices = dataset.strided_case_indices(max_cases=1, stride_days=int(config["stride_days"]))
         if len(indices) != 1:
@@ -289,6 +296,7 @@ def run(config_path: str | Path, output_dir: str | Path) -> dict[str, Any]:
             "test_2023_accessed": False,
             "case_id": dataset[indices[0]]["meta"]["case_id"],
             "common_random_numbers": True,
+            "conditioning_stats_binding": conditioning_stats_binding,
             "parameter_count_each_arm": parameter_count,
             "precision": "bf16_autocast_fp32_parameters",
             "optimizer_created": False,

@@ -1,0 +1,23 @@
+{
+  "mode": "direct_dynamics_mixed_support_cpu_admission_v1",
+  "resource_kind": "cpu",
+  "dataset_config": "config/data/m2m_2f_two_stage_dynamics_protocol.json",
+  "structured_state_stats": "config/data/m2m_2f_structured_joint_train_stats.json",
+  "dataset_split": "train",
+  "test_2023_access_allowed": false,
+  "conditioning_stats_artifact": {
+    "path": "/home/autoresearch_results/direct_dynamics_mixed_support_train2016_2020_stats_v1/a37db01/stats.json",
+    "sha256": "8bf75a878ab4316a5fc9a83ce40ed239cd5292f397696e651353b720982e90c2"
+  },
+  "dynamic_forcing_stats": {
+    "source_split": "train",
+    "indices": [6, 7, 13, 14],
+    "means": [0.00024072701720376523, -0.017859677007622955, -0.106700353199528, -0.18476749778477272],
+    "stds": [0.06025002092600086, 0.0655322642143171, 4.434678472175259, 4.7337812043401915],
+    "finite_value_count_per_field": [100059986, 100059986, 104958646, 104958646]
+  },
+  "coarse_factor": 4,
+  "max_cases": 12,
+  "stride_days": 180,
+  "seed": 91731
+}
