@@ -203,7 +203,18 @@ trajectory latent двигает кромку; lead innovations и nonlocal sour
 
 Train-only audit без coastline: среди изменившихся established-ice cells внутри
 8 px от d0 edge находятся `93.2/86.0/79.0%` на +3/+6/+9. Это поддерживает
-front bias, но доказывает необходимость nonlocal source branch.
+front bias; оставшаяся доля мотивирует unrestricted nonlocal source branch, но
+не доказывает физический перенос кромки или превосходство этой архитектуры.
+
+Astra verdict после GEO-T1: `HOLD` на GPU, `GO` только на bounded CPU
+representation admission. До обучения нужно явно определить `K<=B`, archive
+`a_cap`, inactive-coordinate filler law и decoder
+`A=B[K*a_cap+(1-K)*a_cap*sigmoid(Q)]`, `H=B*exp(L)`. Дискретный training path
+обязан иметь проверенные ненулевые gradients без скрытого STE. Первый CPU gate:
+`B80=1{D_omega A>0}`, потеря occurrence changes при restriction,
+mixed-support round trip, land invariance и birth/death при пустой исходной
+кромке. Прохождение этого gate подтвердит только корректность representation,
+не калибровку.
 
 Первый falsifier: compact 80×64 joint mask-only front+source против
 equal-capacity ordinary conv mask generator, leave-one-train-year-out, joint
