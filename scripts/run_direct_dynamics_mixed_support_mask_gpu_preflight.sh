@@ -6,7 +6,7 @@ cd "$ROOT"
 
 RUN_ID="${IDEA_F1_PREFLIGHT_RUN_ID:?IDEA_F1_PREFLIGHT_RUN_ID is required}"
 EXPECTED_COMMIT="${IDEA_F1_EXPECTED_COMMIT:?IDEA_F1_EXPECTED_COMMIT is required}"
-CONFIG="config/admission/direct_dynamics_mixed_support_v1.json"
+CONFIG="config/admission/direct_dynamics_mixed_support_train2016_2020_v2.json"
 if [[ ! "$RUN_ID" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$ ]]; then
   echo "unsafe IDEA_F1_PREFLIGHT_RUN_ID" >&2
   exit 2
