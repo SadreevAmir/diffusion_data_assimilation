@@ -119,12 +119,13 @@ def _real_case_check(item: dict[str, Any], means: list[float], stds: list[float]
         valid=batch.valid,
         noise=noise,
     )
+    altered_noise = torch.where(land, torch.full_like(noise, 1e6), noise)
     sample_changed = sample_masks(
         candidate,
         condition=altered_condition,
         d0_occurrence=altered_d0,
         valid=batch.valid,
-        noise=altered_state,
+        noise=altered_noise,
     )
     sampling_land_invariant = torch.equal(sample_reference, sample_changed)
     return {
