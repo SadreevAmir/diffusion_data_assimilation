@@ -26,7 +26,7 @@
 | GEO-H1 | Endpoint-only geometry suffix continuation | REJECTED | Обе ветви хуже EMA6; это не был geometry-CFM test |
 | GEO-P0 | Geometry-CFM zero-update preflight | COMPLETED | Математика, gradients и lifecycle прошли Astra audit |
 | GEO-T1 | Full-CFM control512/treatment512 | REJECTED | Geometry term даёт малый matched-control gain, но обе ветви значительно хуже EMA6 |
-| IDEA-F1 | One-shot front-plus-source mixed-support flow | CPU INTEGRATION PASS / ASTRA REVIEW | Реальный source+masked-CFM runner прошёл gate; GPU ещё не разрешён |
+| IDEA-F1 | One-shot front-plus-source mixed-support flow | GPU PREFLIGHT PASS / TRAINING HOLD | Runner исполним; Astra проверяет допуск к подготовке compact A/B |
 
 ## DYN-B0 — direct EMA6
 
@@ -251,6 +251,23 @@ land равен нулю. На synthetic remote birth из полностью п
 нулю, а обе пары source gradients положительны. Per-case denominator обязан
 быть положительным и не использует clamp. Этот результат передан Astra на
 exact-code review; `gpu_training_authorized=false` до её решения.
+
+Zero-update GPU preflight прошёл на exact commit
+`7da6b4e8d653f93c5307d1fe4addfa3ce529f193`: run
+`idea-f1-mask-preflight-7da6b4e-20260913-1327`, ClearML
+`e3af93189b29459dbb629bfd0a3af98f`, JSON SHA-256
+`4d0d29de24310baf6c8aed65d60e4557b181b858171d190a57de514b48a342e2`.
+На NVIDIA L40 peak allocation `2.362 MiB`; candidate/control loss
+`4.36417/4.36422`; все gradients конечны и положительны, параметры bitwise
+не изменились, optimizer не создавался (`steps=0`), test-2023 закрыт. Fixed
+inputs, predictions, terminal latents и decoded samples сохранены до
+соответствующих проверок и привязаны SHA. Предшествующий run
+`e39843f331ce45ceb0b71764de7d4fab` сохранён как честный failure до tensor
+execution из-за несовместимого device-object CUDA API; optimizer steps там
+также ноль. Preflight доказывает только execution/memory path, не solver
+accuracy, skill или calibration. Проверяемая A/B-гипотеза — edge-gated
+additive head плюс unrestricted source head против двух unrestricted heads;
+это не deformation sampler и не явный shared smooth trajectory latent.
 
 Первый falsifier: compact 80×64 joint mask-only front+source против
 equal-capacity ordinary conv mask generator, leave-one-train-year-out, joint
