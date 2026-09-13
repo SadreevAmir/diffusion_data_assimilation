@@ -1,0 +1,39 @@
+{
+  "schema_version": "direct_dynamics_mixed_support_mask_ab_training_v1",
+  "project_name": "sea_ice_two_stage",
+  "task_name": "direct_dynamics_mixed_support_mask_ab_v1",
+  "admission_config": {
+    "path": "config/admission/direct_dynamics_mixed_support_train2016_2020_v2.json",
+    "sha256": "537cdc211f6d5795c249bb8c8e719030da117dd24a94ba1814dfb134c3d6ac73"
+  },
+  "preflight": {
+    "path": "/home/autoresearch_results/direct_dynamics_mixed_support_mask_gpu_preflight_v1/idea-f1-mask-preflight-dfcb1b4-20260913-1405/preflight.json",
+    "sha256": "1ea0b2df083e4c41fe81baee0582d2d9e41f7517047e7cd68f7c94ac07cf8263",
+    "code_commit": "dfcb1b48d2afa4bddf7138f5acfccaa1edbab358",
+    "clearml_task_id": "8d97a2b0970c405ba1541bbcd6646757"
+  },
+  "protocol": {
+    "train_years": [2016, 2017, 2018, 2019, 2020],
+    "heldout_year": 2021,
+    "target_slice_index": 23,
+    "trajectory_lead_days": [3, 6, 9],
+    "coarse_shape": [80, 64],
+    "updates_per_arm": 512,
+    "batch_size": 8,
+    "hidden_channels": 8,
+    "learning_rate": 0.001,
+    "weight_decay": 0.0,
+    "adam_betas": [0.9, 0.999],
+    "ema_decay": 0.99,
+    "checkpoint_updates": [128, 256, 384, 512],
+    "precision": "bf16",
+    "workers": 4,
+    "prefetch_factor": 2,
+    "seed": 91731,
+    "test_2023": "closed"
+  },
+  "clearml": {
+    "env_path": "/home/.env",
+    "tags": ["idea-f1", "matched-ab", "mask-only", "heldout-2021", "512-updates"]
+  }
+}
