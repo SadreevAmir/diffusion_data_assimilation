@@ -37,8 +37,8 @@
     "test_2023_accessed": false
   },
   "required_preflight": {
-    "path": "/home/autoresearch_results/direct_dynamics_geometry_cfm_v1/preflight/REVIEWED_RUN_ID/preflight.json",
-    "sha256": "REVIEWED_AFTER_ZERO_UPDATE_PREFLIGHT"
+    "path": "/home/autoresearch_results/direct_dynamics_geometry_cfm_v1/preflight/astra-go-e4f0e06-20260913-0537/preflight.json",
+    "sha256": "c4d290e5a467526eb020f1614224d4f90098d395c13c8a61b1c9323d67d626ce"
   },
   "clearml": {
     "env_path": "/home/.env",
