@@ -150,7 +150,8 @@ def run(config_path: str | Path, output_dir: str | Path) -> dict[str, Any]:
         if not torch.cuda.is_available() or torch.cuda.device_count() != 1:
             raise RuntimeError("preflight requires exactly one visible CUDA device")
         device = torch.device("cuda:0")
-        torch.cuda.reset_peak_memory_stats(device)
+        torch.cuda.set_device(0)
+        torch.cuda.reset_peak_memory_stats(0)
         dataset_config = dict(load_json(config["dataset_config"]))
         dataset_config["dynamic_forcing_stats"] = config["dynamic_forcing_stats"]
         dataset = build_dataset(dataset_config, "train")
@@ -283,7 +284,7 @@ def run(config_path: str | Path, output_dir: str | Path) -> dict[str, Any]:
             "status": "preflight_passed",
             "code_commit": commit,
             "resource_kind": "single_gpu",
-            "device_name": torch.cuda.get_device_name(device),
+            "device_name": torch.cuda.get_device_name(0),
             "dataset_split": "train",
             "test_2023_accessed": False,
             "case_id": dataset[indices[0]]["meta"]["case_id"],
@@ -293,7 +294,7 @@ def run(config_path: str | Path, output_dir: str | Path) -> dict[str, Any]:
             "optimizer_created": False,
             "optimizer_steps": 0,
             "sampling_steps_per_arm": 1,
-            "peak_gpu_memory_mib": float(torch.cuda.max_memory_allocated(device) / 2**20),
+            "peak_gpu_memory_mib": float(torch.cuda.max_memory_allocated(0) / 2**20),
             "arms": arms,
             "evidence_sha256": evidence_sha256,
             "clearml_task_id": str(tracker.task.id),
