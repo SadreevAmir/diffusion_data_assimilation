@@ -1,13 +1,16 @@
 import json
 from pathlib import Path
+from unittest import mock
 
 import torch
 
 from assim_lib.direct_dynamics_geometry_cfm_training import (
     _check_protocol,
     _gradient_norm,
+    _assert_exact_matched_prediction,
     _load_frozen_metric,
     _merge_status,
+    _persist_preflight_evidence,
     _record_terminal_failure,
     compute_matched_loss,
     make_matched_schedule,
@@ -134,6 +137,52 @@ def test_failure_after_evidence_preserves_evidence_and_closes_tracker(tmp_path):
     assert payload["status"] == "failed_terminal_non_resumable"
     assert payload["fixed_inputs_and_predictions_sha256"] == "a" * 64
     assert calls == ["mark_failed", "close"]
+
+
+def test_mismatched_predictions_are_durable_before_parity_failure(tmp_path):
+    path = tmp_path / "fixed_inputs_and_predictions.pt"
+    common = {"truth": torch.zeros((1, 1, 2, 2))}
+    control = torch.zeros((1, 1, 2, 2))
+    treatment = torch.ones((1, 1, 2, 2))
+    _persist_preflight_evidence(
+        path,
+        common,
+        {"control_evidence_forward": control, "treatment_evidence_forward": treatment},
+    )
+    try:
+        _assert_exact_matched_prediction(control, treatment)
+    except RuntimeError as error:
+        assert "predictions differ" in str(error)
+    else:
+        raise AssertionError("intentional parity mismatch was accepted")
+    payload = torch.load(path, map_location="cpu", weights_only=True)
+    assert torch.equal(payload["predictions"]["control_evidence_forward"], control)
+    assert torch.equal(payload["predictions"]["treatment_evidence_forward"], treatment)
+
+
+def test_failure_status_write_cannot_skip_cleanup_or_mask_primary(tmp_path):
+    calls = []
+
+    class Task:
+        def mark_failed(self, **_kwargs):
+            calls.append("mark_failed")
+
+    class Tracker:
+        task = Task()
+
+        def close(self):
+            calls.append("close")
+
+    primary = RuntimeError("primary failure")
+    with mock.patch(
+        "assim_lib.direct_dynamics_geometry_cfm_training._merge_status",
+        side_effect=OSError("status disk unavailable"),
+    ):
+        result = _record_terminal_failure(tmp_path / "status.json", Tracker(), primary)
+    assert calls == ["mark_failed", "close"]
+    assert result["error"] == "primary failure"
+    assert result["error_type"] == "RuntimeError"
+    assert any("failure_status_write" in item for item in result["cleanup_errors"])
 
 
 def test_launcher_has_exact_clean_one_gpu_admission_and_timeout():

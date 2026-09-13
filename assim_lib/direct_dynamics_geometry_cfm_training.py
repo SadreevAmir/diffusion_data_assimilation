@@ -74,13 +74,17 @@ def _record_terminal_failure(
     tracker: ClearMLTracker | None,
     error: BaseException,
 ) -> dict[str, Any]:
-    failure = _merge_status(
-        status_path,
-        status="failed_terminal_non_resumable",
-        error_type=type(error).__name__,
-        error=str(error),
-    )
     cleanup_errors: list[str] = []
+    failure = {
+        "status": "failed_terminal_non_resumable",
+        "error_type": type(error).__name__,
+        "error": str(error),
+        "updated_at": _utc_now(),
+    }
+    try:
+        failure = _merge_status(status_path, **failure)
+    except Exception as cleanup_error:
+        cleanup_errors.append(f"failure_status_write: {cleanup_error}")
     if tracker is not None:
         try:
             tracker.task.mark_failed(
@@ -93,7 +97,11 @@ def _record_terminal_failure(
         except Exception as cleanup_error:
             cleanup_errors.append(f"clearml_close: {cleanup_error}")
     if cleanup_errors:
-        failure = _merge_status(status_path, cleanup_errors=cleanup_errors)
+        failure["cleanup_errors"] = cleanup_errors
+        try:
+            failure = _merge_status(status_path, cleanup_errors=cleanup_errors)
+        except Exception:
+            pass
     return failure
 
 
@@ -437,6 +445,29 @@ def _implementation_manifest(
     return identity
 
 
+def _make_forward_evidence(
+    batch: dict[str, torch.Tensor],
+    timesteps: torch.Tensor,
+    noise_seed: int,
+    grid: torch.Tensor,
+) -> dict[str, torch.Tensor]:
+    state, target, noise = make_cfm_pair(batch, timesteps, noise_seed)
+    model_input = torch.cat((state, grid.expand(state.shape[0], -1, -1, -1), batch["condition"]), dim=1)
+    if model_input.shape[1] != DIRECT_INPUT_CHANNELS:
+        raise ValueError("matched model input has wrong channel count")
+    return {
+        "truth": batch["truth"],
+        "condition": batch["condition"],
+        "valid": batch["valid"],
+        "initial_sic": batch["initial_sic"],
+        "initial_sit": batch["initial_sit"],
+        "noise": noise,
+        "timesteps": timesteps,
+        "model_input": model_input,
+        "target_velocity": target,
+    }
+
+
 def _one_forward(
     model: torch.nn.Module,
     batch: dict[str, torch.Tensor],
@@ -447,32 +478,53 @@ def _one_forward(
     geometry_weight: float,
     spec: GeometryCFMSpec,
 ) -> tuple[torch.Tensor, dict[str, torch.Tensor], dict[str, torch.Tensor]]:
-    state, target, noise = make_cfm_pair(batch, timesteps, noise_seed)
-    model_input = torch.cat((state, grid.expand(state.shape[0], -1, -1, -1), batch["condition"]), dim=1)
-    if model_input.shape[1] != DIRECT_INPUT_CHANNELS:
-        raise ValueError("matched model input has wrong channel count")
+    evidence = _make_forward_evidence(batch, timesteps, noise_seed, grid)
     torch.manual_seed(int(dropout_seed))
     torch.cuda.manual_seed_all(int(dropout_seed))
     with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
-        prediction = model(model_input, timesteps.to(model_input.device) * 1000, return_dict=False)[0]
+        prediction = model(
+            evidence["model_input"],
+            timesteps.to(evidence["model_input"].device) * 1000,
+            return_dict=False,
+        )[0]
     loss, diagnostics = compute_matched_loss(
-        prediction, target, batch, geometry_weight=geometry_weight, spec=spec
+        prediction,
+        evidence["target_velocity"],
+        batch,
+        geometry_weight=geometry_weight,
+        spec=spec,
     )
-    if not torch.isfinite(loss):
-        raise FloatingPointError("non-finite matched full-CFM loss")
-    evidence = {
-        "truth": batch["truth"],
-        "condition": batch["condition"],
-        "valid": batch["valid"],
-        "initial_sic": batch["initial_sic"],
-        "initial_sit": batch["initial_sit"],
-        "noise": noise,
-        "timesteps": timesteps,
-        "model_input": model_input,
-        "target_velocity": target,
-        "prediction_fp32": prediction.float(),
-    }
+    evidence["prediction_fp32"] = prediction.float()
     return loss, diagnostics, evidence
+
+
+def _persist_preflight_evidence(
+    path: Path,
+    common: dict[str, torch.Tensor],
+    predictions: dict[str, torch.Tensor],
+) -> str:
+    return _atomic_torch_save(
+        {
+            "common": {key: value.detach().cpu() for key, value in common.items()},
+            "predictions": {
+                key: value.detach().cpu() for key, value in predictions.items()
+            },
+            "prediction_sha256": {
+                key: _tensor_sha256(value) for key, value in predictions.items()
+            },
+            "schedule_update": 0,
+            "optimizer_steps": 0,
+        },
+        path,
+    )
+
+
+def _assert_exact_matched_prediction(
+    control: torch.Tensor,
+    treatment: torch.Tensor,
+) -> None:
+    if not torch.equal(control, treatment):
+        raise RuntimeError("matched control/treatment predictions differ")
 
 
 def run_preflight(config_path: Path, output_dir: Path) -> dict[str, Any]:
@@ -537,7 +589,22 @@ def run_preflight(config_path: Path, output_dir: Path) -> dict[str, Any]:
         )
         torch.cuda.reset_peak_memory_stats(device)
 
-        # Produce and durably save both matched predictions before any backward.
+        # Save the exact fixed inputs before the first model forward. Then save
+        # every obtained prediction before checking it, so failed admission is
+        # itself inspectable.
+        fixed_inputs_path = output_dir / "fixed_inputs_and_predictions.pt"
+        common_evidence = _make_forward_evidence(
+            batch, timesteps, schedule["noise_seeds"][0], grid
+        )
+        saved_predictions: dict[str, torch.Tensor] = {}
+        fixed_inputs_sha = _persist_preflight_evidence(
+            fixed_inputs_path, common_evidence, saved_predictions
+        )
+        _merge_status(
+            status_path,
+            status="fixed_inputs_saved_before_forward",
+            fixed_inputs_and_predictions_sha256=fixed_inputs_sha,
+        )
         prediction_evidence: dict[str, dict[str, torch.Tensor]] = {}
         with torch.no_grad():
             for arm, weight in (("control", 0.0), ("treatment", treatment_weight)):
@@ -557,38 +624,34 @@ def run_preflight(config_path: Path, output_dir: Path) -> dict[str, Any]:
                     "native": diagnostics["native"].detach().cpu(),
                     "loss": loss.detach().cpu(),
                 }
+                saved_predictions[f"{arm}_evidence_forward"] = evidence[
+                    "prediction_fp32"
+                ]
+                fixed_inputs_sha = _persist_preflight_evidence(
+                    fixed_inputs_path, common_evidence, saved_predictions
+                )
+                _merge_status(
+                    status_path,
+                    status=f"{arm}_prediction_saved_before_checks",
+                    fixed_inputs_and_predictions_sha256=fixed_inputs_sha,
+                )
+                if not torch.isfinite(loss):
+                    raise FloatingPointError(f"non-finite {arm} preflight loss")
                 if arm == "control":
                     native = UNetTrainer._masked_mse(
                         evidence["prediction_fp32"], evidence["target_velocity"], batch["valid"]
                     )
                     if not torch.equal(loss.detach(), native.detach()):
                         raise RuntimeError("real control path differs from native masked MSE")
-                    common_evidence = {
-                        key: value.detach().cpu()
-                        for key, value in evidence.items()
-                        if key != "prediction_fp32"
-                    }
-        if not torch.equal(
+        _assert_exact_matched_prediction(
             prediction_evidence["control"]["prediction"],
             prediction_evidence["treatment"]["prediction"],
-        ):
-            raise RuntimeError("matched control/treatment predictions differ")
+        )
         if not torch.equal(
             prediction_evidence["control"]["native"],
             prediction_evidence["treatment"]["native"],
         ):
             raise RuntimeError("matched control/treatment native losses differ")
-        fixed_inputs_path = output_dir / "fixed_inputs_and_predictions.pt"
-        fixed_inputs_sha = _atomic_torch_save(
-            {
-                "common": common_evidence,
-                "control_prediction": prediction_evidence["control"]["prediction"],
-                "treatment_prediction": prediction_evidence["treatment"]["prediction"],
-                "schedule_update": 0,
-                "optimizer_steps": 0,
-            },
-            fixed_inputs_path,
-        )
         _merge_status(
             status_path,
             status="fixed_inputs_and_predictions_saved_before_backward",
@@ -614,6 +677,19 @@ def run_preflight(config_path: Path, output_dir: Path) -> dict[str, Any]:
                 weight,
                 spec,
             )
+            saved_predictions[f"{arm}_backward_forward"] = evidence[
+                "prediction_fp32"
+            ]
+            fixed_inputs_sha = _persist_preflight_evidence(
+                fixed_inputs_path, common_evidence, saved_predictions
+            )
+            _merge_status(
+                status_path,
+                status=f"{arm}_backward_prediction_saved_before_checks",
+                fixed_inputs_and_predictions_sha256=fixed_inputs_sha,
+            )
+            if not torch.isfinite(loss):
+                raise FloatingPointError(f"non-finite {arm} backward loss")
             if _tensor_sha256(evidence["prediction_fp32"]) != expected_prediction_sha:
                 raise RuntimeError(f"{arm} backward forward differs from saved prediction")
             loss.backward()
@@ -813,6 +889,8 @@ def run_training(config_path: Path, output_dir: Path) -> dict[str, Any]:
                     weight,
                     spec,
                 )
+                if not torch.isfinite(loss):
+                    raise FloatingPointError("non-finite matched full-CFM training loss")
                 loss.backward()
                 unclipped_norm = _gradient_norm(model)
                 torch.nn.utils.clip_grad_norm_(model.parameters(), float(protocol["gradient_clip_norm"]))
