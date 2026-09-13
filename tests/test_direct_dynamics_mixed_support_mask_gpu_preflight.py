@@ -1,4 +1,8 @@
+import json
+import tempfile
 from pathlib import Path
+
+from assim_lib.direct_dynamics_mixed_support_mask_gpu_preflight import _finalize_failure
 
 
 def test_preflight_is_zero_update_and_train_only():
@@ -8,6 +12,12 @@ def test_preflight_is_zero_update_and_train_only():
     assert 'build_dataset(dataset_config, "train")' in source
     assert '"test_2023_accessed": False' in source
     assert "torch.optim" not in source
+    assert "fixed_inputs.pt" in source
+    assert "prediction.pt" in source
+    assert "sample.pt" in source
+    assert "parameters changed during zero-update preflight" in source
+    assert "CLEARML_REQUIRE_ONLINE" in source
+    assert "signal.SIGTERM" in source and "signal.SIGINT" in source
 
 
 def test_wrapper_enforces_single_gpu_policy_and_exact_commit():
@@ -20,3 +30,34 @@ def test_wrapper_enforces_single_gpu_policy_and_exact_commit():
     assert '"$GPU_UTILIZATION" -lt 5' in source
     assert "flock -n 9" in source
     assert "570s" in source and "--kill-after=30s" in source
+    assert "CLEARML_REQUIRE_ONLINE=1" in source
+
+
+def test_failure_injection_boundary_preserves_primary_error_and_closes_tracker():
+    class FailingTask:
+        def mark_failed(self, **_kwargs):
+            raise RuntimeError("injected mark failure")
+
+    class Tracker:
+        def __init__(self):
+            self.task = FailingTask()
+            self.closed = False
+
+        def close(self):
+            self.closed = True
+
+    tracker = Tracker()
+    with tempfile.TemporaryDirectory() as directory:
+        status = Path(directory) / "status.json"
+        _finalize_failure(
+            status,
+            {"optimizer_steps": 0},
+            RuntimeError("injected preflight failure after fixed_evidence"),
+            tracker,
+            {"fixed_inputs.pt": "abc"},
+        )
+        payload = json.loads(status.read_text())
+    assert tracker.closed
+    assert payload["error"] == "injected preflight failure after fixed_evidence"
+    assert payload["evidence_sha256"]["fixed_inputs.pt"] == "abc"
+    assert any("clearml_mark_failed" in item for item in payload["cleanup_errors"])

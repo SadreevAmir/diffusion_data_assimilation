@@ -75,6 +75,8 @@ printf '{"status":"running","run_id":"%s","code_commit":"%s","gpu_uuid":"%s"}\n'
   "$RUN_ID" "$CURRENT_COMMIT" "$GPU_UUID" > "$LAUNCH/status.json"
 export CUDA_VISIBLE_DEVICES="$GPU_UUID"
 export IDEA_F1_CODE_COMMIT="$CURRENT_COMMIT"
+export CLEARML_REQUIRE_ONLINE=1
+unset CLEARML_OFFLINE_MODE
 export PYTHONUNBUFFERED=1
 export OMP_NUM_THREADS=2
 export MKL_NUM_THREADS=2
