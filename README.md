@@ -1,5 +1,9 @@
 # Flow-matching data assimilation
 
+The canonical SIC/SIT experiment history, including negative results and the
+active dynamics-calibration run, is maintained in
+[`docs/research/EXPERIMENT_LEDGER.md`](docs/research/EXPERIMENT_LEDGER.md).
+
 Conditional flow matching for assimilating a dense sea-ice forecast and sparse
 satellite-track observations. The model generates two physical fields:
 sea-ice concentration (`siconc`) and sea-ice thickness (`sithic`).

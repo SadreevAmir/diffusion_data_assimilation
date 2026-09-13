@@ -1,0 +1,206 @@
+# Канонический журнал экспериментов SIC/SIT
+
+Последнее обновление: 2026-09-13. Это единая точка входа в историю
+экспериментов, отрицательных результатов и текущих решений проекта. Число
+считается доказанным только вместе с указанным JSON/PT-артефактом, ClearML task
+или SHA. Validation-2022 является development reuse; test-2023 закрыт до
+замораживания окончательного метода.
+
+Статусы: `REFERENCE` — рабочий baseline; `COMPLETED` — расчёт завершён;
+`REJECTED` — метод не прошёл объявленный gate; `VALIDATING` — обучение
+завершено, окончательный вывод ещё не сделан; `PROPOSED` — идея, а не результат.
+
+## Сводка
+
+| ID | Эксперимент | Статус | Решение |
+|---|---|---|---|
+| DYN-B0 | Direct joint dynamics EMA6 | REFERENCE | Лучшие подтверждённые динамика и визуальные семплы; ансамбль недодисперсен |
+| DYN-B1 | EMA6/EMA8 mixture screen | REJECTED | Соседние checkpoints слишком похожи; EMA8 хуже на проверенных cases |
+| CAL-P1 | Global anomaly spread | REJECTED | CRPS/ranks лучше, boundary и spatial metrics хуже |
+| CAL-P2 | Hurdle-IDR/ECC-Q | REJECTED | Чинит atoms/ranks, разрушает CRPS и геометрию |
+| CAL-P3 | Mean-preserving projected spread | REJECTED | Сохраняет mean, но создаёт cap/boundary failures |
+| CAL-P4 | Open-logit | REJECTED | CRPS/ranks лучше, boundary/spatial gate провален |
+| CAL-P5 | ZOIB-EMOS/ECC-Q | REJECTED | Explicit marginal atoms не дают полезный joint spatial law |
+| CAL-P6 | Прочие frozen postprocessors | REJECTED | Ни один не прошёл общий no-compensation gate |
+| CAS-C1 | Coarse-budget train64 + frozen fine | REJECTED | Малый CRPS gain, SIT+3 ranks хуже; не end-to-end cascade |
+| GEO-H1 | Endpoint-only geometry suffix continuation | REJECTED | Обе ветви хуже EMA6; это не был geometry-CFM test |
+| GEO-P0 | Geometry-CFM zero-update preflight | COMPLETED | Математика, gradients и lifecycle прошли Astra audit |
+| GEO-T1 | Full-CFM control512/treatment512 | VALIDATING | Training завершён; frozen paired evaluation запущена |
+| IDEA-F1 | One-shot front-plus-source mixed-support flow | PROPOSED | Основной кандидат следующей полноценной модели |
+
+## DYN-B0 — direct EMA6
+
+Один conditional flow совместно генерирует SIC/SIT на +3, +6 и +9 суток.
+Все горизонты принадлежат одному member и создаются one-shot.
+
+- server run:
+  `/home/autoresearch_results/direct_dynamics_all_hours_v1/training/seed1701-night_20260909_v1`
+- checkpoint: `epoch_snapshots/epoch_0006/ema_last_model.pth`
+- SHA-256:
+  `9b8bb6954b7a19179aee2e58b0c6cdddfcb8b489b1e29d6f503086c704fa0b1b`
+- evidence:
+  `/Users/amir/sciml/autoresearch_results/direct_dynamics_baseline_audit_v1/files/result/paired_evaluation.json`
+- protocol: 12 validation-2022 cases, 8 members.
+
+| Поле/горизонт | RMSE model / persistence | RMSE gain | Fair-CRPS gain |
+|---|---:|---:|---:|
+| SIC +3 | 0.090 / 0.104 | 13.3% | 31.8% |
+| SIT +3 | 0.142 / 0.177 | 19.8% | 33.2% |
+| SIC +6 | 0.108 / 0.132 | 18.2% | 38.9% |
+| SIT +6 | 0.173 / 0.229 | 24.2% | 40.2% |
+| SIC +9 | 0.123 / 0.150 | 18.2% | 40.3% |
+| SIT +9 | 0.208 / 0.262 | 20.5% | 39.3% |
+
+Spread/RMSE приблизительно SIC/SIT +3 `0.764/0.708`, +9 `0.711/0.534`;
+fractional rank-TV `0.159…0.220`. Вывод: модель действительно учит динамику,
+но uncertainty особенно на SIT и дальних lead недостаточна. Pooled ranks
+смешивают exact-zero/cap atoms и сами по себе не являются calibration verdict.
+
+## DYN-B1 — EMA6/EMA8 checkpoint screen
+
+Артефакт:
+`/Users/amir/sciml/diffusion_data_assimilation/docs/research/audit_checkpoint_disagreement_cpu.py`.
+На двух winter cases корреляция anomaly fields `0.84–0.90`; RMS разницы means
+`0.025–0.048` при within-model spread RMS `0.078–0.116`. Для block16 SIT+9
+mean error EMA6/EMA8 `0.142/0.163`. Простую checkpoint mixture не развивать;
+это не опровергает независимый multi-seed/year-bootstrap ensemble.
+
+## CAL-P1…P6 — предыдущая post-hoc калибровка assimilation SIC
+
+Это отдельный старый protocol: 40 validation dates и 10 members. Его числа
+нельзя напрямую смешивать с 12×8 direct-dynamics validation.
+
+| Метод | Ключевой результат | Почему отклонён |
+|---|---|---|
+| Global spread | fair CRPS `0.058491→0.055690`, SSR `0.724→1.061` | IIEE +5.50%, edge +4.41%, extent error +10.05%, Brier хуже |
+| Hurdle-IDR/ECC-Q | zero-mass error `0.396859→0.013451`, rank discrepancy `0.079014→0.005308` | fair CRPS `→0.085581`, IIEE `→0.183385`, edge `→0.305843` |
+| Projected spread | fair CRPS `→0.056300`, mean сохранён | Brier `0.056973→0.059650`, upper-cap mass `0→0.167438` |
+| Open-logit | fair CRPS `→0.055738`, rank discrepancy `→0.011764` | Brier `→0.059107`, mass above .999 `→0.071936`, variogram fail |
+| ZOIB-EMOS/ECC-Q | zero/one mass errors `→0.008275/0.0000687`, ranks `→0.009882` | fair CRPS не лучше, RMSE `→0.200774`, IIEE `→0.087190`, edge `→0.040165` |
+
+Другие frozen negative mechanisms: topology-preserving stratified transport,
+analog-residual dressing, guidance mixture, coherent/slack offsets, latent
+temperature 1.30, locked MC dropout и IID calendar bias mixture. Ни один не
+прошёл одновременно proper-score, reliability, boundary и spatial/physical
+families. Точные первоисточники: `paper/PAPER_DRAFT.md`,
+`paper/CLAIM_LEDGER.md`, `paper/REPRODUCIBILITY.md`.
+
+## CAS-C1 — coarse-budget train64 + frozen fine
+
+Server result:
+`.../coarse_budget_train64_paired_388d8ce_v1/coarse_budget_paired_validation.json`.
+Fair CRPS `0.0821684→0.0810646` (`−1.343%`), mean SSR
+`0.54567→0.55171`, joint ES `0.216942→0.216815`; mean RMSE skill слегка хуже.
+SIC rank-TV улучшился, но SIT+3 rank-TV `0.19934→0.24540`, mean rank
+`0.494→0.661`. `fine_resampled_for_candidate=false`, поэтому это не end-to-end
+draw нового cascade law. Визуально coarse lift нёс около 91.5% variance, а
+fine residual часто выглядел как зерно.
+
+## GEO-H1 — endpoint-only suffix continuation
+
+Два matched продолжения EMA6 по 256 slice23 dates: endpoint-score control и
+geometry treatment. Native flow-matching anchor отсутствовал; менялся только
+terminal suffix.
+
+- fair CRPS против EMA6 хуже на `15.8%/11.2%` для control/treatment;
+- native joint ES хуже на `2.69%/2.47%`;
+- geometry ES хуже на `3.60%/3.76%`;
+- treatment/control geometry-ES ratio `1.0016`, CI включает нулевой эффект;
+- treatment rank-TV `0.304…0.487` против EMA6 `0.159…0.220`.
+
+Семплы оставались гладкими; провал — сдвиг conditional law/ranks. Отклонён
+именно endpoint-only/slice23/suffix-only protocol, а не geometry-aware CFM.
+
+## GEO-P0 — geometry-CFM preflight
+
+- run: `astra-go-e4f0e06-20260913-0537`;
+- ClearML: `d27b3de33642486a99430a35963dfd55`;
+- preflight SHA:
+  `c4d290e5a467526eb020f1614224d4f90098d395c13c8a61b1c9323d67d626ce`;
+- optimizer steps 0, parameters unchanged;
+- control native loss `0.0958311483`;
+- treatment native/geometry/total `0.0958311483/0.05304547/0.1011356935`;
+- peak allocated GPU `13932.8 MiB`.
+
+Prediction parity, adjoints, gradients, evidence lifecycle и one-GPU admission
+получили Astra GO.
+
+## GEO-T1 — matched full-CFM control512/treatment512
+
+Обе ветви стартовали из EMA6. Control продолжал native CFM; treatment сохранял
+тот же native CFM и добавлял fixed condition-dependent quadratic metric с
+`λ=0.1`: valid-ocean block means 160×128/80×64, lead differences,
+d0-linearized SIC×SIT product и d0 ice-edge tube. Future truth не используется
+как weight; post-hoc clipping отсутствует.
+
+- run: `geometry-full-cfm-ab-8e432ee-20260913-0638`;
+- ClearML: `7c02ac408929452a8c45d4f196631a93`;
+- exact training commit:
+  `8e432ee9404f90d664ac95281af480e1db4de461`;
+- result SHA:
+  `f5aadba59042b2700c41060b5239886053276ad5f7da096d042899b2afd2542d`;
+- control512 raw SHA:
+  `569d68d4f142ea8071b6bf1cf60c8a936a1b1038357b16e6939a7ddb94ba1207`;
+- treatment512 raw SHA:
+  `e1832b3b3b1dee9a16342dd66451ab1efd51ea29754aa494bb12107a87ca8561`;
+- 512 updates/arm, batch 8, AdamW LR `1e-5`, bf16 network/FP32 loss;
+- exact common 4096 cases/times/noise/dropout;
+- mean native pre-step loss `0.0486220/0.0486232`;
+- test-2023 false, exit 0, ClearML закрыт до terminal success.
+
+Frozen paired validation получила Astra GO и запущена:
+
+- run: `geometry-full-cfm-paired-56bc3e7-20260913-1124`;
+- ClearML: `fd1aee40fef44d03a8c06702426a56f9`;
+- exact evaluation commit:
+  `56bc3e7b2f74602a16a208dcd84584356c870f3a`;
+- laws: EMA6/control512/treatment512;
+- protocol: 12 validation-2022 cases × 8 common-noise members, full public
+  RK4-17, zero optimizer;
+- numerical и manual visual verdict: `PENDING`.
+
+До numerical + visual gate treatment512 нельзя называть лучшей или
+откалиброванной моделью.
+
+## IDEA-F1 — front-plus-source mixed-support trajectory law
+
+Статус `PROPOSED`; обучение не запускалось. Предлагаемый закон:
+
+`P(Y|C)=P(B,K|C)P(Q,H|B,K,C)`, где `B` — joint ice/open masks, `K` — cap
+events, `Q` — interior SIC, `H` — positive SIT для +3/+6/+9. Shared smooth
+trajectory latent двигает кромку; lead innovations и nonlocal source branch
+моделируют рост/таяние вдали от неё.
+
+Train-only audit без coastline: среди изменившихся established-ice cells внутри
+8 px от d0 edge находятся `93.2/86.0/79.0%` на +3/+6/+9. Это поддерживает
+front bias, но доказывает необходимость nonlocal source branch.
+
+Первый falsifier: compact 80×64 joint mask-only front+source против
+equal-capacity ordinary conv mask generator, leave-one-train-year-out, joint
+mask/edge proper scores, occurrence reliability и 16-member visual review.
+
+## Не перезапускать без новой гипотезы
+
+- blind spread/temperature sweeps;
+- endpoint-only H1;
+- EMA6/EMA8 checkpoint mixture;
+- naive continuous hard cascade без explicit face/atom law;
+- 20×16 как единственный источник macro uncertainty;
+- AR с teacher-forced future drivers, отсутствующими на inference;
+- post-hoc clipping/rounding, выдаваемый за mixed-support calibration;
+- selection только по pooled rank histogram или одной паре метрик.
+
+## Шаблон обязательной записи нового run
+
+Каждая новая запись должна содержать: гипотезу и predeclared falsifier;
+dataset/split/years/cases и test-access; input/target/support law; source
+checkpoint, git/config SHA и ClearML; GPU/optimizer/updates/batch/precision/
+solver/members/seeds; proper scores с paired uncertainty; tie/atom-aware ranks;
+boundary/spatial/temporal metrics; fixed-scale all-member images; ручной
+визуальный verdict; итог `ACCEPT/REJECT/HOLD`; что именно результат
+опровергает и чего не опровергает.
+
+Будущие идеи подробно ведутся отдельно в
+`/Users/amir/sciml/diffusion_data_assimilation/docs/research/data_driven_calibration_design.md`.
+Этот журнал обновляется только после появления проверяемого evidence или
+явного изменения статуса run.
