@@ -25,7 +25,7 @@
 | CAS-C1 | Coarse-budget train64 + frozen fine | REJECTED | Малый CRPS gain, SIT+3 ranks хуже; не end-to-end cascade |
 | GEO-H1 | Endpoint-only geometry suffix continuation | REJECTED | Обе ветви хуже EMA6; это не был geometry-CFM test |
 | GEO-P0 | Geometry-CFM zero-update preflight | COMPLETED | Математика, gradients и lifecycle прошли Astra audit |
-| GEO-T1 | Full-CFM control512/treatment512 | VALIDATING | Training завершён; frozen paired evaluation запущена |
+| GEO-T1 | Full-CFM control512/treatment512 | REJECTED | Geometry term даёт малый matched-control gain, но обе ветви значительно хуже EMA6 |
 | IDEA-F1 | One-shot front-plus-source mixed-support flow | PROPOSED | Основной кандидат следующей полноценной модели |
 
 ## DYN-B0 — direct EMA6
@@ -148,7 +148,7 @@ d0-linearized SIC×SIT product и d0 ice-edge tube. Future truth не испол
 - mean native pre-step loss `0.0486220/0.0486232`;
 - test-2023 false, exit 0, ClearML закрыт до terminal success.
 
-Frozen paired validation получила Astra GO и запущена:
+Frozen paired validation получила Astra GO и завершена:
 
 - run: `geometry-full-cfm-paired-56bc3e7-20260913-1124`;
 - ClearML: `fd1aee40fef44d03a8c06702426a56f9`;
@@ -157,10 +157,40 @@ Frozen paired validation получила Astra GO и запущена:
 - laws: EMA6/control512/treatment512;
 - protocol: 12 validation-2022 cases × 8 common-noise members, full public
   RK4-17, zero optimizer;
-- numerical и manual visual verdict: `PENDING`.
+- numerical result SHA:
+  `42d8b7be09142893741d024258af904f14eb60ae93d84fdae882fc6602128039`;
+- complete tensor SHA:
+  `213900d11312e93dc617c51bc95a0277df04169b570ff45bf4227972225c81dc`;
+- test-2023 false; все `3×12×8=288` members сохранены до scoring.
 
-До numerical + visual gate treatment512 нельзя называть лучшей или
-откалиброванной моделью.
+Aggregate standardized fair CRPS: EMA6 `0.076124`, control512 `0.090588`,
+treatment512 `0.090248`. Treatment лучше matched control только на `0.376%`
+(`ratio=0.996239`, paired CI `0.994705…0.998574`), но хуже EMA6 на `18.55%`
+(`ratio=1.185538`, CI `1.07014…1.30310`). Native joint energy score:
+`0.205588/0.237327/0.236561`; geometry energy score:
+`0.118870/0.137907/0.137545` для EMA6/control/treatment соответственно.
+Geometry effect относительно control статистически поддержан, однако
+replacement gate провален на всех шести SIC/SIT × lead fair-CRPS и RMSE.
+
+Rank histograms всех трёх laws далеки от uniform: pooled distributions имеют
+центральный горб, а truth-support diagnostics показывают различное поведение
+zero atoms и interior/positive support. Treatment не исправляет эту структуру;
+его pooled rank-TV лишь смешанно и несущественно отличается от control/EMA6.
+Adjusted spread/skill treatment равен `0.692/0.662/0.656/0.488/0.658/0.502`
+для d3 SIC/SIT, d6 SIC/SIT, d9 SIC/SIT: ансамбль всё ещё слишком узкий по
+spread-vs-RMSE diagnostic.
+
+Manual visual gate: ориентация одинакова у truth/initial/sample; fixed scales
+SIC `0…1`, SIT `0…4`; инверсии, track leakage и salt-and-pepper зерна не видно.
+На малоледных летних случаях почти пустые карты являются корректным следствием
+fixed scale. Members различаются главным образом на кромке, но paired
+treatment-control delta на фиксированных пределах почти нулевой — визуально
+подтверждает слишком слабый geometry effect.
+
+Решение: `REJECT` treatment512 как замену EMA6 и не продолжать blind suffix
+training. Результат доказывает только существование слабого полезного
+geometry-loss direction относительно matched continuation; он не доказывает
+калибровку и не оправдывает дальнейшую настройку λ на тех же development cases.
 
 ## IDEA-F1 — front-plus-source mixed-support trajectory law
 
