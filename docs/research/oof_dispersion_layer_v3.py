@@ -88,11 +88,16 @@ def cell_index(d: np.ndarray, mu: np.ndarray) -> np.ndarray:
 
 
 def _unit_field(x: np.ndarray, ell: float, water: np.ndarray) -> np.ndarray:
+    """Mask-aware Gaussian smoothing of white noise with exact pointwise unit variance."""
     sig = ell / np.sqrt(2.0)  # filtered white noise has correlation exp(-h^2/(4 sig^2)) = rho with length ell
+    wf = water.astype(float)
     num = gaussian_filter(np.where(water, x, 0.0), sig, mode="constant")
-    den = gaussian_filter(water.astype(float), sig, mode="constant")
+    den = gaussian_filter(wf, sig, mode="constant")
+    # var(num) = sum k^2 w = G_{sig/sqrt2}(w) / (4 pi sig^2)
+    k2w = gaussian_filter(wf, sig / np.sqrt(2.0), mode="constant") / (4 * np.pi * sig**2)
+    std_local = np.sqrt(np.maximum(k2w, 1e-12)) / np.maximum(den, 1e-6)
     y = np.where(den > 1e-6, num / np.maximum(den, 1e-6), 0.0)
-    return y / max(y[water].std(), 1e-9)
+    return np.where(water, y / std_local, 0.0)
 
 
 def smooth_unit(x: np.ndarray, ell: dict, water: np.ndarray, x2: np.ndarray | None = None) -> np.ndarray:
