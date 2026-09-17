@@ -1,13 +1,39 @@
-# Independent review request: calibrated probabilistic sea-ice dynamics
+# In-repository research task: calibrated probabilistic sea-ice dynamics
 
-You are an independent scientific reviewer. Read this document and every file in
-the attached bundle before answering. Do not accept the current diagnosis or
-proposed architecture by default. Separate mathematical facts, empirical facts,
-working hypotheses, and claims that rely on oracle future information.
+You are operating as Claude Code inside the existing git repository, not merely
+reviewing an uploaded archive. Start from repository root and read `CLAUDE.md`,
+this document, and every repository file referenced below. The checkpoint commit
+that introduced the handoff and synthetic admission is `3f3fac1`; verify that it
+is present in history before working.
 
-## Required output
+Do not accept the current diagnosis or proposed architecture by default.
+Separate mathematical facts, empirical facts, working hypotheses, and claims
+that rely on oracle future information.
 
-Return one self-contained review with these sections:
+## In-repository execution contract
+
+- Work in the current checkout. Do not clone the project elsewhere.
+- The worktree already contains unrelated modified and untracked user files.
+  Preserve them. Never reset, clean, stash, overwrite, or stage them.
+- Inspect `git status` before and after each unit of work. Stage only files you
+  created or intentionally changed for this task.
+- First write the independent review to
+  `docs/research/claude_face_aware_cascade_review.md` and commit it separately.
+- If and only if the review gives `GO`, or a `HOLD` with a safe CPU falsifier,
+  implement the smallest admitted experiment in new isolated files. Do not begin
+  a broad architecture rewrite.
+- Keep development-2021 and test-2023 closed. Use train-only data for admission.
+- Do not modify VPN, Cisco, Tailscale, Amnezia, routes, dispatchers, or background
+  services. If server SSH is unavailable, report the blocker and continue only
+  with local code/math checks that do not require private data.
+- Do not launch a GPU job before CPU admission passes. A later GPU run may use
+  only UUID `GPU-40ff1cbb-07cc-992e-23cb-8fe181972b76`, one GPU maximum, after
+  the existing five-minute idle check, and must be tracked in ClearML.
+- Write scientific reports in Russian; code and identifiers may remain English.
+
+## Required review output
+
+Write one self-contained review with these sections:
 
 1. **Verdict:** `GO`, `HOLD`, or `NO-GO` for a face-aware spatial refinement
    cascade without a separate occurrence-mask model.
@@ -21,6 +47,16 @@ Return one self-contained review with these sections:
    remain valid after removing it.
 6. **Recommended next action:** implementation-level instructions sufficient for
    another researcher to run the experiment.
+
+At the end, add a machine-readable decision block:
+
+```yaml
+verdict: GO | HOLD | NO-GO
+separate_occurrence_model_required: true | false | unresolved
+cpu_falsifier_allowed: true | false
+gpu_pilot_allowed: true | false
+primary_failure_risk: <one sentence>
+```
 
 Do not propose opening test-2023. Do not recommend a broad hyperparameter sweep.
 Do not treat visually smooth samples or a flat pooled rank histogram as adequate
@@ -235,12 +271,20 @@ replace it with a more decisive design.
   `V=A*H` is therefore a working product proxy, not an unquestionable physical
   volume claim.
 
-## Files in the bundle
+## Repository files to inspect
 
-- `CLAUDE_HANDOFF.md` — this independent-review request.
+- `CLAUDE.md` — repository collaboration and safety rules.
+- `CLAUDE_HANDOFF.md` — this research task.
 - `sic_grain_root_cause_audit_ru.md` — detailed latest grain/root-cause audit.
 - `data_driven_calibration_design.md` — mathematical and empirical design audit.
-- `audit_face_aware_cascade_toy.py` — executable synthetic algorithm admission.
-- `face_aware_cascade_toy_result.json` — exact numerical toy result.
-- `face_aware_cascade_toy_comparison.png` — held-out synthetic comparison.
+- `docs/research/audit_face_aware_cascade_toy.py` — executable synthetic
+  algorithm admission.
+- `.codex_artifacts/face_aware_cascade_toy_v1/result.json` — exact numerical toy
+  result.
+- `.codex_artifacts/face_aware_cascade_toy_v1/toy_comparison.png` — held-out
+  synthetic comparison.
 
+The two long research documents currently live at
+`docs/research/sic_grain_root_cause_audit_ru.md` and
+`docs/research/data_driven_calibration_design.md`. They may be untracked in this
+working tree; that does not authorize staging all of `docs/`.
