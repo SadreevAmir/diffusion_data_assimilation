@@ -1,0 +1,223 @@
+{
+  "schema_version": "face_dependence_train_cpu_audit_v1",
+  "claim_boundary": "Train-only 2016--2020 CPU audit. Test A samples an empirically fitted product law of child faces under truth parents; it bounds what any locally conditioned refinement kernel can reproduce. Test B is a date-shifted truth ensemble, a reference for attainable statistics, not a forecast.",
+  "config": {
+    "seed": 20260917,
+    "draws": 4,
+    "factors": [
+      4,
+      2
+    ],
+    "fit_anchors": 377,
+    "eval_anchors": 81,
+    "cap": 0.9970703125,
+    "stable_threshold": 0.95,
+    "tube_px": 8
+  },
+  "test_a": {
+    "factor_4": {
+      "factor": 4,
+      "num_feature_cells": 4238,
+      "summary": {
+        "lead_3": {
+          "truth_nl1_stable": 0.004416153932075966,
+          "truth_nl1_tube": 0.045345434394301366,
+          "truth_isolated_stable": 0.009169651941167742,
+          "truth_agree_stable": 0.9230627250724234,
+          "truth_cap_components": 32.888888888888886,
+          "persistence_nl1_stable": 0.019377743632695992,
+          "product_nl1_stable": 0.029818973491316243,
+          "product_nl1_tube": 0.09279330561836771,
+          "product_isolated_stable": 0.020992901677299548,
+          "product_agree_stable": 0.9004025249385396,
+          "product_cap_components": 141.84876543209876,
+          "product_cap_retention": 0.21563958948393278,
+          "product_rmse_water": 0.04901201689916226,
+          "ratio_nl1_stable_product_over_truth": 6.752249570544024,
+          "ratio_nl1_tube_product_over_truth": 2.046364906585374,
+          "ratio_isolated_stable_product_over_truth": 2.289389151517362,
+          "ratio_cap_components_product_over_truth": 4.3129692192192195
+        },
+        "lead_6": {
+          "truth_nl1_stable": 0.004368047368646474,
+          "truth_nl1_tube": 0.042607487677031146,
+          "truth_isolated_stable": 0.00856933183268254,
+          "truth_agree_stable": 0.9291763030749068,
+          "truth_cap_components": 35.04938271604938,
+          "persistence_nl1_stable": 0.020361044116939488,
+          "product_nl1_stable": 0.03083046967055018,
+          "product_nl1_tube": 0.08650778844317497,
+          "product_isolated_stable": 0.02058400941003358,
+          "product_agree_stable": 0.8986746964762145,
+          "product_cap_components": 146.94444444444446,
+          "product_cap_retention": 0.21607416398467444,
+          "product_rmse_water": 0.05022154235924928,
+          "ratio_nl1_stable_product_over_truth": 7.058181166222932,
+          "ratio_nl1_tube_product_over_truth": 2.0303423919033277,
+          "ratio_isolated_stable_product_over_truth": 2.4020553541325484,
+          "ratio_cap_components_product_over_truth": 4.192497358224728
+        },
+        "lead_9": {
+          "truth_nl1_stable": 0.0042631933351344724,
+          "truth_nl1_tube": 0.04057539631617539,
+          "truth_isolated_stable": 0.009949943008214416,
+          "truth_agree_stable": 0.9305611358270032,
+          "truth_cap_components": 36.60493827160494,
+          "persistence_nl1_stable": 0.022435441598440062,
+          "product_nl1_stable": 0.03151923701941647,
+          "product_nl1_tube": 0.08260236194863536,
+          "product_isolated_stable": 0.021484131985891285,
+          "product_agree_stable": 0.8989131007787607,
+          "product_cap_components": 151.9104938271605,
+          "product_cap_retention": 0.20077145525205548,
+          "product_rmse_water": 0.050524173571762664,
+          "ratio_nl1_stable_product_over_truth": 7.393339813997027,
+          "ratio_nl1_tube_product_over_truth": 2.0357746183173058,
+          "ratio_isolated_stable_product_over_truth": 2.159221612440849,
+          "ratio_cap_components_product_over_truth": 4.15
+        }
+      },
+      "gates": {
+        "local_kernel_sufficient_nl1_ratio_le_1p5_all_leads": false,
+        "local_kernel_isolated_le_2x_truth_all_leads": false,
+        "local_kernel_rejected_nl1_ratio_gt_3_any_lead": true
+      }
+    },
+    "factor_2": {
+      "factor": 2,
+      "num_feature_cells": 1142,
+      "summary": {
+        "lead_3": {
+          "truth_nl1_stable": 0.004416153932075966,
+          "truth_nl1_tube": 0.045345434394301366,
+          "truth_isolated_stable": 0.009169651941167742,
+          "truth_agree_stable": 0.9230627250724234,
+          "truth_cap_components": 32.888888888888886,
+          "persistence_nl1_stable": 0.019377743632695992,
+          "product_nl1_stable": 0.022728054068294534,
+          "product_nl1_tube": 0.07529257204414118,
+          "product_isolated_stable": 0.016081154280538662,
+          "product_agree_stable": 0.9184245234254129,
+          "product_cap_components": 99.3395061728395,
+          "product_cap_retention": 0.31356632386273003,
+          "product_rmse_water": 0.03495464678596846,
+          "ratio_nl1_stable_product_over_truth": 5.146571975947955,
+          "ratio_nl1_tube_product_over_truth": 1.6604223346816878,
+          "ratio_isolated_stable_product_over_truth": 1.7537366067670777,
+          "ratio_cap_components_product_over_truth": 3.0204579579579582
+        },
+        "lead_6": {
+          "truth_nl1_stable": 0.004368047368646474,
+          "truth_nl1_tube": 0.042607487677031146,
+          "truth_isolated_stable": 0.00856933183268254,
+          "truth_agree_stable": 0.9291763030749068,
+          "truth_cap_components": 35.04938271604938,
+          "persistence_nl1_stable": 0.020361044116939488,
+          "product_nl1_stable": 0.02313989483156921,
+          "product_nl1_tube": 0.07043292748004101,
+          "product_isolated_stable": 0.015864810072411716,
+          "product_agree_stable": 0.9134903168156671,
+          "product_cap_components": 104.1574074074074,
+          "product_cap_retention": 0.32186515291855694,
+          "product_rmse_water": 0.03557502622946085,
+          "ratio_nl1_stable_product_over_truth": 5.297537521608783,
+          "ratio_nl1_tube_product_over_truth": 1.6530645508585105,
+          "ratio_isolated_stable_product_over_truth": 1.8513473841571848,
+          "ratio_cap_components_product_over_truth": 2.9717330045790775
+        },
+        "lead_9": {
+          "truth_nl1_stable": 0.0042631933351344724,
+          "truth_nl1_tube": 0.04057539631617539,
+          "truth_isolated_stable": 0.009949943008214416,
+          "truth_agree_stable": 0.9305611358270032,
+          "truth_cap_components": 36.60493827160494,
+          "persistence_nl1_stable": 0.022435441598440062,
+          "product_nl1_stable": 0.022325448400206997,
+          "product_nl1_tube": 0.06663047575242191,
+          "product_isolated_stable": 0.016603015268590364,
+          "product_agree_stable": 0.9120383248823497,
+          "product_cap_components": 108.04320987654322,
+          "product_cap_retention": 0.29767522564132987,
+          "product_rmse_water": 0.03573818652557186,
+          "ratio_nl1_stable_product_over_truth": 5.236790040980582,
+          "ratio_nl1_tube_product_over_truth": 1.6421398631135404,
+          "ratio_isolated_stable_product_over_truth": 1.6686543083596903,
+          "ratio_cap_components_product_over_truth": 2.9516020236087694
+        }
+      },
+      "gates": {
+        "local_kernel_sufficient_nl1_ratio_le_1p5_all_leads": false,
+        "local_kernel_isolated_le_2x_truth_all_leads": true,
+        "local_kernel_rejected_nl1_ratio_gt_3_any_lead": true
+      }
+    }
+  },
+  "test_b": {
+    "members": 16,
+    "shift_days": [
+      -8,
+      -7,
+      -6,
+      -5,
+      -4,
+      -3,
+      -2,
+      -1,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "summary": {
+      "lead_3": {
+        "fair_crps": 0.011582571450336544,
+        "rmse": 0.058858214163783375,
+        "spread": 0.07182289901646544,
+        "rank_tv_pooled": 0.04372782292198923,
+        "rank_tv_open": 0.019587262839352644,
+        "rank_tv_interior": 0.25344633713233383,
+        "rank_tv_cap": 0.42344715051341975,
+        "truth_nl1_stable": NaN,
+        "member_nl1_stable": NaN,
+        "cap_retention": 0.22068598465386272,
+        "spread_over_rmse": 1.2202697624600967,
+        "ratio_nl1_stable_member_over_truth": NaN,
+        "num_cases": 81
+      },
+      "lead_6": {
+        "fair_crps": 0.01177901469869198,
+        "rmse": 0.05924791986180935,
+        "spread": 0.07096794668468646,
+        "rank_tv_pooled": 0.04447668441721323,
+        "rank_tv_open": 0.01876622872142979,
+        "rank_tv_interior": 0.2572857443636429,
+        "rank_tv_cap": 0.41142354180135154,
+        "truth_nl1_stable": NaN,
+        "member_nl1_stable": NaN,
+        "cap_retention": 0.21191241029806088,
+        "spread_over_rmse": 1.1978133046731947,
+        "ratio_nl1_stable_member_over_truth": NaN,
+        "num_cases": 80
+      },
+      "lead_9": {
+        "fair_crps": 0.011382141353735704,
+        "rmse": 0.05732675855983008,
+        "spread": 0.07009001117556274,
+        "rank_tv_pooled": 0.042984673594593695,
+        "rank_tv_open": 0.018092334771319333,
+        "rank_tv_interior": 0.25370136068168786,
+        "rank_tv_cap": 0.434925715450488,
+        "truth_nl1_stable": NaN,
+        "member_nl1_stable": NaN,
+        "cap_retention": 0.20098676452608868,
+        "spread_over_rmse": 1.2226404027782605,
+        "ratio_nl1_stable_member_over_truth": NaN,
+        "num_cases": 79
+      }
+    }
+  }
+}
