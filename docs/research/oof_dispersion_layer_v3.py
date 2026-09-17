@@ -73,7 +73,7 @@ def dist_bin(d: np.ndarray) -> np.ndarray:
     return np.searchsorted(np.array(DIST_EDGES, dtype=float), d, side="left")  # 0..6
 
 
-MU_EDGES = np.array([-0.5, 0.0, 0.15, 0.3, 0.5, 0.7, 0.85, 0.92, 0.96, CAP], dtype=float)  # 11 bins of the latent analysis mean, fine near the cap
+MU_EDGES = np.array([-0.5, 0.0, 0.15, 0.3, 0.5, 0.7, 0.85, 0.92, 0.96, 0.98, 0.99, CAP], dtype=float)  # 13 bins, finer near the cap
 
 
 NMU = len(MU_EDGES) + 1
