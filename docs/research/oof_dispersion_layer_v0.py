@@ -68,8 +68,18 @@ def dist_bin(d: np.ndarray) -> np.ndarray:
     return np.searchsorted(np.array(DIST_EDGES, dtype=float), d, side="left")  # 0..6
 
 
-def cell_index(d: np.ndarray, bg: np.ndarray) -> np.ndarray:
-    return dist_bin(d) * 3 + bg_class(bg)
+MU_EDGES = np.array([-0.5, 0.0, 0.15, 0.3, 0.5, 0.7, 0.85, 0.92, 0.96, CAP], dtype=float)  # 11 bins of the latent analysis mean, fine near the cap
+
+
+NMU = len(MU_EDGES) + 1
+
+
+def mu_bin(mu: np.ndarray) -> np.ndarray:
+    return np.searchsorted(MU_EDGES, mu, side="right")  # 0..10
+
+
+def cell_index(d: np.ndarray, mu: np.ndarray) -> np.ndarray:
+    return dist_bin(d) * NMU + mu_bin(mu)
 
 
 def _unit_field(x: np.ndarray, ell: float, water: np.ndarray) -> np.ndarray:
@@ -155,12 +165,17 @@ def prepare(c: dict) -> None:
     c["mu"] = enc(np.where(keep, mean, 0.0), w)
     c["resid"] = c["zt"] - c["mu"]
     c["dist_d"] = distance_transform_edt(~c["day_d"]) if c["day_d"].any() else np.full(w.shape, 1e4)
-    c["cell"] = cell_index(c["dist_d"], c["bg"])
-    c["zobs"] = enc(c["obs"], w)
+    c["cell"] = cell_index(c["dist_d"], c["mu"])
+    # Observation latent: observed positive values as-is (cap -> CAP+delta); observed open water
+    # is encoded consistently with the analysis-mean edge (at least one pixel into the water side).
+    zobs = c["obs"].astype(np.float64).copy()
+    zobs[c["obs"] >= CAP] = CAP + DELTA_CAP
+    zobs = np.where(c["obs"] <= 0, np.minimum(c["mu"], -GAMMA), zobs)
+    c["zobs"] = np.where(w, zobs, 0.0)
 
 
 def fit(train: list[dict]) -> dict:
-    n_cells = 7 * 3
+    n_cells = 7 * NMU
     ssum = np.zeros(n_cells); ssq = np.zeros(n_cells); cnt = np.zeros(n_cells)
     for c in train:
         w = c["water"]; r = c["resid"][w]; k = c["cell"][w]
@@ -172,8 +187,8 @@ def fit(train: list[dict]) -> dict:
     # fallback for sparse cells: pooled by distance bin
     for i in range(n_cells):
         if np.isnan(var[i]):
-            db = i // 3
-            idx = [db * 3 + j for j in range(3) if not np.isnan(var[db * 3 + j])]
+            mb = i % NMU
+            idx = [db * NMU + mb for db in range(7) if not np.isnan(var[db * NMU + mb])]
             var[i] = np.mean([var[j] for j in idx]) if idx else np.nanmean(var)
             b[i] = 0.0
     s = np.sqrt(np.maximum(var, 1e-8))
@@ -236,11 +251,14 @@ def simulate(c: dict, params: dict, M: int, rng) -> np.ndarray:
     return out
 
 
-def evaluate(cases: list[dict], members_by_case: dict, label: str, rng) -> dict:
+def evaluate(cases: list[dict], members_by_case: dict, label: str, rng, per_date: dict | None = None) -> dict:
     acc = defaultdict(lambda: defaultdict(list))
     for c in cases:
         m = members_by_case[c["date"]]; y = c["truth"]; w = c["water"]
         mean = m.mean(0); sd = m.std(0, ddof=1)
+        if per_date is not None:
+            per_date[c["date"].isoformat()] = {"fair_crps": fair_crps(m[:, w], y[w]), "rmse": float(np.sqrt(np.mean((mean[w] - y[w]) ** 2))),
+                                                "member_cap_mass": float(np.mean(m[:, w] >= CAP)), "truth_cap_mass": float(np.mean(y[w] >= CAP))}
         for lo, hi, name in STRATA:
             sel = w & (c["dist_d"] >= lo) & (c["dist_d"] <= hi)
             if sel.sum() < 50:
@@ -277,6 +295,8 @@ def main() -> None:
     p.add_argument("--members", type=int, default=10)
     p.add_argument("--folds", type=int, default=5)
     p.add_argument("--seed", type=int, default=20260918)
+    p.add_argument("--save-members-dir", type=Path, default=None)
+    p.add_argument("--save-members-dates", nargs="*", default=("2022-01-16", "2022-04-11", "2022-07-15"))
     a = p.parse_args()
     rng = np.random.default_rng(a.seed)
     cases = load_cases(a.samples_dir, a.experiment, a.mode)
@@ -295,8 +315,24 @@ def main() -> None:
             layered[cases[i]["date"]] = simulate(cases[i], params, a.members, rng)
         print(f"fold {k}: kernel={params['ell']} corr={params['empirical_corr']}", flush=True)
     raw = {c["date"]: c["ens"] for c in cases}
-    res = {"raw": evaluate(cases, raw, "raw", rng), "layered": evaluate(cases, layered, "layered", rng), "fold_params": fold_params,
+    pd_raw, pd_lay = {}, {}
+    res = {"raw": evaluate(cases, raw, "raw", rng, pd_raw), "layered": evaluate(cases, layered, "layered", rng, pd_lay), "fold_params": fold_params,
            "config": {"tau_day": TAU_DAY, "mean_zero_threshold": MEAN_ZERO_THRESHOLD, "gamma": GAMMA, "r_max": R_MAX, "tau_stale": TAU_STALE, "delta_cap": DELTA_CAP, "members": a.members, "folds": a.folds}}
+    dates = sorted(pd_raw)
+    boot = {}
+    for metric in ("fair_crps", "rmse"):
+        delta = np.array([pd_lay[d][metric] - pd_raw[d][metric] for d in dates])
+        bs = [float(np.mean(delta[rng.integers(0, len(delta), len(delta))])) for _ in range(4000)]
+        boot[metric] = {"mean_delta": float(delta.mean()), "ci95": [float(np.quantile(bs, .025)), float(np.quantile(bs, .975))], "dates_improved": int((delta < 0).sum()), "n_dates": len(delta)}
+    res["paired_bootstrap_layered_minus_raw"] = boot
+    res["cap_mass"] = {"truth": float(np.mean([pd_raw[d]["truth_cap_mass"] for d in dates])), "raw": float(np.mean([pd_raw[d]["member_cap_mass"] for d in dates])), "layered": float(np.mean([pd_lay[d]["member_cap_mass"] for d in dates]))}
+    res["per_date"] = {"raw": pd_raw, "layered": pd_lay}
+    if a.save_members_dir is not None:
+        a.save_members_dir.mkdir(parents=True, exist_ok=True)
+        for c in cases:
+            if c["date"].isoformat() in a.save_members_dates:
+                np.savez_compressed(a.save_members_dir / f"layered_{c['date'].isoformat()}.npz", members=layered[c["date"]].astype(np.float32), raw=c["ens"].astype(np.float32), truth=c["truth"].astype(np.float32), background=c["bg"].astype(np.float32), day_d=c["day_d"], cond=c["cond"], water=c["water"])
+    print("bootstrap:", json.dumps(boot), "| cap mass:", res["cap_mass"])
     a.output.parent.mkdir(parents=True, exist_ok=True)
     a.output.write_text(json.dumps(res, indent=2, default=float))
     hdr = f"{'stratum':12s} {'RMSE raw/lay':>16s} {'s/r raw/lay':>14s} {'fCRPS raw/lay':>16s} {'rankTV raw/lay':>16s} {'cov80 raw/lay':>14s} {'zero t/raw/lay':>16s}"
