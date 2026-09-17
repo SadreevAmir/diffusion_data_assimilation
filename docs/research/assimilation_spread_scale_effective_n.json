@@ -1,0 +1,37 @@
+{
+  "part1_scale_decomposition_dev2022": {
+    "native": {
+      "rmse_mean": 0.1940250446830317,
+      "spread": 0.14112793134956325,
+      "spread_over_rmse": 0.7273696629222088,
+      "mse_share_of_native": 1.0
+    },
+    "block4_80x64": {
+      "rmse_mean": 0.18619652968929434,
+      "spread": 0.1339707532792437,
+      "spread_over_rmse": 0.7195126219742137,
+      "mse_share_of_native": 0.9209320353846709
+    },
+    "block16_20x16": {
+      "rmse_mean": 0.1642784329482303,
+      "spread": 0.1177161243899398,
+      "spread_over_rmse": 0.716564690065166,
+      "mse_share_of_native": 0.7168784390711541
+    },
+    "detail_below_16": {
+      "rmse_mean": 0.10323911289974477,
+      "spread": 0.07784604720613156,
+      "spread_over_rmse": 0.7540363823324173,
+      "mse_share_of_native": 0.28312156092884594
+    }
+  },
+  "part2_train_redundancy": {
+    "n_dates": 214,
+    "rms_diff_hour0_vs_hour23_same_day": 0.05308950854036696,
+    "rms_diff_day_to_day_hour23": 0.05418051099437333,
+    "rms_diff_year_to_year_same_date_hour23 (background error)": 0.18318397967062158,
+    "largescale_anomaly_var_explained_by_month_climatology": 0.020247406345248353,
+    "largescale_anomaly_var_explained_by_year_month_mean": 0.7331540884407649,
+    "note": "Y-bg anomaly at 16x16-block scale; (year,month) groups have ~3 dates each (days 5/15/25), so the year-month share is an upper bound of a low-dimensional 'year regime' mode."
+  }
+}
