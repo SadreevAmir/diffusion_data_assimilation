@@ -133,13 +133,13 @@ def rank_tv(m: np.ndarray, y: np.ndarray, rng) -> float:
     return float(0.5 * np.abs(h - 1 / (M + 1)).sum())
 
 
-def load_cases(samples_dir: Path, experiment: Path, mode: str) -> list[dict]:
+def load_cases(samples_dir: Path, experiment: Path, mode: str, split: str = "valid") -> list[dict]:
     e = load_json(experiment)
     dc = merge_config_overrides(load_json(resolve_path(e["data_config"], experiment.parent)), e.get("data_overrides"))
     dc = merge_config_overrides(dc, e["modes"][mode].get("data_overrides", {}))
     fields = list(dc["fields"])
     dc["observed_channels"] = [fields.index("siconc")]
-    ds = build_dataset(dc, split="valid")
+    ds = build_dataset(dc, split=split)
     cases = []
     for f in sorted(glob.glob(str(samples_dir / "*.npz"))):
         d = date.fromisoformat(Path(f).stem.split("_")[1])
@@ -373,24 +373,37 @@ def main() -> None:
     p.add_argument("--folds", type=int, default=5)
     p.add_argument("--seed", type=int, default=20260918)
     p.add_argument("--save-members-dir", type=Path, default=None)
+    p.add_argument("--apply-samples-dir", type=Path, default=None, help="frozen application: fit on ALL dev cases, apply to these cases (test split)")
+    p.add_argument("--apply-mode", default="test_strict_full")
+    p.add_argument("--apply-split", default="test")
     p.add_argument("--save-members-dates", nargs="*", default=("2022-01-16", "2022-04-11", "2022-07-15"))
     a = p.parse_args()
     rng = np.random.default_rng(a.seed)
     cases = load_cases(a.samples_dir, a.experiment, a.mode)
     for c in cases:
         prepare(c)
-    n = len(cases); fold_size = int(np.ceil(n / a.folds))
-    layered = {}
-    fold_params = []
-    for k in range(a.folds):
-        held = list(range(k * fold_size, min(n, (k + 1) * fold_size)))
-        purge = set(held) | {h - 1 for h in held} | {h + 1 for h in held}
-        train = [cases[i] for i in range(n) if i not in purge]
-        params = fit(train)
-        fold_params.append({"fold": k, "ell": params["ell"], "ell1": params["ell1"], "s_track": params["s_track"], "empirical_corr": params["empirical_corr"], "empirical_corr_pass1": params["empirical_corr_pass1"]})
-        for i in held:
-            layered[cases[i]["date"]] = simulate(cases[i], params, a.members, rng)
-        print(f"fold {k}: kernel={params['ell']} corr={params['empirical_corr']}", flush=True)
+    if a.apply_samples_dir is not None:
+        params = fit(cases)
+        test_cases = load_cases(a.apply_samples_dir, a.experiment, a.apply_mode, split=a.apply_split)
+        for c in test_cases:
+            prepare(c)
+        layered = {c["date"]: simulate(c, params, a.members, rng) for c in test_cases}
+        fold_params = [{"fold": "all_dev", "ell": params["ell"], "ell1": params["ell1"], "s_track": params["s_track"], "empirical_corr": params["empirical_corr"]}]
+        cases = test_cases
+        print(f"applied frozen dev-fitted layer to {len(test_cases)} test cases", flush=True)
+    else:
+        n = len(cases); fold_size = int(np.ceil(n / a.folds))
+        layered = {}
+        fold_params = []
+        for k in range(a.folds):
+            held = list(range(k * fold_size, min(n, (k + 1) * fold_size)))
+            purge = set(held) | {h - 1 for h in held} | {h + 1 for h in held}
+            train = [cases[i] for i in range(n) if i not in purge]
+            params = fit(train)
+            fold_params.append({"fold": k, "ell": params["ell"], "ell1": params["ell1"], "s_track": params["s_track"], "empirical_corr": params["empirical_corr"], "empirical_corr_pass1": params["empirical_corr_pass1"]})
+            for i in held:
+                layered[cases[i]["date"]] = simulate(cases[i], params, a.members, rng)
+            print(f"fold {k}: kernel={params['ell']} corr={params['empirical_corr']}", flush=True)
     raw = {c["date"]: c["ens"] for c in cases}
     pd_raw, pd_lay = {}, {}
     res = {"raw": evaluate(cases, raw, "raw", rng, pd_raw), "layered": evaluate(cases, layered, "layered", rng, pd_lay), "fold_params": fold_params,
