@@ -1,0 +1,310 @@
+#!/usr/bin/env python3
+"""OOF dispersion layer v0 (AS-1) for saved assimilation ensembles (dev-2022).
+
+Point analysis = latent mean of the saved members.  Residual law in a latent
+with exact atoms (water -> minus distance to ice edge, cap -> censoring):
+    z* - mu = b(cell) + s(cell) * g,   g ~ smooth Gaussian field (Gaussian kernel, length ell)
+cell = (distance-to-day-d-track bin) x (background class).  b, s, ell are fitted
+on training folds only (5 contiguous folds of 8 dates, +-1 date purge), then
+members are drawn on held-out dates by conditional simulation with exact
+kriging on day-d track pixels and noisy kriging (nugget tau) on d-1/d-2 pixels.
+Reports raw vs layered fair CRPS, RMSE, spread/RMSE by distance strata,
+exact-zero shares, rank TV and 80% coverage.  Development evidence only;
+for test-2023 the parameters would be fitted on all of 2022.
+"""
+from __future__ import annotations
+
+import argparse
+import glob
+import json
+from collections import defaultdict
+from datetime import date
+from pathlib import Path
+
+import numpy as np
+import torch
+from scipy.ndimage import distance_transform_edt, gaussian_filter
+
+from assim_lib.config import load_json, merge_config_overrides, resolve_path
+from assim_lib.data import build_dataset
+
+CAP = 0.9970703125
+DELTA_CAP = 0.01
+GAMMA = 0.02  # latent slope per pixel in open water (declared)
+R_MAX = 40.0
+TAU_STALE = 0.02
+TAU_DAY = 0.01  # declared observation error in latent units on day-d track pixels
+EDGE_BAND_PX = 5.0  # sub-threshold analysis-mean values are kept within this band of the mean ice edge
+MEAN_ZERO_THRESHOLD = 0.15  # analysis-mean values below the IIEE edge threshold are encoded as open water
+DIST_EDGES = [0, 2, 5, 10, 20, 40]  # bins: 0, 1-2, 3-5, 6-10, 11-20, 21-40, >40
+LAGS = (1, 2, 4, 8, 16)
+STRATA = [(0, 0, "on_track_d"), (1, 2, "d1_2"), (3, 5, "d3_5"), (6, 10, "d6_10"), (11, 20, "d11_20"), (21, 40, "d21_40"), (41, 10_000, "d_gt_40")]
+
+
+def enc(a: np.ndarray, water: np.ndarray) -> np.ndarray:
+    z = a.astype(np.float64).copy()
+    ice = (a > 0) & water
+    if ice.any():
+        d = distance_transform_edt(~ice)
+    else:
+        d = np.full(a.shape, R_MAX)
+    z[~ice] = -GAMMA * np.minimum(d[~ice], R_MAX)
+    z[a >= CAP] = CAP + DELTA_CAP
+    return np.where(water, z, 0.0)
+
+
+def dec(z: np.ndarray) -> np.ndarray:
+    return np.clip(z, 0.0, CAP)
+
+
+def bg_class(bg: np.ndarray) -> np.ndarray:
+    c = np.ones(bg.shape, dtype=np.int64)
+    c[bg <= 0] = 0
+    c[bg >= 0.95] = 2
+    return c
+
+
+def dist_bin(d: np.ndarray) -> np.ndarray:
+    return np.searchsorted(np.array(DIST_EDGES, dtype=float), d, side="left")  # 0..6
+
+
+def cell_index(d: np.ndarray, bg: np.ndarray) -> np.ndarray:
+    return dist_bin(d) * 3 + bg_class(bg)
+
+
+def _unit_field(x: np.ndarray, ell: float, water: np.ndarray) -> np.ndarray:
+    sig = ell / np.sqrt(2.0)  # filtered white noise has correlation exp(-h^2/(4 sig^2)) = rho with length ell
+    num = gaussian_filter(np.where(water, x, 0.0), sig, mode="constant")
+    den = gaussian_filter(water.astype(float), sig, mode="constant")
+    y = np.where(den > 1e-6, num / np.maximum(den, 1e-6), 0.0)
+    return y / max(y[water].std(), 1e-9)
+
+
+def smooth_unit(x: np.ndarray, ell: dict, water: np.ndarray, x2: np.ndarray | None = None) -> np.ndarray:
+    """Unit-variance field with two-scale correlation a*rho_l1 + (1-a)*rho_l2 (independent white inputs)."""
+    a = ell["a"]
+    if x2 is None:
+        x2 = np.random.default_rng(0).standard_normal(x.shape)
+    return np.sqrt(a) * _unit_field(x, ell["l1"], water) + np.sqrt(1 - a) * _unit_field(x2, ell["l2"], water)
+
+
+def rho_apply(field_on_T: np.ndarray, ell: dict) -> np.ndarray:
+    """Apply the two-scale covariance operator to a field supported on T."""
+    a = ell["a"]
+    out = a * gaussian_filter(field_on_T, ell["l1"], mode="constant") * (2 * np.pi * ell["l1"] ** 2)
+    out += (1 - a) * gaussian_filter(field_on_T, ell["l2"], mode="constant") * (2 * np.pi * ell["l2"] ** 2)
+    return out
+
+
+def rho_matrix(d2: np.ndarray, ell: dict) -> np.ndarray:
+    return ell["a"] * np.exp(-d2 / (2 * ell["l1"] ** 2)) + (1 - ell["a"]) * np.exp(-d2 / (2 * ell["l2"] ** 2))
+
+
+def fair_crps(m: np.ndarray, y: np.ndarray) -> float:
+    M = m.shape[0]
+    t1 = np.abs(m - y[None]).mean(0)
+    t2 = np.zeros_like(y)
+    for i in range(M):
+        t2 += np.abs(m[i][None] - m).sum(0)
+    return float((t1 - t2 / (2 * M * (M - 1))).mean())
+
+
+def rank_tv(m: np.ndarray, y: np.ndarray, rng) -> float:
+    M = m.shape[0]
+    below = (m < y[None]).sum(0)
+    ties = (m == y[None]).sum(0)
+    r = below + np.floor(rng.random(y.shape) * (ties + 1)).astype(int)
+    h = np.bincount(r, minlength=M + 1).astype(float)
+    h /= h.sum()
+    return float(0.5 * np.abs(h - 1 / (M + 1)).sum())
+
+
+def load_cases(samples_dir: Path, experiment: Path, mode: str) -> list[dict]:
+    e = load_json(experiment)
+    dc = merge_config_overrides(load_json(resolve_path(e["data_config"], experiment.parent)), e.get("data_overrides"))
+    dc = merge_config_overrides(dc, e["modes"][mode].get("data_overrides", {}))
+    fields = list(dc["fields"])
+    dc["observed_channels"] = [fields.index("siconc")]
+    ds = build_dataset(dc, split="valid")
+    cases = []
+    for f in sorted(glob.glob(str(samples_dir / "*.npz"))):
+        d = date.fromisoformat(Path(f).stem.split("_")[1])
+        z = np.load(f)
+        valid = z["valid_mask"]
+        vm = torch.as_tensor(valid[None].astype(np.float32))
+        saved = ds.assimilation_range
+        ds.assimilation_range = 1
+        _, day_mask, _ = ds._sral_track_observations(d, ds.hour_index, vm)
+        ds.assimilation_range = saved
+        day_d = (day_mask[0].numpy() > 0)[: valid.shape[0], : valid.shape[1]] & valid
+        cases.append({
+            "date": d, "ens": z["analysis_ensemble"].astype(np.float64), "truth": z["truth"].astype(np.float64),
+            "bg": z["background"].astype(np.float64), "obs": z["obs_values"].astype(np.float64),
+            "cond": z["conditioning_mask"] & valid, "day_d": day_d, "water": valid,
+        })
+    return cases
+
+
+def prepare(c: dict) -> None:
+    w = c["water"]
+    c["zt"] = enc(c["truth"], w)
+    mean = c["ens"].mean(0)
+    core = (mean >= MEAN_ZERO_THRESHOLD) & w
+    band = (distance_transform_edt(~core) <= EDGE_BAND_PX) if core.any() else np.zeros_like(core)
+    keep = core | (band & (mean > 0))
+    c["mu"] = enc(np.where(keep, mean, 0.0), w)
+    c["resid"] = c["zt"] - c["mu"]
+    c["dist_d"] = distance_transform_edt(~c["day_d"]) if c["day_d"].any() else np.full(w.shape, 1e4)
+    c["cell"] = cell_index(c["dist_d"], c["bg"])
+    c["zobs"] = enc(c["obs"], w)
+
+
+def fit(train: list[dict]) -> dict:
+    n_cells = 7 * 3
+    ssum = np.zeros(n_cells); ssq = np.zeros(n_cells); cnt = np.zeros(n_cells)
+    for c in train:
+        w = c["water"]; r = c["resid"][w]; k = c["cell"][w]
+        ssum += np.bincount(k, weights=r, minlength=n_cells)
+        ssq += np.bincount(k, weights=r * r, minlength=n_cells)
+        cnt += np.bincount(k, minlength=n_cells)
+    b = np.where(cnt > 200, ssum / np.maximum(cnt, 1), 0.0)
+    var = np.where(cnt > 200, ssq / np.maximum(cnt, 1) - b**2, np.nan)
+    # fallback for sparse cells: pooled by distance bin
+    for i in range(n_cells):
+        if np.isnan(var[i]):
+            db = i // 3
+            idx = [db * 3 + j for j in range(3) if not np.isnan(var[db * 3 + j])]
+            var[i] = np.mean([var[j] for j in idx]) if idx else np.nanmean(var)
+            b[i] = 0.0
+    s = np.sqrt(np.maximum(var, 1e-8))
+    # correlation length of standardised residual from empirical correlations at lags
+    cors = {lag: [] for lag in LAGS}
+    for c in train:
+        w = c["water"]
+        std = (c["resid"] - b[c["cell"]]) / s[c["cell"]]
+        std = np.where(w, std, 0.0)
+        for lag in LAGS:
+            a1 = std[:, lag:]; a2 = std[:, :-lag]; m = w[:, lag:] & w[:, :-lag]
+            b1 = std[lag:, :]; b2 = std[:-lag, :]; mv = w[lag:, :] & w[:-lag, :]
+            num = (a1 * a2)[m].sum() + (b1 * b2)[mv].sum()
+            den = (a1 * a1)[m].sum() + (b1 * b1)[mv].sum()
+            cors[lag].append(num / max(den, 1e-9))
+    lag_arr = np.array(LAGS, float); cor_arr = np.array([np.mean(cors[l]) for l in LAGS])
+    # two-scale Gaussian mixture kernel fitted by least squares on the empirical lag correlations
+    best = None
+    for l1 in (1.0, 1.5, 2.0, 3.0, 4.0):
+        for l2 in (8.0, 12.0, 16.0, 24.0, 32.0, 48.0):
+            g1 = np.exp(-lag_arr**2 / (2 * l1**2)); g2 = np.exp(-lag_arr**2 / (2 * l2**2))
+            # rho(0)=1 constraint: a*g1 + (1-a)*g2 ; solve for a in [0,1]
+            denom = np.sum((g1 - g2) ** 2)
+            a_hat = float(np.clip(np.sum((cor_arr - g2) * (g1 - g2)) / max(denom, 1e-12), 0.0, 1.0))
+            err = float(np.sum((a_hat * g1 + (1 - a_hat) * g2 - cor_arr) ** 2))
+            if best is None or err < best[0]:
+                best = (err, a_hat, l1, l2)
+    _, a_mix, l1, l2 = best
+    ell = {"a": a_mix, "l1": l1, "l2": l2}
+    return {"b": b, "s": s, "ell": ell, "empirical_corr": {int(l): float(v) for l, v in zip(LAGS, cor_arr)}, "cell_counts": cnt.tolist()}
+
+
+def simulate(c: dict, params: dict, M: int, rng) -> np.ndarray:
+    w = c["water"]; b = params["b"][c["cell"]]; s = params["s"][c["cell"]]; ell = params["ell"]
+    mean_field = np.where(w, c["mu"] + b, 0.0)
+    T = c["cond"]
+    idx = np.flatnonzero(T.ravel())
+    nT = idx.size
+    ti = np.unravel_index(idx, T.shape)
+    r_T = (c["zobs"] - mean_field)[ti]
+    s_T = s[ti]
+    nug = np.where(c["day_d"][ti], TAU_DAY**2, TAU_STALE**2)
+    yy, xx = np.array(ti[0], float), np.array(ti[1], float)
+    d2 = (yy[:, None] - yy[None]) ** 2 + (xx[:, None] - xx[None]) ** 2
+    Sigma_TT = np.outer(s_T, s_T) * rho_matrix(d2, ell) + np.diag(nug) + 1e-8 * np.eye(nT)
+    L = np.linalg.cholesky(Sigma_TT)
+
+    def krig(v_T: np.ndarray) -> np.ndarray:
+        wgt = np.linalg.solve(L.T, np.linalg.solve(L, v_T))
+        g = np.zeros(T.shape); g[ti] = s_T * wgt
+        return s * rho_apply(g, ell)
+
+    update = krig(r_T)
+    out = np.zeros((M, *T.shape))
+    for m in range(M):
+        e = s * smooth_unit(rng.standard_normal(T.shape), ell, w, rng.standard_normal(T.shape))
+        e_T = e[ti] + np.sqrt(nug) * rng.standard_normal(nT)
+        zm = mean_field + update + e - krig(e_T)
+        out[m] = np.where(w, dec(zm), 0.0)
+    return out
+
+
+def evaluate(cases: list[dict], members_by_case: dict, label: str, rng) -> dict:
+    acc = defaultdict(lambda: defaultdict(list))
+    for c in cases:
+        m = members_by_case[c["date"]]; y = c["truth"]; w = c["water"]
+        mean = m.mean(0); sd = m.std(0, ddof=1)
+        for lo, hi, name in STRATA:
+            sel = w & (c["dist_d"] >= lo) & (c["dist_d"] <= hi)
+            if sel.sum() < 50:
+                continue
+            a = acc[name]; mm = m[:, sel]; yy = y[sel]
+            a["rmse"].append(float(np.sqrt(np.mean((mean[sel] - yy) ** 2))))
+            a["spread"].append(float(np.sqrt(np.mean(sd[sel] ** 2))))
+            a["fair_crps"].append(fair_crps(mm, yy))
+            a["rank_tv"].append(rank_tv(mm, yy, rng))
+            lo_q, hi_q = np.quantile(mm, [0.1, 0.9], axis=0)
+            a["cov80"].append(float(np.mean((yy >= lo_q) & (yy <= hi_q))))
+            a["truth_zero"].append(float(np.mean(yy == 0)))
+            a["member_zero"].append(float(np.mean(mm == 0)))
+            a["member_cap"].append(float(np.mean(mm >= CAP)))
+            a["truth_cap"].append(float(np.mean(yy >= CAP)))
+        a = acc["all_water"]; mm = m[:, w]; yy = y[w]
+        a["rmse"].append(float(np.sqrt(np.mean((mean[w] - yy) ** 2)))); a["spread"].append(float(np.sqrt(np.mean(sd[w] ** 2))))
+        a["fair_crps"].append(fair_crps(mm, yy)); a["rank_tv"].append(rank_tv(mm, yy, rng))
+        a["truth_zero"].append(float(np.mean(yy == 0))); a["member_zero"].append(float(np.mean(mm == 0)))
+    out = {}
+    for name, d in acc.items():
+        s = {k: float(np.mean(v)) for k, v in d.items()}
+        s["spread_over_rmse"] = s["spread"] / s["rmse"]
+        out[name] = s
+    return out
+
+
+def main() -> None:
+    p = argparse.ArgumentParser()
+    p.add_argument("--samples-dir", type=Path, required=True)
+    p.add_argument("--experiment", type=Path, required=True)
+    p.add_argument("--mode", default="validation_strict_full")
+    p.add_argument("--output", type=Path, required=True)
+    p.add_argument("--members", type=int, default=10)
+    p.add_argument("--folds", type=int, default=5)
+    p.add_argument("--seed", type=int, default=20260918)
+    a = p.parse_args()
+    rng = np.random.default_rng(a.seed)
+    cases = load_cases(a.samples_dir, a.experiment, a.mode)
+    for c in cases:
+        prepare(c)
+    n = len(cases); fold_size = int(np.ceil(n / a.folds))
+    layered = {}
+    fold_params = []
+    for k in range(a.folds):
+        held = list(range(k * fold_size, min(n, (k + 1) * fold_size)))
+        purge = set(held) | {h - 1 for h in held} | {h + 1 for h in held}
+        train = [cases[i] for i in range(n) if i not in purge]
+        params = fit(train)
+        fold_params.append({"fold": k, "ell": params["ell"], "empirical_corr": params["empirical_corr"], "s_by_cell": params["s"].tolist(), "b_by_cell": params["b"].tolist()})
+        for i in held:
+            layered[cases[i]["date"]] = simulate(cases[i], params, a.members, rng)
+        print(f"fold {k}: kernel={params['ell']} corr={params['empirical_corr']}", flush=True)
+    raw = {c["date"]: c["ens"] for c in cases}
+    res = {"raw": evaluate(cases, raw, "raw", rng), "layered": evaluate(cases, layered, "layered", rng), "fold_params": fold_params,
+           "config": {"tau_day": TAU_DAY, "mean_zero_threshold": MEAN_ZERO_THRESHOLD, "gamma": GAMMA, "r_max": R_MAX, "tau_stale": TAU_STALE, "delta_cap": DELTA_CAP, "members": a.members, "folds": a.folds}}
+    a.output.parent.mkdir(parents=True, exist_ok=True)
+    a.output.write_text(json.dumps(res, indent=2, default=float))
+    hdr = f"{'stratum':12s} {'RMSE raw/lay':>16s} {'s/r raw/lay':>14s} {'fCRPS raw/lay':>16s} {'rankTV raw/lay':>16s} {'cov80 raw/lay':>14s} {'zero t/raw/lay':>16s}"
+    print(hdr)
+    for name in res["raw"]:
+        r, l = res["raw"][name], res["layered"][name]
+        print(f"{name:12s} {r['rmse']:7.4f}/{l['rmse']:7.4f} {r['spread_over_rmse']:6.2f}/{l['spread_over_rmse']:6.2f} {r['fair_crps']:7.4f}/{l['fair_crps']:7.4f} {r['rank_tv']:7.3f}/{l['rank_tv']:7.3f} {r.get('cov80',float('nan')):6.2f}/{l.get('cov80',float('nan')):6.2f} {r['truth_zero']:.2f}/{r['member_zero']:.2f}/{l['member_zero']:.2f}")
+
+
+if __name__ == "__main__":
+    main()
