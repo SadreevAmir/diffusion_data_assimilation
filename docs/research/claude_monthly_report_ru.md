@@ -221,8 +221,11 @@ balanced_50m, 40 дат, регион full (`aggregate_case_mean_metrics.csv` ч
 меняется только ошибка — протокол siconc-only стоит +22 % RMSE в 2022 и +2 %
 в 2019. Разброс модели **не следует за трудностью условия**.
 
-### II.8 Ещё считается ⏳ (очередь на одной GPU)
-- arm A@ep10 под native-two-field на тех же 40 dev-датах (идёт).
+### II.8 Arm A в нормальных условиях (готово) и что ещё считается ⏳
+- arm A@ep10 native, 40 dev-дат: RMSE .166 (baseline .156), CRPS .051 (.045),
+  s/r **.98** (.90), cov80 .77; по стратумам расстояния s/r 1.08 → .96,
+  rank-TV .12 vs .15. Калибрована лучше, skill хуже — недообучена (6.5k vs
+  48k updates). Обучающая метрика на 12 датах вводила в заблуждение.
 - legacy `m2m_2f` ema_last / ema_best под native (следом).
 - arm C@ep10 (field-dropout) под строгим siconc-only.
 
