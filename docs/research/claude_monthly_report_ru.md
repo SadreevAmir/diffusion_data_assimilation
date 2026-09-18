@@ -226,7 +226,9 @@ balanced_50m, 40 дат, регион full (`aggregate_case_mean_metrics.csv` ч
   s/r **.98** (.90), cov80 .77; по стратумам расстояния s/r 1.08 → .96,
   rank-TV .12 vs .15. Калибрована лучше, skill хуже — недообучена (6.5k vs
   48k updates). Обучающая метрика на 12 датах вводила в заблуждение.
-- legacy `m2m_2f` ema_last / ema_best под native (следом).
+- legacy `m2m_2f` ema_last native (готово): RMSE .163, CRPS .066, spread .080,
+  s/r **.49**, cov80 .31 — коллапс чистой модели подтверждён в нормальных
+  условиях. ema_best (эп. ~5) — следом.
 - arm C@ep10 (field-dropout) под строгим siconc-only.
 
 ---
