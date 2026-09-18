@@ -32,10 +32,13 @@ class VNet(nn.Module):
         return self.net(torch.cat([yt, c, t], -1))
 
 
+FIXED_MASK = np.array([1, 4, 6, 9, 12, 15])  # v3: the same observed coordinates for every sample (a 6-dim continuous condition)
+
+
 def make_obs(y, rng, s_obs):
     N = y.shape[0]; mask = np.zeros((N, M_DIM)); vals = np.zeros((N, M_DIM))
     for i in range(N):
-        idx = rng.choice(M_DIM, S_OBS, replace=False); mask[i, idx] = 1
+        idx = FIXED_MASK; mask[i, idx] = 1
         vals[i, idx] = y[i, idx] + s_obs * rng.normal(size=S_OBS)
     return np.concatenate([mask, vals], 1)
 
@@ -92,11 +95,10 @@ def run(s_obs, N, steps, eval_every, seed, truth, out, tag):
     rng = np.random.default_rng(seed); torch.manual_seed(seed); gen = torch.Generator().manual_seed(seed + 1)
     x_tr = rng.uniform(-1, 1, (N, 2)); y_tr = truth.sample(x_tr, rng)[0]; c_tr = make_obs(y_tr, rng, 0.0)  # clean obs + fixed masks; noise added per step
     # nearest-neighbour distance between training conditions (observed values, same mask pattern not required): scale of 'neighbourhood'
-    vals = c_tr[:, M_DIM:]; masks = c_tr[:, :M_DIM]
-    dd = np.sqrt(((vals[:, None] - vals[None]) ** 2 * (masks[:, None] * masks[None])).sum(-1) / np.maximum((masks[:, None] * masks[None]).sum(-1), 1)); np.fill_diagonal(dd, np.inf)
-    same = (masks[:, None] == masks[None]).all(-1); dd_same = np.where(same, dd, np.inf)
-    nn_any = float(np.median(dd.min(1))); nn_same = float(np.median(np.where(np.isfinite(dd_same.min(1)), dd_same.min(1), np.nan)))
-    print(f"[{tag} s_obs={s_obs} N={N}] median NN distance per observed coord: any mask {nn_any:.3f}, same mask {nn_same:.3f}", flush=True)
+    vals = c_tr[:, M_DIM:][:, FIXED_MASK]
+    dd = np.sqrt(((vals[:, None] - vals[None]) ** 2).mean(-1)); np.fill_diagonal(dd, np.inf)
+    nn_any = float(np.median(dd.min(1))); nn_same = nn_any
+    print(f"[{tag} s_obs={s_obs} N={N}] median NN distance (rms per observed coord) between training conditions: {nn_any:.3f}", flush=True)
     x_te = rng.uniform(-1, 1, (128, 2)); y_te = truth.sample(x_te, rng)[0]; c_te = make_obs(y_te, rng, s_obs)
     post = np.stack([true_posterior(truth, c_te[i], s_obs, rng) for i in range(len(c_te))])
     C = torch.as_tensor(c_tr, dtype=torch.float32); Y = torch.as_tensor(y_tr, dtype=torch.float32)
@@ -117,8 +119,8 @@ def main():
     p = argparse.ArgumentParser(); p.add_argument("--steps", type=int, default=20000); p.add_argument("--eval-every", type=int, default=2000)
     p.add_argument("--output", type=Path, default=Path("docs/research/general_ml/synth_noisy_partial_obs.json")); a = p.parse_args()
     truth = Truth(seed=123); out = {}
-    for N in (512, 2048):
-        for s_obs in (0.0, 0.1, 0.3, 1.0):
+    for N in (512, 2048, 8192):
+        for s_obs in (0.0, 0.1, 0.3):
             run(s_obs, N, a.steps, a.eval_every, 0, truth, out, "partial"); a.output.write_text(json.dumps(out, indent=1))
     print("done")
 
