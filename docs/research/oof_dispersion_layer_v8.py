@@ -388,7 +388,7 @@ def evaluate(cases: list[dict], members_by_case: dict, label: str, rng, per_date
     out = {}
     for name, d in acc.items():
         s = {k: float(np.mean(v)) for k, v in d.items()}
-        s["spread_over_rmse"] = s["spread"] / s["rmse"]
+        s["spread_over_rmse"] = s["spread"] / max(s["rmse"], 1e-9)
         out[name] = s
     return out
 
