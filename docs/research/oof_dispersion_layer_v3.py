@@ -424,7 +424,7 @@ def main() -> None:
     if a.save_members_dir is not None:
         a.save_members_dir.mkdir(parents=True, exist_ok=True)
         for c in cases:
-            if c["date"].isoformat() in a.save_members_dates:
+            if "all" in a.save_members_dates or c["date"].isoformat() in a.save_members_dates:
                 np.savez_compressed(a.save_members_dir / f"layered_{c['date'].isoformat()}.npz", members=layered[c["date"]].astype(np.float32), raw=c["ens"].astype(np.float32), truth=c["truth"].astype(np.float32), background=c["bg"].astype(np.float32), day_d=c["day_d"], cond=c["cond"], water=c["water"])
     print("bootstrap:", json.dumps(boot), "| cap mass:", res["cap_mass"])
     a.output.parent.mkdir(parents=True, exist_ok=True)
