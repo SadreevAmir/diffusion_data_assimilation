@@ -85,8 +85,14 @@ def evaluate(net, truth, x, rng, M=32, gen=None):
     d1 = np.linalg.norm(ens - y[:, None], axis=-1).mean(1)
     d2 = np.linalg.norm(ens[:, :, None] - ens[:, None], axis=-1).sum((1, 2)) / (M * (M - 1))
     es = float(np.mean(d1 - 0.5 * d2))
+    # copula check (Proposition B): correlation matrix of pixelwise-standardised members vs the true K
+    K = truth.L @ truth.L.T
+    z = (ens - mean[:, None]) / np.maximum(sd[:, None], 1e-6)  # (N, M, m)
+    C = np.einsum("nmi,nmj->ij", z, z) / (z.shape[0] * z.shape[1])
+    d = np.tril_indices(M_DIM, -1)
+    copula_err = float(np.sqrt(np.mean((C[d] - K[d]) ** 2))); copula_corr = float(np.corrcoef(C[d], K[d])[0, 1])
     return dict(rmse_mean=rmse, spread=spread, true_spread=true_spread, spread_over_true=spread / true_spread,
-                spread_over_rmse=spread / rmse, rank_tv=tv, energy_score=es)
+                spread_over_rmse=spread / rmse, rank_tv=tv, energy_score=es, copula_rmse_vs_true=copula_err, copula_corr_vs_true=copula_corr)
 
 
 def run(k: int, N: int, steps: int, eval_every: int, seed: int, truth: Truth, out: dict, tag: str):
@@ -110,7 +116,7 @@ def run(k: int, N: int, steps: int, eval_every: int, seed: int, truth: Truth, ou
             e_out = evaluate(net, truth, x_test, rng, gen=gen); e_in = evaluate(net, truth, x_in, rng, gen=gen)
             net.train()
             curve.append(dict(step=step, loss=float(loss), oos=e_out, ins=e_in))
-            print(f"[{tag} k={k} N={N}] step {step:6d} loss {float(loss):.4f} | OOS rmse {e_out['rmse_mean']:.3f} spread/true {e_out['spread_over_true']:.3f} s/r {e_out['spread_over_rmse']:.2f} rankTV {e_out['rank_tv']:.3f} ES {e_out['energy_score']:.4f} | in-sample rmse {e_in['rmse_mean']:.3f} spread/true {e_in['spread_over_true']:.3f}  ({time.time()-t0:.0f}s)", flush=True)
+            print(f"[{tag} k={k} N={N}] step {step:6d} loss {float(loss):.4f} | OOS rmse {e_out['rmse_mean']:.3f} spread/true {e_out['spread_over_true']:.3f} s/r {e_out['spread_over_rmse']:.2f} rankTV {e_out['rank_tv']:.3f} ES {e_out['energy_score']:.4f} copula-err {e_out['copula_rmse_vs_true']:.3f} (corr {e_out['copula_corr_vs_true']:.2f}) | in-sample rmse {e_in['rmse_mean']:.3f} spread/true {e_in['spread_over_true']:.3f}  ({time.time()-t0:.0f}s)", flush=True)
     out[f"{tag}_k{k}_N{N}"] = dict(k=k, N=N, curve=curve)
 
 
@@ -120,9 +126,15 @@ def main():
     p.add_argument("--eval-every", type=int, default=1000)
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--output", type=Path, default=Path("docs/research/general_ml/synth_realizations_per_condition.json"))
+    p.add_argument("--copula-only", action="store_true")
     a = p.parse_args()
     truth = Truth(seed=123)
     out = {}
+    if a.copula_only:
+        for N in (256, 512, 8192):
+            run(1, N, a.steps, a.eval_every, a.seed, truth, out, "copula")
+            a.output.write_text(json.dumps(out, indent=1))
+        print("done"); return
     for k in K_GRID:  # fixed budget: N*k = BUDGET
         run(k, BUDGET // k, a.steps, a.eval_every, a.seed, truth, out, "budget")
         a.output.write_text(json.dumps(out, indent=1))
