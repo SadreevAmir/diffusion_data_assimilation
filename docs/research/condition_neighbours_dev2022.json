@@ -1,0 +1,367 @@
+{
+ "coarse": 8,
+ "rows": [
+  {
+   "date": "2022-01-01",
+   "nn_date": "2021-02-21",
+   "nn_dist": 0.31300623301165437,
+   "nn_doy_offset": 51,
+   "anomaly_rms": 0.3934802150262815,
+   "ratio": 0.7954815034111636,
+   "n_within_anomaly": 198
+  },
+  {
+   "date": "2022-01-10",
+   "nn_date": "2018-02-06",
+   "nn_dist": 0.30669833965004123,
+   "nn_doy_offset": 27,
+   "anomaly_rms": 0.5393255861007649,
+   "ratio": 0.5686701086581478,
+   "n_within_anomaly": 589
+  },
+  {
+   "date": "2022-01-19",
+   "nn_date": "2019-02-21",
+   "nn_dist": 0.17955047079551206,
+   "nn_doy_offset": 33,
+   "anomaly_rms": 0.3983368502642806,
+   "ratio": 0.4507503402619855,
+   "n_within_anomaly": 353
+  },
+  {
+   "date": "2022-01-28",
+   "nn_date": "2016-01-20",
+   "nn_dist": 0.2098956352565992,
+   "nn_doy_offset": 8,
+   "anomaly_rms": 0.3526459489568958,
+   "ratio": 0.5952021733907821,
+   "n_within_anomaly": 90
+  },
+  {
+   "date": "2022-02-06",
+   "nn_date": "2016-01-20",
+   "nn_dist": 0.23986285790169745,
+   "nn_doy_offset": 17,
+   "anomaly_rms": 0.3412902662075349,
+   "ratio": 0.7028118925484955,
+   "n_within_anomaly": 25
+  },
+  {
+   "date": "2022-02-15",
+   "nn_date": "2016-01-21",
+   "nn_dist": 0.264510329448487,
+   "nn_doy_offset": 25,
+   "anomaly_rms": 0.3938544422590128,
+   "ratio": 0.6715941248024202,
+   "n_within_anomaly": 29
+  },
+  {
+   "date": "2022-02-24",
+   "nn_date": "2016-01-21",
+   "nn_dist": 0.2925923362679451,
+   "nn_doy_offset": 34,
+   "anomaly_rms": 0.38893782823898954,
+   "ratio": 0.7522856225961048,
+   "n_within_anomaly": 13
+  },
+  {
+   "date": "2022-03-05",
+   "nn_date": "2016-01-15",
+   "nn_dist": 0.35043078635341735,
+   "nn_doy_offset": 50,
+   "anomaly_rms": 0.3483881264847734,
+   "ratio": 1.0058631730342085,
+   "n_within_anomaly": 0
+  },
+  {
+   "date": "2022-03-14",
+   "nn_date": "2016-01-15",
+   "nn_dist": 0.3399399267724557,
+   "nn_doy_offset": 59,
+   "anomaly_rms": 0.42549034787441964,
+   "ratio": 0.7989368700621771,
+   "n_within_anomaly": 15
+  },
+  {
+   "date": "2022-03-23",
+   "nn_date": "2016-01-15",
+   "nn_dist": 0.40149535288653865,
+   "nn_doy_offset": 68,
+   "anomaly_rms": 0.6009368701593686,
+   "ratio": 0.6681156920527476,
+   "n_within_anomaly": 106
+  },
+  {
+   "date": "2022-04-01",
+   "nn_date": "2016-01-02",
+   "nn_dist": 0.3940308867900163,
+   "nn_doy_offset": 90,
+   "anomaly_rms": 0.44111891556208943,
+   "ratio": 0.8932532088040889,
+   "n_within_anomaly": 14
+  },
+  {
+   "date": "2022-04-10",
+   "nn_date": "2019-03-26",
+   "nn_dist": 0.5258587072130484,
+   "nn_doy_offset": 15,
+   "anomaly_rms": 0.557475517937293,
+   "ratio": 0.943285741334024,
+   "n_within_anomaly": 6
+  },
+  {
+   "date": "2022-04-19",
+   "nn_date": "2021-01-29",
+   "nn_dist": 0.47647931951147415,
+   "nn_doy_offset": 81,
+   "anomaly_rms": 0.4439844273428227,
+   "ratio": 1.0731892610809084,
+   "n_within_anomaly": 0
+  },
+  {
+   "date": "2022-04-28",
+   "nn_date": "2019-05-06",
+   "nn_dist": 0.4436974817540779,
+   "nn_doy_offset": 8,
+   "anomaly_rms": 0.5276046406244225,
+   "ratio": 0.8409658437214653,
+   "n_within_anomaly": 61
+  },
+  {
+   "date": "2022-05-07",
+   "nn_date": "2017-04-06",
+   "nn_dist": 0.4115365088474518,
+   "nn_doy_offset": 31,
+   "anomaly_rms": 0.5844358708872288,
+   "ratio": 0.7041602498195406,
+   "n_within_anomaly": 188
+  },
+  {
+   "date": "2022-05-16",
+   "nn_date": "2017-04-12",
+   "nn_dist": 0.44042957397936205,
+   "nn_doy_offset": 34,
+   "anomaly_rms": 0.5471213257034634,
+   "ratio": 0.8049943463875732,
+   "n_within_anomaly": 56
+  },
+  {
+   "date": "2022-05-25",
+   "nn_date": "2019-06-17",
+   "nn_dist": 0.37688286643525565,
+   "nn_doy_offset": 23,
+   "anomaly_rms": 0.5429999244338723,
+   "ratio": 0.6940753570604837,
+   "n_within_anomaly": 107
+  },
+  {
+   "date": "2022-06-03",
+   "nn_date": "2019-06-20",
+   "nn_dist": 0.279484936402854,
+   "nn_doy_offset": 17,
+   "anomaly_rms": 0.5915174913493159,
+   "ratio": 0.47248803372714876,
+   "n_within_anomaly": 194
+  },
+  {
+   "date": "2022-06-12",
+   "nn_date": "2019-06-22",
+   "nn_dist": 0.23442780766858196,
+   "nn_doy_offset": 10,
+   "anomaly_rms": 0.6074436544349003,
+   "ratio": 0.38592518986253654,
+   "n_within_anomaly": 87
+  },
+  {
+   "date": "2022-06-21",
+   "nn_date": "2019-07-02",
+   "nn_dist": 0.3285437240971889,
+   "nn_doy_offset": 11,
+   "anomaly_rms": 0.7847805958383067,
+   "ratio": 0.4186440462970887,
+   "n_within_anomaly": 1286
+  },
+  {
+   "date": "2022-06-30",
+   "nn_date": "2019-07-08",
+   "nn_dist": 0.2999720353885967,
+   "nn_doy_offset": 8,
+   "anomaly_rms": 0.637524778219618,
+   "ratio": 0.4705260809255334,
+   "n_within_anomaly": 1015
+  },
+  {
+   "date": "2022-07-09",
+   "nn_date": "2016-07-23",
+   "nn_dist": 0.1275886497920588,
+   "nn_doy_offset": 14,
+   "anomaly_rms": 0.3748954271277508,
+   "ratio": 0.3403313045709176,
+   "n_within_anomaly": 773
+  },
+  {
+   "date": "2022-07-18",
+   "nn_date": "2016-07-23",
+   "nn_dist": 0.00027417278106380726,
+   "nn_doy_offset": 5,
+   "anomaly_rms": 0.16218193472964387,
+   "ratio": 0.0016905260226476601,
+   "n_within_anomaly": 628
+  },
+  {
+   "date": "2022-07-27",
+   "nn_date": "2016-07-23",
+   "nn_dist": 0.0,
+   "nn_doy_offset": 4,
+   "anomaly_rms": 0.001467662751657555,
+   "ratio": 0.0,
+   "n_within_anomaly": 512
+  },
+  {
+   "date": "2022-08-05",
+   "nn_date": "2016-07-23",
+   "nn_dist": 0.0,
+   "nn_doy_offset": 13,
+   "anomaly_rms": 0.0,
+   "ratio": 0.0,
+   "n_within_anomaly": 0
+  },
+  {
+   "date": "2022-08-14",
+   "nn_date": "2016-07-23",
+   "nn_dist": 0.0,
+   "nn_doy_offset": 22,
+   "anomaly_rms": 0.0,
+   "ratio": 0.0,
+   "n_within_anomaly": 0
+  },
+  {
+   "date": "2022-08-23",
+   "nn_date": "2016-07-23",
+   "nn_dist": 0.0,
+   "nn_doy_offset": 31,
+   "anomaly_rms": 0.0,
+   "ratio": 0.0,
+   "n_within_anomaly": 0
+  },
+  {
+   "date": "2022-09-01",
+   "nn_date": "2016-07-23",
+   "nn_dist": 0.0,
+   "nn_doy_offset": 40,
+   "anomaly_rms": 0.0,
+   "ratio": 0.0,
+   "n_within_anomaly": 0
+  },
+  {
+   "date": "2022-09-10",
+   "nn_date": "2016-07-23",
+   "nn_dist": 0.0,
+   "nn_doy_offset": 49,
+   "anomaly_rms": 0.0,
+   "ratio": 0.0,
+   "n_within_anomaly": 0
+  },
+  {
+   "date": "2022-09-19",
+   "nn_date": "2016-07-23",
+   "nn_dist": 0.0,
+   "nn_doy_offset": 58,
+   "anomaly_rms": 0.0,
+   "ratio": 0.0,
+   "n_within_anomaly": 0
+  },
+  {
+   "date": "2022-09-28",
+   "nn_date": "2016-07-23",
+   "nn_dist": 0.0,
+   "nn_doy_offset": 67,
+   "anomaly_rms": 0.0,
+   "ratio": 0.0,
+   "n_within_anomaly": 0
+  },
+  {
+   "date": "2022-10-07",
+   "nn_date": "2016-07-23",
+   "nn_dist": 0.0,
+   "nn_doy_offset": 76,
+   "anomaly_rms": 0.0,
+   "ratio": 0.0,
+   "n_within_anomaly": 0
+  },
+  {
+   "date": "2022-10-16",
+   "nn_date": "2021-10-07",
+   "nn_dist": 0.0004719403231100511,
+   "nn_doy_offset": 9,
+   "anomaly_rms": 0.0005741942151101902,
+   "ratio": 0.8219175858807353,
+   "n_within_anomaly": 8
+  },
+  {
+   "date": "2022-10-25",
+   "nn_date": "2017-10-25",
+   "nn_dist": 0.0789864608857041,
+   "nn_doy_offset": 0,
+   "anomaly_rms": 0.25150833121817506,
+   "ratio": 0.314051071402426,
+   "n_within_anomaly": 128
+  },
+  {
+   "date": "2022-11-03",
+   "nn_date": "2021-11-05",
+   "nn_dist": 0.10794809465940307,
+   "nn_doy_offset": 2,
+   "anomaly_rms": 0.23419513703206277,
+   "ratio": 0.46093226369864504,
+   "n_within_anomaly": 113
+  },
+  {
+   "date": "2022-11-12",
+   "nn_date": "2021-11-14",
+   "nn_dist": 0.16281001173781567,
+   "nn_doy_offset": 2,
+   "anomaly_rms": 0.23964848816628212,
+   "ratio": 0.6793700764965752,
+   "n_within_anomaly": 56
+  },
+  {
+   "date": "2022-11-21",
+   "nn_date": "2020-11-05",
+   "nn_dist": 0.29041955437619205,
+   "nn_doy_offset": 16,
+   "anomaly_rms": 0.44210736186469046,
+   "ratio": 0.6568982546485544,
+   "n_within_anomaly": 131
+  },
+  {
+   "date": "2022-11-30",
+   "nn_date": "2019-12-23",
+   "nn_dist": 0.29073663273531053,
+   "nn_doy_offset": 23,
+   "anomaly_rms": 0.691017952928714,
+   "ratio": 0.4207367283340367,
+   "n_within_anomaly": 730
+  },
+  {
+   "date": "2022-12-09",
+   "nn_date": "2019-12-25",
+   "nn_dist": 0.24585092439356632,
+   "nn_doy_offset": 16,
+   "anomaly_rms": 0.6088421582204647,
+   "ratio": 0.40380075701745755,
+   "n_within_anomaly": 621
+  },
+  {
+   "date": "2022-12-18",
+   "nn_date": "2020-12-08",
+   "nn_dist": 0.216199583999843,
+   "nn_doy_offset": 10,
+   "anomaly_rms": 0.7223019830383766,
+   "ratio": 0.2993202138119509,
+   "n_within_anomaly": 947
+  }
+ ],
+ "median_ratio": 0.4715070573263411,
+ "median_n_within": 74.0
+}
