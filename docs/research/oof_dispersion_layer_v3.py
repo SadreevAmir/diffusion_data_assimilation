@@ -379,6 +379,7 @@ def main() -> None:
     p.add_argument("--save-members-dir", type=Path, default=None)
     p.add_argument("--apply-samples-dir", type=Path, default=None, help="frozen application: fit on ALL dev cases, apply to these cases (test split)")
     p.add_argument("--apply-mode", default="test_strict_full")
+    p.add_argument("--apply-experiment", type=Path, default=None, help="experiment file for the apply cases (default: same as --experiment)")
     p.add_argument("--apply-split", default="test")
     p.add_argument("--save-members-dates", nargs="*", default=("2022-01-16", "2022-04-11", "2022-07-15"))
     a = p.parse_args()
@@ -388,7 +389,7 @@ def main() -> None:
         prepare(c)
     if a.apply_samples_dir is not None:
         params = fit(cases)
-        test_cases = load_cases(a.apply_samples_dir, a.experiment, a.apply_mode, split=a.apply_split)
+        test_cases = load_cases(a.apply_samples_dir, a.apply_experiment or a.experiment, a.apply_mode, split=a.apply_split)
         for c in test_cases:
             prepare(c)
         layered = {c["date"]: simulate(c, params, a.members, rng) for c in test_cases}
