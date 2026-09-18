@@ -247,7 +247,9 @@ balanced_50m, 40 дат, регион full (`aggregate_case_mean_metrics.csv` ч
 - legacy `m2m_2f` ema_last native (готово): RMSE .163, CRPS .066, spread .080,
   s/r **.49**, cov80 .31 — коллапс чистой модели подтверждён в нормальных
   условиях. ema_best (эп. ~5) — следом.
-- arm C@ep10 (field-dropout) под строгим siconc-only.
+- arm C@ep10 (field-dropout sithic) под строгим siconc-only (готово): RMSE
+  .181 (baseline .190), CRPS .056 (.062), s/r .87 (.72), cov80 .78 (.47) —
+  обучение под протокол работает; кандидат-генератор для таблицы с 3D-Var.
 
 ---
 
