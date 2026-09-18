@@ -34,8 +34,7 @@ sea-ice data assimilation*.
 - Эмпирика C: доминирующая неопределённость — межгодовая мода (73 % variance
   крупномасштабной аномалии «истина − фон» объясняется (год, месяц); 72 % MSE
   на 20×16) с ~6 реализациями в train — почему у GenCast не так. ✅
-- Решающий тест: in-sample (train-даты) vs OOS spread/RMSE. ⏳ (H4, GPU после
-  обучений)
+- Решающий тест: in-sample (train-даты) vs OOS spread/RMSE. ✅ **Опровергает** generalization-gap для balanced_50m: in-sample s/r .75 vs OOS .72 (RMSE .180 vs .190). Коллапс запоминания доказан только для чистой модели (кривая legacy); недодисперсия balanced — иной механизм: сдвиг протокола siconc-only (arm C проверяет).
 - Отрицательные результаты прошлой кампании как следствие: 15 семей
   post-hoc (C11–C40), 3 proper-score fine-tune. ✅ (CLAIM_LEDGER)
 
