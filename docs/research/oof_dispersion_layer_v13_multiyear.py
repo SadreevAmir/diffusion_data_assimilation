@@ -10,7 +10,7 @@ from pathlib import Path
 
 import numpy as np
 
-from docs.research import oof_dispersion_layer_v13 as L
+import importlib
 
 
 def main() -> None:
@@ -20,7 +20,10 @@ def main() -> None:
     p.add_argument("--output", type=Path, required=True)
     p.add_argument("--folds", type=int, default=5)
     p.add_argument("--seed", type=int, default=20260918)
+    p.add_argument("--layer", default="oof_dispersion_layer_v13", help="layer module under docs.research")
     a = p.parse_args()
+    global L
+    L = importlib.import_module(f"docs.research.{a.layer}")
     rng = np.random.default_rng(a.seed)
     years = {}
     for label, sd, ex in a.set:
