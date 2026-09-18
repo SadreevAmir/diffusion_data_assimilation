@@ -1,0 +1,13 @@
+{
+  "status": "completed",
+  "started_at": "2026-09-17T20:12:31.603967",
+  "updated_at": "2026-09-18T00:08:14.140627",
+  "completed_cases": 200,
+  "total_cases": 200,
+  "progress_percent": 100.0,
+  "elapsed_hours": 3.9284824012426864,
+  "estimated_remaining_hours": 0.0,
+  "last": {
+    "target_date": "2023-07-19"
+  }
+}

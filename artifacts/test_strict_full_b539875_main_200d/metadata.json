@@ -1,0 +1,77 @@
+{
+  "protocol": "LiubovAnt/3d_var model-to-model main_200d",
+  "colleague_reference": {
+    "branch": "origin/vae_exp",
+    "config": "config/assimilation/model2model/main_200d/var_100_main_200d.yaml",
+    "data_config": "config/data/model/var_200d.yaml",
+    "clearml_project": "m2m_main_200d",
+    "clearml_task": "3d_var_baseline_var_100_main_200d"
+  },
+  "experiment_config": "/home/autoresearch_worktrees/test_strict_full_b539875/config/experiments/experiment_m2m_flow_modes.json",
+  "experiment_mode": "test_strict_full",
+  "checkpoint": "/home/checkpoints/concat_conditioning/m2m_2f_diffusion_balanced_50m/run_20260607_184239/ema_last_model.pth",
+  "dataset_split": "test",
+  "temporal_split_protocol": "3dvar_main_200d",
+  "temporal_splits": {
+    "train": {
+      "back_start_day": "2015-01-01",
+      "back_end_day": "2020-12-31",
+      "obs_start_day": "2016-01-01",
+      "obs_end_day": "2021-12-31"
+    },
+    "valid": {
+      "back_start_day": "2021-01-01",
+      "back_end_day": "2021-12-31",
+      "obs_start_day": "2022-01-01",
+      "obs_end_day": "2022-12-31"
+    },
+    "test": {
+      "back_start_day": "2022-01-01",
+      "back_end_day": "2022-07-19",
+      "obs_start_day": "2023-01-01",
+      "obs_end_day": "2023-07-19"
+    }
+  },
+  "checkpoint_training_split_kind": "legacy_overlapping_2023_validation",
+  "checkpoint_selection": "fixed final epoch; legacy 2023 validation was not used for checkpoint selection",
+  "point_estimator": "mean of the generated ensemble",
+  "start_date": "2023-01-01",
+  "end_date": "2023-07-19",
+  "num_cases": 200,
+  "case_stride_days": 1,
+  "target_hour": 23,
+  "assimilation_range": 3,
+  "observation_source": "M2M values on real SRAL footprints",
+  "sral_transform_index": 1,
+  "observed_fields": [
+    "siconc"
+  ],
+  "field_protocol": "siconc-only",
+  "strict_information_note": "siconc-only hides both observation and background information for every other field",
+  "conditioning_mode": "full",
+  "cfg_mode": "none",
+  "cfg_background_scale": 1.0,
+  "cfg_observation_scale": 1.0,
+  "ensemble_size": 5,
+  "sample_batch_size": 5,
+  "num_timesteps": 25,
+  "method": "dopri5",
+  "rtol": 1e-05,
+  "atol": 1e-06,
+  "inference_precision": "float32",
+  "seed": 1234,
+  "normalization_means": [
+    0.7343208614260409,
+    0.7205874274506255
+  ],
+  "normalization_stds": [
+    0.3458938161358195,
+    0.5776655110213467
+  ],
+  "normalization_source": "checkpoint_metadata",
+  "aggregation": "Arithmetic mean of per-day metrics, matching the colleague ClearML logger. Columns ending in _finite_case_mean are diagnostic nan-safe alternatives.",
+  "track_imitation": "Same-day dense M2M truth evaluated only on the next day's rule-1 SRAL footprint",
+  "edge_threshold": 0.15,
+  "save_ensembles": true,
+  "cases_file": "cases.json"
+}
