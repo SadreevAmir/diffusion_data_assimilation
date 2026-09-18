@@ -7,6 +7,10 @@ The true posterior p(y | obs) = sum_x w(x) N(y; mu_post(x), Sigma_post(x)) is co
 (Gaussian likelihood of the observations given x), so spread and ranks are checked against the true posterior.
 Hypothesis: with s_obs = 0 the exact observed values identify the training target (fingerprint) and the model collapses
 with training; with s_obs > 0 the condition has many consistent targets and the model stays calibrated.
+v2: observation noise is RESAMPLED at every training step (as in the sea-ice pipeline, fresh noise per epoch), so the
+network sees infinitely many noisy views of each target -> the empirical minimiser is a kernel smoother over training
+targets with bandwidth s_obs. Calibration then requires s_obs to exceed the nearest-neighbour distance of the training
+conditions (reported), which grows with the condition dimension: 'noise as bandwidth' vs the curse of dimensionality.
 """
 from __future__ import annotations
 import argparse, json, time
@@ -86,20 +90,27 @@ def evaluate(net, truth, cond, y_true, post_draws, rng, M=32, gen=None):
 
 def run(s_obs, N, steps, eval_every, seed, truth, out, tag):
     rng = np.random.default_rng(seed); torch.manual_seed(seed); gen = torch.Generator().manual_seed(seed + 1)
-    x_tr = rng.uniform(-1, 1, (N, 2)); y_tr = truth.sample(x_tr, rng)[0]; c_tr = make_obs(y_tr, rng, s_obs)
+    x_tr = rng.uniform(-1, 1, (N, 2)); y_tr = truth.sample(x_tr, rng)[0]; c_tr = make_obs(y_tr, rng, 0.0)  # clean obs + fixed masks; noise added per step
+    # nearest-neighbour distance between training conditions (observed values, same mask pattern not required): scale of 'neighbourhood'
+    vals = c_tr[:, M_DIM:]; masks = c_tr[:, :M_DIM]
+    dd = np.sqrt(((vals[:, None] - vals[None]) ** 2 * (masks[:, None] * masks[None])).sum(-1) / np.maximum((masks[:, None] * masks[None]).sum(-1), 1)); np.fill_diagonal(dd, np.inf)
+    same = (masks[:, None] == masks[None]).all(-1); dd_same = np.where(same, dd, np.inf)
+    nn_any = float(np.median(dd.min(1))); nn_same = float(np.median(np.where(np.isfinite(dd_same.min(1)), dd_same.min(1), np.nan)))
+    print(f"[{tag} s_obs={s_obs} N={N}] median NN distance per observed coord: any mask {nn_any:.3f}, same mask {nn_same:.3f}", flush=True)
     x_te = rng.uniform(-1, 1, (128, 2)); y_te = truth.sample(x_te, rng)[0]; c_te = make_obs(y_te, rng, s_obs)
     post = np.stack([true_posterior(truth, c_te[i], s_obs, rng) for i in range(len(c_te))])
     C = torch.as_tensor(c_tr, dtype=torch.float32); Y = torch.as_tensor(y_tr, dtype=torch.float32)
     net = VNet(); opt = torch.optim.Adam(net.parameters(), lr=1e-3); curve = []; t0 = time.time()
     for step in range(1, steps + 1):
-        idx = torch.randint(0, N, (256,)); y1 = Y[idx]; c = C[idx]
+        idx = torch.randint(0, N, (256,)); y1 = Y[idx]; c = C[idx].clone()
+        c[:, M_DIM:] += s_obs * torch.randn_like(c[:, M_DIM:]) * c[:, :M_DIM]  # fresh observation noise every step
         y0 = torch.randn_like(y1); t = torch.rand(256, 1); yt = (1 - t) * y0 + t * y1
         loss = ((net(yt, c, t) - (y1 - y0)) ** 2).mean(); opt.zero_grad(); loss.backward(); opt.step()
         if step % eval_every == 0:
             net.eval(); e = evaluate(net, truth, c_te, y_te, post, rng, gen=gen); net.train()
             curve.append(dict(step=step, loss=float(loss), oos=e))
             print(f"[{tag} s_obs={s_obs} N={N}] step {step:6d} | spread/true {e['spread_over_true']:.3f} rmse {e['rmse_mean']:.3f} (opt {e['rmse_optimal']:.3f}) rankTV {e['rank_tv']:.3f} ES {e['energy_score']:.4f} (true {e['energy_score_true_posterior']:.4f}) ({time.time()-t0:.0f}s)", flush=True)
-    out[f"{tag}_s{s_obs}_N{N}"] = dict(s_obs=s_obs, N=N, curve=curve)
+    out[f"{tag}_s{s_obs}_N{N}"] = dict(s_obs=s_obs, N=N, nn_any=nn_any, nn_same=nn_same, curve=curve)
 
 
 def main():
@@ -107,7 +118,7 @@ def main():
     p.add_argument("--output", type=Path, default=Path("docs/research/general_ml/synth_noisy_partial_obs.json")); a = p.parse_args()
     truth = Truth(seed=123); out = {}
     for N in (512, 2048):
-        for s_obs in (0.0, 0.03, 0.1):
+        for s_obs in (0.0, 0.1, 0.3, 1.0):
             run(s_obs, N, a.steps, a.eval_every, 0, truth, out, "partial"); a.output.write_text(json.dumps(out, indent=1))
     print("done")
 
