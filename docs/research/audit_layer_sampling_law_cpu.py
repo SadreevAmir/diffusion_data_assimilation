@@ -73,11 +73,16 @@ def main():
                 for m in range(c["anom"].shape[0]):
                     g = L.smooth_unit(rng.standard_normal(w.shape), {"a": 0.0, "l1": params["ell"]["l1"], "l2": params["ell"]["l2"]}, w, rng.standard_normal(w.shape))
                     score = np.sqrt(1 - lam) * c["anom"][m] + np.sqrt(lam) * g
-                    u = L.F_MIX(score) if (lam == 0.5 and getattr(L, "F_MIX", None) is not None) else ndtr(np.clip(score, -6, 6))
+                    if lam == 0.5 and "fmix_tab" in params:
+                        u = L.F_cell(score[w], L.dist_bin(c["dist_d"])[w], params["fmix_tab"]); uu = np.full(w.shape, np.nan); uu[w] = u; u = uu
+                    elif lam == 0.5 and getattr(L, "F_MIX", None) is not None:
+                        u = L.F_MIX(score)
+                    else:
+                        u = ndtr(np.clip(score, -6, 6))
                     for lo, hi, name in L.STRATA:
                         sel = w & (c["dist_d"] >= lo) & (c["dist_d"] <= hi)
                         if sel.sum() > 100:
-                            pit[lam][name].append(np.quantile(u[sel], np.linspace(0.05, 0.95, 19)))
+                            pit[lam][name].append(np.nanquantile(u[sel], np.linspace(0.05, 0.95, 19)))
             # (2) two banks, independent layer runs
             full = L.simulate(c, params, 10, rng)
             cA = dict(c); cA["ens"] = c["ens"][:5]; L.prepare(cA)
