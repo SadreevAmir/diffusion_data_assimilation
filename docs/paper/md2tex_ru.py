@@ -61,7 +61,10 @@ while i < len(lines):
     body.append(inline(" ".join(para)))
 tex = r"""\documentclass[11pt]{article}
 \usepackage[margin=2.2cm]{geometry}
-\usepackage{fontspec}\setmainfont{PT Serif}\setmonofont{Menlo}[Scale=0.85]
+\usepackage{fontspec}
+\setmainfont{STIX Two Text}
+\setmonofont{Menlo}[Scale=0.85]
+\newfontfamily\symfont{STIX Two Math}
 \usepackage[russian,english]{babel}
 \usepackage{graphicx,booktabs,tabularx,float,caption,amsmath,amssymb}
 \captionsetup{font=small}
@@ -69,5 +72,5 @@ tex = r"""\documentclass[11pt]{article}
 \begin{document}
 \selectlanguage{russian}
 {\LARGE\bfseries """ + (title or "") + r"""\par}\bigskip
-""" + "\n".join(body) + "\n\\end{document}\n"
+""" + re.sub(r"([\u2190-\u22FF\u1D40\u2070-\u209F]+)", r"{\\symfont \1}", "\n".join(body).replace("ᵀ", "\\textsuperscript{T}")) + "\n\\end{document}\n"
 out.write_text(tex); print("written", out)
