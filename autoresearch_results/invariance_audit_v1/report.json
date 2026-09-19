@@ -1,0 +1,20 @@
+{
+  "protocol_version": "1.0",
+  "checkpoint": "P0+P1-pilot",
+  "status": "STOP_REVIEW",
+  "repo_commit": "see git log -1 after commit 'P0 + P1-pilot report'",
+  "completed_experiments": ["P0.1 inventory", "P0.1 data lineage (source map)", "P0.2 score parity (15/16 PASS)", "P1-pilot: 6 trainings (K0/K1/Kfresh x blocks 0,1), evaluation, baselines, label-free V, solver audit, same-key mean matching, large-n V"],
+  "blocked_experiments": ["reference unit tests (permission classifier; user asked to run)", "P0.3 ice checks (not executed under protocol)", "P1-confirm", "P2", "P3", "P4", "P5", "P6", "P7"],
+  "new_training_runs": 6,
+  "primary_contrasts": [
+    {"contrast": "K1-K0", "metric": "joint_oracle_kernel_regret_mmd2", "step": 10000, "block0": {"delta": 0.0171, "se_conditions": 0.0011}, "block1": {"delta": 0.0216, "se_conditions": 0.0013}, "n_conditions": 512, "verdict": "SUPPORTED_IN_PILOT"},
+    {"contrast": "Kfresh-K0", "metric": "joint_oracle_kernel_regret_mmd2", "step": 10000, "block0": {"delta": 0.0009, "se_conditions": 0.0002}, "block1": {"delta": 0.0009, "se_conditions": 0.0002}},
+    {"contrast": "K1-K0 mean-matched (same key pilot)", "metric": "mmd2", "step": 10000, "block0": 0.0037, "block1": 0.0050},
+    {"label_free_V_kernel": {"K1": {"block0": [0.0187, 0.0011, 0.0081], "block1": [0.0174, 0.0011, 0.0068]}, "K0": {"block0": [0.0025, 0.0011, 0.0], "block1": [-0.0020, 0.0011, 0.0]}, "Kfresh": {"block0": [0.0037, 0.0011, 0.0], "block1": [-0.0011, 0.0011, 0.0]}, "format": "[estimate, se, hoeffding_lower_bound_95]", "n_triplets": 65536}}
+  ],
+  "critical_audit_failures": [],
+  "negative_findings": ["effect mostly in the conditional mean (~70%); shape ~30%", "all networks undertrained at 10k steps (mmd2 .046 vs .004 empirical target); memorisation of stored replies weak", "spread ratios would wrongly favour K1", "first mean-matching diagnostic (one pilot key per category) was biased for key-sensitive models; replaced by same-key pilot"],
+  "holdout_accessed": [],
+  "artifacts": ["docs/research/invariance_audit_v1/REPORT_P0_P1_pilot.md", "docs/research/invariance_audit_v1/p1_pilot.py", "docs/research/invariance_audit_v1/p0_score_parity.py", "autoresearch_results/invariance_audit_v1/p0_inventory.json", "autoresearch_results/invariance_audit_v1/p0_data_lineage.md", "autoresearch_results/invariance_audit_v1/p0_score_parity.csv", "autoresearch_results/invariance_audit_v1/p1_pilot/"],
+  "decisions_requested": ["authorize P2 on the trained K1 networks (memberwise key randomisation, V/L curve, negative controls)", "training length for confirmation: 20k per spec vs registered 40k/80k dynamics extension", "central claim wording: nuisance sensitivity measured by V (mean-dominated) vs require mean-matched effect"]
+}

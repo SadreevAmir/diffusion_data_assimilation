@@ -1,0 +1,17 @@
+check,repo_function,repo_value,reference_value,status,note
+"plain CRPS (1/M^2), mean over D",assim_lib.metrics.ensemble_crps,0.5665546071228408,0.5665546071228411,PASS,
+"plain CRPS (1/M^2), mean over D",audit_layer_sampling_law_cpu.crps_plain,0.5665546071228408,0.5665546071228411,PASS,
+"fair/U CRPS (1/(M(M-1))), mean over D",assim_lib.metrics.fair_ensemble_crps,0.5137079298723016,0.5137079298723018,PASS,
+"fair/U CRPS (1/(M(M-1))), mean over D",oof_dispersion_layer_v19.fair_crps,0.5137079298723016,0.5137079298723018,PASS,
+"fair/U CRPS (1/(M(M-1))), mean over D",audit_layer_sampling_law_cpu.crps_fair,0.5137079298723016,0.5137079298723018,PASS,
+"fair/U CRPS (1/(M(M-1))), mean over D",audit_multivariate_scores_cpu.fair_crps_1d,0.5137079298723016,0.5137079298723018,PASS,
+"cross-score two banks, mean over D",audit_layer_sampling_law_cpu.crps_cross,0.4964902663608327,0.4964902663608328,PASS,
+"energy score (norm, U pairwise), reference normalisation /sqrt(D)",audit_multivariate_scores_cpu.energy_patches formula (rescaled by 1/sqrt(D)),0.6145663074779986,0.6145663074779987,PASS,repo reports unscaled norm; only a constant factor per patch size
+energy score must NOT be the squared norm,squared-norm variant (should differ),1.0,True,PASS,
+same marginal multisets -> same plain CRPS,assim_lib.metrics.ensemble_crps,0.5665546071228409,0.5665546071228408,PASS,
+same marginal multisets -> same fair CRPS,oof_dispersion_layer_v19.fair_crps,0.5137079298723015,0.5137079298723016,PASS,
+M=1 plain CRPS defined,assim_lib.metrics.ensemble_crps,0.7023001403826276,0.7023001403826276,PASS,
+M=1 fair CRPS refuses,assim_lib.metrics.fair_ensemble_crps,True,True,PASS,
+M=1 fair CRPS refuses,oof_dispersion_layer_v19.fair_crps,False,True,FAIL,returned nan
+"unbiased MMD^2 can be negative (reference, not clipped)",reference.mmd2_unbiased,1.0,True,PASS,min=-0.0297
+duplicating 5 members to 10 changes fair CRPS (must not be treated as 10 iid),oof_dispersion_layer_v19.fair_crps(dup) != fair_crps(m[:5]),1.0,True,PASS,dup 0.5762 vs 5 0.5123
