@@ -69,7 +69,22 @@ def main():
             c = cases[i]; w = c["water"]; y = c["truth"]
             # (1) PIT of the mixed score per lambda: reconstruct the score exactly as simulate() does
             mu2 = L.kriged_mean(c, params["ell1"], params["s_track"], None); cell = L.cell_index(c["dist_d"], mu2)
-            for lam in (1.0, 0.5, 0.0):
+            if hasattr(L, "_mixed_score_cdf") and "v19" in L.__name__:
+                # v19: within-date per-cell PIT — replicate on the held-out date
+                Mg = c["anom"].shape[0]; sc = np.zeros((Mg, *w.shape))
+                for m in range(Mg):
+                    g = L.smooth_unit(rng.standard_normal(w.shape), {"a": 0.0, "l1": params["ell"]["l1"], "l2": params["ell"]["l2"]}, w, rng.standard_normal(w.shape))
+                    sc[m] = np.sqrt(0.5) * c["anom"][m] + np.sqrt(0.5) * g
+                cw = cell[w]; sw = sc[:, w]; U = np.empty_like(sw)
+                for ci in np.unique(cw):
+                    sel = cw == ci; v = np.sort(sw[:, sel].ravel()); U[:, sel] = (np.searchsorted(v, sw[:, sel], side="right") - 0.5) / v.size
+                for m in range(Mg):
+                    uu = np.full(w.shape, np.nan); uu[w] = U[m]
+                    for lo, hi, name in L.STRATA:
+                        sel = w & (c["dist_d"] >= lo) & (c["dist_d"] <= hi)
+                        if sel.sum() > 100:
+                            pit[0.5][name].append(np.nanquantile(uu[sel], np.linspace(0.05, 0.95, 19)))
+            for lam in ((1.0, 0.0) if "v19" in L.__name__ else (1.0, 0.5, 0.0)):
                 for m in range(c["anom"].shape[0]):
                     g = L.smooth_unit(rng.standard_normal(w.shape), {"a": 0.0, "l1": params["ell"]["l1"], "l2": params["ell"]["l2"]}, w, rng.standard_normal(w.shape))
                     score = np.sqrt(1 - lam) * c["anom"][m] + np.sqrt(lam) * g
