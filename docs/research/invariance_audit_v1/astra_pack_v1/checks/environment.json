@@ -1,0 +1,14 @@
+{
+  "scope": "Local analytical reference implementation only; no user repository or GPU training accessed",
+  "python": "3.13.5 (main, Jul 15 2026, 20:25:40) [GCC 14.2.0]",
+  "platform": "Linux-6.18.44-x86_64-with-glibc2.41",
+  "numpy": "2.3.5",
+  "scipy": "1.17.0",
+  "tested_at_utc": "2026-09-19T21:21:17.899530+00:00",
+  "unit_tests": {
+    "count": 17,
+    "passed": 17,
+    "failed": 0,
+    "log": "unit_tests.txt"
+  }
+}

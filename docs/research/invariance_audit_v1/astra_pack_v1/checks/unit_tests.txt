@@ -1,0 +1,22 @@
+test_01_invalid_inputs_are_not_silently_repaired (test_core.ReferenceTests.test_01_invalid_inputs_are_not_silently_repaired) ... ok
+test_02_empirical_crps_binary_equals_brier (test_core.ReferenceTests.test_02_empirical_crps_binary_equals_brier) ... ok
+test_03_weighted_cdf_risk_decomposition_exact_enumeration (test_core.ReferenceTests.test_03_weighted_cdf_risk_decomposition_exact_enumeration) ... ok
+test_04_empirical_covariance_correction_exact_enumeration (test_core.ReferenceTests.test_04_empirical_covariance_correction_exact_enumeration) ... ok
+test_05_projection_and_information_price_exact (test_core.ReferenceTests.test_05_projection_and_information_price_exact) ... ok
+test_06_grouped_ensemble_risk_and_u_bias_monte_carlo (test_core.ReferenceTests.test_06_grouped_ensemble_risk_and_u_bias_monte_carlo) ... ok
+test_07_cross_score_all_cloned_members_exact (test_core.ReferenceTests.test_07_cross_score_all_cloned_members_exact) ... ok
+test_08_fixed_quantile_fair_counterexample_exact_integral (test_core.ReferenceTests.test_08_fixed_quantile_fair_counterexample_exact_integral) ... ok
+test_09_same_marginals_same_scores (test_core.ReferenceTests.test_09_same_marginals_same_scores) ... ok
+test_10_exact_atomic_flow_one_dimensional_quantile_transport (test_core.ReferenceTests.test_10_exact_atomic_flow_one_dimensional_quantile_transport) ... ok
+test_11_single_atom_field_and_path (test_core.ReferenceTests.test_11_single_atom_field_and_path) ... ok
+test_12_stationary_key_marginals_and_weights (test_core.ReferenceTests.test_12_stationary_key_marginals_and_weights) ... ok
+test_13_gaussian_kernel_formula_monte_carlo (test_core.ReferenceTests.test_13_gaussian_kernel_formula_monte_carlo) ... ok
+test_14_teacher_moments_cdf_and_kernel (test_core.ReferenceTests.test_14_teacher_moments_cdf_and_kernel) ... ok
+test_15_label_free_v_triplet_unbiased_discrete_enumeration (test_core.ReferenceTests.test_15_label_free_v_triplet_unbiased_discrete_enumeration) ... ok
+test_16_linear_gaussian_conditioning_and_matheron (test_core.ReferenceTests.test_16_linear_gaussian_conditioning_and_matheron) ... ok
+test_17_kernel_cross_score_consistency_point_forecast (test_core.ReferenceTests.test_17_kernel_cross_score_consistency_point_forecast) ... ok
+
+----------------------------------------------------------------------
+Ran 17 tests in 0.191s
+
+OK

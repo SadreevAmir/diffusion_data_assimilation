@@ -1,0 +1,140 @@
+{
+  "protocol_version": "1.0",
+  "authorization": {
+    "stages": [
+      "P0",
+      "P1-pilot"
+    ],
+    "stop_after": "P1-pilot",
+    "max_new_training_runs": 6,
+    "max_concurrent_new_training_jobs": 1,
+    "new_protected_holdout_access": false
+  },
+  "teacher": {
+    "implementation": "reference.core.category_teacher",
+    "categories": 16,
+    "replies_per_category": 128,
+    "target_dim": 2,
+    "key_dim": 8,
+    "resample_training_targets": false
+  },
+  "arms": [
+    {
+      "id": "K0",
+      "key_mode": "zero"
+    },
+    {
+      "id": "K1",
+      "key_mode": "fixed_per_example",
+      "rho": 1.0
+    },
+    {
+      "id": "Kfresh",
+      "key_mode": "fresh_per_presentation",
+      "rho": 0.0
+    }
+  ],
+  "seed_blocks": [
+    0,
+    1
+  ],
+  "seed_offsets": {
+    "data": 1000,
+    "keys": 2000,
+    "init": 3000,
+    "batches": 4000,
+    "flow": 5000,
+    "augmentation": 6000,
+    "validation": 7000,
+    "test": 9000
+  },
+  "model": {
+    "type": "MLP_CFM",
+    "hidden_widths": [
+      256,
+      256,
+      256
+    ],
+    "activation": "SiLU",
+    "input_dim": 58,
+    "output_dim": 2,
+    "time_embedding_dim": 32,
+    "time_embedding_frequencies": "10**linspace(-1,1,16)",
+    "time_embedding_formula": "concat(sin(2*pi*t*f),cos(2*pi*t*f))",
+    "condition_category_encoding": "one_hot_16",
+    "normalization": null,
+    "dropout": 0.0,
+    "weight_init": "xavier_uniform",
+    "bias_init": 0.0,
+    "ema": false
+  },
+  "training": {
+    "optimizer": "Adam",
+    "lr": 0.0002,
+    "betas": [
+      0.9,
+      0.999
+    ],
+    "weight_decay": 0.0,
+    "batch_size": 256,
+    "gradient_clip_norm": 1.0,
+    "steps": 10000,
+    "checkpoints": [
+      0,
+      500,
+      2000,
+      5000,
+      10000
+    ],
+    "time_law": "Uniform[0,1)",
+    "path": "z_t=(1-t)*z0+t*y",
+    "target_velocity": "y-z0",
+    "target_normalization": null,
+    "precision": "float32"
+  },
+  "sampling": {
+    "method": "Heun",
+    "steps": 64,
+    "t_end": 0.999,
+    "key_fixed_within_trajectory": true,
+    "members": 64,
+    "cfg": false
+  },
+  "validation": {
+    "categories": "all_16",
+    "external_keys_per_category": 32,
+    "truth_replicates_per_condition": 32,
+    "label_free_triplets_per_category": 128,
+    "kernel": "mean_RBF",
+    "kernel_bandwidths": [
+      0.25,
+      0.5,
+      1.0,
+      2.0
+    ],
+    "unbiased_estimates_clipped": false
+  },
+  "solver_audit": {
+    "categories": [
+      0,
+      4,
+      8,
+      12
+    ],
+    "keys_per_category": 8,
+    "heun_steps": [
+      32,
+      64,
+      128
+    ],
+    "alternative": "DOP853",
+    "rtol": 1e-07,
+    "atol": 1e-08,
+    "endpoints": [
+      0.999,
+      0.9999
+    ]
+  },
+  "primary_comparison": "K1 minus K0, joint oracle kernel regret, per training seed and checkpoint",
+  "status": "PROPOSED_NOT_RUN_ON_USER_REPOSITORY"
+}
