@@ -169,6 +169,28 @@ RMSE $>40$\,px from tracks & 0.290 & 0.244 & 0.203 & \textbf{0.197} \\
 \label{fig:ranks}
 \end{figure}
 
+\paragraph{Where the gain comes from (ablations at identical marginals).} Table~\ref{tab:ablation} decomposes the layer. Shifting the generator's members to the kriged mean and pinning the day-$d$ observations, with no recalibration of the spread, already yields CRPS $0.0352$ (76\% of the total gain) and keeps the generator's fine-scale texture; the out-of-fold marginals add $-3\%$ CRPS and, mainly, calibration (per-date rank TV $0.13\to0.08$, spread/RMSE $\to1.0$). With the marginals fixed, the generator's own-date dependence beats a stationary field and the dependence of another date in single-site CRPS ($0.0340$ vs $0.0352/0.0351$), but only the mixture improves the energy score ($0.689$ vs $0.728$ stationary and $0.725$ own-date pattern); the pure generator pattern is over-dispersed ($1.16$) and rough. The honest summary is: the generator supplies a conditional mean and structure, a classical assimilation update supplies most of the skill, and the out-of-fold marginals supply calibration.
+
+\begin{table}[t]
+\centering\small
+\begin{tabular}{lcccccc}
+\toprule
+variant & fair CRPS (dates $<$ raw) & ES $16{\times}16$ & VS lag 1 / 16 & CRPS block 16 & rank TV & spread/RMSE \\
+\midrule
+raw generator & 0.0415 & 0.821 & 0.0060 / 0.0271 & 0.0361 & 0.157 & 0.93 \\
+mean correction only (kriging $+$ obs) & 0.0352 (37) & \textbf{0.703} & \textbf{0.0058} / 0.0231 & 0.0270 & 0.129 & 0.97 \\
+$+$ marginals, stationary copula ($\lambda{=}1$) & 0.0352 (34) & 0.728 & 0.0066 / 0.0254 & 0.0277 & \textbf{0.081} & 0.96 \\
+$+$ marginals, own-date generator copula ($\lambda{=}0$) & \textbf{0.0340} (40) & 0.725 & 0.0069 / 0.0243 & 0.0270 & 0.094 & 1.16 \\
+$+$ marginals, other-date generator copula & 0.0351 (32) & 0.723 & 0.0078 / 0.0244 & 0.0273 & 0.093 & 1.04 \\
+$+$ marginals, mixture ($\lambda{=}0.5$, v15) & 0.0341 (38) & \textbf{0.689} & 0.0067 / 0.0245 & 0.0271 & 0.084 & 1.03 \\
+\bottomrule
+\end{tabular}
+\caption{Ablations on the 40 development dates (native protocol, cross-fitted). All ``$+$ marginals'' rows share the same kriged mean and out-of-fold cell marginals and differ only in the copula. Differences in single-site CRPS between them measure the non-uniformity of the mixed score's PIT (Section~\ref{sec:layer}).}
+\label{tab:ablation}
+\end{table}
+
+\paragraph{Sampling-law audit.} The probability-integral transform of the mixed score on held-out dates has KS distance to uniformity $0.01$--$0.02$ for $\lambda=1$, $0.05$--$0.06$ for $\lambda=0.5$ and $0.11$--$0.15$ for $\lambda=0$: the tails of the cell marginals are compressed unless the score is mapped through its own CDF, which we estimate on the training folds (final version). The two-bank cross score---the layer applied independently to two halves of the raw ensemble, scored across banks so that no independence within a bank is assumed---is $0.0329$ against $0.0413$ for the raw generator (better on 40/40 dates), so the reported gain does not rest on the exchangeability assumption of fair scores; the stratified-ensemble unit test of \citet{roberts2026} reproduces $M/[6(M+1)]$.
+
 \paragraph{Removing the identifying part of the condition.} [Arms D/E: tracks-only generators with white and with realistic (SIC-dependent, spatially coherent, fitted to SRAL-vs-AMSR2 statistics) observation noise, real satellite geometry in training; epoch curves of spread/RMSE and ranks under tracks-only evaluation --- pending.]
 
 \paragraph{Comparison with 3D-Var.} [200-day test-2023 deterministic comparison exists (full-domain RMSE $0.275\to0.157$, IIEE $0.118\to0.082$); probabilistic line with the frozen layer --- pending; colleagues' 3D-Var numbers to be inserted by the authors.]
