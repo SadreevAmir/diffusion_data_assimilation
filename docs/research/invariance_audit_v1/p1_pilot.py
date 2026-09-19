@@ -27,7 +27,8 @@ CFG = json.loads((HERE / "astra_pack_v1" / "P1_PILOT_CONFIG.json").read_text())
 NCAT, NREP, KDIM, YDIM = 16, 128, 8, 2
 SCALES = tuple(CFG["validation"]["kernel_bandwidths"])
 FREQ = 10.0 ** np.linspace(-1, 1, 16)
-ARMS = {"K0": ("zero", None), "K1": ("fixed_per_example", 1.0), "Kfresh": ("fresh_per_presentation", 0.0)}
+ARMS = {"K0": ("zero", None), "K1": ("fixed_per_example", 1.0), "Kfresh": ("fresh_per_presentation", 0.0),
+        "Krho05": ("rho_mixed", 0.5), "Krho09": ("rho_mixed", 0.9), "Kcached": ("cached_rho", 0.5), "Kclass": ("class_key", None)}
 
 
 def sha(path: Path) -> str:
@@ -119,6 +120,10 @@ def train(block: int, arm: str, resume: bool) -> None:
     opt = torch.optim.Adam(model.parameters(), lr=tr["lr"], betas=tuple(tr["betas"]), weight_decay=tr["weight_decay"])
     onehot = np.eye(NCAT, dtype=np.float32)[C]; Yt = torch.as_tensor(Y, dtype=torch.float32)
     Kt = torch.as_tensor(K, dtype=torch.float32); Ct = torch.as_tensor(onehot)
+    _rc = np.random.default_rng(np.random.SeedSequence([s["augmentation"], 1]))
+    Kcached_t = torch.as_tensor((0.5 * K + np.sqrt(0.75) * _rc.standard_normal(K.shape)).astype(np.float32))
+    Kclass = np.random.default_rng(np.random.SeedSequence([s["keys"], 2])).standard_normal((NCAT, KDIM)).astype(np.float32); Kclass_t = torch.as_tensor(Kclass)
+    np.save(rd / "class_keys.npy", Kclass) if mode == "class_key" else None
     log = []; t0 = time.time()
 
     def save(step):
@@ -134,8 +139,14 @@ def train(block: int, arm: str, resume: bool) -> None:
             key = torch.zeros(bs, KDIM)
         elif mode == "fixed_per_example":
             key = Kt[b]
-        else:  # fresh: rho=0 -> pure standard normal, independent of the example
+        elif mode == "fresh_per_presentation":  # rho=0 -> pure standard normal, independent of the example
             key = torch.as_tensor(rng_aug.standard_normal((bs, KDIM)).astype(np.float32))
+        elif mode == "rho_mixed":  # T1.4: rho K_i + sqrt(1-rho^2) E, fresh E at every presentation, stationary N(0,I) marginal
+            key = rho * Kt[b] + float(np.sqrt(1 - rho * rho)) * torch.as_tensor(rng_aug.standard_normal((bs, KDIM)).astype(np.float32))
+        elif mode == "cached_rho":  # control: rho K_i + sqrt(1-rho^2) E_i computed ONCE per example, then fixed (still an identifier)
+            key = Kcached_t[b]
+        else:  # class_key: one fixed 8-D key per category (redundant function of C, not an identifier)
+            key = Kclass_t[C[idx[step]]]
         z0 = torch.as_tensor(Z0[step]); t = torch.as_tensor(T[step])
         zt = (1 - t)[:, None] * z0 + t[:, None] * y
         v = model(net_input(torch, zt, c, key, t))
@@ -164,14 +175,23 @@ def heun_sample(torch, model, c_idx: np.ndarray, keys: np.ndarray, z0: np.ndarra
     return z.numpy().astype(np.float64)
 
 
+CURRENT_BLOCK = [0]
+
+
 def load_model(torch, block: int, arm: str, step: int):
+    CURRENT_BLOCK[0] = block
     m = build_model(torch, seeds(block)["init"]); m.load_state_dict(torch.load(block_dir(block) / f"train_{arm}" / f"ckpt_{step:05d}.pt")); m.eval(); return m
 
 
 def sample_conditions(torch, model, arm: str, cats: np.ndarray, keys: np.ndarray, M: int, rng: np.random.Generator, steps=None, t_end=None):
     """cats (n,), keys (n,8): M members per condition with independent base noise; key fixed per condition (zero for K0)."""
     sm = CFG["sampling"]; steps = steps or sm["steps"]; t_end = t_end or sm["t_end"]
-    n = len(cats); cc = np.repeat(cats, M); kk = np.repeat(keys if arm != "K0" else np.zeros_like(keys), M, axis=0)
+    n = len(cats); cc = np.repeat(cats, M)
+    if arm == "K0":
+        keys = np.zeros_like(keys)
+    elif arm == "Kclass":  # the category's own fixed key (regenerated from the block's key seed, identical to training)
+        keys = np.random.default_rng(np.random.SeedSequence([seeds(CURRENT_BLOCK[0])["keys"], 2])).standard_normal((NCAT, KDIM)).astype(np.float32)[cats]
+    kk = np.repeat(keys, M, axis=0)
     z0 = rng.standard_normal((n * M, YDIM))
     return heun_sample(torch, model, cc, kk, z0, steps, t_end).reshape(n, M, YDIM)
 
