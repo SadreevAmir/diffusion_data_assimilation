@@ -9,9 +9,13 @@ def esc(t):
         t = t.replace(a, b)
     return t
 def inline(t):
-    parts = re.split(r"(`[^`]*`)", t); res = []
+    parts = re.split(r"(\$\$.+?\$\$|\$[^$\n]+?\$|`[^`]*`)", t); res = []
     for p in parts:
-        if p.startswith("`") and p.endswith("`") and len(p) > 1:
+        if p.startswith("$$") and p.endswith("$$") and len(p) > 4:
+            res.append("\\[" + p[2:-2] + "\\]")
+        elif p.startswith("$") and p.endswith("$") and len(p) > 2:
+            res.append(p)
+        elif p.startswith("`") and p.endswith("`") and len(p) > 1:
             res.append("\\texttt{" + esc(p[1:-1]) + "}")
         else:
             p = esc(p)
@@ -62,15 +66,18 @@ while i < len(lines):
 tex = r"""\documentclass[11pt]{article}
 \usepackage[margin=2.2cm]{geometry}
 \usepackage{fontspec}
-\setmainfont{STIX Two Text}
+\setmainfont{PT Serif}
 \setmonofont{Menlo}[Scale=0.85]
 \newfontfamily\symfont{STIX Two Math}
+\usepackage{amsmath,amssymb}
+\usepackage{unicode-math}
+\setmathfont{STIX Two Math}
 \usepackage[russian,english]{babel}
-\usepackage{graphicx,booktabs,tabularx,float,caption,amsmath,amssymb}
+\usepackage{graphicx,booktabs,tabularx,float,caption}
 \captionsetup{font=small}
 \setlength{\parskip}{4pt}\setlength{\parindent}{0pt}
 \begin{document}
 \selectlanguage{russian}
 {\LARGE\bfseries """ + (title or "") + r"""\par}\bigskip
-""" + re.sub(r"([\u2190-\u22FF\u1D40\u2070-\u209F]+)", r"{\\symfont \1}", "\n".join(body).replace("ᵀ", "\\textsuperscript{T}")) + "\n\\end{document}\n"
+""" + re.sub(r"([\u0370-\u03FF\u2100-\u214F\u2190-\u22FF\u2300-\u23FF\u25A0-\u27BF\u1D40\u2070-\u209F\u2016\u1E00-\u1EFF]+)", r"{\\symfont \1}", "\n".join(body).replace("ᵀ", "\\textsuperscript{T}").replace("✅", "{\\symfont ✓}")) + "\n\\end{document}\n"
 out.write_text(tex); print("written", out)
