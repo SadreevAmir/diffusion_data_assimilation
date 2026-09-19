@@ -87,6 +87,7 @@ TAPER_PX = 2.0
 ANOM_SD_FLOOR = 1e-3
 LAMBDA = 0.5  # weight of the synthetic stationary field in the score
 TAU_DAY = 0.003  # declared observation error in latent units on day-d track pixels (OSSE: obs exact)
+OBS_SIGMA = 0.0  # >0: observations carry N(0, OBS_SIGMA^2) error -> TAU_DAY := OBS_SIGMA and no pinning (set by --obs-sigma)
 EDGE_BAND_PX = 5.0  # sub-threshold analysis-mean values are kept within this band of the mean ice edge
 MEAN_ZERO_THRESHOLD = 0.15  # analysis-mean values below the IIEE edge threshold are encoded as open water
 DIST_EDGES = [0, 2, 5, 10, 20, 40]  # bins: 0, 1-2, 3-5, 6-10, 11-20, 21-40, >40
@@ -473,7 +474,8 @@ def simulate(c: dict, params: dict, M: int, rng) -> np.ndarray:
         u = np.clip(F_cell(score[w], dist_bin(c["dist_d"])[w], params["fmix_tab"]), U_CLIP, 1 - U_CLIP)  # v17: empirical PIT per distance bin
         r = Finv_cell(u, cell[w], Q)
         zm = np.zeros(w.shape); zm[w] = mu2[w] + r
-        zm[pin] = c["zobs"][pin]  # exact observations of day d (OSSE)
+        if OBS_SIGMA <= 0:
+            zm[pin] = c["zobs"][pin]  # exact observations of day d (OSSE)
         out[m] = np.where(w, dec(zm), 0.0)
     return out
 
@@ -522,6 +524,7 @@ def main() -> None:
     p.add_argument("--members", type=int, default=10)
     p.add_argument("--folds", type=int, default=5)
     p.add_argument("--seed", type=int, default=20260918)
+    p.add_argument("--obs-sigma", type=float, default=0.0, help="observation error sd (physical units); 0 = exact observations")
     p.add_argument("--save-members-dir", type=Path, default=None)
     p.add_argument("--apply-samples-dir", type=Path, default=None, help="frozen application: fit on ALL dev cases, apply to these cases (test split)")
     p.add_argument("--apply-mode", default="test_strict_full")
@@ -529,6 +532,9 @@ def main() -> None:
     p.add_argument("--apply-split", default="test")
     p.add_argument("--save-members-dates", nargs="*", default=("2022-01-16", "2022-04-11", "2022-07-15"))
     a = p.parse_args()
+    global OBS_SIGMA, TAU_DAY
+    if a.obs_sigma > 0:
+        OBS_SIGMA = float(a.obs_sigma); TAU_DAY = float(a.obs_sigma)
     rng = np.random.default_rng(a.seed)
     cases = load_cases(a.samples_dir, a.experiment, a.mode)
     for c in cases:
