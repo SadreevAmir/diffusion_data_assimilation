@@ -18,7 +18,8 @@ import argparse, json
 from pathlib import Path
 import numpy as np
 from scipy.special import ndtr
-from docs.research import oof_dispersion_layer_v15 as L
+import importlib, os
+L = importlib.import_module("docs.research." + os.environ.get("LAYER_MODULE", "oof_dispersion_layer_v15"))
 
 
 def crps_plain(m, y):
@@ -62,6 +63,8 @@ def main():
     for k in range(a.folds):
         held = list(range(k * fold_size, min(n, (k + 1) * fold_size))); purge = set(held) | {h - 1 for h in held} | {h + 1 for h in held}
         train = [cases[i] for i in range(n) if i not in purge]; params = L.fit(train)
+        if hasattr(L, "_mixed_score_cdf") and getattr(L, "F_MIX", None) is None:
+            L.F_MIX = L._mixed_score_cdf(cases[0]["anom"].shape[0], L.LAMBDA)
         for i in held:
             c = cases[i]; w = c["water"]; y = c["truth"]
             # (1) PIT of the mixed score per lambda: reconstruct the score exactly as simulate() does
@@ -70,7 +73,7 @@ def main():
                 for m in range(c["anom"].shape[0]):
                     g = L.smooth_unit(rng.standard_normal(w.shape), {"a": 0.0, "l1": params["ell"]["l1"], "l2": params["ell"]["l2"]}, w, rng.standard_normal(w.shape))
                     score = np.sqrt(1 - lam) * c["anom"][m] + np.sqrt(lam) * g
-                    u = ndtr(np.clip(score, -6, 6))
+                    u = L.F_MIX(score) if (lam == 0.5 and getattr(L, "F_MIX", None) is not None) else ndtr(np.clip(score, -6, 6))
                     for lo, hi, name in L.STRATA:
                         sel = w & (c["dist_d"] >= lo) & (c["dist_d"] <= hi)
                         if sel.sum() > 100:
