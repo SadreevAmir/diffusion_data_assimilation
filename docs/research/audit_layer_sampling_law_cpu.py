@@ -74,7 +74,8 @@ def main():
                     g = L.smooth_unit(rng.standard_normal(w.shape), {"a": 0.0, "l1": params["ell"]["l1"], "l2": params["ell"]["l2"]}, w, rng.standard_normal(w.shape))
                     score = np.sqrt(1 - lam) * c["anom"][m] + np.sqrt(lam) * g
                     if lam == 0.5 and "fmix_tab" in params:
-                        u = L.F_cell(score[w], L.dist_bin(c["dist_d"])[w], params["fmix_tab"]); uu = np.full(w.shape, np.nan); uu[w] = u; u = uu
+                        key = cell[w] if params["fmix_tab"].shape[0] > 7 else L.dist_bin(c["dist_d"])[w]
+                        u = L.F_cell(score[w], key, params["fmix_tab"]); uu = np.full(w.shape, np.nan); uu[w] = u; u = uu
                     elif lam == 0.5 and getattr(L, "F_MIX", None) is not None:
                         u = L.F_MIX(score)
                     else:
