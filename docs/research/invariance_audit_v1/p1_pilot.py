@@ -22,8 +22,12 @@ sys.path.insert(0, str(REF))
 import core as R  # noqa: E402  (reference implementation, kept verbatim)
 
 ROOT = HERE.parents[2]
-OUT = ROOT / "autoresearch_results" / "invariance_audit_v1" / "p1_pilot"
+import os
 CFG = json.loads((HERE / "astra_pack_v1" / "P1_PILOT_CONFIG.json").read_text())
+STAGE = os.environ.get("P1_STAGE", "pilot")  # "pilot" (10k, blocks 0/1) or "confirm" (20k, blocks 10-14; frozen before generation)
+OUT = ROOT / "autoresearch_results" / "invariance_audit_v1" / ("p1_pilot" if STAGE == "pilot" else "p1_confirm")
+if STAGE == "confirm":
+    CFG["training"]["steps"] = 20000; CFG["training"]["checkpoints"] = [0, 500, 2000, 5000, 10000, 20000]
 NCAT, NREP, KDIM, YDIM = 16, 128, 8, 2
 SCALES = tuple(CFG["validation"]["kernel_bandwidths"])
 FREQ = 10.0 ** np.linspace(-1, 1, 16)
