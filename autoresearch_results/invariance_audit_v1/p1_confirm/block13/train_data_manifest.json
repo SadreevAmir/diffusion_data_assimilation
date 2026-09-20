@@ -1,0 +1,20 @@
+{
+ "block": 13,
+ "seeds": {
+  "data": 1013,
+  "keys": 2013,
+  "init": 3013,
+  "batches": 4013,
+  "flow": 5013,
+  "augmentation": 6013,
+  "validation": 7013,
+  "test": 9013
+ },
+ "n_train": 2048,
+ "distinct_conditions": 16,
+ "replies_per_condition": 128,
+ "key_dim": 8,
+ "sha256": "af2e630d2595922c72e519bca2588311e518f8287ce920ba37d22e4ebbcc43c9",
+ "teacher": "reference.core.category_teacher",
+ "created": "2026-09-20T09:21:37"
+}

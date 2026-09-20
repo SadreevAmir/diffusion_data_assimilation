@@ -10,17 +10,17 @@
   "P0.2 score parity (15/16 PASS)",
   "P1-pilot: 6 trainings (K0/K1/Kfresh x blocks 0,1), evaluation, baselines, label-free V, solver audit, same-key mean matching, large-n V",
   "P2 (executed before review, flagged): budget matrix L in {1..64}, V/L curve predicted by label-free V, negative controls (K0/Kfresh, informative-key T6.3 exact)",
-  "P6.1 (saved samples, CPU): same DA update + fold-fitted law + stationary copula over background / UNet-MSE / CFM mean: CRPS .050 / .0462 / .0362 (arm A) / .0352 (legacy)"
+  "P6.1 (saved samples, CPU): same DA update + fold-fitted law + stationary copula over background / UNet-MSE / CFM mean: CRPS .050 / .0462 / .0362 (arm A) / .0352 (legacy)",
+  "P1-confirm (executed before review): 25 trainings, blocks 10-14, 20k steps; K1-K0 = +.0181±.0010 (10k), +.0435±.0018 (20k), 5/5 blocks; V orders arms identically; Kfresh beats K0 at 20k (-.0085±.0016)",
+  "P3 (executed before review): 16 trainings, linear-Gaussian teacher; network far better than the empirical target in 8/8 cells; exact ODE = analytic mixture law"
  ],
  "blocked_experiments": [
   "P0.3 ice checks (not executed under protocol)",
-  "P1-confirm",
-  "P3",
   "P4",
   "P5",
   "P7"
  ],
- "new_training_runs": 6,
+ "new_training_runs": 55,
  "primary_contrasts": [
   {
    "contrast": "K1-K0",
@@ -130,6 +130,18 @@
     "background": 0.05
    },
    "verdict": "generative backbone -22% CRPS (C5 OBSERVED, single training pair)"
+  },
+  {
+   "contrast": "K1-K0 joint regret, P1-confirm 5 new blocks",
+   "step10000": {
+    "mean": 0.0181,
+    "se_between_blocks": 0.001
+   },
+   "step20000": {
+    "mean": 0.0435,
+    "se_between_blocks": 0.0018
+   },
+   "verdict": "CONFIRMED (5/5)"
   }
  ],
  "critical_audit_failures": [],
