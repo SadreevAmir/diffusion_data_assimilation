@@ -53,8 +53,10 @@ def run(block: int, arm: str, resume: bool) -> None:
         Wk = 1.0 - kxx; Wc = 0.5 * np.abs(X[m] - Xp[m]).mean()
         # iid mixture bank: new key per member (Qbar) -> ordinary score vs truths, minus W/n
         Kb = rng.standard_normal((ncal, KDIM)); B = P.sample_conditions(torch, model, arm, np.full(ncal, c), Kb, 1, rng)[:, 0]
-        Rk = np.mean([R.kernel_empirical_score(B, y, SCALES) for y in truths[c]]) - Wk / ncal
-        Rc = np.mean([R.empirical_score(B, y, "marginal") for y in truths[c]]) - Wc / ncal
+        # finite-bank penalty of a NEW-KEY-PER-MEMBER bank is (V+W)/n, not W/n (review 2, §3); V_c from the triplets above
+        Vk_c = float(Hk[m].mean()); Vc_c = float(Hc[m].mean())
+        Rk = np.mean([R.kernel_empirical_score(B, y, SCALES) for y in truths[c]]) - (Vk_c + Wk) / ncal
+        Rc = np.mean([R.empirical_score(B, y, "marginal") for y in truths[c]]) - (Vc_c + Wc) / ncal
         # raw underlying-law risk at fixed external keys (should be R(Qbar)+V): 8 keys x 512 members
         raw = []
         for _ in range(8):
@@ -62,7 +64,7 @@ def run(block: int, arm: str, resume: bool) -> None:
             raw.append(np.mean([R.kernel_empirical_score(Bk, y, SCALES) for y in truths[c]]) - Wk / 512)
         ing[c] = {"V_kernel": float(Hk[m].mean()), "V_kernel_se": float(Hk[m].std(ddof=1) / np.sqrt(m.sum())), "V_crps": float(Hc[m].mean()), "V_crps_se": float(Hc[m].std(ddof=1) / np.sqrt(m.sum())),
                   "W_kernel": float(Wk), "W_crps": float(Wc), "R_bar_kernel": float(Rk), "R_bar_crps": float(Rc), "R_raw_fixedkey_kernel": float(np.mean(raw)), "R_raw_fixedkey_kernel_se": float(np.std(raw, ddof=1) / np.sqrt(len(raw)))}
-    (d / "ingredients.json").write_text(json.dumps(ing, indent=1))
+    ing["__correction_v2"] = True; (d / "ingredients.json").write_text(json.dumps(ing, indent=1))
     # ---- budget matrix: ordinary score of the declared 64-member ensemble, 32 runs per (c, L)
     for c in range(NCAT):
         for L in LS:
@@ -83,6 +85,12 @@ def run(block: int, arm: str, resume: bool) -> None:
 def summary(block: int, arm: str) -> None:
     d = OUT / f"block{block}_{arm}"; rows = [{k: float(v) if k != "arm" else v for k, v in r.items()} for r in csv.DictReader((d / "budget_matrix.csv").open())]
     ing = json.loads((d / "ingredients.json").read_text())
+    if not ing.get("__correction_v2"):  # ingredients written by the first version: R_bar had -W/n instead of -(V+W)/n
+        for c in ing:
+            if c.startswith("__"):
+                continue
+            ing[c]["R_bar_kernel"] -= ing[c]["V_kernel"] / 4096; ing[c]["R_bar_crps"] -= ing[c]["V_crps"] / 4096
+        ing["__correction_v2"] = True; (d / "ingredients.json").write_text(json.dumps(ing, indent=1))
     out = []
     for L in LS:
         sel = [r for r in rows if r["L"] == L]

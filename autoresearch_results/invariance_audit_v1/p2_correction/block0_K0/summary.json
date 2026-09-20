@@ -5,60 +5,60 @@
    "arm": "K0",
    "L": 1,
    "kernel_measured": 0.49078971579378017,
-   "kernel_predicted": 0.49039585096162175,
+   "kernel_predicted": 0.4903960864838153,
    "kernel_se_over_cats": 0.008055109741987927,
    "crps_measured": 0.2839765287371959,
-   "crps_predicted": 0.2837907085472635
+   "crps_predicted": 0.2837908368935783
   },
   {
    "block": 0,
    "arm": "K0",
    "L": 2,
    "kernel_measured": 0.4909701147306442,
-   "kernel_predicted": 0.49087820041416713,
+   "kernel_predicted": 0.4908784359363608,
    "kernel_se_over_cats": 0.00865282953337042,
    "crps_measured": 0.28379946700915737,
-   "crps_predicted": 0.28405356180002156
+   "crps_predicted": 0.2840536901463364
   },
   {
    "block": 0,
    "arm": "K0",
    "L": 4,
    "kernel_measured": 0.49235003569506397,
-   "kernel_predicted": 0.4911193751404399,
+   "kernel_predicted": 0.49111961066263354,
    "kernel_se_over_cats": 0.008421942915680396,
    "crps_measured": 0.2845322392000096,
-   "crps_predicted": 0.2841849884264006
+   "crps_predicted": 0.2841851167727154
   },
   {
    "block": 0,
    "arm": "K0",
    "L": 8,
    "kernel_measured": 0.4909624131895822,
-   "kernel_predicted": 0.49123996250357627,
+   "kernel_predicted": 0.4912401980257699,
    "kernel_se_over_cats": 0.008498067306283016,
    "crps_measured": 0.2841141533610959,
-   "crps_predicted": 0.2842507017395901
+   "crps_predicted": 0.28425083008590496
   },
   {
    "block": 0,
    "arm": "K0",
    "L": 16,
    "kernel_measured": 0.49103414185015054,
-   "kernel_predicted": 0.49130025618514445,
+   "kernel_predicted": 0.4913004917073381,
    "kernel_se_over_cats": 0.008393277181332152,
    "crps_measured": 0.28440929241312174,
-   "crps_predicted": 0.2842835583961849
+   "crps_predicted": 0.2842836867424997
   },
   {
    "block": 0,
    "arm": "K0",
    "L": 64,
    "kernel_measured": 0.49220912875959677,
-   "kernel_predicted": 0.4913454764463206,
+   "kernel_predicted": 0.49134571196851423,
    "kernel_se_over_cats": 0.008386847265952357,
    "crps_measured": 0.2845243646795889,
-   "crps_predicted": 0.2843082008886309
+   "crps_predicted": 0.28430832923494576
   }
  ],
  "V_kernel_mean": -0.0009646989050909448,
@@ -104,5 +104,5 @@
   -0.00030440203104186244,
   -0.004573106693988063
  ],
- "raw_fixedkey_minus_Rbar_kernel_mean": 0.0003834417374065126
+ "raw_fixedkey_minus_Rbar_kernel_mean": 0.0003832062152128897
 }
