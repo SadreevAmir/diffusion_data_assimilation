@@ -1,33 +1,77 @@
 {
-  "protocol_version": "1.0",
-  "date": "2026-09-20",
-  "local_repo": {
-    "path": "/Users/amir/sciml/diffusion_data_assimilation",
-    "branch": "codex/autoresearch-track-weight-0625",
-    "head_before_p1": "fbed291",
-    "dirty_tracked_files_not_mine": ["CLAUDE.md", "assim_lib/compare_3dvar.py", "assim_lib/evaluate.py", "assim_lib/metrics.py", "docs/research/oof_dispersion_layer_v6.py"],
-    "note": "shared dirty checkout; pre-existing modifications preserved; no reset/clean performed",
-    "python": "3.14 (.venv)", "torch": "2.10.0", "numpy": "2.3.5", "scipy": "1.17.1", "device_for_p1": "cpu (8 threads), float32 training, float64 scoring"
+ "protocol_version": "1.0",
+ "date": "2026-09-20",
+ "local_repo": {
+  "path": "/Users/amir/sciml/diffusion_data_assimilation",
+  "branch": "codex/autoresearch-track-weight-0625",
+  "head_before_p1": "fbed291",
+  "dirty_tracked_files_not_mine": [
+   "CLAUDE.md",
+   "assim_lib/compare_3dvar.py",
+   "assim_lib/evaluate.py",
+   "assim_lib/metrics.py",
+   "docs/research/oof_dispersion_layer_v6.py"
+  ],
+  "note": "shared dirty checkout; pre-existing modifications preserved; no reset/clean performed",
+  "python": "3.14 (.venv)",
+  "torch": "2.10.0",
+  "numpy": "2.3.5",
+  "scipy": "1.17.1",
+  "device_for_p1": "cpu (8 threads), float32 training, float64 scoring"
+ },
+ "server_worktree": {
+  "path": "/home/a.madreev/diffusion_data_assimilation/autoresearch_worktrees/clean_retrain_v1",
+  "branch": "claude/clean-retrain-v1",
+  "head": "4e21cb9",
+  "python": "3.10.14",
+  "torch": "2.5.1+cu121",
+  "numpy": "2.1.3",
+  "gpus": [
+   {
+    "uuid": "GPU-40d4f57d-941c-2978-f121-2eec1843d630",
+    "name": "NVIDIA L40 46GB",
+    "status_2026-09-20_01:30": "arm F training (mine)"
+   },
+   {
+    "uuid": "GPU-40ff1cbb-07cc-992e-23cb-8fe181972b76",
+    "name": "NVIDIA L40 46GB",
+    "status_2026-09-20_01:30": "other user's process resident (paper_sr-trainer-1); not used"
+   }
+  ],
+  "policy": "one new training job at a time; never share a GPU with other users' processes"
+ },
+ "arms_status": {
+  "arm_R_unet_mse": {
+   "training": "finished 2026-09-19 23:01 (EXIT=0, 12 epochs)",
+   "checkpoint": "claude_clean_retrain_R_unet_mse/run_20260919_180132/ema_last_model.pth (+ema_best, epoch snapshots)",
+   "ensemble": "eval_armR_unet_mse_dev2022/result/samples (40 dates, 1 member, native-two-field)",
+   "evaluation": "DONE (deterministic point metrics; RMSE .2266 full)",
+   "same_layer_evaluation": "NOT DONE (single member: generator copula absent; requires P6.1 design with fold-fitted residual law)",
+   "bug_found_and_fixed": "compare_3dvar/evaluate built TrainingConfig from the experiment model config (objective=flow) instead of the run config (objective=regression); first eval integrated the regression net as a flow (RMSE .72; kept as eval_armR_unet_mse_dev2022_flowbug); server commits 353f6b0, 4e21cb9"
   },
-  "server_worktree": {
-    "path": "/home/a.madreev/diffusion_data_assimilation/autoresearch_worktrees/clean_retrain_v1",
-    "branch": "claude/clean-retrain-v1", "head": "4e21cb9",
-    "python": "3.10.14", "torch": "2.5.1+cu121", "numpy": "2.1.3",
-    "gpus": [{"uuid": "GPU-40d4f57d-941c-2978-f121-2eec1843d630", "name": "NVIDIA L40 46GB", "status_2026-09-20_01:30": "arm F training (mine)"},
-             {"uuid": "GPU-40ff1cbb-07cc-992e-23cb-8fe181972b76", "name": "NVIDIA L40 46GB", "status_2026-09-20_01:30": "other user's process resident (paper_sr-trainer-1); not used"}],
-    "policy": "one new training job at a time; never share a GPU with other users' processes"
+  "arm_F_tracksonly_libgeom": {
+   "training": "RUNNING (GPU 0, started 2026-09-19 23:38, epoch 4/24 at 01:30, ~20 min/epoch)",
+   "checkpoint": "not yet",
+   "ensemble": "not yet",
+   "evaluation": "not yet",
+   "scientific_status": "T6-type intervention on ice (background removed = informative component); NOT a T3 test"
   },
-  "arms_status": {
-    "arm_R_unet_mse": {"training": "finished 2026-09-19 23:01 (EXIT=0, 12 epochs)", "checkpoint": "claude_clean_retrain_R_unet_mse/run_20260919_180132/ema_last_model.pth (+ema_best, epoch snapshots)",
-                       "ensemble": "eval_armR_unet_mse_dev2022/result/samples (40 dates, 1 member, native-two-field)", "evaluation": "DONE (deterministic point metrics; RMSE .2266 full)",
-                       "same_layer_evaluation": "NOT DONE (single member: generator copula absent; requires P6.1 design with fold-fitted residual law)",
-                       "bug_found_and_fixed": "compare_3dvar/evaluate built TrainingConfig from the experiment model config (objective=flow) instead of the run config (objective=regression); first eval integrated the regression net as a flow (RMSE .72; kept as eval_armR_unet_mse_dev2022_flowbug); server commits 353f6b0, 4e21cb9"},
-    "arm_F_tracksonly_libgeom": {"training": "RUNNING (GPU 0, started 2026-09-19 23:38, epoch 4/24 at 01:30, ~20 min/epoch)", "checkpoint": "not yet", "ensemble": "not yet", "evaluation": "not yet",
-                                  "scientific_status": "T6-type intervention on ice (background removed = informative component); NOT a T3 test"},
-    "arm_C_fielddrop": {"training": "done", "dev_eval": "eval_armC_ep10_dev2022 (siconc-only, 40 dates, 10 members)", "test_2023": "test_armC_ep10_main_200d (200 days, 5 members) + layer v19 fitted on dev (oof_layer_v19_armC_test2023.json); 2023 is a PREVIOUSLY SEEN benchmark (legacy model evaluated on it earlier)"}
-  },
-  "reference_tests": {"command": "python -m unittest discover -s reference -p 'test_*.py' -v", "status": "UNKNOWN locally (execution of external code blocked by the agent's permission classifier; pack's own checks/unit_tests.txt reports 17/17 OK); user asked to run"},
-  "score_parity": {"file": "autoresearch_results/invariance_audit_v1/p0_score_parity.csv", "result": "15 PASS / 1 FAIL: oof_dispersion_layer_v19.fair_crps returns NaN instead of refusing at M=1 (never used with M=1; layer M=10)"},
-  "p0_open_items": ["data lineage table (p0_data_lineage.md): partially compiled from claims table / passport; several old numbers UNVERIFIED pending file-level re-derivation",
-                     "P0.3 ice checks (fold inputs, NaN semantics, geometry provenance, v19 single-version diagnostics chain, independent A/B banks) — documented in analysis-doc §13/§16/§17 but not re-executed under this protocol"]
+  "arm_C_fielddrop": {
+   "training": "done",
+   "dev_eval": "eval_armC_ep10_dev2022 (siconc-only, 40 dates, 10 members)",
+   "test_2023": "test_armC_ep10_main_200d (200 days, 5 members) + layer v19 fitted on dev (oof_layer_v19_armC_test2023.json); 2023 is a PREVIOUSLY SEEN benchmark (legacy model evaluated on it earlier)"
+  }
+ },
+ "reference_tests": {
+  "command": "python -m unittest discover -s reference -p 'test_*.py' -v",
+  "status": "PASS 17/17 locally (2026-09-20 08:50)"
+ },
+ "score_parity": {
+  "file": "autoresearch_results/invariance_audit_v1/p0_score_parity.csv",
+  "result": "15 PASS / 1 FAIL: oof_dispersion_layer_v19.fair_crps returns NaN instead of refusing at M=1 (never used with M=1; layer M=10)"
+ },
+ "p0_open_items": [
+  "data lineage table (p0_data_lineage.md): partially compiled from claims table / passport; several old numbers UNVERIFIED pending file-level re-derivation",
+  "P0.3 ice checks (fold inputs, NaN semantics, geometry provenance, v19 single-version diagnostics chain, independent A/B banks) — documented in analysis-doc §13/§16/§17 but not re-executed under this protocol"
+ ]
 }

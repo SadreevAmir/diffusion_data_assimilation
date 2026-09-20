@@ -4,6 +4,7 @@
  "status": "STOP_REVIEW",
  "repo_commit": "see git log -1 after commit 'P0 + P1-pilot report'",
  "completed_experiments": [
+  "reference unit tests: 17/17 OK locally (numpy 2.3.5, scipy 1.17.1, python 3.14; log reference_unit_tests_local.txt)",
   "P0.1 inventory",
   "P0.1 data lineage (source map)",
   "P0.2 score parity (15/16 PASS)",
@@ -12,7 +13,6 @@
   "P6.1 (saved samples, CPU): same DA update + fold-fitted law + stationary copula over background / UNet-MSE / CFM mean: CRPS .050 / .0462 / .0362 (arm A) / .0352 (legacy)"
  ],
  "blocked_experiments": [
-  "reference unit tests (permission classifier; user asked to run)",
   "P0.3 ice checks (not executed under protocol)",
   "P1-confirm",
   "P3",

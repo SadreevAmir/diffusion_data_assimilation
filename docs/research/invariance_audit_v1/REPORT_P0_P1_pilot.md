@@ -10,7 +10,7 @@
 
 - **P0.1** инвентаризация: `autoresearch_results/invariance_audit_v1/p0_inventory.json` (версии, GPU, статусы arm R/F, найденный и исправленный баг evaluate). Source map: `p0_data_lineage.md` (18 чисел; статусы TRACED / TRACED_NOT_RERUN; ни одно старое число не было пересчитано под этим протоколом).
 - **P0.2** паритет score: `p0_score_parity.csv` — 15 PASS / 1 FAIL (`oof_dispersion_layer_v19.fair_crps` при M = 1 возвращает NaN вместо отказа; слой всегда использует M = 10, на выводы не влияет). Совпадают с эталоном: plain CRPS (1/M²), fair/U CRPS (1/(M(M−1))) во всех четырёх реализациях репозитория, cross-score двух банков, energy score использует норму (не квадрат), одинаковые мультимножества маргиналов дают одинаковый CRPS, M = 1 plain определён / fair (`assim_lib`) отказывает, unbiased MMD² бывает отрицательной и не обрезается.
-- **Reference unit tests**: `UNKNOWN` в моём исполнении — классификатор разрешений агента заблокировал запуск внешнего кода; в пакете `checks/unit_tests.txt` 17/17 OK; пользователь попрошен запустить команду. Сам модуль `core.py` при импорте из моего скрипта исполнялся (учитель, score, V-триплеты взяты из него без переписывания).
+- **Reference unit tests**: **17/17 OK** локально (python 3.14, numpy 2.3.5, scipy 1.17.1; лог `autoresearch_results/invariance_audit_v1/reference_unit_tests_local.txt`; запущены 20.09 08:50 после разрешения пользователя). Сам модуль `core.py` при импорте из моего скрипта исполнялся (учитель, score, V-триплеты взяты из него без переписывания).
 - **P0.3** (ледовые проверки) — НЕ выполнены под протоколом; перечислены как открытые в `p0_inventory.json`.
 - **P1-pilot**: 6 обучений (K0/K1/Kfresh × seed-блоки 0,1), 10 000 шагов каждое, CPU (8 потоков), 14 с на обучение; checkpoints 0/500/2000/5000/10000; оценка на 16 × 32 = 512 условиях с 32 свежими истинами (общий банк), M = 64, Heun-64 до T = 0.999; baseline'ы (эмпирическая мера 128 ответов, fitted Gaussian, oracle finite-M); V по 128 триплетам на категорию для каждого checkpoint; аудит solver (Heun 32/64/128 vs DOP853, T = .999/.9999) для K1 и K0 block 0; зарегистрированное расширение для финального checkpoint: mean matching с pilot-банком при **том же** внешнем ключе (1024 членов на условие) и V по 4096 триплетам на категорию (65 536) для границы Хёффдинга.
 - Новых GPU-обучений нет; защищённых holdout'ов не открывалось; P1-confirm, P2–P7 не запускались.
@@ -30,7 +30,7 @@
 
 | Проверка | PASS / FAIL / UNKNOWN | Файл и hash | Влияние на вывод |
 |---|---|---|---|
-| Reference unit tests | UNKNOWN (не мог запустить; пакет сообщает 17/17 OK) | `astra_pack_v1/checks/unit_tests.txt` | низкое: учитель/score импортированы из того же модуля |
+| Reference unit tests | PASS 17/17 | `reference_unit_tests_local.txt` | учитель/score импортированы из того же модуля |
 | Repo-score parity | PASS (15/16; 1 FAIL — NaN при M = 1 в `fair_crps` слоя, не используется) | `autoresearch_results/invariance_audit_v1/p0_score_parity.csv` | старые CRPS-числа слоя считаны корректной формулой |
 | Независимость банков и ключей | PASS для P1 (отдельные SeedSequence для validation/pilot/triplets; X, X′, Z — независимые вызовы семплера; ключ фиксирован внутри траектории) | `p1_pilot.py` (`sample_conditions`, `audit_v`, `diag_final`) | — |
 | Точное описание forecast estimand | PASS: `conditional_generator_at_external_key` (один новый K на условие, M = 64 iid базовых шумов); V — по независимым парам ключей | `validation_bank.npz`, `key_sensitivity_*` | — |
