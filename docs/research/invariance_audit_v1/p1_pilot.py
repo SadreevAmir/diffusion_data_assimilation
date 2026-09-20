@@ -382,7 +382,7 @@ def report(blocks: list[int]) -> None:
     for b in blocks:
         for step in CFG["training"]["checkpoints"]:
             k0 = {r["cond"]: r for r in rows if r["block"] == b and r["arm"] == "K0" and r["step"] == step}
-            for other in ("K1", "Kfresh"):
+            for other in [a for a in ARMS if a != "K0"]:
                 k1 = {r["cond"]: r for r in rows if r["block"] == b and r["arm"] == other and r["step"] == step}
                 common = sorted(set(k0) & set(k1))
                 if common:
