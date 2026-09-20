@@ -24,7 +24,7 @@ os.environ.setdefault("P1_STAGE", "confirm")
 HERE = Path(__file__).resolve().parent; sys.path.insert(0, str(HERE))
 import p1_pilot as P
 R = P.R; SCALES = P.SCALES; NCAT, KDIM, YDIM = P.NCAT, P.KDIM, P.YDIM
-OUT = P.OUT.parent / "confirm_decomposition"; ARMS = ("K0", "K1", "Kfresh", "Krho05", "Krho09"); STEPS = (5000, 10000, 20000); BLOCKS = (10, 11, 12, 13, 14)
+OUT = P.OUT.parent / "confirm_decomposition"; ARMS = ("K0", "K1", "Kfresh", "Krho05", "Krho09"); STEPS = (500, 2000, 5000, 10000, 20000); BLOCKS = (10, 11, 12, 13, 14)
 
 
 def responsibilities(T, X):
@@ -75,7 +75,30 @@ def analyse(block: int, arm: str, step: int) -> None:
              "mean_err2_mixture": float(((MIX[i].mean(0) - mu_t) ** 2).sum() - np.trace(np.cov(MIX[i], rowvar=False, ddof=1)) / 128),
              "kernel_score_raw": float(np.mean([R.kernel_empirical_score(X[i], y, SCALES) for y in truths[i]])), "kernel_score_mixture64": float(np.mean([R.kernel_empirical_score(MIX[i][:64], y, SCALES) for y in truths[i]]))}
         r.update({f"raw_{k}": v for k, v in structure(T, X[i]).items()}); r.update({f"mix_{k}": v for k, v in structure(T, MIX[i]).items()})
+        # --- review-3 §5.1: precisely defined diagnostics with unbiased finite-M controls ---
+        # mode event f(x) = posterior responsibility of component 0 under the KNOWN teacher (soft, in [0,1]); p = E_truth f = pi_0 exactly
+        # only if responsibilities integrate to the weight, which holds: E_{P*}[r_0(X)] = pi_0. Unbiased squared error of the event
+        # probability: (mean f - p)^2 - var(f)/M  (not clipped).  Same for the mixture bank (M = 128) and for an oracle bank (M = 64).
+        for tag, S in (("raw", X[i]), ("mix", MIX[i][:64]), ("mix128", MIX[i])):
+            fr = responsibilities(T, S); r[f"{tag}_p0_sqerr_unbiased"] = float((fr.mean() - T.weights[0]) ** 2 - fr.var(ddof=1) / len(fr))
+        Ora = T.sample(64, rng); fo = responsibilities(T, Ora); r["oracle64_p0_sqerr_unbiased"] = float((fo.mean() - T.weights[0]) ** 2 - fo.var(ddof=1) / 64)
+        r["oracle64_mmd2"] = T.mmd2_from_samples(Ora, SCALES); r["oracle64_cov_err_fro"] = float(np.linalg.norm(np.cov(Ora, rowvar=False, ddof=1) - T.moments()[1]))
+        # covariance: unbiased squared Frobenius error via two independent banks <S_A - Sigma, S_B - Sigma>; raw: split the 64 members
+        # into two halves of 32 (independent base noises); mixture: two halves of the 128-bank; oracle: two fresh 32-banks
+        Sig = T.moments()[1]
+        def cov_ip(A, B):
+            return float(np.sum((np.cov(A, rowvar=False, ddof=1) - Sig) * (np.cov(B, rowvar=False, ddof=1) - Sig)))
+        r["raw_cov_sqerr_unbiased"] = cov_ip(X[i][:32], X[i][32:]); r["mix_cov_sqerr_unbiased"] = cov_ip(MIX[i][:64], MIX[i][64:]); r["oracle_cov_sqerr_unbiased"] = cov_ip(T.sample(32, rng), T.sample(32, rng))
+        # secondary distributional scores: single-scale MMD^2 and the energy score of the finite ensemble vs the 32 truths (raw and mixture64)
+        for sc in SCALES:
+            r[f"mmd2_raw_scale{sc}"] = T.mmd2_from_samples(X[i], (sc,)); r[f"mmd2_mix_scale{sc}"] = T.mmd2_from_samples(MIX[i], (sc,))
+        r["energy_raw"] = float(np.mean([R.empirical_score(X[i], y, "energy") for y in truths[i]])); r["energy_mix64"] = float(np.mean([R.empirical_score(MIX[i][:64], y, "energy") for y in truths[i]]))
+        r["crps_raw"] = float(np.mean([R.empirical_score(X[i], y, "marginal") for y in truths[i]])); r["crps_mix64"] = float(np.mean([R.empirical_score(MIX[i][:64], y, "marginal") for y in truths[i]]))
         rows.append(r)
+    # label-free V in the energy geometry (1/2 E[|X-Z| - |X-X'|]/sqrt(d), same triplets) per category
+    He = 0.5 * (np.linalg.norm(A - Z, axis=1) - np.linalg.norm(A - Ap, axis=1)) / np.sqrt(YDIM)
+    for rr in rows:
+        rr["V_energy"] = float(He[cc == rr["cat"]].mean())
     res = {"per_condition": rows}
     # memorisation diagnostics for key arms (stored examples)
     if arm != "K0":
@@ -109,7 +132,7 @@ def report():
     for f in sorted(OUT.glob("b*_s*.json")):
         d = json.loads(f.read_text()); pc = d["per_condition"]
         b, arm, step = pc[0]["block"], pc[0]["arm"], pc[0]["step"]
-        keys = ["mmd2_raw", "mmd2_mixture", "V", "mmd2_raw_centered", "mmd2_mixture_centered", "mean_err2_raw", "mean_err2_mixture", "kernel_score_raw", "kernel_score_mixture64", "raw_cov_err_fro", "mix_cov_err_fro", "raw_var_ratio_eig0", "raw_var_ratio_eig1", "mix_var_ratio_eig0", "mix_var_ratio_eig1"]
+        keys = ["mmd2_raw", "mmd2_mixture", "V", "V_energy", "energy_raw", "energy_mix64", "crps_raw", "crps_mix64", "raw_p0_sqerr_unbiased", "mix_p0_sqerr_unbiased", "mix128_p0_sqerr_unbiased", "oracle64_p0_sqerr_unbiased", "oracle64_mmd2", "oracle64_cov_err_fro", "raw_cov_sqerr_unbiased", "mix_cov_sqerr_unbiased", "oracle_cov_sqerr_unbiased"] + [f"mmd2_{t}_scale{sc}" for t in ("raw", "mix") for sc in (0.25, 0.5, 1.0, 2.0)] + [ "mmd2_raw_centered", "mmd2_mixture_centered", "mean_err2_raw", "mean_err2_mixture", "kernel_score_raw", "kernel_score_mixture64", "raw_cov_err_fro", "mix_cov_err_fro", "raw_var_ratio_eig0", "raw_var_ratio_eig1", "mix_var_ratio_eig0", "mix_var_ratio_eig1"]
         r = {"block": b, "arm": arm, "step": step, **{k: float(np.mean([x[k] for x in pc])) for k in keys}}
         r["p0_abs_err_raw"] = float(np.mean([abs(x["raw_p_comp0_model"] - x["raw_p_comp0_true"]) for x in pc])); r["p0_abs_err_mix"] = float(np.mean([abs(x["mix_p_comp0_model"] - x["mix_p_comp0_true"]) for x in pc]))
         r["identity_residual"] = r["mmd2_raw"] - r["mmd2_mixture"] - r["V"]

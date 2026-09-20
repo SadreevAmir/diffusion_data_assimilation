@@ -32,7 +32,8 @@ NCAT, NREP, KDIM, YDIM = 16, 128, 8, 2
 SCALES = tuple(CFG["validation"]["kernel_bandwidths"])
 FREQ = 10.0 ** np.linspace(-1, 1, 16)
 ARMS = {"K0": ("zero", None), "K1": ("fixed_per_example", 1.0), "Kfresh": ("fresh_per_presentation", 0.0),
-        "Krho05": ("rho_mixed", 0.5), "Krho09": ("rho_mixed", 0.9), "Kcached": ("cached_rho", 0.5), "Kclass": ("class_key", None)}
+        "Krho05": ("rho_mixed", 0.5), "Krho09": ("rho_mixed", 0.9), "Kcached": ("cached_rho", 0.5), "Kclass": ("class_key", None),
+        "KfreshBatch": ("fresh_per_batch", 0.0)}  # review-3 §6: ONE fresh key shared by the whole batch at each step (same marginal law per example)
 
 
 def sha(path: Path) -> str:
@@ -119,6 +120,7 @@ def train(block: int, arm: str, resume: bool) -> None:
     Z0 = rng_flow.standard_normal((steps, bs, YDIM)).astype(np.float32)
     T = rng_flow.random((steps, bs)).astype(np.float32)
     rng_aug = np.random.default_rng(s["augmentation"])  # consumed only by Kfresh
+    rng_keybatch = np.random.default_rng(np.random.SeedSequence([s["augmentation"], 7]))  # KfreshBatch keys
     mode, rho = ARMS[arm]
     model = build_model(torch, s["init"]); init_hash = state_hash(torch, model)
     opt = torch.optim.Adam(model.parameters(), lr=tr["lr"], betas=tuple(tr["betas"]), weight_decay=tr["weight_decay"])
@@ -145,6 +147,8 @@ def train(block: int, arm: str, resume: bool) -> None:
             key = Kt[b]
         elif mode == "fresh_per_presentation":  # rho=0 -> pure standard normal, independent of the example
             key = torch.as_tensor(rng_aug.standard_normal((bs, KDIM)).astype(np.float32))
+        elif mode == "fresh_per_batch":  # one fresh N(0,I) key per step, broadcast to the batch (keys from a SEPARATE stream)
+            key = torch.as_tensor(np.repeat(rng_keybatch.standard_normal((1, KDIM)), bs, axis=0).astype(np.float32))
         elif mode == "rho_mixed":  # T1.4: rho K_i + sqrt(1-rho^2) E, fresh E at every presentation, stationary N(0,I) marginal
             key = rho * Kt[b] + float(np.sqrt(1 - rho * rho)) * torch.as_tensor(rng_aug.standard_normal((bs, KDIM)).astype(np.float32))
         elif mode == "cached_rho":  # control: rho K_i + sqrt(1-rho^2) E_i computed ONCE per example, then fixed (still an identifier)
