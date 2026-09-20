@@ -69,20 +69,22 @@ def main():
                 assert abs(crps_plain(e[:, w], y[w]) - ref_plain) < 1e-12 and abs(crps_fair(e[:, w], y[w]) - ref_fair) < 1e-12, (name, crps_plain(e[:, w], y[w]) - ref_plain)
             r = {"date": c["date"].isoformat(), "marginal_crps_plain": ref_plain, "marginal_crps_fair": ref_fair}
             for name, e in ens.items():
-                rr = {"es16_fair": energy_patches(e, y, w, np.random.default_rng(1000 + i)), "vs05": variogram_score(e, y, w, np.random.default_rng(2000 + i))}
+                rr = {"es16_fair": energy_patches(e, y, w, np.random.default_rng(1000 + i))}
+                vs = variogram_score(e, y, w, np.random.default_rng(2000 + i)); rr.update({f"vs05_lag{k}": float(v) for k, v in (vs.items() if isinstance(vs, dict) else enumerate(np.atleast_1d(vs)))})
                 for s_ in (1, 4, 16, 64):
                     bm = block_means(e, s_, w); by = block_means(y[None], s_, w)[0]; rr[f"block{s_}_fair"] = fair_crps_1d(bm, by); rr[f"block{s_}_plain"] = crps_plain(bm, by)
                 rr.update(projections_crps(e, y, w)); r[name] = rr
-            rows.append(r); print(f"{r['date']}: " + " | ".join(f"{v}: es16 {r[v]['es16_fair']:.4f} vs {r[v]['vs05']:.4g} b16 {r[v]['block16_fair']:.4f} dom {r[v].get('proj_domain_fair', float('nan')):.5f}" for v in variants), flush=True)
+            rows.append(r); print(f"{r['date']}: " + " | ".join(f"{v}: es16 {r[v]['es16_fair']:.4f} b16 {r[v]['block16_fair']:.4f} dom {r[v].get('proj_domain_fair', float('nan')):.5f}" for v in variants), flush=True)
     keys = sorted(rows[0]["stationary"]); summary = {}
     for v in variants:
         summary[v] = {k: float(np.mean([r[v][k] for r in rows])) for k in keys}
         summary[v]["dates_better_than_stationary_es16"] = int(sum(r[v]["es16_fair"] < r["stationary"]["es16_fair"] for r in rows))
         summary[v]["dates_better_than_stationary_block16"] = int(sum(r[v]["block16_fair"] < r["stationary"]["block16_fair"] for r in rows))
     a.output.write_text(json.dumps({"summary": summary, "per_date": rows, "marginal_crps_plain_mean": float(np.mean([r["marginal_crps_plain"] for r in rows])), "marginal_crps_fair_mean": float(np.mean([r["marginal_crps_fair"] for r in rows]))}, indent=1))
-    print("\nvariant      es16_fair  vs05     block1  block4  block16 block64  proj_dom  dates<stat(es16/b16)")
+    vsk = [k for k in keys if k.startswith("vs05")]
+    print("\nvariant      es16_fair  " + " ".join(vsk) + "  block1  block4  block16 block64  proj_dom  dates<stat(es16/b16)")
     for v in variants:
-        s = summary[v]; print(f"{v:12s} {s['es16_fair']:.4f}  {s['vs05']:.4g}  {s['block1_fair']:.4f}  {s['block4_fair']:.4f}  {s['block16_fair']:.4f}  {s['block64_fair']:.4f}  {s.get('proj_domain_fair', float('nan')):.5f}  {s['dates_better_than_stationary_es16']}/{s['dates_better_than_stationary_block16']}")
+        s = summary[v]; print(f"{v:12s} {s['es16_fair']:.4f}  " + " ".join(f"{s[k]:.4g}" for k in vsk) + f"  {s['block1_fair']:.4f}  {s['block4_fair']:.4f}  {s['block16_fair']:.4f}  {s['block64_fair']:.4f}  {s.get('proj_domain_fair', float('nan')):.5f}  {s['dates_better_than_stationary_es16']}/{s['dates_better_than_stationary_block16']}")
 
 
 if __name__ == "__main__":
