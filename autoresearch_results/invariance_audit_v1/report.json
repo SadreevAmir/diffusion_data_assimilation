@@ -12,7 +12,8 @@
   "P2 (executed before review, flagged): budget matrix L in {1..64}, V/L curve predicted by label-free V, negative controls (K0/Kfresh, informative-key T6.3 exact)",
   "P6.1 (saved samples, CPU): same DA update + fold-fitted law + stationary copula over background / UNet-MSE / CFM mean: CRPS .050 / .0462 / .0362 (arm A) / .0352 (legacy)",
   "P1-confirm (executed before review): 25 trainings, blocks 10-14, 20k steps; K1-K0 = +.0181±.0010 (10k), +.0435±.0018 (20k), 5/5 blocks; V orders arms identically; Kfresh beats K0 at 20k (-.0085±.0016)",
-  "P3 (executed before review): 16 trainings, linear-Gaussian teacher; network far better than the empirical target in 8/8 cells; exact ODE = analytic mixture law"
+  "P3 (executed before review): 16 trainings, linear-Gaussian teacher; network far better than the empirical target in 8/8 cells; exact ODE = analytic mixture law",
+  "Ice arm F (library geometry for all training samples) + two geometry diagnostics: Cor.(e) prediction NOT_SUPPORTED (F s/r .60/.64 vs D .90/.95); geometry-as-information hypothesis not supported (D on library geometry .157 vs .171, n.s.); F mean does not transfer library->real"
  ],
  "blocked_experiments": [
   "P0.3 ice checks (not executed under protocol)",
@@ -149,7 +150,8 @@
   "effect mostly in the conditional mean (~70%); shape ~30%",
   "all networks undertrained at 10k steps (mmd2 .046 vs .004 empirical target); memorisation of stored replies weak",
   "spread ratios would wrongly favour K1",
-  "first mean-matching diagnostic (one pilot key per category) was biased for key-sensitive models; replaced by same-key pilot"
+  "first mean-matching diagnostic (one pilot key per category) was biased for key-sensitive models; replaced by same-key pilot",
+  "ice: randomising the observation-mask identifier for all training samples reduced spread and skill; SRAL mask is not a nuisance encoding (T6 regime); mechanism open"
  ],
  "holdout_accessed": [],
  "artifacts": [
@@ -164,6 +166,7 @@
  "decisions_requested": [
   "P2 already executed before review (flagged); decide whether to accept as diagnostic or require re-run under P1-confirm",
   "training length for confirmation: 20k per spec vs registered 40k/80k dynamics extension",
-  "central claim wording: nuisance sensitivity measured by V (mean-dominated) vs require mean-matched effect"
+  "central claim wording: nuisance sensitivity measured by V (mean-dominated) vs require mean-matched effect",
+  "ice: close the mask-as-identifier test negatively, or design a P4-like truly information-equivalent encoding test (P6.4)"
  ]
 }
