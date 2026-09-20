@@ -8,7 +8,8 @@
   "P0.1 data lineage (source map)",
   "P0.2 score parity (15/16 PASS)",
   "P1-pilot: 6 trainings (K0/K1/Kfresh x blocks 0,1), evaluation, baselines, label-free V, solver audit, same-key mean matching, large-n V",
-  "P2 (executed before review, flagged): budget matrix L in {1..64}, V/L curve predicted by label-free V, negative controls (K0/Kfresh, informative-key T6.3 exact)"
+  "P2 (executed before review, flagged): budget matrix L in {1..64}, V/L curve predicted by label-free V, negative controls (K0/Kfresh, informative-key T6.3 exact)",
+  "P6.1 (saved samples, CPU): same DA update + fold-fitted law + stationary copula over background / UNet-MSE / CFM mean: CRPS .050 / .0462 / .0362 (arm A) / .0352 (legacy)"
  ],
  "blocked_experiments": [
   "reference unit tests (permission classifier; user asked to run)",
@@ -17,7 +18,6 @@
   "P3",
   "P4",
   "P5",
-  "P6",
   "P7"
  ],
  "new_training_runs": 6,
@@ -120,6 +120,16 @@
     "block1": 0.0015
    },
    "verdict": "V predicts the gain (G2) within MC noise; measured 10-20% below prediction"
+  },
+  {
+   "contrast": "UNet-MSE + same layer vs CFM mean (equal budget) + same layer, fair CRPS dev-2022 native",
+   "values": {
+    "unet_mse": 0.0462,
+    "cfm_armA": 0.0362,
+    "cfm_legacy": 0.0352,
+    "background": 0.05
+   },
+   "verdict": "generative backbone -22% CRPS (C5 OBSERVED, single training pair)"
   }
  ],
  "critical_audit_failures": [],
