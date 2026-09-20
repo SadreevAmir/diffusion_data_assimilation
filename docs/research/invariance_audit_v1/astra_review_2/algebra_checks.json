@@ -1,0 +1,76 @@
+{
+  "verification": "exact enumeration, not a new agent run",
+  "grouped_forecast_checks": [
+    {
+      "M": 64,
+      "L": 1,
+      "exact_score": 0.8228125000000007,
+      "prediction": 0.8228125000000001
+    },
+    {
+      "M": 64,
+      "L": 2,
+      "exact_score": 0.6628125000000006,
+      "prediction": 0.6628125
+    },
+    {
+      "M": 64,
+      "L": 4,
+      "exact_score": 0.5828125000000005,
+      "prediction": 0.5828125
+    },
+    {
+      "M": 64,
+      "L": 8,
+      "exact_score": 0.5428125000000004,
+      "prediction": 0.5428125
+    },
+    {
+      "M": 64,
+      "L": 16,
+      "exact_score": 0.5228124999999999,
+      "prediction": 0.5228125
+    },
+    {
+      "M": 64,
+      "L": 64,
+      "exact_score": 0.5078125,
+      "prediction": 0.5078125
+    }
+  ],
+  "mixture_bank_B": 4096,
+  "incorrect_correction_bias": 7.812500000003997e-05,
+  "corrected_risk": 0.5,
+  "report_plugin_calculations": [
+    {
+      "arm": "K0",
+      "reported_raw_MMD2": 0.0401,
+      "reported_V": 0.0001,
+      "predicted_mixture_MMD2": 0.04
+    },
+    {
+      "arm": "Kfresh",
+      "reported_raw_MMD2": 0.0316,
+      "reported_V": 0.001,
+      "predicted_mixture_MMD2": 0.0306
+    },
+    {
+      "arm": "Krho05",
+      "reported_raw_MMD2": 0.0384,
+      "reported_V": 0.0029,
+      "predicted_mixture_MMD2": 0.0355
+    },
+    {
+      "arm": "Krho09",
+      "reported_raw_MMD2": 0.0582,
+      "reported_V": 0.0148,
+      "predicted_mixture_MMD2": 0.0434
+    },
+    {
+      "arm": "K1",
+      "reported_raw_MMD2": 0.0836,
+      "reported_V": 0.0387,
+      "predicted_mixture_MMD2": 0.0449
+    }
+  ]
+}
