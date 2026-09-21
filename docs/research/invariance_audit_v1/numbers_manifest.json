@@ -1,0 +1,915 @@
+{
+ "local": [
+  {
+   "quantity": "K0 conditional (raw) score",
+   "file": "autoresearch_results/invariance_audit_v1/confirm_decomposition/confirm_decomposition_summary.csv",
+   "key": "crps_raw",
+   "value_20k_mean_blocks": 0.276209998312937,
+   "se_blocks": 0.00038662783517052303,
+   "n_blocks": 5,
+   "paired_20k_minus_10k_mean": -0.0031994072806617703,
+   "paired_20k_minus_10k_se": 0.0007858484293294486,
+   "sha256_16": "7f64fb5f0aa54d5e"
+  },
+  {
+   "quantity": "K0 key-mixture score L=64",
+   "file": "autoresearch_results/invariance_audit_v1/confirm_decomposition/confirm_decomposition_summary.csv",
+   "key": "crps_mix64",
+   "value_20k_mean_blocks": 0.27653979598411393,
+   "se_blocks": 0.0005637420810190717,
+   "n_blocks": 5,
+   "paired_20k_minus_10k_mean": -0.002828725231629736,
+   "paired_20k_minus_10k_se": 0.0008330428527524551,
+   "sha256_16": "7f64fb5f0aa54d5e"
+  },
+  {
+   "quantity": "K0 nuisance-key sensitivity V",
+   "file": "autoresearch_results/invariance_audit_v1/confirm_decomposition/confirm_decomposition_summary.csv",
+   "key": "V",
+   "value_20k_mean_blocks": -0.00010310301661579989,
+   "se_blocks": 0.00048636844549764023,
+   "n_blocks": 5,
+   "paired_20k_minus_10k_mean": 0.00037117109380004363,
+   "paired_20k_minus_10k_se": 0.0004891002330483309,
+   "sha256_16": "7f64fb5f0aa54d5e"
+  },
+  {
+   "quantity": "K0 MMD² raw",
+   "file": "autoresearch_results/invariance_audit_v1/confirm_decomposition/confirm_decomposition_summary.csv",
+   "key": "mmd2_raw",
+   "value_20k_mean_blocks": 0.04013401611505026,
+   "se_blocks": 0.0008614526313383995,
+   "n_blocks": 5,
+   "paired_20k_minus_10k_mean": -0.008419732022620053,
+   "paired_20k_minus_10k_se": 0.0008345823717885806,
+   "sha256_16": "7f64fb5f0aa54d5e"
+  },
+  {
+   "quantity": "K0 MMD² mixture",
+   "file": "autoresearch_results/invariance_audit_v1/confirm_decomposition/confirm_decomposition_summary.csv",
+   "key": "mmd2_mixture",
+   "value_20k_mean_blocks": 0.04049890796484713,
+   "se_blocks": 0.0009217796824035099,
+   "n_blocks": 5,
+   "paired_20k_minus_10k_mean": -0.008148051929003359,
+   "paired_20k_minus_10k_se": 0.0008767467642894811,
+   "sha256_16": "7f64fb5f0aa54d5e"
+  },
+  {
+   "quantity": "K1 conditional (raw) score",
+   "file": "autoresearch_results/invariance_audit_v1/confirm_decomposition/confirm_decomposition_summary.csv",
+   "key": "crps_raw",
+   "value_20k_mean_blocks": 0.30676205981532806,
+   "se_blocks": 0.0021766883122563453,
+   "n_blocks": 5,
+   "paired_20k_minus_10k_mean": 0.012895659139091997,
+   "paired_20k_minus_10k_se": 0.00121534519665161,
+   "sha256_16": "7f64fb5f0aa54d5e"
+  },
+  {
+   "quantity": "K1 key-mixture score L=64",
+   "file": "autoresearch_results/invariance_audit_v1/confirm_decomposition/confirm_decomposition_summary.csv",
+   "key": "crps_mix64",
+   "value_20k_mean_blocks": 0.278423200766439,
+   "se_blocks": 0.000672060504425136,
+   "n_blocks": 5,
+   "paired_20k_minus_10k_mean": -0.002017009130915426,
+   "paired_20k_minus_10k_se": 0.0007543604368145338,
+   "sha256_16": "7f64fb5f0aa54d5e"
+  },
+  {
+   "quantity": "K1 nuisance-key sensitivity V",
+   "file": "autoresearch_results/invariance_audit_v1/confirm_decomposition/confirm_decomposition_summary.csv",
+   "key": "V",
+   "value_20k_mean_blocks": 0.03854978800954227,
+   "se_blocks": 0.0014844867698726389,
+   "n_blocks": 5,
+   "paired_20k_minus_10k_mean": 0.023134165074974466,
+   "paired_20k_minus_10k_se": 0.0011503988053196141,
+   "sha256_16": "7f64fb5f0aa54d5e"
+  },
+  {
+   "quantity": "K1 MMD² raw",
+   "file": "autoresearch_results/invariance_audit_v1/confirm_decomposition/confirm_decomposition_summary.csv",
+   "key": "mmd2_raw",
+   "value_20k_mean_blocks": 0.08361390509032238,
+   "se_blocks": 0.002382766060883635,
+   "n_blocks": 5,
+   "paired_20k_minus_10k_mean": 0.01692382979680753,
+   "paired_20k_minus_10k_se": 0.0009717274626959132,
+   "sha256_16": "7f64fb5f0aa54d5e"
+  },
+  {
+   "quantity": "K1 MMD² mixture",
+   "file": "autoresearch_results/invariance_audit_v1/confirm_decomposition/confirm_decomposition_summary.csv",
+   "key": "mmd2_mixture",
+   "value_20k_mean_blocks": 0.045888952470983714,
+   "se_blocks": 0.0005795077525290392,
+   "n_blocks": 5,
+   "paired_20k_minus_10k_mean": -0.00499386302010167,
+   "paired_20k_minus_10k_se": 0.001109494314765089,
+   "sha256_16": "7f64fb5f0aa54d5e"
+  },
+  {
+   "quantity": "Kfresh conditional (raw) score",
+   "file": "autoresearch_results/invariance_audit_v1/confirm_decomposition/confirm_decomposition_summary.csv",
+   "key": "crps_raw",
+   "value_20k_mean_blocks": 0.2737616178852297,
+   "se_blocks": 0.000404860259508702,
+   "n_blocks": 5,
+   "paired_20k_minus_10k_mean": -0.006681961306870932,
+   "paired_20k_minus_10k_se": 0.0009846961422260248,
+   "sha256_16": "7f64fb5f0aa54d5e"
+  },
+  {
+   "quantity": "Kfresh key-mixture score L=64",
+   "file": "autoresearch_results/invariance_audit_v1/confirm_decomposition/confirm_decomposition_summary.csv",
+   "key": "crps_mix64",
+   "value_20k_mean_blocks": 0.27357645128811026,
+   "se_blocks": 0.00034040835494043007,
+   "n_blocks": 5,
+   "paired_20k_minus_10k_mean": -0.006070002612614711,
+   "paired_20k_minus_10k_se": 0.0009646383107505363,
+   "sha256_16": "7f64fb5f0aa54d5e"
+  },
+  {
+   "quantity": "Kfresh nuisance-key sensitivity V",
+   "file": "autoresearch_results/invariance_audit_v1/confirm_decomposition/confirm_decomposition_summary.csv",
+   "key": "V",
+   "value_20k_mean_blocks": 0.0006821949063568986,
+   "se_blocks": 0.0005900731377227312,
+   "n_blocks": 5,
+   "paired_20k_minus_10k_mean": 6.565240359480652e-05,
+   "paired_20k_minus_10k_se": 0.0007736577676297292,
+   "sha256_16": "7f64fb5f0aa54d5e"
+  },
+  {
+   "quantity": "Kfresh MMD² raw",
+   "file": "autoresearch_results/invariance_audit_v1/confirm_decomposition/confirm_decomposition_summary.csv",
+   "key": "mmd2_raw",
+   "value_20k_mean_blocks": 0.03158860665957878,
+   "se_blocks": 0.0018485436680221268,
+   "n_blocks": 5,
+   "paired_20k_minus_10k_mean": -0.018472258360586902,
+   "paired_20k_minus_10k_se": 0.0019894032959009555,
+   "sha256_16": "7f64fb5f0aa54d5e"
+  },
+  {
+   "quantity": "Kfresh MMD² mixture",
+   "file": "autoresearch_results/invariance_audit_v1/confirm_decomposition/confirm_decomposition_summary.csv",
+   "key": "mmd2_mixture",
+   "value_20k_mean_blocks": 0.031088610742676492,
+   "se_blocks": 0.001782127517640551,
+   "n_blocks": 5,
+   "paired_20k_minus_10k_mean": -0.0179366997396103,
+   "paired_20k_minus_10k_se": 0.0021354755244855283,
+   "sha256_16": "7f64fb5f0aa54d5e"
+  },
+  {
+   "quantity": "Krho05 conditional (raw) score",
+   "file": "autoresearch_results/invariance_audit_v1/confirm_decomposition/confirm_decomposition_summary.csv",
+   "key": "crps_raw",
+   "value_20k_mean_blocks": 0.2769206900317357,
+   "se_blocks": 0.0003769560421991788,
+   "n_blocks": 5,
+   "paired_20k_minus_10k_mean": -0.00530663836973434,
+   "paired_20k_minus_10k_se": 0.0009035439150331653,
+   "sha256_16": "7f64fb5f0aa54d5e"
+  },
+  {
+   "quantity": "Krho05 key-mixture score L=64",
+   "file": "autoresearch_results/invariance_audit_v1/confirm_decomposition/confirm_decomposition_summary.csv",
+   "key": "crps_mix64",
+   "value_20k_mean_blocks": 0.27522304866097913,
+   "se_blocks": 0.000315512231150276,
+   "n_blocks": 5,
+   "paired_20k_minus_10k_mean": -0.0045745707301446115,
+   "paired_20k_minus_10k_se": 0.0008963714284937672,
+   "sha256_16": "7f64fb5f0aa54d5e"
+  },
+  {
+   "quantity": "Krho05 nuisance-key sensitivity V",
+   "file": "autoresearch_results/invariance_audit_v1/confirm_decomposition/confirm_decomposition_summary.csv",
+   "key": "V",
+   "value_20k_mean_blocks": 0.0026943263293417266,
+   "se_blocks": 0.0004889266625379872,
+   "n_blocks": 5,
+   "paired_20k_minus_10k_mean": 0.0004273334059090998,
+   "paired_20k_minus_10k_se": 0.0008013562066543425,
+   "sha256_16": "7f64fb5f0aa54d5e"
+  },
+  {
+   "quantity": "Krho05 MMD² raw",
+   "file": "autoresearch_results/invariance_audit_v1/confirm_decomposition/confirm_decomposition_summary.csv",
+   "key": "mmd2_raw",
+   "value_20k_mean_blocks": 0.038402961677016824,
+   "se_blocks": 0.0015068230019742274,
+   "n_blocks": 5,
+   "paired_20k_minus_10k_mean": -0.013693667730795691,
+   "paired_20k_minus_10k_se": 0.0017212772811660009,
+   "sha256_16": "7f64fb5f0aa54d5e"
+  },
+  {
+   "quantity": "Krho05 MMD² mixture",
+   "file": "autoresearch_results/invariance_audit_v1/confirm_decomposition/confirm_decomposition_summary.csv",
+   "key": "mmd2_mixture",
+   "value_20k_mean_blocks": 0.03618269777524894,
+   "se_blocks": 0.001428596408212069,
+   "n_blocks": 5,
+   "paired_20k_minus_10k_mean": -0.013154934369329904,
+   "paired_20k_minus_10k_se": 0.0017237857466330443,
+   "sha256_16": "7f64fb5f0aa54d5e"
+  },
+  {
+   "quantity": "Krho09 conditional (raw) score",
+   "file": "autoresearch_results/invariance_audit_v1/confirm_decomposition/confirm_decomposition_summary.csv",
+   "key": "crps_raw",
+   "value_20k_mean_blocks": 0.2887485310518053,
+   "se_blocks": 0.0010174598341318095,
+   "n_blocks": 5,
+   "paired_20k_minus_10k_mean": -0.00047490749194861737,
+   "paired_20k_minus_10k_se": 0.0005184132202059658,
+   "sha256_16": "7f64fb5f0aa54d5e"
+  },
+  {
+   "quantity": "Krho09 key-mixture score L=64",
+   "file": "autoresearch_results/invariance_audit_v1/confirm_decomposition/confirm_decomposition_summary.csv",
+   "key": "crps_mix64",
+   "value_20k_mean_blocks": 0.2778707632901831,
+   "se_blocks": 0.000560296305587327,
+   "n_blocks": 5,
+   "paired_20k_minus_10k_mean": -0.0023775721625894806,
+   "paired_20k_minus_10k_se": 0.0006837757906933664,
+   "sha256_16": "7f64fb5f0aa54d5e"
+  },
+  {
+   "quantity": "Krho09 nuisance-key sensitivity V",
+   "file": "autoresearch_results/invariance_audit_v1/confirm_decomposition/confirm_decomposition_summary.csv",
+   "key": "V",
+   "value_20k_mean_blocks": 0.014585114737371452,
+   "se_blocks": 0.0007462433740713845,
+   "n_blocks": 5,
+   "paired_20k_minus_10k_mean": 0.004640514126675924,
+   "paired_20k_minus_10k_se": 0.0009229356554661104,
+   "sha256_16": "7f64fb5f0aa54d5e"
+  },
+  {
+   "quantity": "Krho09 MMD² raw",
+   "file": "autoresearch_results/invariance_audit_v1/confirm_decomposition/confirm_decomposition_summary.csv",
+   "key": "mmd2_raw",
+   "value_20k_mean_blocks": 0.058228085020711126,
+   "se_blocks": 0.0012239701210892393,
+   "n_blocks": 5,
+   "paired_20k_minus_10k_mean": -0.002559580917197635,
+   "paired_20k_minus_10k_se": 0.0006758036762559241,
+   "sha256_16": "7f64fb5f0aa54d5e"
+  },
+  {
+   "quantity": "Krho09 MMD² mixture",
+   "file": "autoresearch_results/invariance_audit_v1/confirm_decomposition/confirm_decomposition_summary.csv",
+   "key": "mmd2_mixture",
+   "value_20k_mean_blocks": 0.04431521762832269,
+   "se_blocks": 0.00040779230958567077,
+   "n_blocks": 5,
+   "paired_20k_minus_10k_mean": -0.006072145860290613,
+   "paired_20k_minus_10k_se": 0.0008668788865725279,
+   "sha256_16": "7f64fb5f0aa54d5e"
+  },
+  {
+   "quantity": "K1-K0 mmd2_joint at 20k (block 10)",
+   "file": "autoresearch_results/invariance_audit_v1/p1_confirm/p1_primary_contrasts.csv",
+   "key": "K1-K0/mmd2_joint",
+   "value": 0.04353821051253726,
+   "se_over_conditions": 0.0023655470545271124,
+   "sha256_16": "4d6050db9000d9a7"
+  },
+  {
+   "quantity": "K1-K0 crps_marginal at 20k (block 10)",
+   "file": "autoresearch_results/invariance_audit_v1/p1_confirm/p1_primary_contrasts.csv",
+   "key": "K1-K0/crps_marginal",
+   "value": 0.031025902863437236,
+   "se_over_conditions": 0.0022095582978798696,
+   "sha256_16": "4d6050db9000d9a7"
+  },
+  {
+   "quantity": "K1-K0 mean_mse_corrected at 20k (block 10)",
+   "file": "autoresearch_results/invariance_audit_v1/p1_confirm/p1_primary_contrasts.csv",
+   "key": "K1-K0/mean_mse_corrected",
+   "value": 0.09323511116903321,
+   "se_over_conditions": 0.007787782028629182,
+   "sha256_16": "4d6050db9000d9a7"
+  },
+  {
+   "quantity": "K1-K0 mmd2_joint_mean_matched at 20k (block 10)",
+   "file": "autoresearch_results/invariance_audit_v1/p1_confirm/p1_primary_contrasts.csv",
+   "key": "K1-K0/mmd2_joint_mean_matched",
+   "value": 0.07205277948224129,
+   "se_over_conditions": 0.0032967370577012918,
+   "sha256_16": "4d6050db9000d9a7"
+  },
+  {
+   "quantity": "Kfresh-K0 mmd2_joint at 20k (block 10)",
+   "file": "autoresearch_results/invariance_audit_v1/p1_confirm/p1_primary_contrasts.csv",
+   "key": "Kfresh-K0/mmd2_joint",
+   "value": -0.008451480400539571,
+   "se_over_conditions": 0.0004664133336484471,
+   "sha256_16": "4d6050db9000d9a7"
+  },
+  {
+   "quantity": "Kfresh-K0 crps_marginal at 20k (block 10)",
+   "file": "autoresearch_results/invariance_audit_v1/p1_confirm/p1_primary_contrasts.csv",
+   "key": "Kfresh-K0/crps_marginal",
+   "value": -0.0020982917985067637,
+   "se_over_conditions": 0.00022256025437912785,
+   "sha256_16": "4d6050db9000d9a7"
+  },
+  {
+   "quantity": "Kfresh-K0 mean_mse_corrected at 20k (block 10)",
+   "file": "autoresearch_results/invariance_audit_v1/p1_confirm/p1_primary_contrasts.csv",
+   "key": "Kfresh-K0/mean_mse_corrected",
+   "value": 0.0034185701602932454,
+   "se_over_conditions": 0.00042634010697364526,
+   "sha256_16": "4d6050db9000d9a7"
+  },
+  {
+   "quantity": "Kfresh-K0 mmd2_joint_mean_matched at 20k (block 10)",
+   "file": "autoresearch_results/invariance_audit_v1/p1_confirm/p1_primary_contrasts.csv",
+   "key": "Kfresh-K0/mmd2_joint_mean_matched",
+   "value": -0.006987529681949191,
+   "se_over_conditions": 0.00045479014260144633,
+   "sha256_16": "4d6050db9000d9a7"
+  },
+  {
+   "quantity": "K1-K0 mmd2_joint at 20k (block 11)",
+   "file": "autoresearch_results/invariance_audit_v1/p1_confirm/p1_primary_contrasts.csv",
+   "key": "K1-K0/mmd2_joint",
+   "value": 0.0367909834382073,
+   "se_over_conditions": 0.0018471742139322712,
+   "sha256_16": "4d6050db9000d9a7"
+  },
+  {
+   "quantity": "K1-K0 crps_marginal at 20k (block 11)",
+   "file": "autoresearch_results/invariance_audit_v1/p1_confirm/p1_primary_contrasts.csv",
+   "key": "K1-K0/crps_marginal",
+   "value": 0.023732930110521532,
+   "se_over_conditions": 0.0015926597255158995,
+   "sha256_16": "4d6050db9000d9a7"
+  },
+  {
+   "quantity": "K1-K0 mean_mse_corrected at 20k (block 11)",
+   "file": "autoresearch_results/invariance_audit_v1/p1_confirm/p1_primary_contrasts.csv",
+   "key": "K1-K0/mean_mse_corrected",
+   "value": 0.06640047786614287,
+   "se_over_conditions": 0.00481475434849939,
+   "sha256_16": "4d6050db9000d9a7"
+  },
+  {
+   "quantity": "K1-K0 mmd2_joint_mean_matched at 20k (block 11)",
+   "file": "autoresearch_results/invariance_audit_v1/p1_confirm/p1_primary_contrasts.csv",
+   "key": "K1-K0/mmd2_joint_mean_matched",
+   "value": 0.06146427309380581,
+   "se_over_conditions": 0.002822017339526776,
+   "sha256_16": "4d6050db9000d9a7"
+  },
+  {
+   "quantity": "Kfresh-K0 mmd2_joint at 20k (block 11)",
+   "file": "autoresearch_results/invariance_audit_v1/p1_confirm/p1_primary_contrasts.csv",
+   "key": "Kfresh-K0/mmd2_joint",
+   "value": -0.00724810182881715,
+   "se_over_conditions": 0.0002304791712819721,
+   "sha256_16": "4d6050db9000d9a7"
+  },
+  {
+   "quantity": "Kfresh-K0 crps_marginal at 20k (block 11)",
+   "file": "autoresearch_results/invariance_audit_v1/p1_confirm/p1_primary_contrasts.csv",
+   "key": "Kfresh-K0/crps_marginal",
+   "value": -0.0019519002821234877,
+   "se_over_conditions": 0.00014842621879405314,
+   "sha256_16": "4d6050db9000d9a7"
+  },
+  {
+   "quantity": "Kfresh-K0 mean_mse_corrected at 20k (block 11)",
+   "file": "autoresearch_results/invariance_audit_v1/p1_confirm/p1_primary_contrasts.csv",
+   "key": "Kfresh-K0/mean_mse_corrected",
+   "value": 0.00027919702947827205,
+   "se_over_conditions": 0.0003022871108658282,
+   "sha256_16": "4d6050db9000d9a7"
+  },
+  {
+   "quantity": "Kfresh-K0 mmd2_joint_mean_matched at 20k (block 11)",
+   "file": "autoresearch_results/invariance_audit_v1/p1_confirm/p1_primary_contrasts.csv",
+   "key": "Kfresh-K0/mmd2_joint_mean_matched",
+   "value": -0.007284815272026755,
+   "se_over_conditions": 0.00026040159375885816,
+   "sha256_16": "4d6050db9000d9a7"
+  },
+  {
+   "quantity": "K1-K0 mmd2_joint at 20k (block 12)",
+   "file": "autoresearch_results/invariance_audit_v1/p1_confirm/p1_primary_contrasts.csv",
+   "key": "K1-K0/mmd2_joint",
+   "value": 0.04706429780414452,
+   "se_over_conditions": 0.002736041854424496,
+   "sha256_16": "4d6050db9000d9a7"
+  },
+  {
+   "quantity": "K1-K0 crps_marginal at 20k (block 12)",
+   "file": "autoresearch_results/invariance_audit_v1/p1_confirm/p1_primary_contrasts.csv",
+   "key": "K1-K0/crps_marginal",
+   "value": 0.03424185274018497,
+   "se_over_conditions": 0.0025746833249202196,
+   "sha256_16": "4d6050db9000d9a7"
+  },
+  {
+   "quantity": "K1-K0 mean_mse_corrected at 20k (block 12)",
+   "file": "autoresearch_results/invariance_audit_v1/p1_confirm/p1_primary_contrasts.csv",
+   "key": "K1-K0/mean_mse_corrected",
+   "value": 0.11243811154985883,
+   "se_over_conditions": 0.009007941664003214,
+   "sha256_16": "4d6050db9000d9a7"
+  },
+  {
+   "quantity": "K1-K0 mmd2_joint_mean_matched at 20k (block 12)",
+   "file": "autoresearch_results/invariance_audit_v1/p1_confirm/p1_primary_contrasts.csv",
+   "key": "K1-K0/mmd2_joint_mean_matched",
+   "value": 0.07299708701499208,
+   "se_over_conditions": 0.003570490137469993,
+   "sha256_16": "4d6050db9000d9a7"
+  },
+  {
+   "quantity": "Kfresh-K0 mmd2_joint at 20k (block 12)",
+   "file": "autoresearch_results/invariance_audit_v1/p1_confirm/p1_primary_contrasts.csv",
+   "key": "Kfresh-K0/mmd2_joint",
+   "value": -0.013625798405887056,
+   "se_over_conditions": 0.0003912033395857114,
+   "sha256_16": "4d6050db9000d9a7"
+  },
+  {
+   "quantity": "Kfresh-K0 crps_marginal at 20k (block 12)",
+   "file": "autoresearch_results/invariance_audit_v1/p1_confirm/p1_primary_contrasts.csv",
+   "key": "Kfresh-K0/crps_marginal",
+   "value": -0.004098436840989866,
+   "se_over_conditions": 0.0002155874696180265,
+   "sha256_16": "4d6050db9000d9a7"
+  },
+  {
+   "quantity": "Kfresh-K0 mean_mse_corrected at 20k (block 12)",
+   "file": "autoresearch_results/invariance_audit_v1/p1_confirm/p1_primary_contrasts.csv",
+   "key": "Kfresh-K0/mean_mse_corrected",
+   "value": 0.00031555651504648044,
+   "se_over_conditions": 0.0004100947751333707,
+   "sha256_16": "4d6050db9000d9a7"
+  },
+  {
+   "quantity": "Kfresh-K0 mmd2_joint_mean_matched at 20k (block 12)",
+   "file": "autoresearch_results/invariance_audit_v1/p1_confirm/p1_primary_contrasts.csv",
+   "key": "Kfresh-K0/mmd2_joint_mean_matched",
+   "value": -0.012048167915784697,
+   "se_over_conditions": 0.0003802798765131498,
+   "sha256_16": "4d6050db9000d9a7"
+  },
+  {
+   "quantity": "K1-K0 mmd2_joint at 20k (block 13)",
+   "file": "autoresearch_results/invariance_audit_v1/p1_confirm/p1_primary_contrasts.csv",
+   "key": "K1-K0/mmd2_joint",
+   "value": 0.043850073519465786,
+   "se_over_conditions": 0.0028899413262292173,
+   "sha256_16": "4d6050db9000d9a7"
+  },
+  {
+   "quantity": "K1-K0 crps_marginal at 20k (block 13)",
+   "file": "autoresearch_results/invariance_audit_v1/p1_confirm/p1_primary_contrasts.csv",
+   "key": "K1-K0/crps_marginal",
+   "value": 0.03079639950815763,
+   "se_over_conditions": 0.002375083890838845,
+   "sha256_16": "4d6050db9000d9a7"
+  },
+  {
+   "quantity": "K1-K0 mean_mse_corrected at 20k (block 13)",
+   "file": "autoresearch_results/invariance_audit_v1/p1_confirm/p1_primary_contrasts.csv",
+   "key": "K1-K0/mean_mse_corrected",
+   "value": 0.10398360702194942,
+   "se_over_conditions": 0.009618268330054622,
+   "sha256_16": "4d6050db9000d9a7"
+  },
+  {
+   "quantity": "K1-K0 mmd2_joint_mean_matched at 20k (block 13)",
+   "file": "autoresearch_results/invariance_audit_v1/p1_confirm/p1_primary_contrasts.csv",
+   "key": "K1-K0/mmd2_joint_mean_matched",
+   "value": 0.06686372740323318,
+   "se_over_conditions": 0.003161696264433961,
+   "sha256_16": "4d6050db9000d9a7"
+  },
+  {
+   "quantity": "Kfresh-K0 mmd2_joint at 20k (block 13)",
+   "file": "autoresearch_results/invariance_audit_v1/p1_confirm/p1_primary_contrasts.csv",
+   "key": "Kfresh-K0/mmd2_joint",
+   "value": -0.003929099593272789,
+   "se_over_conditions": 0.00018519485227624395,
+   "sha256_16": "4d6050db9000d9a7"
+  },
+  {
+   "quantity": "Kfresh-K0 crps_marginal at 20k (block 13)",
+   "file": "autoresearch_results/invariance_audit_v1/p1_confirm/p1_primary_contrasts.csv",
+   "key": "Kfresh-K0/crps_marginal",
+   "value": -0.0011312088133901012,
+   "se_over_conditions": 0.0001718685787043537,
+   "sha256_16": "4d6050db9000d9a7"
+  },
+  {
+   "quantity": "Kfresh-K0 mean_mse_corrected at 20k (block 13)",
+   "file": "autoresearch_results/invariance_audit_v1/p1_confirm/p1_primary_contrasts.csv",
+   "key": "Kfresh-K0/mean_mse_corrected",
+   "value": -0.0002964302069998094,
+   "se_over_conditions": 0.0003919616722198561,
+   "sha256_16": "4d6050db9000d9a7"
+  },
+  {
+   "quantity": "Kfresh-K0 mmd2_joint_mean_matched at 20k (block 13)",
+   "file": "autoresearch_results/invariance_audit_v1/p1_confirm/p1_primary_contrasts.csv",
+   "key": "Kfresh-K0/mmd2_joint_mean_matched",
+   "value": -0.003063517279141547,
+   "se_over_conditions": 0.0002044705009534512,
+   "sha256_16": "4d6050db9000d9a7"
+  },
+  {
+   "quantity": "K1-K0 mmd2_joint at 20k (block 14)",
+   "file": "autoresearch_results/invariance_audit_v1/p1_confirm/p1_primary_contrasts.csv",
+   "key": "K1-K0/mmd2_joint",
+   "value": 0.04615587960200571,
+   "se_over_conditions": 0.0026028168047708155,
+   "sha256_16": "4d6050db9000d9a7"
+  },
+  {
+   "quantity": "K1-K0 crps_marginal at 20k (block 14)",
+   "file": "autoresearch_results/invariance_audit_v1/p1_confirm/p1_primary_contrasts.csv",
+   "key": "K1-K0/crps_marginal",
+   "value": 0.03296322228965379,
+   "se_over_conditions": 0.0023664123417907476,
+   "sha256_16": "4d6050db9000d9a7"
+  },
+  {
+   "quantity": "K1-K0 mean_mse_corrected at 20k (block 14)",
+   "file": "autoresearch_results/invariance_audit_v1/p1_confirm/p1_primary_contrasts.csv",
+   "key": "K1-K0/mean_mse_corrected",
+   "value": 0.11209053617432978,
+   "se_over_conditions": 0.008010629698869497,
+   "sha256_16": "4d6050db9000d9a7"
+  },
+  {
+   "quantity": "K1-K0 mmd2_joint_mean_matched at 20k (block 14)",
+   "file": "autoresearch_results/invariance_audit_v1/p1_confirm/p1_primary_contrasts.csv",
+   "key": "K1-K0/mmd2_joint_mean_matched",
+   "value": 0.06727972555736217,
+   "se_over_conditions": 0.003335788449387956,
+   "sha256_16": "4d6050db9000d9a7"
+  },
+  {
+   "quantity": "Kfresh-K0 mmd2_joint at 20k (block 14)",
+   "file": "autoresearch_results/invariance_audit_v1/p1_confirm/p1_primary_contrasts.csv",
+   "key": "Kfresh-K0/mmd2_joint",
+   "value": -0.009472567048840875,
+   "se_over_conditions": 0.00027326507855886934,
+   "sha256_16": "4d6050db9000d9a7"
+  },
+  {
+   "quantity": "Kfresh-K0 crps_marginal at 20k (block 14)",
+   "file": "autoresearch_results/invariance_audit_v1/p1_confirm/p1_primary_contrasts.csv",
+   "key": "Kfresh-K0/crps_marginal",
+   "value": -0.0029620644035266335,
+   "se_over_conditions": 0.00020298895554687362,
+   "sha256_16": "4d6050db9000d9a7"
+  },
+  {
+   "quantity": "Kfresh-K0 mean_mse_corrected at 20k (block 14)",
+   "file": "autoresearch_results/invariance_audit_v1/p1_confirm/p1_primary_contrasts.csv",
+   "key": "Kfresh-K0/mean_mse_corrected",
+   "value": 5.7548366840853455e-05,
+   "se_over_conditions": 0.0004457428093225751,
+   "sha256_16": "4d6050db9000d9a7"
+  },
+  {
+   "quantity": "Kfresh-K0 mmd2_joint_mean_matched at 20k (block 14)",
+   "file": "autoresearch_results/invariance_audit_v1/p1_confirm/p1_primary_contrasts.csv",
+   "key": "Kfresh-K0/mmd2_joint_mean_matched",
+   "value": -0.008835693026089707,
+   "se_over_conditions": 0.0002803785496514983,
+   "sha256_16": "4d6050db9000d9a7"
+  },
+  {
+   "quantity": "K1 memory contrast_perm_owner_minus_own at 20k",
+   "file": "autoresearch_results/invariance_audit_v1/confirm_decomposition/memory_long_form.csv",
+   "key": "contrast_perm_owner_minus_own",
+   "value_mean_blocks": -0.0927029248214543,
+   "se_blocks": 0.003250381562375617,
+   "n_blocks": 5,
+   "sha256_16": "d025db4b99ad7f93"
+  },
+  {
+   "quantity": "K1 memory loss_gap_fresh_minus_stored at 20k",
+   "file": "autoresearch_results/invariance_audit_v1/confirm_decomposition/memory_long_form.csv",
+   "key": "loss_gap_fresh_minus_stored",
+   "value_mean_blocks": 0.1695575827732682,
+   "se_blocks": 0.011776050718953357,
+   "n_blocks": 5,
+   "sha256_16": "d025db4b99ad7f93"
+  },
+  {
+   "quantity": "K1 memory contrast_stored_minus_new at 20k",
+   "file": "autoresearch_results/invariance_audit_v1/confirm_decomposition/memory_long_form.csv",
+   "key": "contrast_stored_minus_new",
+   "value_mean_blocks": -0.10220716950129116,
+   "se_blocks": 0.012303399555361324,
+   "n_blocks": 5,
+   "sha256_16": "d025db4b99ad7f93"
+  },
+  {
+   "quantity": "Kfresh memory contrast_perm_owner_minus_own at 20k",
+   "file": "autoresearch_results/invariance_audit_v1/confirm_decomposition/memory_long_form.csv",
+   "key": "contrast_perm_owner_minus_own",
+   "value_mean_blocks": 0.00869148969233724,
+   "se_blocks": 0.004622812070983325,
+   "n_blocks": 5,
+   "sha256_16": "d025db4b99ad7f93"
+  },
+  {
+   "quantity": "Kfresh memory loss_gap_fresh_minus_stored at 20k",
+   "file": "autoresearch_results/invariance_audit_v1/confirm_decomposition/memory_long_form.csv",
+   "key": "loss_gap_fresh_minus_stored",
+   "value_mean_blocks": 0.005489735305309296,
+   "se_blocks": 0.012582323124273416,
+   "n_blocks": 5,
+   "sha256_16": "d025db4b99ad7f93"
+  },
+  {
+   "quantity": "Kfresh memory contrast_stored_minus_new at 20k",
+   "file": "autoresearch_results/invariance_audit_v1/confirm_decomposition/memory_long_form.csv",
+   "key": "contrast_stored_minus_new",
+   "value_mean_blocks": -0.0018900628071699455,
+   "se_blocks": 0.004258425587412061,
+   "n_blocks": 5,
+   "sha256_16": "d025db4b99ad7f93"
+  },
+  {
+   "quantity": "Krho05 memory contrast_perm_owner_minus_own at 20k",
+   "file": "autoresearch_results/invariance_audit_v1/confirm_decomposition/memory_long_form.csv",
+   "key": "contrast_perm_owner_minus_own",
+   "value_mean_blocks": -0.006634746475262165,
+   "se_blocks": 0.00368437444971,
+   "n_blocks": 5,
+   "sha256_16": "d025db4b99ad7f93"
+  },
+  {
+   "quantity": "Krho05 memory loss_gap_fresh_minus_stored at 20k",
+   "file": "autoresearch_results/invariance_audit_v1/confirm_decomposition/memory_long_form.csv",
+   "key": "loss_gap_fresh_minus_stored",
+   "value_mean_blocks": 0.027399644255638123,
+   "se_blocks": 0.012048152325128144,
+   "n_blocks": 5,
+   "sha256_16": "d025db4b99ad7f93"
+  },
+  {
+   "quantity": "Krho05 memory contrast_stored_minus_new at 20k",
+   "file": "autoresearch_results/invariance_audit_v1/confirm_decomposition/memory_long_form.csv",
+   "key": "contrast_stored_minus_new",
+   "value_mean_blocks": -0.016130982756266298,
+   "se_blocks": 0.006048756994119949,
+   "n_blocks": 5,
+   "sha256_16": "d025db4b99ad7f93"
+  },
+  {
+   "quantity": "Krho09 memory contrast_perm_owner_minus_own at 20k",
+   "file": "autoresearch_results/invariance_audit_v1/confirm_decomposition/memory_long_form.csv",
+   "key": "contrast_perm_owner_minus_own",
+   "value_mean_blocks": -0.04314632244195162,
+   "se_blocks": 0.00399251454218871,
+   "n_blocks": 5,
+   "sha256_16": "d025db4b99ad7f93"
+  },
+  {
+   "quantity": "Krho09 memory loss_gap_fresh_minus_stored at 20k",
+   "file": "autoresearch_results/invariance_audit_v1/confirm_decomposition/memory_long_form.csv",
+   "key": "loss_gap_fresh_minus_stored",
+   "value_mean_blocks": 0.08402927322313189,
+   "se_blocks": 0.012304742693288328,
+   "n_blocks": 5,
+   "sha256_16": "d025db4b99ad7f93"
+  },
+  {
+   "quantity": "Krho09 memory contrast_stored_minus_new at 20k",
+   "file": "autoresearch_results/invariance_audit_v1/confirm_decomposition/memory_long_form.csv",
+   "key": "contrast_stored_minus_new",
+   "value_mean_blocks": -0.05261966361779262,
+   "se_blocks": 0.009051894661636743,
+   "n_blocks": 5,
+   "sha256_16": "d025db4b99ad7f93"
+  },
+  {
+   "quantity": "pilot-size audit block 10: (K1-K0) c256 vs c1024",
+   "file": "autoresearch_results/invariance_audit_v1/confirm_decomposition/pilot_size_audit_b10.json",
+   "key": "K1.c256-K0.c256 / K1.c1024-K0.c1024",
+   "value": [
+    0.01656925388397578,
+    0.016478362480511953
+   ],
+   "oracle_artifact_256_1024": [
+    0.0012463616612093215,
+    7.333645958436559e-05
+   ],
+   "sha256_16": "ed93f13431ca5070"
+  }
+ ],
+ "server": [
+  {
+   "quantity": "layer_v19 ordinary/U/cross_Q5 CRPS dev-2022",
+   "file": "$R/assimilation_track_distance_cpu_v1/audit_sampling_law_v19.json",
+   "keys": [
+    "ordinary",
+    "U",
+    "cross_Q5"
+   ],
+   "values_quoted_in_draft": [
+    0.0372,
+    0.0337,
+    0.0331
+   ],
+   "sha256_16": "PENDING_SERVER"
+  },
+  {
+   "quantity": "unified table: raw / v19 / mean-update / R+layer / A+layer ordinary CRPS",
+   "file": "$R/assimilation_track_distance_cpu_v1/unified_score_table_native2f.json",
+   "keys": [
+    "raw",
+    "v19",
+    "update_only",
+    "R_layer",
+    "A_layer"
+   ],
+   "values_quoted_in_draft": [
+    0.0451,
+    0.0375,
+    0.0383,
+    0.05,
+    0.0396
+   ],
+   "sha256_16": "PENDING_SERVER"
+  },
+  {
+   "quantity": "test-2023 arm C raw / update / v19 full RMSE, MAE, IIEE",
+   "file": "$R/assimilation_track_distance_cpu_v1/test2023_full_metrics_armC.json",
+   "keys": [
+    "raw_M5_full_rmse",
+    "update_only_M5_full_rmse",
+    "v19_M10_full_rmse",
+    "v19_M10_full_mae",
+    "v19_M10_full_iiee",
+    "frac_pixels_clipped",
+    "frac_pixels_pinned"
+   ],
+   "values_quoted_in_draft": [
+    0.2033,
+    0.1434,
+    0.145,
+    0.0614,
+    0.0695,
+    0.598,
+    0.013
+   ],
+   "sha256_16": "PENDING_SERVER"
+  },
+  {
+   "quantity": "3D-Var var_100 on our masks, test-2023: RMSE/MAE/IIEE full and track_imitation",
+   "file": "$R/threedvar_repro/main_200d_ourmasks.json",
+   "keys": [
+    "var_100.full.rmse",
+    "var_100.full.mae",
+    "var_100.full.iiee"
+   ],
+   "values_quoted_in_draft": [
+    0.1632,
+    0.0617,
+    0.0742
+   ],
+   "sha256_16": "PENDING_SERVER"
+  },
+  {
+   "quantity": "block-bootstrap paired contrasts (v19 − 3D-Var etc.)",
+   "file": "$R/threedvar_repro/paired_daily_contrasts.json",
+   "keys": [
+    "v19_minus_3dvar.rmse.mean/ci28",
+    "update_minus_3dvar.iiee.mean/ci28"
+   ],
+   "values_quoted_in_draft": [
+    [
+     -0.018,
+     [
+      -0.022,
+      -0.013
+     ]
+    ],
+    [
+     0.032,
+     [
+      0.01,
+      0.058
+     ]
+    ]
+   ],
+   "sha256_16": "PENDING_SERVER"
+  },
+  {
+   "quantity": "3D-Var loss trajectory, 2 days",
+   "file": "$R/threedvar_repro/convergence_2d.json",
+   "keys": [
+    "rel_change_last20"
+   ],
+   "values_quoted_in_draft": [
+    "0.03–0.05 %"
+   ],
+   "sha256_16": "PENDING_SERVER"
+  },
+  {
+   "quantity": "observation set hash shared by all rows",
+   "file": "$R/threedvar_repro/observation_artifacts.json",
+   "keys": [
+    "sha256"
+   ],
+   "values_quoted_in_draft": [
+    "c1bcede865b7…"
+   ],
+   "sha256_16": "PENDING_SERVER"
+  },
+  {
+   "quantity": "T9 fixed-reference strata",
+   "file": "$R/assimilation_track_distance_cpu_v1/ice_matrix_stratified_fixedref.json",
+   "keys": [
+    "REF_dist_obs_gt20 D/F rmse deployment & trainmatched"
+   ],
+   "values_quoted_in_draft": [
+    [
+     0.334,
+     0.4
+    ],
+    [
+     0.436,
+     0.458
+    ]
+   ],
+   "sha256_16": "PENDING_SERVER"
+  },
+  {
+   "quantity": "P6.2 es16 stationary vs gen_same, variogram lag1",
+   "file": "$R/assimilation_track_distance_cpu_v1/p6_copula_only_native2f.json",
+   "keys": [
+    "summary.stationary.es16_fair",
+    "summary.gen_same.es16_fair"
+   ],
+   "values_quoted_in_draft": [
+    0.684,
+    0.689
+   ],
+   "sha256_16": "PENDING_SERVER"
+  },
+  {
+   "quantity": "deployment obs open-water share",
+   "file": "$R/assimilation_track_distance_cpu_v1/p0_ice_observation_passport.json",
+   "keys": [
+    "open_water_share"
+   ],
+   "values_quoted_in_draft": [
+    0.83
+   ],
+   "sha256_16": "PENDING_SERVER"
+  },
+  {
+   "quantity": "cross_Q10 (in progress)",
+   "file": "$R/assimilation_track_distance_cpu_v1/cross_q10_native2f.json",
+   "keys": [
+    "cross_Q10"
+   ],
+   "values_quoted_in_draft": [
+    "RUNNING"
+   ],
+   "sha256_16": "PENDING_SERVER"
+  },
+  {
+   "quantity": "hybrid bg-mean + D-spread (in progress)",
+   "file": "$R/assimilation_track_distance_cpu_v1/hybrid_bgmean_Dspread_dev2022.json",
+   "keys": [],
+   "values_quoted_in_draft": [
+    "RUNNING"
+   ],
+   "sha256_16": "PENDING_SERVER"
+  },
+  {
+   "quantity": "legacy ordinary CRPS test-2023 (in progress)",
+   "file": "$R/assimilation_track_distance_cpu_v1/legacy_test2023_ordinary_crps.json",
+   "keys": [
+    "ordinary"
+   ],
+   "values_quoted_in_draft": [
+    "RUNNING"
+   ],
+   "sha256_16": "PENDING_SERVER"
+  }
+ ]
+}
