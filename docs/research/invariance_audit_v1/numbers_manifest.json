@@ -732,7 +732,7 @@
     0.0337,
     0.0331
    ],
-   "sha256_16": "PENDING_SERVER"
+   "sha256_16": "9dfdd63c5b241be1"
   },
   {
    "quantity": "unified table: raw / v19 / mean-update / R+layer / A+layer ordinary CRPS",
@@ -751,7 +751,7 @@
     0.05,
     0.0396
    ],
-   "sha256_16": "PENDING_SERVER"
+   "sha256_16": "a59d4a91a742f054"
   },
   {
    "quantity": "test-2023 arm C raw / update / v19 full RMSE, MAE, IIEE",
@@ -774,7 +774,7 @@
     0.598,
     0.013
    ],
-   "sha256_16": "PENDING_SERVER"
+   "sha256_16": "36f13be4e2f60a4d"
   },
   {
    "quantity": "3D-Var var_100 on our masks, test-2023: RMSE/MAE/IIEE full and track_imitation",
@@ -789,7 +789,7 @@
     0.0617,
     0.0742
    ],
-   "sha256_16": "PENDING_SERVER"
+   "sha256_16": "015865a4d2204346"
   },
   {
    "quantity": "block-bootstrap paired contrasts (v19 − 3D-Var etc.)",
@@ -814,7 +814,7 @@
      ]
     ]
    ],
-   "sha256_16": "PENDING_SERVER"
+   "sha256_16": "8bc59b7b22d2000d"
   },
   {
    "quantity": "3D-Var loss trajectory, 2 days",
@@ -825,7 +825,7 @@
    "values_quoted_in_draft": [
     "0.03–0.05 %"
    ],
-   "sha256_16": "PENDING_SERVER"
+   "sha256_16": "8efc953e116d19be"
   },
   {
    "quantity": "observation set hash shared by all rows",
@@ -836,7 +836,7 @@
    "values_quoted_in_draft": [
     "c1bcede865b7…"
    ],
-   "sha256_16": "PENDING_SERVER"
+   "sha256_16": "d86da24d228ca375"
   },
   {
    "quantity": "T9 fixed-reference strata",
@@ -854,7 +854,7 @@
      0.458
     ]
    ],
-   "sha256_16": "PENDING_SERVER"
+   "sha256_16": "23221ab255584f34"
   },
   {
    "quantity": "P6.2 es16 stationary vs gen_same, variogram lag1",
@@ -867,7 +867,7 @@
     0.684,
     0.689
    ],
-   "sha256_16": "PENDING_SERVER"
+   "sha256_16": "44666d0d16527c5b"
   },
   {
    "quantity": "deployment obs open-water share",
@@ -878,38 +878,52 @@
    "values_quoted_in_draft": [
     0.83
    ],
-   "sha256_16": "PENDING_SERVER"
+   "sha256_16": "6413a98904a96853"
   },
   {
-   "quantity": "cross_Q10 (in progress)",
+   "quantity": "cross_Q10 two independent legacy runs",
    "file": "$R/assimilation_track_distance_cpu_v1/cross_q10_native2f.json",
    "keys": [
-    "cross_Q10"
+    "lay_cross_Q10",
+    "lay_U_A",
+    "lay_U_B",
+    "layA_ordinary",
+    "layB_ordinary"
    ],
    "values_quoted_in_draft": [
-    "RUNNING"
+    0.033,
+    0.0338,
+    0.0334,
+    0.0373,
+    0.0369
    ],
-   "sha256_16": "PENDING_SERVER"
+   "sha256_16": "165f6a7bc5fae60f"
   },
   {
-   "quantity": "hybrid bg-mean + D-spread (in progress)",
+   "quantity": "hybrid bg-mean + D-spread (rejected diagnostic)",
    "file": "$R/assimilation_track_distance_cpu_v1/hybrid_bgmean_Dspread_dev2022.json",
-   "keys": [],
-   "values_quoted_in_draft": [
-    "RUNNING"
+   "keys": [
+    "hybrid_bgmean_Danom_v19_M10.crps_ordinary",
+    "D_v19_M10.crps_ordinary"
    ],
-   "sha256_16": "PENDING_SERVER"
+   "values_quoted_in_draft": [
+    0.0429,
+    0.0456
+   ],
+   "sha256_16": "e6027d9192e0d074"
   },
   {
-   "quantity": "legacy ordinary CRPS test-2023 (in progress)",
+   "quantity": "legacy ordinary CRPS test-2023",
    "file": "$R/assimilation_track_distance_cpu_v1/legacy_test2023_ordinary_crps.json",
    "keys": [
-    "ordinary"
+    "summary.ordinary",
+    "summary.U"
    ],
    "values_quoted_in_draft": [
-    "RUNNING"
+    0.0481,
+    0.0414
    ],
-   "sha256_16": "PENDING_SERVER"
+   "sha256_16": "fa2b78c11e5b10f6"
   }
  ]
 }

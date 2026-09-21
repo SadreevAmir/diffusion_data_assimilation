@@ -62,9 +62,9 @@ def main():
         (f"{A}/ice_matrix_stratified_fixedref.json", "T9 fixed-reference strata", ["REF_dist_obs_gt20 D/F rmse deployment & trainmatched"], [[0.334, 0.400], [0.436, 0.458]]),
         (f"{A}/p6_copula_only_native2f.json", "P6.2 es16 stationary vs gen_same, variogram lag1", ["summary.stationary.es16_fair", "summary.gen_same.es16_fair"], [0.684, 0.689]),
         (f"{A}/p0_ice_observation_passport.json", "deployment obs open-water share", ["open_water_share"], [0.83]),
-        (f"{A}/cross_q10_native2f.json", "cross_Q10 (in progress)", ["cross_Q10"], ["RUNNING"]),
-        (f"{A}/hybrid_bgmean_Dspread_dev2022.json", "hybrid bg-mean + D-spread (in progress)", [], ["RUNNING"]),
-        (f"{A}/legacy_test2023_ordinary_crps.json", "legacy ordinary CRPS test-2023 (in progress)", ["ordinary"], ["RUNNING"]),
+        (f"{A}/cross_q10_native2f.json", "cross_Q10 two independent legacy runs", ["lay_cross_Q10", "lay_U_A", "lay_U_B", "layA_ordinary", "layB_ordinary"], [0.0330, 0.0338, 0.0334, 0.0373, 0.0369]),
+        (f"{A}/hybrid_bgmean_Dspread_dev2022.json", "hybrid bg-mean + D-spread (rejected diagnostic)", ["hybrid_bgmean_Danom_v19_M10.crps_ordinary", "D_v19_M10.crps_ordinary"], [0.0429, 0.0456]),
+        (f"{A}/legacy_test2023_ordinary_crps.json", "legacy ordinary CRPS test-2023", ["summary.ordinary", "summary.U"], [0.0481, 0.0414]),
     ]
     for rel, q, keys, vals in server_entries:
         man["server"].append({"quantity": q, "file": f"$R/{rel}", "keys": keys, "values_quoted_in_draft": vals, "sha256_16": sha(S / rel) if S else "PENDING_SERVER"})
